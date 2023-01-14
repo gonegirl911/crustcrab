@@ -36,12 +36,10 @@ impl ChunkMap {
         Self::area_deltas().map(move |delta| coords + delta)
     }
 
-    fn remove(&mut self, coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
+    fn remove(&mut self, coords: Point3<i32>) -> Option<impl Iterator<Item = Point3<i32>>> {
         self.chunks
             .remove(&coords)
             .map(|_| Self::neighbor_deltas().map(move |delta| coords + delta))
-            .into_iter()
-            .flatten()
     }
 
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
@@ -101,7 +99,8 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                                 })
                                 .unwrap_or_else(|_| unreachable!())
                         })
-                        .flat_map(|coords| self.remove(coords)),
+                        .filter_map(|coords| self.remove(coords))
+                        .flatten(),
                 );
 
                 updated.extend(
@@ -171,17 +170,15 @@ impl Chunk {
     pub const DIM: usize = 16;
 
     pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Option<Self> {
-        let mut is_nonempty = false;
         let blocks = array::from_fn(|x| {
-            array::from_fn(|y| {
-                array::from_fn(|z| {
-                    let block = f(point![x as u8, y as u8, z as u8]);
-                    is_nonempty = is_nonempty || !matches!(block, Block::Air);
-                    block
-                })
-            })
+            array::from_fn(|y| array::from_fn(|z| f(point![x as u8, y as u8, z as u8])))
         });
-        is_nonempty.then_some(Self(blocks))
+        blocks
+            .iter()
+            .flatten()
+            .flatten()
+            .any(|block| !matches!(block, Block::Air))
+            .then_some(Self(blocks))
     }
 
     fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
