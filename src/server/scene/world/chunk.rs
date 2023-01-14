@@ -19,7 +19,7 @@ use std::{array, collections::LinkedList, sync::Arc};
 
 #[derive(Default)]
 pub struct ChunkMap {
-    chunks: FxHashMap<Point3<i32>, Arc<Chunk>>,
+    chunks: FxHashMap<Point3<i32>, Box<Chunk>>,
     generator: ChunkGenerator,
 }
 
@@ -30,15 +30,18 @@ impl ChunkMap {
     fn insert(
         &mut self,
         coords: Point3<i32>,
-        chunk: Arc<Chunk>,
+        chunk: Box<Chunk>,
     ) -> impl Iterator<Item = Point3<i32>> {
-        assert!(self.chunks.insert(coords, chunk).is_none());
+        self.chunks.insert(coords, chunk);
         Self::area_deltas().map(move |delta| coords + delta)
     }
 
     fn remove(&mut self, coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
-        assert!(self.chunks.remove(&coords).is_some());
-        Self::neighbor_deltas().map(move |delta| coords + delta)
+        self.chunks
+            .remove(&coords)
+            .map(|_| Self::neighbor_deltas().map(move |delta| coords + delta))
+            .into_iter()
+            .flatten()
     }
 
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
@@ -70,7 +73,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
             ChunkMapEvent::InitialRenderRequested { area } => {
                 self.chunks
                     .par_extend(area.par_points().filter_map(|coords| {
-                        Some((coords, Arc::new(self.generator.get(coords)?)))
+                        Some((coords, Box::new(self.generator.get(coords)?)))
                     }));
 
                 self.chunks.par_iter().for_each(|(coords, chunk)| {
@@ -78,7 +81,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                         .send(ServerEvent::ChunkUpdated {
                             coords: *coords,
                             data: Some(Arc::new(ChunkData {
-                                chunk: chunk.clone(),
+                                chunk: (**chunk).clone(),
                                 area: self.chunk_area(*coords),
                             })),
                         })
@@ -103,7 +106,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
 
                 updated.extend(
                     curr.par_exclusive_points(prev)
-                        .filter_map(|coords| Some((coords, Arc::new(self.generator.get(coords)?))))
+                        .filter_map(|coords| Some((coords, Box::new(self.generator.get(coords)?))))
                         .collect::<LinkedList<_>>()
                         .into_iter()
                         .flat_map(|(coords, chunk)| self.insert(coords, chunk)),
@@ -117,7 +120,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                             .send(ServerEvent::ChunkUpdated {
                                 coords: *coords,
                                 data: Some(Arc::new(ChunkData {
-                                    chunk: chunk.clone(),
+                                    chunk: (**chunk).clone(),
                                     area: self.chunk_area(*coords),
                                 })),
                             })
@@ -151,7 +154,7 @@ impl ChunkMapEvent {
 }
 
 pub struct ChunkData {
-    chunk: Arc<Chunk>,
+    chunk: Chunk,
     area: ChunkArea,
 }
 
@@ -161,6 +164,7 @@ impl ChunkData {
     }
 }
 
+#[derive(Clone)]
 pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl Chunk {

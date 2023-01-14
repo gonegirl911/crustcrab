@@ -49,11 +49,13 @@ impl ChunkMeshPool {
     }
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
+        let prev = std::time::Instant::now();
         for (coords, mesh) in &self.meshes {
             if Self::bounding_sphere(*coords).is_visible(frustum) {
                 mesh.draw(render_pass, *coords);
             }
         }
+        dbg!(prev.elapsed());
     }
 
     fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
