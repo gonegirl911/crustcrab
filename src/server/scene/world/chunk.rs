@@ -20,6 +20,7 @@ use std::{array, collections::LinkedList, sync::Arc};
 #[derive(Default)]
 pub struct ChunkMap {
     chunks: FxHashMap<Point3<i32>, Arc<Chunk>>,
+    generator: ChunkGenerator,
 }
 
 impl ChunkMap {
@@ -62,15 +63,15 @@ impl ChunkMap {
 }
 
 impl EventHandler<ChunkMapEvent> for ChunkMap {
-    type Context<'a> = (Sender<ServerEvent>, &'a ChunkGenerator);
+    type Context<'a> = Sender<ServerEvent>;
 
-    fn handle(&mut self, event: &ChunkMapEvent, (server_tx, generator): Self::Context<'_>) {
+    fn handle(&mut self, event: &ChunkMapEvent, server_tx: Self::Context<'_>) {
         match event {
             ChunkMapEvent::InitialRenderRequested { area } => {
-                self.chunks.par_extend(
-                    area.par_points()
-                        .map(|coords| (coords, Arc::new(generator.get(coords)))),
-                );
+                self.chunks
+                    .par_extend(area.par_points().filter_map(|coords| {
+                        Some((coords, Arc::new(self.generator.get(coords)?)))
+                    }));
 
                 self.chunks.par_iter().for_each(|(coords, chunk)| {
                     server_tx
@@ -102,7 +103,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
 
                 updated.extend(
                     curr.par_exclusive_points(prev)
-                        .map(|coords| (coords, Arc::new(generator.get(coords))))
+                        .filter_map(|coords| Some((coords, Arc::new(self.generator.get(coords)?))))
                         .collect::<LinkedList<_>>()
                         .into_iter()
                         .flat_map(|(coords, chunk)| self.insert(coords, chunk)),
@@ -160,49 +161,40 @@ impl ChunkData {
     }
 }
 
-#[derive(Clone)]
-pub struct Chunk {
-    blocks: [[[Block; Self::DIM]; Self::DIM]; Self::DIM],
-    is_empty: bool,
-}
+pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl Chunk {
     pub const DIM: usize = 16;
 
-    pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
-        let mut is_empty = true;
+    pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Option<Self> {
+        let mut is_nonempty = false;
         let blocks = array::from_fn(|x| {
             array::from_fn(|y| {
                 array::from_fn(|z| {
                     let block = f(point![x as u8, y as u8, z as u8]);
-                    is_empty = !(!is_empty || !matches!(block, Block::Air));
+                    is_nonempty = is_nonempty || !matches!(block, Block::Air);
                     block
                 })
             })
         });
-        Self { blocks, is_empty }
+        is_nonempty.then_some(Self(blocks))
     }
 
     fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
-        (!self.is_empty)
-            .then(|| {
-                self.blocks.iter().zip(0..).flat_map(move |(blocks, x)| {
-                    blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
-                        blocks.iter().zip(0..).flat_map(move |(block, z)| {
-                            let coords = point![x, y, z];
-                            block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
-                        })
-                    })
+        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
+            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
+                blocks.iter().zip(0..).flat_map(move |(block, z)| {
+                    let coords = point![x, y, z];
+                    block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
                 })
             })
-            .into_iter()
-            .flatten()
+        })
     }
 
     unsafe fn get_unchecked(&self, coords: Point3<u8>) -> Block {
         unsafe {
             *self
-                .blocks
+                .0
                 .get_unchecked(coords.x as usize)
                 .get_unchecked(coords.y as usize)
                 .get_unchecked(coords.z as usize)

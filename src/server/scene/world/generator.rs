@@ -5,7 +5,7 @@ use nalgebra::Point3;
 pub struct ChunkGenerator;
 
 impl ChunkGenerator {
-    pub fn get(&self, coords: Point3<i32>) -> Chunk {
+    pub fn get(&self, coords: Point3<i32>) -> Option<Chunk> {
         let fill = if coords.y == 0 {
             Block::Grass
         } else {

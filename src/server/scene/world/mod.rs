@@ -2,10 +2,7 @@ pub mod block;
 pub mod chunk;
 pub mod generator;
 
-use self::{
-    chunk::{ChunkMap, ChunkMapEvent},
-    generator::ChunkGenerator,
-};
+use self::chunk::{ChunkMap, ChunkMapEvent};
 use super::player::Player;
 use crate::server::{
     event_loop::{Event, EventHandler},
@@ -24,9 +21,8 @@ impl Default for World {
 
         thread::spawn(move || {
             let mut chunks = ChunkMap::default();
-            let generator = ChunkGenerator::default();
             for (event, server_tx) in chunks_rx {
-                chunks.handle(&event, (server_tx, &generator));
+                chunks.handle(&event, server_tx);
             }
         });
 

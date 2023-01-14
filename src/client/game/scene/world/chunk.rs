@@ -50,7 +50,7 @@ impl ChunkMeshPool {
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
         for (coords, mesh) in &self.meshes {
-            if mesh.len() != 0 && Self::bounding_sphere(*coords).is_visible(frustum) {
+            if Self::bounding_sphere(*coords).is_visible(frustum) {
                 mesh.draw(render_pass, *coords);
             }
         }
@@ -80,8 +80,10 @@ impl EventHandler for ChunkMeshPool {
             }
             Event::RedrawRequested(_) => {
                 for (coords, vertices) in self.vertices_rx.try_iter() {
-                    self.meshes
-                        .insert(coords, ChunkMesh::new(renderer, &vertices));
+                    if !vertices.is_empty() {
+                        self.meshes
+                            .insert(coords, ChunkMesh::new(renderer, &vertices));
+                    }
                 }
             }
             _ => {}
