@@ -60,19 +60,27 @@ impl Block {
             })
     }
 
-    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
-        Aabb {
-            min: coords.cast(),
-            max: coords.map(|c| c + 1).cast(),
-        }
+    pub fn is_air(self) -> bool {
+        matches!(self, Block::Air)
+    }
+
+    pub fn is_not_air(self) -> bool {
+        !self.is_air()
+    }
+
+    pub fn is_transparent(self) -> bool {
+        matches!(self, Block::Air)
     }
 
     pub fn is_opaque(self) -> bool {
         !self.is_transparent()
     }
 
-    fn is_transparent(self) -> bool {
-        matches!(self, Block::Air)
+    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
+        Aabb {
+            min: coords.cast(),
+            max: coords.map(|c| c + 1).cast(),
+        }
     }
 
     fn ambient_occlusion(side: Side, corner: Corner, area: BlockArea) -> u8 {

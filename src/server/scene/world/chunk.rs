@@ -6,7 +6,7 @@ use crate::{
     client::{game::scene::world::block::BlockVertex, ClientEvent},
     math::{
         bounds::{Aabb, BoundingSphere},
-        ray::{Hittable, Ray},
+        ray::Ray,
     },
     server::{
         event_loop::{Event, EventHandler},
@@ -71,6 +71,8 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     type Context<'a> = Sender<ServerEvent>;
 
     fn handle(&mut self, event: &ChunkMapEvent, server_tx: Self::Context<'_>) {
+        let prev = std::time::Instant::now();
+
         match event {
             ChunkMapEvent::InitialRenderRequested { area } => {
                 self.chunks
@@ -87,7 +89,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                                 area: self.chunk_area(*coords),
                             })),
                         })
-                        .unwrap_or_else(|_| unreachable!())
+                        .unwrap_or_else(|_| unreachable!());
                 });
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
@@ -101,7 +103,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                                     coords: *coords,
                                     data: None,
                                 })
-                                .unwrap_or_else(|_| unreachable!())
+                                .unwrap_or_else(|_| unreachable!());
                         })
                         .filter_map(|coords| self.remove(coords))
                         .flatten(),
@@ -131,48 +133,14 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     });
             }
             ChunkMapEvent::BlockDestroyed { ray } => {
-                if let Some((coords, chunk)) = self.chunks.par_iter_mut().find_any(|(coords, _)| {
-                    Chunk::bounding_box(**coords).hit(ray, 0.0..Player::BUILDING_REACH)
-                }) {
-                    dbg!(coords);
-                }
+                todo!()
             }
             ChunkMapEvent::BlockPlaced { ray } => {
                 todo!();
             }
         }
-    }
-}
 
-pub enum ChunkMapEvent {
-    InitialRenderRequested { area: WorldArea },
-    WorldAreaChanged { prev: WorldArea, curr: WorldArea },
-    BlockDestroyed { ray: Ray },
-    BlockPlaced { ray: Ray },
-}
-
-impl ChunkMapEvent {
-    pub fn new(event: &Event, Player { prev, curr }: &Player) -> Option<Self> {
-        if let Event::ClientEvent(event) = event {
-            match event {
-                ClientEvent::InitialRenderRequested { .. } => {
-                    Some(ChunkMapEvent::InitialRenderRequested { area: *curr })
-                }
-                ClientEvent::PlayerPositionChanged { .. } if curr != prev => {
-                    Some(ChunkMapEvent::WorldAreaChanged {
-                        prev: *prev,
-                        curr: *curr,
-                    })
-                }
-                ClientEvent::BlockDestroyed { ray } => {
-                    Some(ChunkMapEvent::BlockDestroyed { ray: *ray })
-                }
-                ClientEvent::BlockPlaced { ray } => Some(ChunkMapEvent::BlockPlaced { ray: *ray }),
-                _ => None,
-            }
-        } else {
-            None
-        }
+        dbg!(prev.elapsed());
     }
 }
 
@@ -201,16 +169,15 @@ impl Chunk {
             .iter()
             .flatten()
             .flatten()
-            .any(|block| !matches!(block, Block::Air))
+            .copied()
+            .any(Block::is_not_air)
             .then_some(Self(blocks))
     }
 
-    pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
-        let dim = Chunk::DIM as f32;
-        BoundingSphere {
-            center: coords.map(|c| (c as f32 + 0.5)) * dim,
-            radius: dim * 3.0f32.sqrt() / 2.0,
-        }
+    fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
+        self.blocks().flat_map(|(coords, block)| {
+            block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
+        })
     }
 
     fn bounding_box(coords: Point3<i32>) -> Aabb {
@@ -221,15 +188,12 @@ impl Chunk {
         }
     }
 
-    fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
-        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
-            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
-                blocks.iter().zip(0..).flat_map(move |(block, z)| {
-                    let coords = point![x, y, z];
-                    block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
-                })
-            })
-        })
+    pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
+        let dim = Chunk::DIM as f32;
+        BoundingSphere {
+            center: coords.map(|c| (c as f32 + 0.5)) * dim,
+            radius: dim * 3.0f32.sqrt() / 2.0,
+        }
     }
 
     unsafe fn get_unchecked(&self, coords: Point3<u8>) -> Block {
@@ -240,6 +204,42 @@ impl Chunk {
                 .get_unchecked(coords.y as usize)
                 .get_unchecked(coords.z as usize)
         }
+    }
+
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
+        self.0.iter().zip(0..).flat_map(|(blocks, x)| {
+            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
+                blocks
+                    .iter()
+                    .zip(0..)
+                    .map(move |(block, z)| (point![x, y, z], block))
+            })
+        })
+    }
+
+    fn blocks_mut(&mut self) -> impl Iterator<Item = (Point3<u8>, &mut Block)> {
+        self.0.iter_mut().zip(0..).flat_map(|(blocks, x)| {
+            blocks.iter_mut().zip(0..).flat_map(move |(blocks, y)| {
+                blocks
+                    .iter_mut()
+                    .zip(0..)
+                    .map(move |(block, z)| (point![x, y, z], block))
+            })
+        })
+    }
+
+    fn par_blocks_mut(&mut self) -> impl ParallelIterator<Item = (Point3<u8>, &mut Block)> {
+        self.0.par_iter_mut().enumerate().flat_map(|(x, blocks)| {
+            blocks
+                .par_iter_mut()
+                .enumerate()
+                .flat_map(move |(y, blocks)| {
+                    blocks
+                        .par_iter_mut()
+                        .enumerate()
+                        .map(move |(z, block)| (point![x, y, z].cast(), block))
+                })
+        })
     }
 }
 
@@ -277,5 +277,37 @@ impl ChunkArea {
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
         let coords = coords.map(|c| (c - Self::LOWER_BOUND) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
+    }
+}
+
+pub enum ChunkMapEvent {
+    InitialRenderRequested { area: WorldArea },
+    WorldAreaChanged { prev: WorldArea, curr: WorldArea },
+    BlockDestroyed { ray: Ray },
+    BlockPlaced { ray: Ray },
+}
+
+impl ChunkMapEvent {
+    pub fn new(event: &Event, Player { prev, curr }: &Player) -> Option<Self> {
+        if let Event::ClientEvent(event) = event {
+            match event {
+                ClientEvent::InitialRenderRequested { .. } => {
+                    Some(ChunkMapEvent::InitialRenderRequested { area: *curr })
+                }
+                ClientEvent::PlayerPositionChanged { .. } if curr != prev => {
+                    Some(ChunkMapEvent::WorldAreaChanged {
+                        prev: *prev,
+                        curr: *curr,
+                    })
+                }
+                ClientEvent::BlockDestroyed { ray } => {
+                    Some(ChunkMapEvent::BlockDestroyed { ray: *ray })
+                }
+                ClientEvent::BlockPlaced { ray } => Some(ChunkMapEvent::BlockPlaced { ray: *ray }),
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 }

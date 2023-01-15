@@ -2,11 +2,6 @@ use super::ray::{Hittable, Ray};
 use nalgebra::Point3;
 use std::ops::Range;
 
-pub struct BoundingSphere {
-    pub center: Point3<f32>,
-    pub radius: f32,
-}
-
 pub struct Aabb {
     pub min: Point3<f32>,
     pub max: Point3<f32>,
@@ -24,4 +19,9 @@ impl Hittable for Aabb {
             })
             .is_some()
     }
+}
+
+pub struct BoundingSphere {
+    pub center: Point3<f32>,
+    pub radius: f32,
 }
