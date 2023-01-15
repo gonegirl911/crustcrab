@@ -163,7 +163,7 @@ impl ChunkData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl Chunk {

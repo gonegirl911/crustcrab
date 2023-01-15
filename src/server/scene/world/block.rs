@@ -5,8 +5,9 @@ use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
 
 #[repr(u8)]
-#[derive(Clone, Copy, Enum)]
+#[derive(Clone, Copy, Default, Enum)]
 pub enum Block {
+    #[default]
     Air,
     Grass,
     Dirt,
