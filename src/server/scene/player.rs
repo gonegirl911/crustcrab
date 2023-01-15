@@ -14,6 +14,8 @@ pub struct Player {
 }
 
 impl Player {
+    pub const BUILDING_REACH: f32 = 4.5;
+
     pub fn chunk_coords(coords: Point3<f32>) -> Point3<i32> {
         (coords / Chunk::DIM as f32).map(|c| c.floor() as i32)
     }

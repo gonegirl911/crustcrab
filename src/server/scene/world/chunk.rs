@@ -30,7 +30,6 @@ pub struct ChunkMap {
 impl ChunkMap {
     pub const LOWER_LIMIT: i32 = 0;
     pub const UPPER_LIMIT: i32 = 15;
-    const BUILDING_REACH: f32 = 4.5;
 
     fn insert(
         &mut self,
@@ -133,8 +132,10 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
             }
             ChunkMapEvent::BlockDestroyed { ray } => {
                 if let Some((coords, chunk)) = self.chunks.par_iter_mut().find_any(|(coords, _)| {
-                    Chunk::bounding_box(**coords).hit(ray, 0.0..Self::BUILDING_REACH)
-                }) {}
+                    Chunk::bounding_box(**coords).hit(ray, 0.0..Player::BUILDING_REACH)
+                }) {
+                    dbg!(coords);
+                }
             }
             ChunkMapEvent::BlockPlaced { ray } => {
                 todo!();

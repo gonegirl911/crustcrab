@@ -20,7 +20,7 @@ impl Hittable for Aabb {
                 let t0 = (self.min[i] - ray.origin[i]) * inv_d;
                 let t1 = (self.max[i] - ray.origin[i]) * inv_d;
                 let (t0, t1) = if inv_d < 0.0 { (t1, t0) } else { (t0, t1) };
-                (t0.max(start) >= t1.min(end)).then_some(())
+                (t0.max(start) < t1.min(end)).then_some(())
             })
             .is_some()
     }
