@@ -1,5 +1,6 @@
 mod app;
 mod client;
+mod math;
 mod server;
 
 fn main() -> ! {

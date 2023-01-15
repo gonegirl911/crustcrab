@@ -13,6 +13,7 @@ use crate::{
         renderer::Renderer,
         ClientEvent,
     },
+    math::ray::Ray,
     server::scene::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};
@@ -85,13 +86,35 @@ impl EventHandler for Player {
             }
             Event::MainEventsCleared => {
                 let changes = self.controller.apply_updates(&mut self.camera, dt);
+
                 if changes.contains(Changes::MOVED) {
                     client_tx
                         .send(ClientEvent::PlayerPositionChanged {
                             coords: self.camera.origin(),
                         })
-                        .unwrap_or_else(|_| unreachable!())
+                        .unwrap_or_else(|_| unreachable!());
                 }
+
+                if changes.contains(Changes::BLOCK_DESTROYED) {
+                    client_tx
+                        .send(ClientEvent::BlockDestroyed {
+                            ray: Ray {
+                                origin: self.camera.origin(),
+                                dir: self.camera.forward(),
+                            },
+                        })
+                        .unwrap_or_else(|_| unreachable!());
+                } else if changes.contains(Changes::BLOCK_PLACED) {
+                    client_tx
+                        .send(ClientEvent::BlockPlaced {
+                            ray: Ray {
+                                origin: self.camera.origin(),
+                                dir: self.camera.forward(),
+                            },
+                        })
+                        .unwrap_or_else(|_| unreachable!());
+                }
+
                 self.is_updated = self.is_updated || !changes.is_empty();
             }
             Event::RedrawRequested(_) => {

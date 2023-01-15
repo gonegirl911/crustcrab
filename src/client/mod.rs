@@ -10,7 +10,7 @@ use self::{
     renderer::Renderer,
     window::Window,
 };
-use crate::server::ServerEvent;
+use crate::{math::ray::Ray, server::ServerEvent};
 use flume::{Receiver, Sender};
 use nalgebra::Point3;
 use std::time::Duration;
@@ -66,7 +66,6 @@ impl Client {
     }
 }
 
-#[derive(Clone)]
 pub enum ClientEvent {
     InitialRenderRequested {
         player_coords: Point3<f32>,
@@ -74,5 +73,11 @@ pub enum ClientEvent {
     },
     PlayerPositionChanged {
         coords: Point3<f32>,
+    },
+    BlockDestroyed {
+        ray: Ray,
+    },
+    BlockPlaced {
+        ray: Ray,
     },
 }

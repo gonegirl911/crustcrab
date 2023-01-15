@@ -5,7 +5,9 @@ use std::{
     f32::consts::{FRAC_PI_2, TAU},
     time::Duration,
 };
-use winit::event::{DeviceEvent, ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{
+    DeviceEvent, ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent,
+};
 
 pub struct Camera {
     forward: Vector3<f32>,
@@ -63,10 +65,12 @@ impl Camera {
 }
 
 pub struct CameraController {
-    relevant: Keys,
-    history: Keys,
     dx: f32,
     dy: f32,
+    relevant_keys: Keys,
+    key_history: Keys,
+    relevant_buttons: MouseButtons,
+    button_history: MouseButtons,
     speed: f32,
     sensitivity: f32,
 }
@@ -74,10 +78,12 @@ pub struct CameraController {
 impl CameraController {
     pub fn new(speed: f32, sensitivity: f32) -> Self {
         Self {
-            relevant: Keys::empty(),
-            history: Keys::empty(),
             dx: 0.0,
             dy: 0.0,
+            relevant_keys: Keys::empty(),
+            key_history: Keys::empty(),
+            relevant_buttons: MouseButtons::empty(),
+            button_history: MouseButtons::empty(),
             speed,
             sensitivity,
         }
@@ -93,9 +99,17 @@ impl CameraController {
             changes |= Changes::ROTATED;
         }
 
-        if !self.relevant.is_empty() {
+        if !self.relevant_keys.is_empty() {
             self.apply_movement(camera, dt);
             changes |= Changes::MOVED;
+        }
+
+        if !self.relevant_buttons.is_empty() {
+            if self.relevant_buttons.contains(MouseButtons::LEFT) {
+                changes |= Changes::BLOCK_DESTROYED;
+            } else if self.relevant_buttons.contains(MouseButtons::RIGHT) {
+                changes |= Changes::BLOCK_PLACED;
+            }
         }
 
         changes
@@ -125,21 +139,21 @@ impl CameraController {
 
         let mut dir = Vector3::zeros();
 
-        if self.relevant.contains(Keys::W) {
+        if self.relevant_keys.contains(Keys::W) {
             dir += forward;
-        } else if self.relevant.contains(Keys::S) {
+        } else if self.relevant_keys.contains(Keys::S) {
             dir -= forward;
         }
 
-        if self.relevant.contains(Keys::A) {
+        if self.relevant_keys.contains(Keys::A) {
             dir -= right;
-        } else if self.relevant.contains(Keys::D) {
+        } else if self.relevant_keys.contains(Keys::D) {
             dir += right;
         }
 
-        if self.relevant.contains(Keys::LSHIFT) {
+        if self.relevant_keys.contains(Keys::LSHIFT) {
             dir -= up;
-        } else if self.relevant.contains(Keys::SPACE) {
+        } else if self.relevant_keys.contains(Keys::SPACE) {
             dir += up;
         }
 
@@ -159,43 +173,63 @@ impl EventHandler for CameraController {
                 self.dx += *dx as f32;
                 self.dy += *dy as f32;
             }
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                virtual_keycode: Some(keycode),
-                                state,
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                let (key, opp) = match keycode {
-                    VirtualKeyCode::W => (Keys::W, Keys::S),
-                    VirtualKeyCode::A => (Keys::A, Keys::D),
-                    VirtualKeyCode::S => (Keys::S, Keys::W),
-                    VirtualKeyCode::D => (Keys::D, Keys::A),
-                    VirtualKeyCode::LShift => (Keys::LSHIFT, Keys::SPACE),
-                    VirtualKeyCode::Space => (Keys::SPACE, Keys::LSHIFT),
-                    _ => return,
-                };
-                match state {
-                    ElementState::Pressed => {
-                        self.relevant |= key;
-                        self.relevant &= !opp;
-                        self.history |= key;
-                    }
-                    ElementState::Released => {
-                        self.relevant &= !key;
-                        if self.history.contains(opp) {
-                            self.relevant |= opp;
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(keycode),
+                            state,
+                            ..
+                        },
+                    ..
+                } => {
+                    let (key, opp) = match keycode {
+                        VirtualKeyCode::W => (Keys::W, Keys::S),
+                        VirtualKeyCode::A => (Keys::A, Keys::D),
+                        VirtualKeyCode::S => (Keys::S, Keys::W),
+                        VirtualKeyCode::D => (Keys::D, Keys::A),
+                        VirtualKeyCode::LShift => (Keys::LSHIFT, Keys::SPACE),
+                        VirtualKeyCode::Space => (Keys::SPACE, Keys::LSHIFT),
+                        _ => return,
+                    };
+                    match state {
+                        ElementState::Pressed => {
+                            self.relevant_keys |= key;
+                            self.relevant_keys &= !opp;
+                            self.key_history |= key;
                         }
-                        self.history &= !key;
+                        ElementState::Released => {
+                            self.relevant_keys &= !key;
+                            if self.key_history.contains(opp) {
+                                self.relevant_keys |= opp;
+                            }
+                            self.key_history &= !key;
+                        }
                     }
                 }
-            }
+                WindowEvent::MouseInput { button, state, .. } => {
+                    let (button, opp) = match button {
+                        MouseButton::Left => (MouseButtons::LEFT, MouseButtons::RIGHT),
+                        MouseButton::Right => (MouseButtons::RIGHT, MouseButtons::LEFT),
+                        _ => return,
+                    };
+                    match state {
+                        ElementState::Pressed => {
+                            self.relevant_buttons |= button;
+                            self.relevant_buttons &= !opp;
+                            self.button_history |= button;
+                        }
+                        ElementState::Released => {
+                            self.relevant_buttons &= !button;
+                            if self.button_history.contains(opp) {
+                                self.relevant_buttons |= opp;
+                            }
+                            self.button_history &= !button;
+                        }
+                    }
+                }
+                _ => {}
+            },
             _ => {}
         }
     }
@@ -205,6 +239,8 @@ bitflags! {
     pub struct Changes: u8 {
         const ROTATED = 1 << 0;
         const MOVED = 1 << 1;
+        const BLOCK_DESTROYED = 1 << 3;
+        const BLOCK_PLACED = 1 << 2;
     }
 
     struct Keys: u8 {
@@ -214,5 +250,10 @@ bitflags! {
         const D = 1 << 3;
         const LSHIFT = 1 << 4;
         const SPACE = 1 << 5;
+    }
+
+    struct MouseButtons: u8 {
+        const LEFT = 1 << 0;
+        const RIGHT = 1 << 1;
     }
 }

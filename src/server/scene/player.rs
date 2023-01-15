@@ -39,6 +39,7 @@ impl EventHandler<Event> for Player {
                 ClientEvent::PlayerPositionChanged { coords } => {
                     self.curr.center = Self::chunk_coords(*coords);
                 }
+                _ => {}
             }
         }
     }

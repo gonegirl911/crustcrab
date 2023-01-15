@@ -4,6 +4,10 @@ use super::{
 };
 use crate::{
     client::{game::scene::world::block::BlockVertex, ClientEvent},
+    math::{
+        bounds::{Aabb, BoundingSphere},
+        ray::{Hittable, Ray},
+    },
     server::{
         event_loop::{Event, EventHandler},
         scene::player::{Player, WorldArea},
@@ -26,6 +30,7 @@ pub struct ChunkMap {
 impl ChunkMap {
     pub const LOWER_LIMIT: i32 = 0;
     pub const UPPER_LIMIT: i32 = 15;
+    const BUILDING_REACH: f32 = 4.5;
 
     fn insert(
         &mut self,
@@ -126,6 +131,14 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                             .unwrap_or_else(|_| unreachable!());
                     });
             }
+            ChunkMapEvent::BlockDestroyed { ray } => {
+                if let Some((coords, chunk)) = self.chunks.par_iter_mut().find_any(|(coords, _)| {
+                    Chunk::bounding_box(**coords).hit(ray, 0.0..Self::BUILDING_REACH)
+                }) {}
+            }
+            ChunkMapEvent::BlockPlaced { ray } => {
+                todo!();
+            }
         }
     }
 }
@@ -133,21 +146,31 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
 pub enum ChunkMapEvent {
     InitialRenderRequested { area: WorldArea },
     WorldAreaChanged { prev: WorldArea, curr: WorldArea },
+    BlockDestroyed { ray: Ray },
+    BlockPlaced { ray: Ray },
 }
 
 impl ChunkMapEvent {
     pub fn new(event: &Event, Player { prev, curr }: &Player) -> Option<Self> {
-        match event {
-            Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
-                Some(ChunkMapEvent::InitialRenderRequested { area: *curr })
+        if let Event::ClientEvent(event) = event {
+            match event {
+                ClientEvent::InitialRenderRequested { .. } => {
+                    Some(ChunkMapEvent::InitialRenderRequested { area: *curr })
+                }
+                ClientEvent::PlayerPositionChanged { .. } if curr != prev => {
+                    Some(ChunkMapEvent::WorldAreaChanged {
+                        prev: *prev,
+                        curr: *curr,
+                    })
+                }
+                ClientEvent::BlockDestroyed { ray } => {
+                    Some(ChunkMapEvent::BlockDestroyed { ray: *ray })
+                }
+                ClientEvent::BlockPlaced { ray } => Some(ChunkMapEvent::BlockPlaced { ray: *ray }),
+                _ => None,
             }
-            Event::ClientEvent(ClientEvent::PlayerPositionChanged { .. }) if curr != prev => {
-                Some(ChunkMapEvent::WorldAreaChanged {
-                    prev: *prev,
-                    curr: *curr,
-                })
-            }
-            _ => None,
+        } else {
+            None
         }
     }
 }
@@ -179,6 +202,22 @@ impl Chunk {
             .flatten()
             .any(|block| !matches!(block, Block::Air))
             .then_some(Self(blocks))
+    }
+
+    pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
+        let dim = Chunk::DIM as f32;
+        BoundingSphere {
+            center: coords.map(|c| (c as f32 + 0.5)) * dim,
+            radius: dim * 3.0f32.sqrt() / 2.0,
+        }
+    }
+
+    fn bounding_box(coords: Point3<i32>) -> Aabb {
+        let dim = Chunk::DIM as i32;
+        Aabb {
+            min: (coords * dim).cast(),
+            max: (coords.map(|c| c + 1) * dim).cast(),
+        }
     }
 
     fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {

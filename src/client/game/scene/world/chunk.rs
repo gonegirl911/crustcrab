@@ -2,7 +2,7 @@ use super::block::BlockVertex;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        game::scene::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
+        game::scene::player::frustum::{Frustum, FrustumCheck},
         renderer::Renderer,
     },
     server::{
@@ -50,17 +50,10 @@ impl ChunkMeshPool {
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
         for (coords, mesh) in &self.meshes {
-            if Self::bounding_sphere(*coords).is_visible(frustum) {
+            if Chunk::bounding_sphere(*coords).is_visible(frustum) {
                 mesh.draw(render_pass, *coords);
             }
         }
-    }
-
-    fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
-        BoundingSphere::new(
-            coords.map(|c| (c as f32 + 0.5) * Chunk::DIM as f32),
-            Chunk::DIM as f32 * 3.0f32.sqrt() / 2.0,
-        )
     }
 }
 
