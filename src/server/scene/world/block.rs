@@ -1,4 +1,4 @@
-use crate::{client::game::scene::world::block::BlockVertex, math::bounds::Aabb};
+use crate::client::game::scene::world::block::BlockVertex;
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
@@ -74,13 +74,6 @@ impl Block {
 
     pub fn is_opaque(self) -> bool {
         !self.is_transparent()
-    }
-
-    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
-        Aabb {
-            min: coords.cast(),
-            max: coords.map(|c| c + 1).cast(),
-        }
     }
 
     fn ambient_occlusion(side: Side, corner: Corner, area: BlockArea) -> u8 {

@@ -1,11 +1,13 @@
 pub mod camera;
 pub mod frustum;
 pub mod projection;
+pub mod ray;
 
 use self::{
     camera::{Camera, CameraController, Changes},
     frustum::Frustum,
     projection::Projection,
+    ray::Ray,
 };
 use crate::{
     client::{
@@ -13,7 +15,6 @@ use crate::{
         renderer::Renderer,
         ClientEvent,
     },
-    math::ray::Ray,
     server::scene::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};

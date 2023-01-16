@@ -6,11 +6,11 @@ pub mod window;
 
 use self::{
     event_loop::{Event, EventHandler, EventLoop},
-    game::Game,
+    game::{scene::player::ray::Ray, Game},
     renderer::Renderer,
     window::Window,
 };
-use crate::{math::ray::Ray, server::ServerEvent};
+use crate::server::ServerEvent;
 use flume::{Receiver, Sender};
 use nalgebra::Point3;
 use std::time::Duration;

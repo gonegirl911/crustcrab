@@ -5,7 +5,7 @@ use crate::{
 };
 use nalgebra::{vector, Point3};
 use rayon::prelude::*;
-use std::ops::{Range, RangeInclusive};
+use std::ops::RangeInclusive;
 
 #[derive(Default)]
 pub struct Player {
@@ -14,14 +14,10 @@ pub struct Player {
 }
 
 impl Player {
-    pub const BUILDING_REACH: Range<f32> = 0.0..4.5;
+    pub const BUILDING_REACH: f32 = 4.5;
 
     pub fn chunk_coords(coords: Point3<f32>) -> Point3<i32> {
         (coords / Chunk::DIM as f32).map(|c| c.floor() as i32)
-    }
-
-    pub fn coords(chunk_coords: Point3<i32>, block_coords: Point3<u8>) -> Point3<i32> {
-        chunk_coords * Chunk::DIM as i32 + block_coords.cast().coords
     }
 }
 

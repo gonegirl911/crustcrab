@@ -3,10 +3,9 @@ use super::{
     generator::ChunkGenerator,
 };
 use crate::{
-    client::{game::scene::world::block::BlockVertex, ClientEvent},
-    math::{
-        bounds::{Aabb, BoundingSphere},
-        ray::Ray,
+    client::{
+        game::scene::{player::ray::Ray, world::block::BlockVertex},
+        ClientEvent,
     },
     server::{
         event_loop::{Event, EventHandler},
@@ -132,26 +131,15 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                             .unwrap_or_else(|_| unreachable!());
                     });
             }
-            ChunkMapEvent::BlockDestroyed { ray } => {
-                todo!()
+            ChunkMapEvent::BlockDestroyed { area, ray } => {
+                todo!();
             }
-            ChunkMapEvent::BlockPlaced { ray } => {
+            ChunkMapEvent::BlockPlaced { area, ray } => {
                 todo!();
             }
         }
 
         dbg!(prev.elapsed());
-    }
-}
-
-pub struct ChunkData {
-    chunk: Chunk,
-    area: ChunkArea,
-}
-
-impl ChunkData {
-    pub fn vertices(&self) -> impl Iterator<Item = BlockVertex> + '_ {
-        self.chunk.vertices(&self.area)
     }
 }
 
@@ -180,22 +168,6 @@ impl Chunk {
         })
     }
 
-    fn bounding_box(coords: Point3<i32>) -> Aabb {
-        let dim = Chunk::DIM as i32;
-        Aabb {
-            min: (coords * dim).cast(),
-            max: (coords.map(|c| c + 1) * dim).cast(),
-        }
-    }
-
-    pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
-        let dim = Chunk::DIM as f32;
-        BoundingSphere {
-            center: coords.map(|c| (c as f32 + 0.5)) * dim,
-            radius: dim * 3.0f32.sqrt() / 2.0,
-        }
-    }
-
     unsafe fn get_unchecked(&self, coords: Point3<u8>) -> Block {
         unsafe {
             *self
@@ -206,39 +178,15 @@ impl Chunk {
         }
     }
 
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
         self.0.iter().zip(0..).flat_map(|(blocks, x)| {
             blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
                 blocks
                     .iter()
+                    .copied()
                     .zip(0..)
                     .map(move |(block, z)| (point![x, y, z], block))
             })
-        })
-    }
-
-    fn blocks_mut(&mut self) -> impl Iterator<Item = (Point3<u8>, &mut Block)> {
-        self.0.iter_mut().zip(0..).flat_map(|(blocks, x)| {
-            blocks.iter_mut().zip(0..).flat_map(move |(blocks, y)| {
-                blocks
-                    .iter_mut()
-                    .zip(0..)
-                    .map(move |(block, z)| (point![x, y, z], block))
-            })
-        })
-    }
-
-    fn par_blocks_mut(&mut self) -> impl ParallelIterator<Item = (Point3<u8>, &mut Block)> {
-        self.0.par_iter_mut().enumerate().flat_map(|(x, blocks)| {
-            blocks
-                .par_iter_mut()
-                .enumerate()
-                .flat_map(move |(y, blocks)| {
-                    blocks
-                        .par_iter_mut()
-                        .enumerate()
-                        .map(move |(z, block)| (point![x, y, z].cast(), block))
-                })
         })
     }
 }
@@ -280,11 +228,22 @@ impl ChunkArea {
     }
 }
 
+pub struct ChunkData {
+    chunk: Chunk,
+    area: ChunkArea,
+}
+
+impl ChunkData {
+    pub fn vertices(&self) -> impl Iterator<Item = BlockVertex> + '_ {
+        self.chunk.vertices(&self.area)
+    }
+}
+
 pub enum ChunkMapEvent {
     InitialRenderRequested { area: WorldArea },
     WorldAreaChanged { prev: WorldArea, curr: WorldArea },
-    BlockDestroyed { ray: Ray },
-    BlockPlaced { ray: Ray },
+    BlockDestroyed { area: WorldArea, ray: Ray },
+    BlockPlaced { area: WorldArea, ray: Ray },
 }
 
 impl ChunkMapEvent {
@@ -300,10 +259,14 @@ impl ChunkMapEvent {
                         curr: *curr,
                     })
                 }
-                ClientEvent::BlockDestroyed { ray } => {
-                    Some(ChunkMapEvent::BlockDestroyed { ray: *ray })
-                }
-                ClientEvent::BlockPlaced { ray } => Some(ChunkMapEvent::BlockPlaced { ray: *ray }),
+                ClientEvent::BlockDestroyed { ray } => Some(ChunkMapEvent::BlockDestroyed {
+                    area: *curr,
+                    ray: *ray,
+                }),
+                ClientEvent::BlockPlaced { ray } => Some(ChunkMapEvent::BlockPlaced {
+                    area: *curr,
+                    ray: *ray,
+                }),
                 _ => None,
             }
         } else {
