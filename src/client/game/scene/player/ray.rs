@@ -21,11 +21,7 @@ impl Ray {
         let tmax = values.map(|c| c.1 * c.2);
         let tdelta = values.map(|c| c.2);
         iter::successors(Some((curr, tmax)), move |(curr, tmax)| {
-            let i = tmax
-                .into_iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| a.total_cmp(b))
-                .map_or_else(|| unreachable!(), |(i, _)| i);
+            let i = tmax.imin();
             (tmax[i] <= reach).then(|| {
                 let mut curr = *curr;
                 let mut tmax = *tmax;
