@@ -55,10 +55,8 @@ impl EventHandler for DepthBuffer {
             } if *width != 0 && *height != 0 => {
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) => {
-                if self.is_resized {
-                    *self = Self::new(renderer);
-                }
+            Event::RedrawRequested(_) if self.is_resized => {
+                *self = Self::new(renderer);
             }
             Event::RedrawEventsCleared => {
                 self.is_resized = false;

@@ -79,10 +79,8 @@ impl EventHandler for Renderer {
                 self.config.height = *height;
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) => {
-                if self.is_resized {
-                    self.refresh();
-                }
+            Event::RedrawRequested(_) if self.is_resized => {
+                self.refresh();
             }
             Event::RedrawEventsCleared => {
                 self.is_resized = false;

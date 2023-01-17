@@ -80,12 +80,12 @@ impl EventHandler for ChunkMeshPool {
                 }
             }
             Event::RedrawRequested(_) => {
-                for (coords, vertices) in self.vertices_rx.try_iter() {
-                    if !vertices.is_empty() {
-                        self.meshes
-                            .insert(coords, ChunkMesh::new(renderer, &vertices));
-                    }
-                }
+                self.meshes.extend(
+                    self.vertices_rx
+                        .try_iter()
+                        .filter(|(_, vertices)| !vertices.is_empty())
+                        .map(|(coords, vertices)| (coords, ChunkMesh::new(renderer, &vertices))),
+                );
             }
             _ => {}
         }

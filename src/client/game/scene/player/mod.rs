@@ -118,17 +118,15 @@ impl EventHandler for Player {
 
                 self.is_updated = self.is_updated || !changes.is_empty();
             }
-            Event::RedrawRequested(_) => {
-                if self.is_updated {
-                    self.uniform.update(
-                        renderer,
-                        &PlayerUniformData {
-                            vp: self.projection.mat() * self.camera.mat(),
-                            origin: self.camera.origin(),
-                            render_distance: self.render_distance,
-                        },
-                    );
-                }
+            Event::RedrawRequested(_) if self.is_updated => {
+                self.uniform.update(
+                    renderer,
+                    &PlayerUniformData {
+                        vp: self.projection.mat() * self.camera.mat(),
+                        origin: self.camera.origin(),
+                        render_distance: self.render_distance,
+                    },
+                );
             }
             Event::RedrawEventsCleared => {
                 self.is_updated = false;
