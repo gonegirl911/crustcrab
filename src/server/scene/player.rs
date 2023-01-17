@@ -5,7 +5,7 @@ use crate::{
 };
 use nalgebra::{vector, Point3};
 use rayon::prelude::*;
-use std::ops::RangeInclusive;
+use std::ops::{RangeInclusive, RangeTo};
 
 #[derive(Default)]
 pub struct Player {
@@ -14,7 +14,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub const BUILDING_REACH: f32 = 4.5;
+    pub const BUILDING_REACH: RangeTo<f32> = ..4.5;
 
     pub fn chunk_coords(coords: Point3<f32>) -> Point3<i32> {
         let dim = Chunk::DIM as f32;
@@ -108,7 +108,7 @@ impl WorldArea {
 
     fn y_range(&self) -> RangeInclusive<i32> {
         let radius = self.radius as i32;
-        (-radius).max(ChunkMap::LOWER_LIMIT - self.center.y)
-            ..=radius.min(ChunkMap::UPPER_LIMIT - self.center.y)
+        (-radius).max(ChunkMap::Y_RANGE.start - self.center.y)
+            ..=radius.min(ChunkMap::Y_RANGE.end - self.center.y - 1)
     }
 }

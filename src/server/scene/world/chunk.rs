@@ -18,7 +18,12 @@ use flume::Sender;
 use nalgebra::{point, vector, Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{array, collections::LinkedList, sync::Arc};
+use std::{
+    array,
+    collections::LinkedList,
+    ops::{Index, IndexMut, Range},
+    sync::Arc,
+};
 
 #[derive(Default)]
 pub struct ChunkMap {
@@ -27,8 +32,7 @@ pub struct ChunkMap {
 }
 
 impl ChunkMap {
-    pub const LOWER_LIMIT: i32 = 0;
-    pub const UPPER_LIMIT: i32 = 15;
+    pub const Y_RANGE: Range<i32> = 0..16;
 
     fn insert(
         &mut self,
@@ -51,7 +55,7 @@ impl ChunkMap {
             let block_coords = delta.map(|c| (c + Chunk::DIM as i8) as u8 % Chunk::DIM as u8);
             self.chunks
                 .get(&chunk_coords)
-                .map(|chunk| unsafe { chunk.get_unchecked(block_coords) }.is_opaque())
+                .map(|chunk| chunk[block_coords].is_opaque())
                 .unwrap_or_default()
         })
     }
@@ -136,7 +140,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                         let chunk_coords = Player::chunk_coords(coords);
                         let block_coords = Player::block_coords(coords);
                         self.chunks.get_mut(&chunk_coords).and_then(|chunk| {
-                            let block = unsafe { chunk.get_unchecked_mut(block_coords) };
+                            let block = &mut chunk[block_coords];
                             block.is_not_air().then(|| {
                                 *block = Block::Air;
                                 coords
@@ -206,35 +210,29 @@ impl Chunk {
         })
     }
 
-    unsafe fn get_unchecked(&self, coords: Point3<u8>) -> Block {
-        unsafe {
-            *self
-                .0
-                .get_unchecked(coords.x as usize)
-                .get_unchecked(coords.y as usize)
-                .get_unchecked(coords.z as usize)
-        }
-    }
-
-    unsafe fn get_unchecked_mut(&mut self, coords: Point3<u8>) -> &mut Block {
-        unsafe {
-            self.0
-                .get_unchecked_mut(coords.x as usize)
-                .get_unchecked_mut(coords.y as usize)
-                .get_unchecked_mut(coords.z as usize)
-        }
-    }
-
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
         self.0.iter().zip(0..).flat_map(|(blocks, x)| {
             blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
                 blocks
                     .iter()
-                    .copied()
                     .zip(0..)
                     .map(move |(block, z)| (point![x, y, z], block))
             })
         })
+    }
+}
+
+impl Index<Point3<u8>> for Chunk {
+    type Output = Block;
+
+    fn index(&self, coords: Point3<u8>) -> &Self::Output {
+        &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+    }
+}
+
+impl IndexMut<Point3<u8>> for Chunk {
+    fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
+        &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }
 }
 

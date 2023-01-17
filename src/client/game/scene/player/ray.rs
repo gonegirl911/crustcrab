@@ -1,5 +1,5 @@
 use nalgebra::{Point3, Vector3};
-use std::{cmp::Ordering, iter};
+use std::{cmp::Ordering, iter, ops::RangeTo};
 
 #[derive(Clone, Copy)]
 pub struct Ray {
@@ -8,7 +8,7 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn points(&self, reach: f32) -> impl Iterator<Item = Point3<i32>> + '_ {
+    pub fn points(&self, reach: RangeTo<f32>) -> impl Iterator<Item = Point3<i32>> + '_ {
         let values = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap_or_else(|| unreachable!()) {
                 Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
@@ -22,7 +22,7 @@ impl Ray {
         let tdelta = values.map(|c| c.2);
         iter::successors(Some((curr, tmax)), move |(curr, tmax)| {
             let i = tmax.imin();
-            (tmax[i] <= reach).then(|| {
+            reach.contains(&tmax[i]).then(|| {
                 let mut curr = *curr;
                 let mut tmax = *tmax;
                 curr[i] += step[i];
