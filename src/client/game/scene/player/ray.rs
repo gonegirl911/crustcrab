@@ -11,9 +11,9 @@ impl Ray {
     pub fn points(&self, reach: f32) -> impl Iterator<Item = Point3<i32>> + '_ {
         let values = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap_or_else(|| unreachable!()) {
+                Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
                 Ordering::Equal => (0, 1.0, f32::INFINITY),
                 Ordering::Greater => (1, if o == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
-                Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
             }
         });
         let curr = self.origin.map(|c| c.floor() as i32);
