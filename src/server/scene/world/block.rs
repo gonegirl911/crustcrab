@@ -3,6 +3,7 @@ use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
+use std::ops::Range;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Default, Enum)]
@@ -98,15 +99,14 @@ impl Block {
 pub struct BlockArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in u32));
 
 impl BlockArea {
-    const DIM: usize = (Self::UPPER_BOUND - Self::LOWER_BOUND + 1) as usize;
-    const LOWER_BOUND: i8 = -1;
-    const UPPER_BOUND: i8 = 1;
+    const DIM: usize = (Self::RANGE.end - Self::RANGE.start) as usize;
+    const RANGE: Range<i8> = -1..2;
 
     pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
         let mut data = BitArray::ZERO;
-        for x in Self::LOWER_BOUND..=Self::UPPER_BOUND {
-            for y in Self::LOWER_BOUND..=Self::UPPER_BOUND {
-                for z in Self::LOWER_BOUND..=Self::UPPER_BOUND {
+        for x in Self::RANGE {
+            for y in Self::RANGE {
+                for z in Self::RANGE {
                     let coords = point![x, y, z];
                     unsafe {
                         data.set_unchecked(Self::index_unchecked(coords), f(coords));
@@ -122,7 +122,7 @@ impl BlockArea {
     }
 
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
-        let coords = coords.map(|c| (c - Self::LOWER_BOUND) as usize);
+        let coords = coords.map(|c| (c - Self::RANGE.start) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
     }
 }

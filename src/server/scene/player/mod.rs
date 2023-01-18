@@ -1,3 +1,6 @@
+pub mod ray;
+
+use self::ray::Ray;
 use super::world::chunk::{Chunk, ChunkMap};
 use crate::{
     client::ClientEvent,
@@ -11,6 +14,7 @@ use std::ops::{RangeInclusive, RangeTo};
 pub struct Player {
     pub prev: WorldArea,
     pub curr: WorldArea,
+    pub ray: Ray,
 }
 
 impl Player {
@@ -36,6 +40,7 @@ impl EventHandler<Event> for Player {
         if let Event::ClientEvent(event) = event {
             match event {
                 ClientEvent::InitialRenderRequested {
+                    player_dir,
                     player_coords,
                     render_distance,
                 } => {
@@ -43,9 +48,17 @@ impl EventHandler<Event> for Player {
                         center: Self::chunk_coords(*player_coords),
                         radius: *render_distance,
                     };
+                    self.ray = Ray {
+                        origin: *player_coords,
+                        dir: *player_dir,
+                    };
+                }
+                ClientEvent::PlayerOrientationChanged { dir } => {
+                    self.ray.dir = *dir;
                 }
                 ClientEvent::PlayerPositionChanged { coords } => {
                     self.curr.center = Self::chunk_coords(*coords);
+                    self.ray.origin = *coords;
                 }
                 _ => {}
             }
@@ -109,6 +122,6 @@ impl WorldArea {
     fn y_range(&self) -> RangeInclusive<i32> {
         let radius = self.radius as i32;
         (-radius).max(ChunkMap::Y_RANGE.start - self.center.y)
-            ..=radius.min(ChunkMap::Y_RANGE.end - self.center.y - 1)
+            ..=radius.min(ChunkMap::Y_RANGE.end - 1 - self.center.y)
     }
 }

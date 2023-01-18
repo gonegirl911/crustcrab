@@ -1,13 +1,11 @@
 pub mod camera;
 pub mod frustum;
 pub mod projection;
-pub mod ray;
 
 use self::{
     camera::{Camera, CameraController, Changes},
     frustum::Frustum,
     projection::Projection,
-    ray::Ray,
 };
 use crate::{
     client::{
@@ -80,6 +78,7 @@ impl EventHandler for Player {
             Event::NewEvents(StartCause::Init) => {
                 client_tx
                     .send(ClientEvent::InitialRenderRequested {
+                        player_dir: self.camera.forward(),
                         player_coords: self.camera.origin(),
                         render_distance: self.render_distance,
                     })
@@ -87,6 +86,14 @@ impl EventHandler for Player {
             }
             Event::MainEventsCleared => {
                 let changes = self.controller.apply_updates(&mut self.camera, dt);
+
+                if changes.contains(Changes::ROTATED) {
+                    client_tx
+                        .send(ClientEvent::PlayerOrientationChanged {
+                            dir: self.camera.forward(),
+                        })
+                        .unwrap_or_else(|_| unreachable!());
+                }
 
                 if changes.contains(Changes::MOVED) {
                     client_tx
@@ -98,21 +105,11 @@ impl EventHandler for Player {
 
                 if changes.contains(Changes::BLOCK_DESTROYED) {
                     client_tx
-                        .send(ClientEvent::BlockDestroyed {
-                            ray: Ray {
-                                origin: self.camera.origin(),
-                                dir: self.camera.forward(),
-                            },
-                        })
+                        .send(ClientEvent::BlockDestroyed)
                         .unwrap_or_else(|_| unreachable!());
                 } else if changes.contains(Changes::BLOCK_PLACED) {
                     client_tx
-                        .send(ClientEvent::BlockPlaced {
-                            ray: Ray {
-                                origin: self.camera.origin(),
-                                dir: self.camera.forward(),
-                            },
-                        })
+                        .send(ClientEvent::BlockPlaced)
                         .unwrap_or_else(|_| unreachable!());
                 }
 

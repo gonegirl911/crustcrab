@@ -6,13 +6,13 @@ pub mod window;
 
 use self::{
     event_loop::{Event, EventHandler, EventLoop},
-    game::{scene::player::ray::Ray, Game},
+    game::Game,
     renderer::Renderer,
     window::Window,
 };
 use crate::server::ServerEvent;
 use flume::{Receiver, Sender};
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
 use std::time::Duration;
 use winit::event_loop::ControlFlow;
 
@@ -68,16 +68,16 @@ impl Client {
 
 pub enum ClientEvent {
     InitialRenderRequested {
+        player_dir: Vector3<f32>,
         player_coords: Point3<f32>,
         render_distance: u32,
+    },
+    PlayerOrientationChanged {
+        dir: Vector3<f32>,
     },
     PlayerPositionChanged {
         coords: Point3<f32>,
     },
-    BlockDestroyed {
-        ray: Ray,
-    },
-    BlockPlaced {
-        ray: Ray,
-    },
+    BlockDestroyed,
+    BlockPlaced,
 }

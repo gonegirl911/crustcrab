@@ -31,14 +31,14 @@ impl EventLoop {
     }
 }
 
-pub enum Event {
-    Init,
-    ClientEvent(ClientEvent),
-    Tick,
-}
-
 pub trait EventHandler<E> {
     type Context<'a>;
 
     fn handle(&mut self, event: &E, ctx: Self::Context<'_>);
+}
+
+pub enum Event {
+    Init,
+    ClientEvent(ClientEvent),
+    Tick,
 }
