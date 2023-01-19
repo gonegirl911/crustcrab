@@ -100,6 +100,8 @@ impl EventHandler for ChunkMeshPool {
                                 }
                             })
                             .or_insert_with(|| (ChunkMesh::new(renderer, &vertices), updated_at));
+                    } else {
+                        self.meshes.remove(&coords);
                     }
                 }
             }

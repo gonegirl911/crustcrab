@@ -25,7 +25,7 @@ use std::{
 #[derive(Default)]
 pub struct ChunkMap {
     chunks: FxHashMap<Point3<i32>, Box<Chunk>>,
-    actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, ChunkAction>>,
+    actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
     selected_block: Option<(Point3<i32>, Vector3<i32>)>,
     generator: ChunkGenerator,
 }
@@ -48,17 +48,6 @@ impl ChunkMap {
             .map(|_| Self::neighbor_deltas().map(move |delta| coords + delta))
     }
 
-    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
-        ChunkArea::from_fn(|delta| {
-            let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
-            let block_coords = delta.map(|c| (c + Chunk::DIM as i8) as u8 % Chunk::DIM as u8);
-            self.chunks
-                .get(&chunk_coords)
-                .map(|chunk| chunk[block_coords].is_opaque())
-                .unwrap_or_default()
-        })
-    }
-
     fn select_block(&mut self, ray: &Ray, server_tx: Sender<ServerEvent>) {
         self.selected_block = ray.cast(Player::BUILDING_REACH).find(|(coords, _)| {
             let coords = coords.cast();
@@ -77,16 +66,16 @@ impl ChunkMap {
             .unwrap_or_else(|_| unreachable!());
     }
 
-    fn apply(&mut self, coords: Point3<i32>, action: ChunkAction, server_tx: Sender<ServerEvent>) {
+    fn apply(&mut self, coords: Point3<i32>, action: BlockAction, server_tx: Sender<ServerEvent>) {
         let coords = coords.cast();
         let chunk_coords = Player::chunk_coords(coords);
         let block_coords = Player::block_coords(coords);
 
         match action {
-            ChunkAction::DestroyBlock => {
+            BlockAction::Destroy => {
                 if let Some(chunk) = self.chunks.get_mut(&chunk_coords) {
                     chunk.apply(block_coords, &action);
-                    if chunk.blocks().all(|(_, block)| block.is_air()) {
+                    if chunk.is_empty() {
                         self.chunks.remove(&chunk_coords);
                         server_tx
                             .send(ServerEvent::ChunkUpdated {
@@ -99,7 +88,7 @@ impl ChunkMap {
                     unreachable!();
                 }
             }
-            ChunkAction::PlaceBlock { .. } => {
+            BlockAction::Place(..) => {
                 self.chunks
                     .entry(chunk_coords)
                     .or_default()
@@ -128,6 +117,17 @@ impl ChunkMap {
                     })
                     .unwrap_or_else(|_| unreachable!());
             });
+    }
+
+    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
+        ChunkArea::from_fn(|delta| {
+            let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
+            let block_coords = delta.map(|c| (c + Chunk::DIM as i8) as u8 % Chunk::DIM as u8);
+            self.chunks
+                .get(&chunk_coords)
+                .map(|chunk| chunk[block_coords].is_opaque())
+                .unwrap_or_default()
+        })
     }
 
     fn area_deltas() -> impl Iterator<Item = Vector3<i32>> {
@@ -223,7 +223,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
             }
             ChunkMapEvent::BlockDestroyed { ray } => {
                 if let Some((coords, _)) = self.selected_block {
-                    self.apply(coords, ChunkAction::DestroyBlock, server_tx.clone());
+                    self.apply(coords, BlockAction::Destroy, server_tx.clone());
                     self.select_block(ray, server_tx);
                 }
             }
@@ -231,9 +231,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 if let Some((coords, normal)) = self.selected_block {
                     self.apply(
                         coords + normal,
-                        ChunkAction::PlaceBlock {
-                            block: Block::Grass,
-                        },
+                        BlockAction::Place(Block::Grass),
                         server_tx.clone(),
                     );
                     self.select_block(ray, server_tx);
@@ -254,9 +252,9 @@ impl ChunkData {
     }
 }
 
-pub enum ChunkAction {
-    DestroyBlock,
-    PlaceBlock { block: Block },
+pub enum BlockAction {
+    Destroy,
+    Place(Block),
 }
 
 #[derive(Clone, Default)]
@@ -284,15 +282,24 @@ impl Chunk {
         })
     }
 
-    fn apply(&mut self, coords: Point3<u8>, action: &ChunkAction) {
+    fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) {
         match action {
-            ChunkAction::DestroyBlock => {
+            BlockAction::Destroy => {
                 self[coords] = Block::Air;
             }
-            ChunkAction::PlaceBlock { block } => {
+            BlockAction::Place(block) => {
                 self[coords] = *block;
             }
         }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0
+            .iter()
+            .flatten()
+            .flatten()
+            .copied()
+            .all(Block::is_air)
     }
 
     fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
