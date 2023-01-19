@@ -19,6 +19,7 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct ChunkMeshPool {
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
+    selected_block: Option<Point3<i32>>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Instant)>,
 }
@@ -26,6 +27,7 @@ pub struct ChunkMeshPool {
 impl ChunkMeshPool {
     pub fn new() -> Self {
         let meshes = FxHashMap::default();
+        let selected_block = None;
         let (data_tx, data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
         let (vertices_tx, vertices_rx) = flume::unbounded();
 
@@ -43,6 +45,7 @@ impl ChunkMeshPool {
 
         Self {
             meshes,
+            selected_block,
             data_tx,
             vertices_rx,
         }
@@ -70,15 +73,21 @@ impl EventHandler for ChunkMeshPool {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::ChunkUpdated { coords, data }) => {
-                if let Some(data) = data {
-                    self.data_tx
-                        .send((*coords, data.clone(), Instant::now()))
-                        .unwrap_or_else(|_| unreachable!());
-                } else {
-                    self.meshes.remove(coords);
+            Event::UserEvent(event) => match event {
+                ServerEvent::ChunkUpdated { coords, data } => {
+                    if let Some(data) = data {
+                        self.data_tx
+                            .send((*coords, data.clone(), Instant::now()))
+                            .unwrap_or_else(|_| unreachable!());
+                    } else {
+                        self.meshes.remove(coords);
+                    }
                 }
-            }
+                ServerEvent::BlockSelected { coords } => {
+                    self.selected_block = *coords;
+                }
+                _ => {}
+            },
             Event::RedrawRequested(_) => {
                 for (coords, vertices, updated_at) in self.vertices_rx.try_iter() {
                     if !vertices.is_empty() {

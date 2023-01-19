@@ -48,7 +48,18 @@ impl ChunkMap {
             .map(|_| Self::neighbor_deltas().map(move |delta| coords + delta))
     }
 
-    fn select(&mut self, ray: &Ray, server_tx: Sender<ServerEvent>) {
+    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
+        ChunkArea::from_fn(|delta| {
+            let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
+            let block_coords = delta.map(|c| (c + Chunk::DIM as i8) as u8 % Chunk::DIM as u8);
+            self.chunks
+                .get(&chunk_coords)
+                .map(|chunk| chunk[block_coords].is_opaque())
+                .unwrap_or_default()
+        })
+    }
+
+    fn select_block(&mut self, ray: &Ray, server_tx: Sender<ServerEvent>) {
         self.selected_block = ray.cast(Player::BUILDING_REACH).find(|(coords, _)| {
             let coords = coords.cast();
             let chunk_coords = Player::chunk_coords(coords);
@@ -66,15 +77,57 @@ impl ChunkMap {
             .unwrap_or_else(|_| unreachable!());
     }
 
-    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
-        ChunkArea::from_fn(|delta| {
-            let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
-            let block_coords = delta.map(|c| (c + Chunk::DIM as i8) as u8 % Chunk::DIM as u8);
-            self.chunks
-                .get(&chunk_coords)
-                .map(|chunk| chunk[block_coords].is_opaque())
-                .unwrap_or_default()
-        })
+    fn apply(&mut self, coords: Point3<i32>, action: ChunkAction, server_tx: Sender<ServerEvent>) {
+        let coords = coords.cast();
+        let chunk_coords = Player::chunk_coords(coords);
+        let block_coords = Player::block_coords(coords);
+
+        match action {
+            ChunkAction::DestroyBlock => {
+                if let Some(chunk) = self.chunks.get_mut(&chunk_coords) {
+                    chunk.apply(block_coords, &action);
+                    if chunk.blocks().all(|(_, block)| block.is_air()) {
+                        self.chunks.remove(&chunk_coords);
+                        server_tx
+                            .send(ServerEvent::ChunkUpdated {
+                                coords: chunk_coords,
+                                data: None,
+                            })
+                            .unwrap_or_else(|_| unreachable!());
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+            ChunkAction::PlaceBlock { .. } => {
+                self.chunks
+                    .entry(chunk_coords)
+                    .or_default()
+                    .apply(block_coords, &action);
+            }
+        }
+
+        self.actions
+            .entry(chunk_coords)
+            .or_default()
+            .insert(block_coords, action);
+
+        Self::area_deltas()
+            .map(|delta| Player::chunk_coords(coords + delta.cast()))
+            .collect::<FxHashSet<_>>()
+            .into_iter()
+            .filter_map(|chunk_coords| self.chunks.get_key_value(&chunk_coords))
+            .for_each(|(chunk_coords, chunk)| {
+                server_tx
+                    .send(ServerEvent::ChunkUpdated {
+                        coords: *chunk_coords,
+                        data: Some(Arc::new(ChunkData {
+                            chunk: (**chunk).clone(),
+                            area: self.chunk_area(*chunk_coords),
+                        })),
+                    })
+                    .unwrap_or_else(|_| unreachable!());
+            });
     }
 
     fn area_deltas() -> impl Iterator<Item = Vector3<i32>> {
@@ -98,7 +151,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                         Some((coords, Box::new(self.generator.get(coords)?)))
                     }));
 
-                self.select(ray, server_tx.clone());
+                self.select_block(ray, server_tx.clone());
 
                 self.chunks.par_iter().for_each(|(coords, chunk)| {
                     server_tx
@@ -113,7 +166,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 });
             }
             ChunkMapEvent::PlayerOrientationChanged { ray } => {
-                self.select(ray, server_tx);
+                self.select_block(ray, server_tx);
             }
             ChunkMapEvent::PlayerPositionChanged { prev, curr, ray } if curr != prev => {
                 let mut updated = FxHashSet::default();
@@ -134,21 +187,21 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
 
                 updated.extend(
                     curr.par_exclusive_points(prev)
-                        .filter_map(|coords| {
-                            let mut chunk = Box::new(self.generator.get(coords)?);
-                            if let Some(actions) = self.actions.get(&coords) {
-                                for action in actions.values() {
-                                    chunk.apply(action);
+                        .filter_map(|chunk_coords| {
+                            let mut chunk = Box::new(self.generator.get(chunk_coords)?);
+                            if let Some(actions) = self.actions.get(&chunk_coords) {
+                                for (block_coords, action) in actions {
+                                    chunk.apply(*block_coords, action);
                                 }
                             }
-                            Some((coords, chunk))
+                            Some((chunk_coords, chunk))
                         })
                         .collect::<LinkedList<_>>()
                         .into_iter()
                         .flat_map(|(coords, chunk)| self.insert(coords, chunk)),
                 );
 
-                self.select(ray, server_tx.clone());
+                self.select_block(ray, server_tx.clone());
 
                 updated
                     .into_par_iter()
@@ -166,49 +219,25 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     });
             }
             ChunkMapEvent::PlayerPositionChanged { ray, .. } => {
-                self.select(ray, server_tx.clone());
+                self.select_block(ray, server_tx);
             }
-            ChunkMapEvent::BlockDestroyed => {
+            ChunkMapEvent::BlockDestroyed { ray } => {
                 if let Some((coords, _)) = self.selected_block {
-                    let coords = coords.cast();
-                    let chunk_coords = Player::chunk_coords(coords);
-                    let block_coords = Player::block_coords(coords);
-
-                    let action = ChunkAction::DestroyBlock {
-                        coords: block_coords,
-                    };
-
-                    if let Some(chunk) = self.chunks.get_mut(&chunk_coords) {
-                        chunk.apply(&action);
-                    } else {
-                        unreachable!();
-                    }
-
-                    self.actions
-                        .entry(chunk_coords)
-                        .or_insert_with(FxHashMap::default)
-                        .insert(block_coords, action);
-
-                    Self::area_deltas()
-                        .map(|delta| Player::chunk_coords(coords + delta.cast()))
-                        .collect::<FxHashSet<_>>()
-                        .into_iter()
-                        .filter_map(|chunk_coords| self.chunks.get_key_value(&chunk_coords))
-                        .for_each(|(chunk_coords, chunk)| {
-                            server_tx
-                                .send(ServerEvent::ChunkUpdated {
-                                    coords: *chunk_coords,
-                                    data: Some(Arc::new(ChunkData {
-                                        chunk: (**chunk).clone(),
-                                        area: self.chunk_area(*chunk_coords),
-                                    })),
-                                })
-                                .unwrap_or_else(|_| unreachable!());
-                        });
+                    self.apply(coords, ChunkAction::DestroyBlock, server_tx.clone());
+                    self.select_block(ray, server_tx);
                 }
             }
-            ChunkMapEvent::BlockPlaced => {
-                todo!();
+            ChunkMapEvent::BlockPlaced { ray } => {
+                if let Some((coords, normal)) = self.selected_block {
+                    self.apply(
+                        coords + normal,
+                        ChunkAction::PlaceBlock {
+                            block: Block::Grass,
+                        },
+                        server_tx.clone(),
+                    );
+                    self.select_block(ray, server_tx);
+                }
             }
         }
     }
@@ -226,7 +255,8 @@ impl ChunkData {
 }
 
 pub enum ChunkAction {
-    DestroyBlock { coords: Point3<u8> },
+    DestroyBlock,
+    PlaceBlock { block: Block },
 }
 
 #[derive(Clone, Default)]
@@ -254,10 +284,13 @@ impl Chunk {
         })
     }
 
-    fn apply(&mut self, action: &ChunkAction) {
+    fn apply(&mut self, coords: Point3<u8>, action: &ChunkAction) {
         match action {
-            ChunkAction::DestroyBlock { coords } => {
-                self[*coords] = Block::Air;
+            ChunkAction::DestroyBlock => {
+                self[coords] = Block::Air;
+            }
+            ChunkAction::PlaceBlock { block } => {
+                self[coords] = *block;
             }
         }
     }
@@ -337,8 +370,12 @@ pub enum ChunkMapEvent {
         curr: WorldArea,
         ray: Ray,
     },
-    BlockDestroyed,
-    BlockPlaced,
+    BlockDestroyed {
+        ray: Ray,
+    },
+    BlockPlaced {
+        ray: Ray,
+    },
 }
 
 impl ChunkMapEvent {
@@ -359,8 +396,8 @@ impl ChunkMapEvent {
                     curr: *curr,
                     ray: *ray,
                 },
-                ClientEvent::BlockDestroyed => ChunkMapEvent::BlockDestroyed,
-                ClientEvent::BlockPlaced => ChunkMapEvent::BlockPlaced,
+                ClientEvent::BlockDestroyed => ChunkMapEvent::BlockDestroyed { ray: *ray },
+                ClientEvent::BlockPlaced => ChunkMapEvent::BlockPlaced { ray: *ray },
             })
         } else {
             None
