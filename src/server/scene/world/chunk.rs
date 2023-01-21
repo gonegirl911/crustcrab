@@ -1,6 +1,6 @@
 use super::{
     block::{Block, BlockArea},
-    generator::ChunkGenerator,
+    loader::ChunkLoader,
 };
 use crate::{
     client::{game::scene::world::block::BlockVertex, ClientEvent},
@@ -27,7 +27,7 @@ pub struct ChunkMap {
     chunks: FxHashMap<Point3<i32>, Box<Chunk>>,
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
     selected_block: Option<(Point3<i32>, Vector3<i32>)>,
-    generator: ChunkGenerator,
+    loader: ChunkLoader,
 }
 
 impl ChunkMap {
@@ -38,7 +38,7 @@ impl ChunkMap {
         coords: Point3<i32>,
         chunk: Box<Chunk>,
     ) -> impl Iterator<Item = Point3<i32>> {
-        self.chunks.insert(coords, chunk);
+        assert!(self.chunks.insert(coords, chunk).is_none());
         Self::area_deltas().map(move |delta| coords + delta)
     }
 
@@ -146,10 +146,10 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     fn handle(&mut self, event: &ChunkMapEvent, server_tx: Self::Context<'_>) {
         match event {
             ChunkMapEvent::InitialRenderRequested { area, ray } => {
-                self.chunks
-                    .par_extend(area.par_points().filter_map(|coords| {
-                        Some((coords, Box::new(self.generator.get(coords)?)))
-                    }));
+                self.chunks.par_extend(
+                    area.par_points()
+                        .filter_map(|coords| Some((coords, Box::new(self.loader.get(coords)?)))),
+                );
 
                 self.select_block(ray, server_tx.clone());
 
@@ -188,7 +188,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 updated.extend(
                     curr.par_exclusive_points(prev)
                         .filter_map(|chunk_coords| {
-                            let mut chunk = Box::new(self.generator.get(chunk_coords)?);
+                            let mut chunk = Box::new(self.loader.get(chunk_coords)?);
                             if let Some(actions) = self.actions.get(&chunk_coords) {
                                 for (block_coords, action) in actions {
                                     chunk.apply(*block_coords, action);

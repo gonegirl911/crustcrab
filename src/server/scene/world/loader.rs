@@ -2,9 +2,9 @@ use super::{block::Block, chunk::Chunk};
 use nalgebra::Point3;
 
 #[derive(Default)]
-pub struct ChunkGenerator;
+pub struct ChunkLoader;
 
-impl ChunkGenerator {
+impl ChunkLoader {
     pub fn get(&self, coords: Point3<i32>) -> Option<Chunk> {
         let fill = if coords.y == 0 {
             Block::Grass

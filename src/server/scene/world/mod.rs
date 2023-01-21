@@ -1,6 +1,6 @@
 pub mod block;
 pub mod chunk;
-pub mod generator;
+pub mod loader;
 
 use self::chunk::{ChunkMap, ChunkMapEvent};
 use super::player::Player;
