@@ -8,7 +8,7 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn cast<'a, R>(&'a self, reach: R) -> impl Iterator<Item = (Point3<i32>, Vector3<i32>)> + 'a
+    pub fn cast<'a, R>(&'a self, reach: R) -> impl Iterator<Item = BlockIntersection> + 'a
     where
         R: RangeBounds<f32> + 'a,
     {
@@ -38,6 +38,15 @@ impl Ray {
                 })
             },
         )
-        .map(|(curr, _, normal)| (curr, normal))
+        .map(|(curr, _, normal)| BlockIntersection {
+            coords: curr,
+            normal,
+        })
     }
+}
+
+#[derive(Clone, Copy)]
+pub struct BlockIntersection {
+    pub coords: Point3<i32>,
+    pub normal: Vector3<i32>,
 }

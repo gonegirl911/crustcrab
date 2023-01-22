@@ -7,7 +7,6 @@ use crate::{
     server::event_loop::{Event, EventHandler},
 };
 use nalgebra::{vector, Point3};
-use rayon::prelude::*;
 use std::ops::{RangeInclusive, RangeTo};
 
 #[derive(Default)]
@@ -85,35 +84,12 @@ impl WorldArea {
         })
     }
 
-    pub fn par_points(&self) -> impl ParallelIterator<Item = Point3<i32>> + '_ {
-        let radius = self.radius as i32;
-        (-radius..=radius).into_par_iter().flat_map(move |dx| {
-            self.y_range().into_par_iter().flat_map(move |dy| {
-                (-radius..=radius).into_par_iter().filter_map(move |dz| {
-                    let dist = dx.pow(2) + dy.pow(2) + dz.pow(2);
-                    (dist <= radius.pow(2)).then_some(self.center + vector![dx, dy, dz])
-                })
-            })
-        })
-    }
-
     pub fn exclusive_points<'a>(
         &'a self,
         other: &'a WorldArea,
     ) -> impl Iterator<Item = Point3<i32>> + 'a {
         let radius = other.radius as i32;
         self.points().filter_map(move |point| {
-            let dist = (point - other.center).map(|c| c.pow(2)).sum();
-            (dist > radius.pow(2)).then_some(point)
-        })
-    }
-
-    pub fn par_exclusive_points<'a>(
-        &'a self,
-        other: &'a WorldArea,
-    ) -> impl ParallelIterator<Item = Point3<i32>> + 'a {
-        let radius = other.radius as i32;
-        self.par_points().filter_map(move |point| {
             let dist = (point - other.center).map(|c| c.pow(2)).sum();
             (dist > radius.pow(2)).then_some(point)
         })

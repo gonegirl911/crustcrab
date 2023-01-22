@@ -3,7 +3,7 @@ pub mod chunk;
 pub mod loader;
 
 use self::chunk::{ChunkMap, ChunkMapEvent};
-use super::player::Player;
+use super::player::{ray::Ray, Player};
 use crate::server::{
     event_loop::{Event, EventHandler},
     ServerEvent,
@@ -12,7 +12,7 @@ use flume::Sender;
 use std::thread;
 
 pub struct World {
-    chunks_tx: Sender<(ChunkMapEvent, Sender<ServerEvent>)>,
+    chunks_tx: Sender<(ChunkMapEvent, Sender<ServerEvent>, Ray)>,
 }
 
 impl Default for World {
@@ -21,8 +21,8 @@ impl Default for World {
 
         thread::spawn(move || {
             let mut chunks = ChunkMap::default();
-            for (event, server_tx) in chunks_rx {
-                chunks.handle(&event, server_tx);
+            for (event, server_tx, ray) in chunks_rx {
+                chunks.handle(&event, (server_tx, ray));
             }
         });
 
@@ -36,7 +36,7 @@ impl EventHandler<Event> for World {
     fn handle(&mut self, event: &Event, (server_tx, player): Self::Context<'_>) {
         if let Some(event) = ChunkMapEvent::new(event, player) {
             self.chunks_tx
-                .send((event, server_tx))
+                .send((event, server_tx, player.ray))
                 .unwrap_or_else(|_| unreachable!());
         }
     }

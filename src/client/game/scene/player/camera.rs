@@ -96,19 +96,19 @@ impl CameraController {
             self.apply_rotation(camera);
             self.dx = 0.0;
             self.dy = 0.0;
-            changes |= Changes::ROTATED;
+            changes.insert(Changes::ROTATED);
         }
 
         if !self.relevant_keys.is_empty() {
             self.apply_movement(camera, dt);
-            changes |= Changes::MOVED;
+            changes.insert(Changes::MOVED);
         }
 
         if !self.relevant_buttons.is_empty() {
             if self.relevant_buttons.contains(MouseButtons::LEFT) {
-                changes |= Changes::BLOCK_DESTROYED;
+                changes.insert(Changes::BLOCK_DESTROYED);
             } else if self.relevant_buttons.contains(MouseButtons::RIGHT) {
-                changes |= Changes::BLOCK_PLACED;
+                changes.insert(Changes::BLOCK_PLACED);
             }
         }
 
@@ -194,16 +194,16 @@ impl EventHandler for CameraController {
                     };
                     match state {
                         ElementState::Pressed => {
-                            self.relevant_keys |= key;
-                            self.relevant_keys &= !opp;
-                            self.key_history |= key;
+                            self.relevant_keys.insert(key);
+                            self.relevant_keys.remove(opp);
+                            self.key_history.insert(key);
                         }
                         ElementState::Released => {
-                            self.relevant_keys &= !key;
+                            self.relevant_keys.remove(key);
                             if self.key_history.contains(opp) {
-                                self.relevant_keys |= opp;
+                                self.relevant_keys.insert(opp);
                             }
-                            self.key_history &= !key;
+                            self.key_history.remove(key);
                         }
                     }
                 }
@@ -215,16 +215,16 @@ impl EventHandler for CameraController {
                     };
                     match state {
                         ElementState::Pressed => {
-                            self.relevant_buttons |= button;
-                            self.relevant_buttons &= !opp;
-                            self.button_history |= button;
+                            self.relevant_buttons.insert(button);
+                            self.relevant_buttons.remove(opp);
+                            self.button_history.insert(button);
                         }
                         ElementState::Released => {
-                            self.relevant_buttons &= !button;
+                            self.relevant_buttons.remove(button);
                             if self.button_history.contains(opp) {
-                                self.relevant_buttons |= opp;
+                                self.relevant_buttons.insert(opp);
                             }
-                            self.button_history &= !button;
+                            self.button_history.remove(button);
                         }
                     }
                 }

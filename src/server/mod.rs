@@ -4,7 +4,7 @@ pub mod ticker;
 
 use self::{
     event_loop::EventLoop,
-    scene::{world::chunk::ChunkData, Scene},
+    scene::{player::ray::BlockIntersection, world::chunk::ChunkData, Scene},
 };
 use crate::{
     client::ClientEvent,
@@ -53,6 +53,6 @@ pub enum ServerEvent {
         data: Option<Arc<ChunkData>>,
     },
     BlockSelected {
-        coords: Option<Point3<i32>>,
+        data: Option<BlockIntersection>,
     },
 }
