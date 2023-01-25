@@ -2,10 +2,6 @@ struct VertexInput {
     @location(0) data: u32,
 }
 
-struct PushConstants {
-    chunk_coords: vec3<f32>,
-}
-
 struct PlayerUniform {
     vp: mat4x4<f32>,
     origin: vec3<f32>,
@@ -16,6 +12,10 @@ struct ClockUniform {
     time: f32,
 }
 
+struct PushConstants {
+    chunk_coords: vec3<f32>,
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
@@ -24,13 +24,13 @@ struct VertexOutput {
     @location(3) fog_factor: f32,
 }
 
-var<push_constant> pc: PushConstants;
-
 @group(0) @binding(0)
 var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
 var<uniform> clock: ClockUniform;
+
+var<push_constant> pc: PushConstants;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {

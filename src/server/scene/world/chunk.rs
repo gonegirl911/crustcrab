@@ -235,8 +235,8 @@ impl ChunkMap {
             .get(&coords)
             .into_iter()
             .flatten()
-            .for_each(|(block_coords, action)| {
-                chunk.apply(*block_coords, action);
+            .for_each(|(coords, action)| {
+                chunk.apply(*coords, action);
             });
         ChunkCell::load_new(chunk)
     }

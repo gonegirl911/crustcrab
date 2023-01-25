@@ -23,7 +23,7 @@ pub struct World {
 impl World {
     pub fn new(
         renderer @ Renderer { device, config, .. }: &Renderer,
-        camera_bind_group_layout: &wgpu::BindGroupLayout,
+        player_bind_group_layout: &wgpu::BindGroupLayout,
         clock_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
@@ -37,7 +37,7 @@ impl World {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: None,
                 bind_group_layouts: &[
-                    camera_bind_group_layout,
+                    player_bind_group_layout,
                     clock_bind_group_layout,
                     atlas.bind_group_layout(),
                     sky_bind_group_layout,
@@ -89,13 +89,13 @@ impl World {
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        camera_bind_group: &'a wgpu::BindGroup,
+        player_bind_group: &'a wgpu::BindGroup,
         clock_bind_group: &'a wgpu::BindGroup,
         sky_bind_group: &'a wgpu::BindGroup,
         frustum: &Frustum,
     ) {
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, camera_bind_group, &[]);
+        render_pass.set_bind_group(0, player_bind_group, &[]);
         render_pass.set_bind_group(1, clock_bind_group, &[]);
         render_pass.set_bind_group(2, self.atlas.bind_group(), &[]);
         render_pass.set_bind_group(3, sky_bind_group, &[]);
