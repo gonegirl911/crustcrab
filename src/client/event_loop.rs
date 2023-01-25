@@ -40,7 +40,7 @@ impl EventLoop {
         self.event_loop.run(move |event, _, control_flow| {
             match event {
                 Event::NewEvents(StartCause::Init) | Event::RedrawEventsCleared => {
-                    for event in self.server_rx.drain() {
+                    for event in self.server_rx.try_iter() {
                         self.proxy
                             .send_event(event)
                             .unwrap_or_else(|_| unreachable!());

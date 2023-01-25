@@ -48,9 +48,16 @@ pub enum ServerEvent {
     TimeUpdated {
         time: f32,
     },
+    ChunkLoaded {
+        coords: Point3<i32>,
+        data: Arc<ChunkData>,
+    },
+    ChunkUnloaded {
+        coords: Point3<i32>,
+    },
     ChunkUpdated {
         coords: Point3<i32>,
-        data: Option<Arc<ChunkData>>,
+        data: Arc<ChunkData>,
     },
     BlockSelected {
         data: Option<BlockIntersection>,

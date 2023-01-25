@@ -63,21 +63,108 @@ impl ChunkMap {
     where
         I: IntoIterator<Item = Point3<i32>> + 'a,
     {
-        points.into_iter().filter(|coords| self.unload(*coords))
+        points.into_iter().filter(|coords| {
+            self.cells
+                .remove_entry(coords)
+                .map(|(coords, cell)| {
+                    if let Some(cell) = cell.unload() {
+                        self.cells.insert(coords, cell);
+                    }
+                })
+                .is_some()
+        })
+    }
+
+    fn apply(
+        &mut self,
+        coords: Point3<i32>,
+        action: BlockAction,
+        server_tx: Sender<ServerEvent>,
+        ray: Ray,
+    ) {
+        let coords = coords.cast();
+        let chunk_coords = Player::chunk_coords(coords);
+        let block_coords = Player::block_coords(coords);
+
+        let (cell, is_created) = if let Some(cell) = self.cells.remove(&chunk_coords) {
+            (cell.apply(block_coords, &action).map_err(Some), false)
+        } else {
+            (
+                ChunkCell::default_with_action(block_coords, &action).map_err(|_| None),
+                true,
+            )
+        };
+
+        match cell {
+            Ok(cell) => {
+                let (is_loaded, is_unloaded) = if let Some(cell) = cell {
+                    self.cells.insert(chunk_coords, cell);
+                    (is_created, false)
+                } else {
+                    (false, !is_created)
+                };
+
+                self.handle(
+                    &ChunkMapEvent::BlockSelectionRequested,
+                    (server_tx.clone(), ray),
+                );
+
+                self.actions
+                    .entry(chunk_coords)
+                    .or_default()
+                    .insert(block_coords, action);
+
+                self.send_updates(
+                    Self::area_deltas()
+                        .filter(|delta| !is_loaded || *delta != Vector3::zeros())
+                        .map(|delta| Player::chunk_coords(coords + delta.cast()))
+                        .collect::<FxHashSet<_>>(),
+                    server_tx.clone(),
+                );
+
+                if is_loaded {
+                    self.send_loads([chunk_coords], server_tx);
+                } else if is_unloaded {
+                    self.send_unloads([chunk_coords], server_tx);
+                }
+            }
+            Err(Some(cell)) => {
+                self.cells.insert(chunk_coords, cell);
+            }
+            Err(None) => {}
+        }
     }
 
     fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>)
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkLoaded {
+                coords,
+                data: Arc::new(ChunkData {
+                    chunk: self.cells[&coords].as_ref().clone(),
+                    area: self.chunk_area(coords),
+                }),
+            })
+            .for_each(|event| {
+                server_tx.send(event).unwrap_or_else(|_| unreachable!());
+            });
+    }
+
+    fn par_send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
         points
             .into_par_iter()
-            .map(|coords| ServerEvent::ChunkUpdated {
+            .map(|coords| ServerEvent::ChunkLoaded {
                 coords,
-                data: Some(Arc::new(ChunkData {
+                data: Arc::new(ChunkData {
                     chunk: self.cells[&coords].as_ref().clone(),
                     area: self.chunk_area(coords),
-                })),
+                }),
             })
             .collect::<LinkedList<_>>()
             .into_iter()
@@ -92,26 +179,46 @@ impl ChunkMap {
     {
         for coords in points {
             server_tx
-                .send(ServerEvent::ChunkUpdated { coords, data: None })
+                .send(ServerEvent::ChunkUnloaded { coords })
                 .unwrap_or_else(|_| unreachable!());
         }
     }
 
-    fn send_updates(
+    fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
         &self,
-        loaded: &FxHashSet<Point3<i32>>,
-        unloaded: &FxHashSet<Point3<i32>>,
+        points: I,
         server_tx: Sender<ServerEvent>,
     ) {
-        Self::outline(loaded.union(&unloaded).copied())
+        points
+            .into_iter()
+            .filter_map(|coords| {
+                Some(ServerEvent::ChunkUpdated {
+                    coords,
+                    data: Arc::new(ChunkData {
+                        chunk: self.cells.get(&coords)?.as_ref().clone(),
+                        area: self.chunk_area(coords),
+                    }),
+                })
+            })
+            .for_each(|event| {
+                server_tx.send(event).unwrap_or_else(|_| unreachable!());
+            });
+    }
+
+    fn par_send_updates<I: IntoParallelIterator<Item = Point3<i32>>>(
+        &self,
+        points: I,
+        server_tx: Sender<ServerEvent>,
+    ) {
+        points
             .into_par_iter()
             .filter_map(|coords| {
                 Some(ServerEvent::ChunkUpdated {
                     coords,
-                    data: Some(Arc::new(ChunkData {
+                    data: Arc::new(ChunkData {
                         chunk: self.cells.get(&coords)?.as_ref().clone(),
                         area: self.chunk_area(coords),
-                    })),
+                    }),
                 })
             })
             .collect::<LinkedList<_>>()
@@ -131,17 +238,6 @@ impl ChunkMap {
                 chunk.apply(*block_coords, action);
             });
         ChunkCell::load_new(chunk)
-    }
-
-    fn unload(&mut self, coords: Point3<i32>) -> bool {
-        self.cells
-            .remove_entry(&coords)
-            .map(|(coords, cell)| {
-                if let Some(cell) = cell.unload() {
-                    self.cells.insert(coords, cell);
-                }
-            })
-            .is_some()
     }
 
     fn outline<I: IntoIterator<Item = Point3<i32>>>(points: I) -> FxHashSet<Point3<i32>> {
@@ -189,7 +285,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     (coords - area.center).map(|c| c.pow(2)).sum()
                 });
 
-                self.send_loads(loaded, server_tx);
+                self.par_send_loads(loaded, server_tx);
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
                 let unloaded = self
@@ -205,9 +301,12 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
-                self.send_updates(&loaded, &unloaded, server_tx.clone());
+                self.par_send_updates(
+                    Self::outline(loaded.union(&unloaded).copied()),
+                    server_tx.clone(),
+                );
                 self.send_unloads(unloaded, server_tx.clone());
-                self.send_loads(loaded, server_tx);
+                self.par_send_loads(loaded, server_tx);
             }
             ChunkMapEvent::BlockSelectionRequested => {
                 server_tx
@@ -226,8 +325,17 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
-            ChunkMapEvent::BlockDestroyed { data } => {}
-            ChunkMapEvent::BlockPlaced { block, data } => {}
+            ChunkMapEvent::BlockDestroyed {
+                data: BlockIntersection { coords, .. },
+            } => {
+                self.apply(*coords, BlockAction::Destroy, server_tx, ray);
+            }
+            ChunkMapEvent::BlockPlaced {
+                block,
+                data: BlockIntersection { coords, normal },
+            } => {
+                self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
+            }
         }
     }
 }
@@ -245,6 +353,14 @@ impl ChunkCell {
         })
     }
 
+    fn default_with_action(coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, ()> {
+        let mut chunk = Chunk::default();
+        chunk
+            .apply(coords, action)
+            .then(|| Self::load_new(chunk))
+            .ok_or(())
+    }
+
     fn load(&mut self) {
         self.players_count += 1;
     }
@@ -256,9 +372,12 @@ impl ChunkCell {
         })
     }
 
-    fn apply(mut self, coords: Point3<u8>, action: &BlockAction) -> Option<Self> {
-        self.chunk.apply(coords, action);
-        self.chunk.is_not_empty().then_some(self)
+    fn apply(mut self, coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, Self> {
+        if self.chunk.apply(coords, action) {
+            Ok(self.chunk.is_not_empty().then_some(self))
+        } else {
+            Err(self)
+        }
     }
 }
 
@@ -293,11 +412,6 @@ impl ChunkData {
     }
 }
 
-enum BlockAction {
-    Destroy,
-    Place(Block),
-}
-
 #[derive(Clone, Default)]
 pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
@@ -311,19 +425,21 @@ impl Chunk {
     }
 
     fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
-        self.blocks().flat_map(|(coords, block)| {
-            block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
+        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
+            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
+                blocks.iter().zip(0..).flat_map(move |(block, z)| {
+                    let coords = point![x, y, z];
+                    block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
+                })
+            })
         })
     }
 
-    fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) {
+    fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
+        let prev = &mut self[coords];
         match action {
-            BlockAction::Destroy => {
-                self[coords] = Block::Air;
-            }
-            BlockAction::Place(block) => {
-                self[coords] = *block;
-            }
+            BlockAction::Destroy => prev.is_not_air().then(|| *prev = Block::Air).is_some(),
+            BlockAction::Place(block) => prev.is_air().then(|| *prev = *block).is_some(),
         }
     }
 
@@ -338,17 +454,6 @@ impl Chunk {
 
     fn is_not_empty(&self) -> bool {
         !self.is_empty()
-    }
-
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
-        self.0.iter().zip(0..).flat_map(|(blocks, x)| {
-            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
-                blocks
-                    .iter()
-                    .zip(0..)
-                    .map(move |(block, z)| (point![x, y, z], block))
-            })
-        })
     }
 }
 
@@ -402,6 +507,11 @@ impl ChunkArea {
     }
 }
 
+enum BlockAction {
+    Destroy,
+    Place(Block),
+}
+
 pub enum ChunkMapEvent {
     InitialRenderRequested {
         area: WorldArea,
@@ -434,7 +544,7 @@ impl ChunkMapEvent {
                         curr: *curr,
                     })
                 }
-                ClientEvent::PlayerPositionChanged { .. } => None,
+                ClientEvent::PlayerPositionChanged { .. } => Some(Self::BlockSelectionRequested),
                 ClientEvent::BlockDestroyed { data } => Some(Self::BlockDestroyed { data: *data }),
                 ClientEvent::BlockPlaced { block, data } => Some(Self::BlockPlaced {
                     block: *block,

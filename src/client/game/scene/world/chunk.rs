@@ -13,12 +13,13 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
 use nalgebra::Point3;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{mem, sync::Arc, thread, time::Instant};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct ChunkMeshPool {
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
+    unloaded: FxHashSet<Point3<i32>>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Instant)>,
 }
@@ -26,6 +27,7 @@ pub struct ChunkMeshPool {
 impl ChunkMeshPool {
     pub fn new() -> Self {
         let meshes = FxHashMap::default();
+        let unloaded = FxHashSet::default();
         let (data_tx, data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
         let (vertices_tx, vertices_rx) = flume::unbounded();
 
@@ -43,6 +45,7 @@ impl ChunkMeshPool {
 
         Self {
             meshes,
+            unloaded,
             data_tx,
             vertices_rx,
         }
@@ -70,29 +73,42 @@ impl EventHandler for ChunkMeshPool {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::ChunkUpdated { coords, data }) => {
-                if let Some(data) = data {
+            Event::UserEvent(event) => match event {
+                ServerEvent::ChunkLoaded { coords, data } => {
+                    self.unloaded.remove(coords);
                     self.data_tx
                         .send((*coords, data.clone(), Instant::now()))
                         .unwrap_or_else(|_| unreachable!());
-                } else {
-                    self.meshes.remove(coords);
                 }
-            }
+                ServerEvent::ChunkUnloaded { coords } => {
+                    self.meshes.remove(coords);
+                    self.unloaded.insert(*coords);
+                }
+                ServerEvent::ChunkUpdated { coords, data } => {
+                    self.data_tx
+                        .send((*coords, data.clone(), Instant::now()))
+                        .unwrap_or_else(|_| unreachable!());
+                }
+                _ => {}
+            },
             Event::RedrawRequested(_) => {
                 for (coords, vertices, updated_at) in self.vertices_rx.try_iter() {
-                    if !vertices.is_empty() {
-                        self.meshes
-                            .entry(coords)
-                            .and_modify(|(mesh, last_updated_at)| {
-                                if updated_at > *last_updated_at {
-                                    *mesh = ChunkMesh::new(renderer, &vertices);
-                                    *last_updated_at = updated_at;
-                                }
-                            })
-                            .or_insert_with(|| (ChunkMesh::new(renderer, &vertices), updated_at));
-                    } else {
-                        self.meshes.remove(&coords);
+                    if !self.unloaded.contains(&coords) {
+                        if !vertices.is_empty() {
+                            self.meshes
+                                .entry(coords)
+                                .and_modify(|(mesh, last_updated_at)| {
+                                    if updated_at > *last_updated_at {
+                                        *mesh = ChunkMesh::new(renderer, &vertices);
+                                        *last_updated_at = updated_at;
+                                    }
+                                })
+                                .or_insert_with(|| {
+                                    (ChunkMesh::new(renderer, &vertices), updated_at)
+                                });
+                        } else {
+                            self.meshes.remove(&coords);
+                        }
                     }
                 }
             }
