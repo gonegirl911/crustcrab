@@ -13,13 +13,7 @@ use crate::{
         renderer::Renderer,
         ClientEvent,
     },
-    server::{
-        scene::{
-            player::ray::BlockIntersection,
-            world::{block::Block, chunk::Chunk},
-        },
-        ServerEvent,
-    },
+    server::scene::world::{block::Block, chunk::Chunk},
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
@@ -33,7 +27,6 @@ pub struct Player {
     projection: Projection,
     render_distance: u32,
     uniform: PlayerUniform,
-    selected_block: Option<BlockIntersection>,
     is_updated: bool,
 }
 
@@ -48,7 +41,6 @@ impl Player {
             projection: Projection::new(70.0, aspect, 0.1, zfar),
             render_distance: render_distance as u32,
             uniform: PlayerUniform::new(renderer),
-            selected_block: None,
             is_updated: true,
         }
     }
@@ -92,9 +84,6 @@ impl EventHandler for Player {
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
-            Event::UserEvent(ServerEvent::BlockSelected { data }) => {
-                self.selected_block = *data;
-            }
             Event::MainEventsCleared => {
                 let changes = self.controller.apply_updates(&mut self.camera, dt);
 
@@ -115,20 +104,15 @@ impl EventHandler for Player {
                 }
 
                 if changes.contains(Changes::BLOCK_DESTROYED) {
-                    if let Some(data) = self.selected_block {
-                        client_tx
-                            .send(ClientEvent::BlockDestroyed { data })
-                            .unwrap_or_else(|_| unreachable!());
-                    }
+                    client_tx
+                        .send(ClientEvent::BlockDestroyed)
+                        .unwrap_or_else(|_| unreachable!());
                 } else if changes.contains(Changes::BLOCK_PLACED) {
-                    if let Some(data) = self.selected_block {
-                        client_tx
-                            .send(ClientEvent::BlockPlaced {
-                                block: Block::Grass,
-                                data,
-                            })
-                            .unwrap_or_else(|_| unreachable!());
-                    }
+                    client_tx
+                        .send(ClientEvent::BlockPlaced {
+                            block: Block::Grass,
+                        })
+                        .unwrap_or_else(|_| unreachable!());
                 }
 
                 self.is_updated = self.is_updated

@@ -30,6 +30,7 @@ use std::{
 pub struct ChunkMap {
     cells: FxHashMap<Point3<i32>, ChunkCell>,
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
+    selected_block: Option<BlockIntersection>,
     loader: ChunkLoader,
 }
 
@@ -309,32 +310,33 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 self.par_send_loads(loaded, server_tx);
             }
             ChunkMapEvent::BlockSelectionRequested => {
+                self.selected_block = ray.cast(Player::BUILDING_REACH).find(
+                    |BlockIntersection { coords, .. }| {
+                        let coords = coords.cast();
+                        let chunk_coords = Player::chunk_coords(coords);
+                        let block_coords = Player::block_coords(coords);
+                        self.cells
+                            .get(&chunk_coords)
+                            .map(|cell| cell[block_coords].is_not_air())
+                            .unwrap_or_default()
+                    },
+                );
+
                 server_tx
                     .send(ServerEvent::BlockSelected {
-                        data: ray.cast(Player::BUILDING_REACH).find(
-                            |BlockIntersection { coords, .. }| {
-                                let coords = coords.cast();
-                                let chunk_coords = Player::chunk_coords(coords);
-                                let block_coords = Player::block_coords(coords);
-                                self.cells
-                                    .get(&chunk_coords)
-                                    .map(|cell| cell[block_coords].is_not_air())
-                                    .unwrap_or_default()
-                            },
-                        ),
+                        coords: self.selected_block.map(|data| data.coords),
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
-            ChunkMapEvent::BlockDestroyed {
-                data: BlockIntersection { coords, .. },
-            } => {
-                self.apply(*coords, BlockAction::Destroy, server_tx, ray);
+            ChunkMapEvent::BlockDestroyed => {
+                if let Some(BlockIntersection { coords, .. }) = self.selected_block {
+                    self.apply(coords, BlockAction::Destroy, server_tx, ray);
+                }
             }
-            ChunkMapEvent::BlockPlaced {
-                block,
-                data: BlockIntersection { coords, normal },
-            } => {
-                self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
+            ChunkMapEvent::BlockPlaced { block } => {
+                if let Some(BlockIntersection { coords, normal }) = self.selected_block {
+                    self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
+                }
             }
         }
     }
@@ -513,21 +515,11 @@ enum BlockAction {
 }
 
 pub enum ChunkMapEvent {
-    InitialRenderRequested {
-        area: WorldArea,
-    },
-    WorldAreaChanged {
-        prev: WorldArea,
-        curr: WorldArea,
-    },
+    InitialRenderRequested { area: WorldArea },
+    WorldAreaChanged { prev: WorldArea, curr: WorldArea },
     BlockSelectionRequested,
-    BlockDestroyed {
-        data: BlockIntersection,
-    },
-    BlockPlaced {
-        block: Block,
-        data: BlockIntersection,
-    },
+    BlockDestroyed,
+    BlockPlaced { block: Block },
 }
 
 impl ChunkMapEvent {
@@ -545,11 +537,8 @@ impl ChunkMapEvent {
                     })
                 }
                 ClientEvent::PlayerPositionChanged { .. } => Some(Self::BlockSelectionRequested),
-                ClientEvent::BlockDestroyed { data } => Some(Self::BlockDestroyed { data: *data }),
-                ClientEvent::BlockPlaced { block, data } => Some(Self::BlockPlaced {
-                    block: *block,
-                    data: *data,
-                }),
+                ClientEvent::BlockDestroyed => Some(Self::BlockDestroyed),
+                ClientEvent::BlockPlaced { block } => Some(Self::BlockPlaced { block: *block }),
             }
         } else {
             None

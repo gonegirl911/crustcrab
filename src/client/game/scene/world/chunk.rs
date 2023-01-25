@@ -20,6 +20,7 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 pub struct ChunkMeshPool {
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
     unloaded: FxHashSet<Point3<i32>>,
+    selected_block: Option<Point3<i32>>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Instant)>,
 }
@@ -28,6 +29,7 @@ impl ChunkMeshPool {
     pub fn new() -> Self {
         let meshes = FxHashMap::default();
         let unloaded = FxHashSet::default();
+        let selected_block = None;
         let (data_tx, data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
         let (vertices_tx, vertices_rx) = flume::unbounded();
 
@@ -46,6 +48,7 @@ impl ChunkMeshPool {
         Self {
             meshes,
             unloaded,
+            selected_block,
             data_tx,
             vertices_rx,
         }
@@ -88,6 +91,9 @@ impl EventHandler for ChunkMeshPool {
                     self.data_tx
                         .send((*coords, data.clone(), Instant::now()))
                         .unwrap_or_else(|_| unreachable!());
+                }
+                ServerEvent::BlockSelected { coords } => {
+                    self.selected_block = *coords;
                 }
                 _ => {}
             },

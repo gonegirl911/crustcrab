@@ -10,10 +10,7 @@ use self::{
     renderer::Renderer,
     window::Window,
 };
-use crate::server::{
-    scene::{player::ray::BlockIntersection, world::block::Block},
-    ServerEvent,
-};
+use crate::server::{scene::world::block::Block, ServerEvent};
 use flume::{Receiver, Sender};
 use nalgebra::{Point3, Vector3};
 use std::time::Duration;
@@ -81,11 +78,8 @@ pub enum ClientEvent {
     PlayerPositionChanged {
         coords: Point3<f32>,
     },
-    BlockDestroyed {
-        data: BlockIntersection,
-    },
+    BlockDestroyed,
     BlockPlaced {
         block: Block,
-        data: BlockIntersection,
     },
 }
