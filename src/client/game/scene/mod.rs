@@ -1,10 +1,14 @@
 pub mod clock;
 pub mod depth_buffer;
 pub mod player;
+pub mod selected_block;
 pub mod sky;
 pub mod world;
 
-use self::{clock::Clock, depth_buffer::DepthBuffer, player::Player, sky::Sky, world::World};
+use self::{
+    clock::Clock, depth_buffer::DepthBuffer, player::Player, selected_block::SelectedBlock,
+    sky::Sky, world::World,
+};
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::Renderer,
@@ -19,6 +23,7 @@ pub struct Scene {
     sky: Sky,
     depth_buffer: DepthBuffer,
     world: World,
+    selected_block: SelectedBlock,
 }
 
 impl Scene {
@@ -37,57 +42,54 @@ impl Scene {
             clock.bind_group_layout(),
             sky.bind_group_layout(),
         );
+        let selected_block = SelectedBlock::new(renderer, player.bind_group_layout());
         Self {
             player,
             clock,
             sky,
             depth_buffer,
             world,
+            selected_block,
         }
     }
 
     pub fn render(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.sky.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: self.depth_buffer.view(),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: true,
+                }),
+                stencil_ops: None,
             }),
+        });
+
+        self.sky.draw(
+            &mut render_pass,
             self.player.bind_group(),
             self.clock.bind_group(),
         );
+
         self.world.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: self.depth_buffer.view(),
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
-            }),
+            &mut render_pass,
             self.player.bind_group(),
             self.clock.bind_group(),
             self.sky.bind_group(),
             &self.player.frustum(),
         );
+
+        self.selected_block
+            .draw(&mut render_pass, self.player.bind_group());
     }
 }
 
@@ -99,5 +101,6 @@ impl EventHandler for Scene {
         self.clock.handle(event, renderer);
         self.depth_buffer.handle(event, renderer);
         self.world.handle(event, renderer);
+        self.selected_block.handle(event, ());
     }
 }

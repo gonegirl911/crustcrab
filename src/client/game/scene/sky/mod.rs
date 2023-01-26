@@ -5,6 +5,7 @@ use self::{
     color_map::ColorMap,
     sphere::{Sphere, SphereMesh, SphereVertex},
 };
+use super::depth_buffer::DepthBuffer;
 use crate::client::renderer::Renderer;
 
 pub struct Sky {
@@ -61,7 +62,13 @@ impl Sky {
                 cull_mode: Some(wgpu::Face::Front),
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DepthBuffer::DEPTH_FORMAT,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
             multisample: Default::default(),
             multiview: None,
         });

@@ -27,7 +27,7 @@ impl SelectedBlock {
         let coords = None;
 
         let shader = device.create_shader_module(wgpu::include_wgsl!(
-            "../../../../../assets/shaders/selected.wgsl"
+            "../../../../assets/shaders/selected.wgsl"
         ));
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
