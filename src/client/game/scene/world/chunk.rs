@@ -137,7 +137,7 @@ impl ChunkMesh {
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX,
             0,
-            bytemuck::cast_slice(&[PushConstants::new(coords)]),
+            bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
         );
         render_pass.draw(0..self.len(), 0..1);
     }
@@ -149,11 +149,11 @@ impl ChunkMesh {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-pub struct PushConstants {
+pub struct BlockPushConstants {
     chunk_coords: Point3<f32>,
 }
 
-impl PushConstants {
+impl BlockPushConstants {
     fn new(chunk_coords: Point3<i32>) -> Self {
         Self {
             chunk_coords: chunk_coords.cast(),

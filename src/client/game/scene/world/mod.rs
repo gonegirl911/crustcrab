@@ -1,11 +1,13 @@
 pub mod atlas;
 pub mod block;
 pub mod chunk;
+pub mod selected;
 
 use self::{
     atlas::TextureAtlas,
     block::BlockVertex,
-    chunk::{ChunkMeshPool, PushConstants},
+    chunk::{BlockPushConstants, ChunkMeshPool},
+    selected::SelectedBlock,
 };
 use super::{depth_buffer::DepthBuffer, player::frustum::Frustum};
 use crate::client::{
@@ -17,6 +19,7 @@ use std::mem;
 pub struct World {
     meshes: ChunkMeshPool,
     atlas: TextureAtlas,
+    selected_block: SelectedBlock,
     render_pipeline: wgpu::RenderPipeline,
 }
 
@@ -29,6 +32,7 @@ impl World {
     ) -> Self {
         let meshes = ChunkMeshPool::new();
         let atlas = TextureAtlas::new(renderer);
+        let selected_block = SelectedBlock::new(renderer, player_bind_group_layout);
 
         let shader = device.create_shader_module(wgpu::include_wgsl!(
             "../../../../../assets/shaders/block.wgsl"
@@ -44,7 +48,7 @@ impl World {
                 ],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX,
-                    range: 0..mem::size_of::<PushConstants>() as u32,
+                    range: 0..mem::size_of::<BlockPushConstants>() as u32,
                 }],
             });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -82,6 +86,7 @@ impl World {
         Self {
             meshes,
             atlas,
+            selected_block,
             render_pipeline,
         }
     }
@@ -100,6 +105,7 @@ impl World {
         render_pass.set_bind_group(2, self.atlas.bind_group(), &[]);
         render_pass.set_bind_group(3, sky_bind_group, &[]);
         self.meshes.draw(render_pass, frustum);
+        self.selected_block.draw(render_pass, player_bind_group);
     }
 }
 
@@ -108,5 +114,6 @@ impl EventHandler for World {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         self.meshes.handle(event, renderer);
+        self.selected_block.handle(event, ());
     }
 }
