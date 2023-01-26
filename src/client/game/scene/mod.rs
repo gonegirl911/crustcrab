@@ -1,13 +1,13 @@
 pub mod clock;
 pub mod depth_buffer;
 pub mod player;
-pub mod selected_block;
+pub mod selection;
 pub mod sky;
 pub mod world;
 
 use self::{
-    clock::Clock, depth_buffer::DepthBuffer, player::Player, selected_block::SelectedBlock,
-    sky::Sky, world::World,
+    clock::Clock, depth_buffer::DepthBuffer, player::Player, selection::SelectedBlock, sky::Sky,
+    world::World,
 };
 use crate::client::{
     event_loop::{Event, EventHandler},
