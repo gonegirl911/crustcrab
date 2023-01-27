@@ -22,8 +22,7 @@ impl BlockSelection {
         renderer @ Renderer { device, config, .. }: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let mesh =
-            BlockSelectionMesh::new(renderer, &VERTICES.map(BlockSelectionVertex::new), &INDICES);
+        let mesh = BlockSelectionMesh::new(renderer, &VERTICES, &INDICES);
         let coords = None;
 
         let shader = device.create_shader_module(wgpu::include_wgsl!(
@@ -62,7 +61,7 @@ impl BlockSelection {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: DepthBuffer::DEPTH_FORMAT,
                 depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_compare: wgpu::CompareFunction::Less,
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -143,22 +142,20 @@ impl BlockSelectionMesh {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockSelectionVertex(u32);
+struct BlockSelectionVertex {
+    coords: Point3<f32>,
+}
 
 impl BlockSelectionVertex {
-    fn new(coords: Point3<u8>) -> Self {
-        let mut data = 0;
-        data |= coords.x as u32;
-        data |= (coords.y << 1) as u32;
-        data |= (coords.z << 2) as u32;
-        Self(data)
+    const fn new(coords: Point3<f32>) -> Self {
+        Self { coords }
     }
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Uint32],
+            attributes: &wgpu::vertex_attr_array![0 => Float32x3],
         }
     }
 }
@@ -177,15 +174,15 @@ impl BlockSelectionPushConstants {
     }
 }
 
-const VERTICES: [Point3<u8>; 8] = [
-    point![0, 0, 0],
-    point![1, 0, 0],
-    point![1, 1, 0],
-    point![0, 1, 0],
-    point![0, 0, 1],
-    point![1, 0, 1],
-    point![1, 1, 1],
-    point![0, 1, 1],
+const VERTICES: [BlockSelectionVertex; 8] = [
+    BlockSelectionVertex::new(point![-0.001, -0.001, -0.001]),
+    BlockSelectionVertex::new(point![1.001, -0.001, -0.001]),
+    BlockSelectionVertex::new(point![1.001, 1.001, -0.001]),
+    BlockSelectionVertex::new(point![-0.001, 1.001, -0.001]),
+    BlockSelectionVertex::new(point![-0.001, -0.001, 1.001]),
+    BlockSelectionVertex::new(point![1.001, -0.001, 1.001]),
+    BlockSelectionVertex::new(point![1.001, 1.001, 1.001]),
+    BlockSelectionVertex::new(point![-0.001, 1.001, 1.001]),
 ];
 
 #[rustfmt::skip]

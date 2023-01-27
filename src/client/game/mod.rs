@@ -48,26 +48,20 @@ impl EventHandler for Game {
         self.scene.handle(event, (client_tx, renderer, dt));
 
         if let Event::RedrawRequested(_) = event {
-            let output = match surface.get_current_texture() {
-                Ok(output) => output,
-                Err(e) => {
-                    match e {
-                        wgpu::SurfaceError::Lost => renderer.refresh(),
-                        wgpu::SurfaceError::OutOfMemory => control_flow.set_exit(),
-                        _ => {}
-                    }
-                    return;
+            match surface.get_current_texture() {
+                Ok(output) => {
+                    let mut encoder = device.create_command_encoder(&Default::default());
+                    self.scene.render(
+                        &output.texture.create_view(&Default::default()),
+                        &mut encoder,
+                    );
+                    queue.submit([encoder.finish()]);
+                    output.present();
                 }
+                Err(wgpu::SurfaceError::Lost) => renderer.refresh(),
+                Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
+                _ => {}
             };
-
-            let mut encoder = device.create_command_encoder(&Default::default());
-            self.scene.render(
-                &output.texture.create_view(&Default::default()),
-                &mut encoder,
-            );
-            queue.submit([encoder.finish()]);
-
-            output.present();
         }
     }
 }

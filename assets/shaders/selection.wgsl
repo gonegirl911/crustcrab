@@ -1,5 +1,5 @@
 struct VertexInput {
-    @location(0) data: u32,
+    @location(0) coords: vec3<f32>,
 }
 
 struct PlayerUniform {
@@ -23,12 +23,7 @@ var<push_constant> pc: PushConstants;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-    let coords = pc.coords + vec3(
-        mix(-0.001, 1.001, f32(extractBits(vertex.data, 0u, 1u))),
-        mix(-0.001, 1.001, f32(extractBits(vertex.data, 1u, 1u))),
-        mix(-0.001, 1.001, f32(extractBits(vertex.data, 2u, 1u))),
-    );
-    return VertexOutput(player.vp * vec4(coords, 1.0));
+    return VertexOutput(player.vp * vec4(pc.coords + vertex.coords, 1.0));
 }
 
 @fragment
