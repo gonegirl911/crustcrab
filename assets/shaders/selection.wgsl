@@ -33,5 +33,5 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4(vec3(1.0), 0.2);
+    return vec4(vec3(1.0), 0.15);
 }

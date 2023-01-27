@@ -11,19 +11,19 @@ use nalgebra::{point, Point3};
 use std::mem;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
-pub struct SelectedBlock {
-    mesh: SelectedBlockMesh,
+pub struct BlockSelection {
+    mesh: BlockSelectionMesh,
     coords: Option<Point3<i32>>,
     render_pipeline: wgpu::RenderPipeline,
 }
 
-impl SelectedBlock {
+impl BlockSelection {
     pub fn new(
         renderer @ Renderer { device, config, .. }: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let mesh =
-            SelectedBlockMesh::new(renderer, &VERTICES.map(SelectedBlockVertex::new), &INDICES);
+            BlockSelectionMesh::new(renderer, &VERTICES.map(BlockSelectionVertex::new), &INDICES);
         let coords = None;
 
         let shader = device.create_shader_module(wgpu::include_wgsl!(
@@ -35,7 +35,7 @@ impl SelectedBlock {
                 bind_group_layouts: &[player_bind_group_layout],
                 push_constant_ranges: &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX,
-                    range: 0..mem::size_of::<SelectedBlockPushConstants>() as u32,
+                    range: 0..mem::size_of::<BlockSelectionPushConstants>() as u32,
                 }],
             });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -44,7 +44,7 @@ impl SelectedBlock {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[SelectedBlockVertex::desc()],
+                buffers: &[BlockSelectionVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -62,7 +62,7 @@ impl SelectedBlock {
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: DepthBuffer::DEPTH_FORMAT,
                 depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -90,7 +90,7 @@ impl SelectedBlock {
     }
 }
 
-impl EventHandler for SelectedBlock {
+impl EventHandler for BlockSelection {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
@@ -100,15 +100,15 @@ impl EventHandler for SelectedBlock {
     }
 }
 
-struct SelectedBlockMesh {
+struct BlockSelectionMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
 }
 
-impl SelectedBlockMesh {
+impl BlockSelectionMesh {
     fn new(
         Renderer { device, .. }: &Renderer,
-        vertices: &[SelectedBlockVertex],
+        vertices: &[BlockSelectionVertex],
         indices: &[u16],
     ) -> Self {
         Self {
@@ -131,7 +131,7 @@ impl SelectedBlockMesh {
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX,
             0,
-            bytemuck::cast_slice(&[SelectedBlockPushConstants::new(coords)]),
+            bytemuck::cast_slice(&[BlockSelectionPushConstants::new(coords)]),
         );
         render_pass.draw_indexed(0..self.len(), 0, 0..1);
     }
@@ -143,9 +143,9 @@ impl SelectedBlockMesh {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct SelectedBlockVertex(u32);
+struct BlockSelectionVertex(u32);
 
-impl SelectedBlockVertex {
+impl BlockSelectionVertex {
     fn new(coords: Point3<u8>) -> Self {
         let mut data = 0;
         data |= coords.x as u32;
@@ -165,11 +165,11 @@ impl SelectedBlockVertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct SelectedBlockPushConstants {
+struct BlockSelectionPushConstants {
     coords: Point3<f32>,
 }
 
-impl SelectedBlockPushConstants {
+impl BlockSelectionPushConstants {
     fn new(coords: Point3<i32>) -> Self {
         Self {
             coords: coords.cast(),

@@ -6,7 +6,7 @@ pub mod sky;
 pub mod world;
 
 use self::{
-    clock::Clock, depth_buffer::DepthBuffer, player::Player, selection::SelectedBlock, sky::Sky,
+    clock::Clock, depth_buffer::DepthBuffer, player::Player, selection::BlockSelection, sky::Sky,
     world::World,
 };
 use crate::client::{
@@ -23,7 +23,7 @@ pub struct Scene {
     sky: Sky,
     depth_buffer: DepthBuffer,
     world: World,
-    selected_block: SelectedBlock,
+    block_selection: BlockSelection,
 }
 
 impl Scene {
@@ -42,14 +42,14 @@ impl Scene {
             clock.bind_group_layout(),
             sky.bind_group_layout(),
         );
-        let selected_block = SelectedBlock::new(renderer, player.bind_group_layout());
+        let block_selection = BlockSelection::new(renderer, player.bind_group_layout());
         Self {
             player,
             clock,
             sky,
             depth_buffer,
             world,
-            selected_block,
+            block_selection,
         }
     }
 
@@ -88,7 +88,7 @@ impl Scene {
             &self.player.frustum(),
         );
 
-        self.selected_block
+        self.block_selection
             .draw(&mut render_pass, self.player.bind_group());
     }
 }
@@ -101,6 +101,6 @@ impl EventHandler for Scene {
         self.clock.handle(event, renderer);
         self.depth_buffer.handle(event, renderer);
         self.world.handle(event, renderer);
-        self.selected_block.handle(event, ());
+        self.block_selection.handle(event, ());
     }
 }

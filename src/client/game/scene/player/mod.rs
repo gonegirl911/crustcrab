@@ -115,9 +115,8 @@ impl EventHandler for Player {
                         .unwrap_or_else(|_| unreachable!());
                 }
 
-                self.is_updated = self.is_updated
-                    || changes.contains(Changes::ROTATED)
-                    || changes.contains(Changes::MOVED);
+                self.is_updated =
+                    self.is_updated || changes.intersects(Changes::ROTATED | Changes::MOVED)
             }
             Event::RedrawRequested(_) if self.is_updated => {
                 self.uniform.update(
