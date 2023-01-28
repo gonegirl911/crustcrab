@@ -8,8 +8,10 @@ pub struct ColorMap {
 
 impl ColorMap {
     pub fn new(Renderer { device, queue, .. }: &Renderer) -> Self {
-        let bytes = include_bytes!("../../../../../assets/textures/sky.png");
-        let image = image::load_from_memory(bytes).unwrap().to_rgba8();
+        let image =
+            image::load_from_memory(include_bytes!("../../../../../assets/textures/sky.png"))
+                .unwrap()
+                .to_rgba8();
         let dimensions = image.dimensions();
         let size = wgpu::Extent3d {
             width: dimensions.0,
@@ -25,23 +27,6 @@ impl ColorMap {
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         });
-
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &image,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: NonZeroU32::new(4 * dimensions.0),
-                rows_per_image: NonZeroU32::new(dimensions.1),
-            },
-            size,
-        );
-
         let view = texture.create_view(&Default::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -87,6 +72,22 @@ impl ColorMap {
                 },
             ],
         });
+
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &image,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: NonZeroU32::new(4 * dimensions.0),
+                rows_per_image: NonZeroU32::new(dimensions.1),
+            },
+            size,
+        );
 
         Self {
             bind_group_layout,

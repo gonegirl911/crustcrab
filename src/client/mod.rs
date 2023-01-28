@@ -53,8 +53,7 @@ impl Client {
             fn handle(&mut self, event: &Event, (control_flow, client_tx, dt): Self::Context<'_>) {
                 self.window.handle(event, control_flow);
                 self.renderer.handle(event, ());
-                self.game
-                    .handle(event, (control_flow, client_tx, &self.renderer, dt));
+                self.game.handle(event, (client_tx, &self.renderer, dt));
             }
         }
 

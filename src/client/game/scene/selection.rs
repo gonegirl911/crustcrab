@@ -24,7 +24,6 @@ impl BlockSelection {
     ) -> Self {
         let mesh = BlockSelectionMesh::new(renderer, &VERTICES, &INDICES);
         let coords = None;
-
         let shader = device.create_shader_module(wgpu::include_wgsl!(
             "../../../../assets/shaders/selection.wgsl"
         ));
@@ -68,7 +67,6 @@ impl BlockSelection {
             multisample: Default::default(),
             multiview: None,
         });
-
         Self {
             mesh,
             coords,

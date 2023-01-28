@@ -56,7 +56,7 @@ impl Renderer {
         }
     }
 
-    pub fn refresh(&self) {
+    pub fn recreate_surface(&self) {
         self.surface.configure(&self.device, &self.config)
     }
 }
@@ -80,7 +80,7 @@ impl EventHandler for Renderer {
                 self.is_resized = true;
             }
             Event::RedrawRequested(_) if self.is_resized => {
-                self.refresh();
+                self.recreate_surface();
             }
             Event::RedrawEventsCleared => {
                 self.is_resized = false;

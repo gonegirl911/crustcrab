@@ -29,7 +29,6 @@ impl World {
     ) -> Self {
         let meshes = ChunkMeshPool::new();
         let atlas = TextureAtlas::new(renderer);
-
         let shader = device.create_shader_module(wgpu::include_wgsl!(
             "../../../../../assets/shaders/block.wgsl"
         ));
@@ -78,7 +77,6 @@ impl World {
             multisample: Default::default(),
             multiview: None,
         });
-
         Self {
             meshes,
             atlas,

@@ -27,7 +27,6 @@ impl Sky {
             &sphere.indices().collect::<Vec<_>>(),
         );
         let color_map = ColorMap::new(renderer);
-
         let shader = device.create_shader_module(wgpu::include_wgsl!(
             "../../../../../assets/shaders/sky.wgsl"
         ));
@@ -72,7 +71,6 @@ impl Sky {
             multisample: Default::default(),
             multiview: None,
         });
-
         Self {
             mesh,
             color_map,

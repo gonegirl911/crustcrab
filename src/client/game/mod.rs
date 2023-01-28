@@ -1,6 +1,7 @@
+pub mod output;
 pub mod scene;
 
-use self::scene::Scene;
+use self::{output::Output, scene::Scene};
 use super::{
     event_loop::{Event, EventHandler},
     renderer::Renderer,
@@ -8,33 +9,28 @@ use super::{
 };
 use flume::Sender;
 use std::time::Duration;
-use winit::event_loop::ControlFlow;
 
 pub struct Game {
     scene: Scene,
+    output: Output,
 }
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             scene: Scene::new(renderer),
+            output: Output::new(renderer),
         }
     }
 }
 
 impl EventHandler for Game {
-    type Context<'a> = (
-        &'a mut ControlFlow,
-        Sender<ClientEvent>,
-        &'a Renderer,
-        Duration,
-    );
+    type Context<'a> = (Sender<ClientEvent>, &'a Renderer, Duration);
 
     fn handle(
         &mut self,
         event: &Event,
         (
-            control_flow,
             client_tx,
             renderer @ Renderer {
                 surface,
@@ -46,22 +42,20 @@ impl EventHandler for Game {
         ): Self::Context<'_>,
     ) {
         self.scene.handle(event, (client_tx, renderer, dt));
+        self.output.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {
-                Ok(output) => {
+                Ok(surface) => {
                     let mut encoder = device.create_command_encoder(&Default::default());
-                    self.scene.render(
-                        &output.texture.create_view(&Default::default()),
-                        &mut encoder,
-                    );
+                    self.scene.draw(&self.output, &mut encoder);
+                    self.output.draw(&surface, &mut encoder);
                     queue.submit([encoder.finish()]);
-                    output.present();
+                    surface.present();
                 }
-                Err(wgpu::SurfaceError::Lost) => renderer.refresh(),
-                Err(wgpu::SurfaceError::OutOfMemory) => control_flow.set_exit(),
+                Err(wgpu::SurfaceError::Lost) => renderer.recreate_surface(),
                 _ => {}
-            };
+            }
         }
     }
 }
