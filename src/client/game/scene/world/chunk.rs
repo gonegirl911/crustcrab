@@ -3,7 +3,7 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         game::scene::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
-        renderer::Renderer,
+        renderer::{Mesh, Renderer},
     },
     server::{
         scene::world::chunk::{Chunk, ChunkData},
@@ -14,11 +14,10 @@ use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
 use nalgebra::Point3;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{mem, sync::Arc, thread, time::Instant};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use std::{sync::Arc, thread, time::Instant};
 
 pub struct ChunkMeshPool {
-    meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
+    meshes: FxHashMap<Point3<i32>, (Mesh<BlockVertex>, Instant)>,
     unloaded: FxHashSet<Point3<i32>>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Instant)>,
@@ -54,7 +53,12 @@ impl ChunkMeshPool {
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
         for (coords, (mesh, _)) in &self.meshes {
             if Self::bounding_sphere(*coords).is_visible(frustum) {
-                mesh.draw(render_pass, *coords);
+                render_pass.set_push_constants(
+                    wgpu::ShaderStages::VERTEX,
+                    0,
+                    bytemuck::cast_slice(&[BlockPushConstants::new(*coords)]),
+                );
+                mesh.draw(render_pass);
             }
         }
     }
@@ -99,13 +103,11 @@ impl EventHandler for ChunkMeshPool {
                                 .entry(coords)
                                 .and_modify(|(mesh, last_updated_at)| {
                                     if updated_at > *last_updated_at {
-                                        *mesh = ChunkMesh::new(renderer, &vertices);
+                                        *mesh = Mesh::new(renderer, &vertices);
                                         *last_updated_at = updated_at;
                                     }
                                 })
-                                .or_insert_with(|| {
-                                    (ChunkMesh::new(renderer, &vertices), updated_at)
-                                });
+                                .or_insert_with(|| (Mesh::new(renderer, &vertices), updated_at));
                         } else {
                             self.meshes.remove(&coords);
                         }
@@ -114,36 +116,6 @@ impl EventHandler for ChunkMeshPool {
             }
             _ => {}
         }
-    }
-}
-
-struct ChunkMesh {
-    vertex_buffer: wgpu::Buffer,
-}
-
-impl ChunkMesh {
-    fn new(Renderer { device, .. }: &Renderer, vertices: &[BlockVertex]) -> Self {
-        Self {
-            vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }),
-        }
-    }
-
-    fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, coords: Point3<i32>) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_push_constants(
-            wgpu::ShaderStages::VERTEX,
-            0,
-            bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
-        );
-        render_pass.draw(0..self.len(), 0..1);
-    }
-
-    fn len(&self) -> u32 {
-        (self.vertex_buffer.size() / mem::size_of::<BlockVertex>() as u64) as u32
     }
 }
 

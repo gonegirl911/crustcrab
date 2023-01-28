@@ -2,17 +2,16 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         game::scene::depth_buffer::DepthBuffer,
-        renderer::Renderer,
+        renderer::{IndexedMesh, Renderer, Vertex},
     },
     server::ServerEvent,
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{point, Point3};
+use nalgebra::Point3;
 use std::mem;
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct BlockSelection {
-    mesh: BlockSelectionMesh,
+    mesh: IndexedMesh<BlockOutlineVertex, u16>,
     coords: Option<Point3<i32>>,
     render_pipeline: wgpu::RenderPipeline,
 }
@@ -22,7 +21,12 @@ impl BlockSelection {
         renderer @ Renderer { device, config, .. }: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let mesh = BlockSelectionMesh::new(renderer, &VERTICES, &INDICES);
+        let outline = BlockOutline::new(0.001);
+        let mesh = IndexedMesh::new(
+            renderer,
+            &outline.vertices().collect::<Vec<_>>(),
+            &outline.indices().collect::<Vec<_>>(),
+        );
         let coords = None;
         let shader = device.create_shader_module(wgpu::include_wgsl!(
             "../../../../assets/shaders/selection.wgsl"
@@ -42,7 +46,7 @@ impl BlockSelection {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[BlockSelectionVertex::desc()],
+                buffers: &[BlockOutlineVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -82,7 +86,12 @@ impl BlockSelection {
         if let Some(coords) = self.coords {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, player_bind_group, &[]);
-            self.mesh.draw(render_pass, coords);
+            render_pass.set_push_constants(
+                wgpu::ShaderStages::VERTEX,
+                0,
+                bytemuck::cast_slice(&[BlockSelectionPushConstants::new(coords)]),
+            );
+            self.mesh.draw(render_pass);
         }
     }
 }
@@ -93,67 +102,6 @@ impl EventHandler for BlockSelection {
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
         if let Event::UserEvent(ServerEvent::BlockSelected { coords }) = event {
             self.coords = *coords;
-        }
-    }
-}
-
-struct BlockSelectionMesh {
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-}
-
-impl BlockSelectionMesh {
-    fn new(
-        Renderer { device, .. }: &Renderer,
-        vertices: &[BlockSelectionVertex],
-        indices: &[u16],
-    ) -> Self {
-        Self {
-            vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }),
-            index_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(indices),
-                usage: wgpu::BufferUsages::INDEX,
-            }),
-        }
-    }
-
-    fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, coords: Point3<i32>) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.set_push_constants(
-            wgpu::ShaderStages::VERTEX,
-            0,
-            bytemuck::cast_slice(&[BlockSelectionPushConstants::new(coords)]),
-        );
-        render_pass.draw_indexed(0..self.len(), 0, 0..1);
-    }
-
-    fn len(&self) -> u32 {
-        (self.index_buffer.size() / mem::size_of::<u16>() as u64) as u32
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockSelectionVertex {
-    coords: Point3<f32>,
-}
-
-impl BlockSelectionVertex {
-    const fn new(coords: Point3<f32>) -> Self {
-        Self { coords }
-    }
-
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Float32x3],
         }
     }
 }
@@ -172,23 +120,36 @@ impl BlockSelectionPushConstants {
     }
 }
 
-const VERTICES: [BlockSelectionVertex; 8] = [
-    BlockSelectionVertex::new(point![-0.001, -0.001, -0.001]),
-    BlockSelectionVertex::new(point![1.001, -0.001, -0.001]),
-    BlockSelectionVertex::new(point![1.001, 1.001, -0.001]),
-    BlockSelectionVertex::new(point![-0.001, 1.001, -0.001]),
-    BlockSelectionVertex::new(point![-0.001, -0.001, 1.001]),
-    BlockSelectionVertex::new(point![1.001, -0.001, 1.001]),
-    BlockSelectionVertex::new(point![1.001, 1.001, 1.001]),
-    BlockSelectionVertex::new(point![-0.001, 1.001, 1.001]),
-];
+struct BlockOutline {
+    padding: f32,
+}
 
-#[rustfmt::skip]
-const INDICES: [u16; 36] = [
-    0, 1, 2, 0, 2, 3,
-    1, 5, 6, 1, 6, 2,
-    5, 4, 7, 5, 7, 6,
-    4, 0, 3, 4, 3, 7,
-    3, 2, 6, 3, 6, 7,
-    4, 5, 1, 4, 1, 0,
-];
+impl BlockOutline {
+    fn new(padding: f32) -> Self {
+        Self { padding }
+    }
+
+    fn vertices(&self) -> impl Iterator<Item = BlockOutlineVertex> {
+        std::iter::empty()
+    }
+
+    fn indices(&self) -> impl Iterator<Item = u16> {
+        std::iter::empty()
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Zeroable, Pod)]
+struct BlockOutlineVertex {
+    coords: Point3<f32>,
+}
+
+impl BlockOutlineVertex {
+    fn new(coords: Point3<f32>) -> Self {
+        Self { coords }
+    }
+}
+
+impl Vertex for BlockOutlineVertex {
+    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
+}

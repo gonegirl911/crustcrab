@@ -1,47 +1,7 @@
-use crate::client::renderer::Renderer;
+use crate::client::renderer::Vertex;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, Point3};
-use std::{
-    f32::consts::{PI, TAU},
-    mem,
-};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
-
-pub struct SphereMesh {
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-}
-
-impl SphereMesh {
-    pub fn new(
-        Renderer { device, .. }: &Renderer,
-        vertices: &[SphereVertex],
-        indices: &[u16],
-    ) -> Self {
-        Self {
-            vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }),
-            index_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(indices),
-                usage: wgpu::BufferUsages::INDEX,
-            }),
-        }
-    }
-
-    pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.len(), 0, 0..1);
-    }
-
-    fn len(&self) -> u32 {
-        (self.index_buffer.size() / mem::size_of::<u16>() as u64) as u32
-    }
-}
+use std::f32::consts::{PI, TAU};
 
 pub struct Sphere {
     sectors: u16,
@@ -92,15 +52,9 @@ impl SphereVertex {
     fn new(coords: Point3<f32>, tex_v: f32) -> Self {
         Self { coords, tex_v }
     }
+}
 
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        const ATTRIBS: [wgpu::VertexAttribute; 2] =
-            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32];
-
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &ATTRIBS,
-        }
-    }
+impl Vertex for SphereVertex {
+    const ATTRIBS: &'static [wgpu::VertexAttribute] =
+        &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32];
 }

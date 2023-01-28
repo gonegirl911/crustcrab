@@ -9,10 +9,9 @@ use self::{
     clock::Clock, depth_buffer::DepthBuffer, player::Player, selection::BlockSelection, sky::Sky,
     world::World,
 };
-use super::output::Output;
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::Renderer,
+    renderer::{Bindable, Renderer, Viewable},
     ClientEvent,
 };
 use flume::Sender;
@@ -54,11 +53,11 @@ impl Scene {
         }
     }
 
-    pub fn draw(&self, output: &Output, encoder: &mut wgpu::CommandEncoder) {
+    pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: output.view(),
+                view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),

@@ -10,7 +10,7 @@ use self::{
 use super::{depth_buffer::DepthBuffer, player::frustum::Frustum};
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::Renderer,
+    renderer::{Bindable, Renderer, Vertex},
 };
 use std::mem;
 

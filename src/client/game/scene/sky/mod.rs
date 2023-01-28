@@ -3,13 +3,13 @@ pub mod sphere;
 
 use self::{
     color_map::ColorMap,
-    sphere::{Sphere, SphereMesh, SphereVertex},
+    sphere::{Sphere, SphereVertex},
 };
 use super::depth_buffer::DepthBuffer;
-use crate::client::renderer::Renderer;
+use crate::client::renderer::{Bindable, IndexedMesh, Renderer, Vertex};
 
 pub struct Sky {
-    mesh: SphereMesh,
+    mesh: IndexedMesh<SphereVertex, u16>,
     color_map: ColorMap,
     render_pipeline: wgpu::RenderPipeline,
 }
@@ -21,7 +21,7 @@ impl Sky {
         clock_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let sphere = Sphere::new(32, 16);
-        let mesh = SphereMesh::new(
+        let mesh = IndexedMesh::new(
             renderer,
             &sphere.vertices().collect::<Vec<_>>(),
             &sphere.indices().collect::<Vec<_>>(),
@@ -90,12 +90,14 @@ impl Sky {
         render_pass.set_bind_group(2, self.color_map.bind_group(), &[]);
         self.mesh.draw(render_pass);
     }
+}
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+impl Bindable for Sky {
+    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         self.color_map.bind_group_layout()
     }
 
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
+    fn bind_group(&self) -> &wgpu::BindGroup {
         self.color_map.bind_group()
     }
 }

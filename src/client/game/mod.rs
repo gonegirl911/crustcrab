@@ -5,7 +5,7 @@ pub mod scene;
 use self::{gui::Gui, output::Output, scene::Scene};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::Renderer,
+    renderer::{Bindable, Renderer, Viewable},
     ClientEvent,
 };
 use flume::Sender;
@@ -13,17 +13,16 @@ use std::time::Duration;
 
 pub struct Game {
     scene: Scene,
-    gui: Gui,
     output: Output,
+    gui: Gui,
 }
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
-        Self {
-            scene: Scene::new(renderer),
-            gui: Gui::new(renderer),
-            output: Output::new(renderer),
-        }
+        let scene = Scene::new(renderer);
+        let output = Output::new(renderer);
+        let gui = Gui::new(renderer, output.bind_group_layout());
+        Self { output, scene, gui }
     }
 }
 
@@ -50,10 +49,11 @@ impl EventHandler for Game {
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {
                 Ok(surface) => {
+                    let view = surface.texture.create_view(&Default::default());
                     let mut encoder = device.create_command_encoder(&Default::default());
-                    self.scene.draw(&self.output, &mut encoder);
-                    self.gui.draw(&self.output, &mut encoder);
-                    self.output.draw(&surface, &mut encoder);
+                    self.scene.draw(self.output.view(), &mut encoder);
+                    self.output.draw(&view, &mut encoder);
+                    self.gui.draw(&view, &mut encoder, self.output.bind_group());
                     queue.submit([encoder.finish()]);
                     surface.present();
                 }

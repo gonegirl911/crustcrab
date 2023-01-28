@@ -1,6 +1,6 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::Renderer,
+    renderer::{Renderer, Viewable},
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
@@ -33,10 +33,6 @@ impl DepthBuffer {
             is_resized: false,
         }
     }
-
-    pub fn view(&self) -> &wgpu::TextureView {
-        &self.view
-    }
 }
 
 impl EventHandler for DepthBuffer {
@@ -63,5 +59,11 @@ impl EventHandler for DepthBuffer {
             }
             _ => {}
         }
+    }
+}
+
+impl Viewable for DepthBuffer {
+    fn view(&self) -> &wgpu::TextureView {
+        &self.view
     }
 }

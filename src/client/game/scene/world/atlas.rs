@@ -1,4 +1,4 @@
-use crate::client::renderer::Renderer;
+use crate::client::renderer::{Bindable, Renderer};
 use std::num::NonZeroU32;
 
 pub struct TextureAtlas {
@@ -94,12 +94,14 @@ impl TextureAtlas {
             bind_group,
         }
     }
+}
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+impl Bindable for TextureAtlas {
+    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
     }
 
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
+    fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
 }

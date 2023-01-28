@@ -1,6 +1,6 @@
+use crate::client::renderer::Vertex;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3};
-use std::mem;
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
@@ -24,12 +24,8 @@ impl BlockVertex {
         data |= (ambient_occlusion as u32) << 25;
         Self(data)
     }
+}
 
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &wgpu::vertex_attr_array![0 => Uint32],
-        }
-    }
+impl Vertex for BlockVertex {
+    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32];
 }

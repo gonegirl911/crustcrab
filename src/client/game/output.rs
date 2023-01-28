@@ -1,8 +1,7 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::Renderer,
+    renderer::{Bindable, Renderer, Viewable},
 };
-use wgpu::SurfaceTexture;
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Output {
@@ -15,8 +14,23 @@ pub struct Output {
 }
 
 impl Output {
-    pub fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
-        let view = Self::create_view(renderer);
+    pub fn new(Renderer { device, config, .. }: &Renderer) -> Self {
+        let view = device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: None,
+                size: wgpu::Extent3d {
+                    width: config.width,
+                    height: config.height,
+                    ..Default::default()
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+            })
+            .create_view(&Default::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -47,7 +61,20 @@ impl Output {
                 },
             ],
         });
-        let bind_group = Self::create_bind_group(renderer, &view, &sampler, &bind_group_layout);
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
         let shader =
             device.create_shader_module(wgpu::include_wgsl!("../../../assets/shaders/output.wgsl"));
         let render_pipeline_layout =
@@ -88,24 +115,11 @@ impl Output {
         }
     }
 
-    pub fn view(&self) -> &wgpu::TextureView {
-        &self.view
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
-    }
-
-    pub fn draw(&self, surface: &SurfaceTexture, encoder: &mut wgpu::CommandEncoder) {
-        let view = surface.texture.create_view(&Default::default());
+    pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
+                view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -119,14 +133,8 @@ impl Output {
         render_pass.draw(0..3, 0..1);
     }
 
-    fn recreate_texture(&mut self, renderer: &Renderer) {
-        self.view = Self::create_view(renderer);
-        self.bind_group =
-            Self::create_bind_group(renderer, &self.view, &self.sampler, &self.bind_group_layout);
-    }
-
-    fn create_view(Renderer { device, config, .. }: &Renderer) -> wgpu::TextureView {
-        device
+    fn recreate_texture(&mut self, Renderer { device, config, .. }: &Renderer) {
+        self.view = device
             .create_texture(&wgpu::TextureDescriptor {
                 label: None,
                 size: wgpu::Extent3d {
@@ -141,29 +149,21 @@ impl Output {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING,
             })
-            .create_view(&Default::default())
-    }
-
-    fn create_bind_group(
-        Renderer { device, .. }: &Renderer,
-        view: &wgpu::TextureView,
-        sampler: &wgpu::Sampler,
-        bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> wgpu::BindGroup {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            .create_view(&Default::default());
+        self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
-            layout: bind_group_layout,
+            layout: &self.bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(view),
+                    resource: wgpu::BindingResource::TextureView(&self.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(sampler),
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
             ],
-        })
+        });
     }
 }
 
@@ -191,5 +191,21 @@ impl EventHandler for Output {
             }
             _ => {}
         }
+    }
+}
+
+impl Viewable for Output {
+    fn view(&self) -> &wgpu::TextureView {
+        &self.view
+    }
+}
+
+impl Bindable for Output {
+    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.bind_group_layout
+    }
+
+    fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
     }
 }
