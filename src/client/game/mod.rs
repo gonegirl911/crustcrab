@@ -1,7 +1,8 @@
+pub mod gui;
 pub mod output;
 pub mod scene;
 
-use self::{output::Output, scene::Scene};
+use self::{gui::Gui, output::Output, scene::Scene};
 use super::{
     event_loop::{Event, EventHandler},
     renderer::Renderer,
@@ -12,6 +13,7 @@ use std::time::Duration;
 
 pub struct Game {
     scene: Scene,
+    gui: Gui,
     output: Output,
 }
 
@@ -19,6 +21,7 @@ impl Game {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             scene: Scene::new(renderer),
+            gui: Gui::new(renderer),
             output: Output::new(renderer),
         }
     }
@@ -49,6 +52,7 @@ impl EventHandler for Game {
                 Ok(surface) => {
                     let mut encoder = device.create_command_encoder(&Default::default());
                     self.scene.draw(&self.output, &mut encoder);
+                    self.gui.draw(&self.output, &mut encoder);
                     self.output.draw(&surface, &mut encoder);
                     queue.submit([encoder.finish()]);
                     surface.present();
