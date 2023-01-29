@@ -10,7 +10,7 @@ use self::{
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{Bindable, Renderer, Uniform},
+        renderer::{Renderer, Uniform},
         ClientEvent,
     },
     server::scene::world::{block::Block, chunk::Chunk},
@@ -43,6 +43,14 @@ impl Player {
             uniform: Uniform::new(renderer),
             is_updated: true,
         }
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.uniform.bind_group_layout()
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        self.uniform.bind_group()
     }
 
     pub fn frustum(&self) -> Frustum {
@@ -113,11 +121,11 @@ impl EventHandler for Player {
             Event::RedrawRequested(_) if self.is_updated => {
                 self.uniform.update(
                     renderer,
-                    &PlayerUniformData {
-                        vp: self.projection.mat() * self.camera.mat(),
-                        origin: self.camera.origin(),
-                        render_distance: self.render_distance,
-                    },
+                    &PlayerUniformData::new(
+                        self.projection.mat() * self.camera.mat(),
+                        self.camera.origin(),
+                        self.render_distance,
+                    ),
                 );
             }
             Event::RedrawEventsCleared => {
@@ -128,20 +136,20 @@ impl EventHandler for Player {
     }
 }
 
-impl Bindable for Player {
-    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.uniform.bind_group_layout()
-    }
-
-    fn bind_group(&self) -> &wgpu::BindGroup {
-        self.uniform.bind_group()
-    }
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct PlayerUniformData {
     vp: Matrix4<f32>,
     origin: Point3<f32>,
     render_distance: u32,
+}
+
+impl PlayerUniformData {
+    fn new(vp: Matrix4<f32>, origin: Point3<f32>, render_distance: u32) -> Self {
+        Self {
+            vp,
+            origin,
+            render_distance,
+        }
+    }
 }

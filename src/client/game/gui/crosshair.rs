@@ -66,28 +66,28 @@ impl Crosshair {
     }
 }
 
-struct Cross {
+pub struct Cross {
     size: u32,
     thickness: u32,
 }
 
 impl Cross {
-    fn new(size: u32, thickness: u32) -> Self {
+    pub fn new(size: u32, thickness: u32) -> Self {
         Self { size, thickness }
     }
 
-    fn vertices(&self) -> impl Iterator<Item = CrossVertex> {
+    pub fn vertices(&self) -> impl Iterator<Item = CrossVertex> {
         std::iter::empty()
     }
 
-    fn indices(&self) -> impl Iterator<Item = u16> {
+    pub fn indices(&self) -> impl Iterator<Item = u16> {
         std::iter::empty()
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct CrossVertex {
+pub struct CrossVertex {
     coords: Point3<f32>,
 }
 

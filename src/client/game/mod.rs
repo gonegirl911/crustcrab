@@ -5,7 +5,7 @@ pub mod scene;
 use self::{gui::Gui, output::Output, scene::Scene};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{Bindable, Renderer, Viewable},
+    renderer::Renderer,
     ClientEvent,
 };
 use flume::Sender;

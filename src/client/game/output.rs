@@ -1,6 +1,6 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{Bindable, Renderer, Viewable},
+    renderer::Renderer,
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
@@ -29,6 +29,7 @@ impl Output {
                 format: config.format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
             })
             .create_view(&Default::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -115,6 +116,18 @@ impl Output {
         }
     }
 
+    pub fn view(&self) -> &wgpu::TextureView {
+        &self.view
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.bind_group_layout
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+
     pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
@@ -148,6 +161,7 @@ impl Output {
                 format: config.format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                     | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
             })
             .create_view(&Default::default());
         self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -191,21 +205,5 @@ impl EventHandler for Output {
             }
             _ => {}
         }
-    }
-}
-
-impl Viewable for Output {
-    fn view(&self) -> &wgpu::TextureView {
-        &self.view
-    }
-}
-
-impl Bindable for Output {
-    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
     }
 }

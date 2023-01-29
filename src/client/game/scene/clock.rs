@@ -1,7 +1,7 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{Bindable, Renderer, Uniform},
+        renderer::{Renderer, Uniform},
     },
     server::ServerEvent,
 };
@@ -19,6 +19,14 @@ impl Clock {
             updated_time: Some(0.0),
         }
     }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.uniform.bind_group_layout()
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        self.uniform.bind_group()
+    }
 }
 
 impl EventHandler for Clock {
@@ -31,7 +39,7 @@ impl EventHandler for Clock {
             }
             Event::RedrawRequested(_) => {
                 if let Some(time) = self.updated_time {
-                    self.uniform.update(renderer, &ClockUniformData { time });
+                    self.uniform.update(renderer, &ClockUniformData::new(time));
                 }
             }
             Event::RedrawEventsCleared => {
@@ -42,18 +50,14 @@ impl EventHandler for Clock {
     }
 }
 
-impl Bindable for Clock {
-    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.uniform.bind_group_layout()
-    }
-
-    fn bind_group(&self) -> &wgpu::BindGroup {
-        self.uniform.bind_group()
-    }
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct ClockUniformData {
     time: f32,
+}
+
+impl ClockUniformData {
+    fn new(time: f32) -> Self {
+        Self { time }
+    }
 }

@@ -11,7 +11,7 @@ use nalgebra::Point3;
 use std::mem;
 
 pub struct BlockSelection {
-    mesh: IndexedMesh<BlockOutlineVertex, u16>,
+    mesh: IndexedMesh<BlockShellVertex, u16>,
     coords: Option<Point3<i32>>,
     render_pipeline: wgpu::RenderPipeline,
 }
@@ -21,7 +21,7 @@ impl BlockSelection {
         renderer @ Renderer { device, config, .. }: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let outline = BlockOutline::new(0.001);
+        let outline = BlockShell::new(0.001);
         let mesh = IndexedMesh::new(
             renderer,
             &outline.vertices().collect::<Vec<_>>(),
@@ -46,7 +46,7 @@ impl BlockSelection {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[BlockOutlineVertex::desc()],
+                buffers: &[BlockShellVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -120,16 +120,16 @@ impl BlockSelectionPushConstants {
     }
 }
 
-struct BlockOutline {
+struct BlockShell {
     padding: f32,
 }
 
-impl BlockOutline {
+impl BlockShell {
     fn new(padding: f32) -> Self {
         Self { padding }
     }
 
-    fn vertices(&self) -> impl Iterator<Item = BlockOutlineVertex> {
+    fn vertices(&self) -> impl Iterator<Item = BlockShellVertex> {
         std::iter::empty()
     }
 
@@ -140,16 +140,16 @@ impl BlockOutline {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockOutlineVertex {
+struct BlockShellVertex {
     coords: Point3<f32>,
 }
 
-impl BlockOutlineVertex {
+impl BlockShellVertex {
     fn new(coords: Point3<f32>) -> Self {
         Self { coords }
     }
 }
 
-impl Vertex for BlockOutlineVertex {
+impl Vertex for BlockShellVertex {
     const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
 }

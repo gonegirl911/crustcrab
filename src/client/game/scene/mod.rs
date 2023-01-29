@@ -11,7 +11,7 @@ use self::{
 };
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{Bindable, Renderer, Viewable},
+    renderer::Renderer,
     ClientEvent,
 };
 use flume::Sender;

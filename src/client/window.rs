@@ -37,11 +37,11 @@ impl EventHandler for Window {
                     state: ElementState::Pressed,
                     ..
                 } => {
-                    self.window.set_cursor_visible(false);
                     self.window
                         .set_cursor_grab(CursorGrabMode::Locked)
                         .or_else(|_| self.window.set_cursor_grab(CursorGrabMode::Confined))
                         .expect("cursor should be lockable");
+                    self.window.set_cursor_visible(false);
                 }
                 WindowEvent::KeyboardInput {
                     input:
@@ -52,10 +52,10 @@ impl EventHandler for Window {
                         },
                     ..
                 } => {
-                    self.window.set_cursor_visible(true);
                     self.window
                         .set_cursor_grab(CursorGrabMode::None)
                         .expect("cursor should be unlockable");
+                    self.window.set_cursor_visible(true);
                 }
                 WindowEvent::CloseRequested => control_flow.set_exit(),
                 _ => {}

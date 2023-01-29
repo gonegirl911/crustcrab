@@ -1,4 +1,4 @@
-use crate::client::game::scene::world::block::BlockVertex;
+use crate::client::game::scene::world::BlockVertex;
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
