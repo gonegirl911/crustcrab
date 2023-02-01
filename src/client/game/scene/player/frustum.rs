@@ -27,8 +27,8 @@ impl Frustum {
     ) -> Self {
         let height = (fovy * 0.5).tan();
         let width = height * aspect;
-        let sphere_factor_x = 1.0 / height.atan().cos();
-        let sphere_factor_y = 1.0 / width.atan().cos();
+        let sphere_factor_x = 1.0 / width.atan().cos();
+        let sphere_factor_y = 1.0 / height.atan().cos();
         Self {
             forward,
             right,
