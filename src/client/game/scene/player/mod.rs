@@ -38,7 +38,7 @@ impl Player {
         Self {
             camera: Camera::new(point![0.0, 100.0, 0.0], Vector3::z(), Vector3::y()),
             controller: CameraController::new(20.0, 0.4),
-            projection: Projection::new(70.0, aspect, 0.1, zfar),
+            projection: Projection::new(90.0, aspect, 0.1, zfar),
             render_distance: render_distance as u32,
             uniform: Uniform::new(renderer),
             is_updated: true,

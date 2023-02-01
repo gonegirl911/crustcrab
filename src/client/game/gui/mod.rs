@@ -1,6 +1,9 @@
 mod crosshair;
 
-use crate::client::renderer::Renderer;
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::Renderer,
+};
 use crosshair::Crosshair;
 
 pub struct Gui {
@@ -35,5 +38,13 @@ impl Gui {
             }),
             output_bind_group,
         );
+    }
+}
+
+impl EventHandler for Gui {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        self.crosshair.handle(event, renderer);
     }
 }

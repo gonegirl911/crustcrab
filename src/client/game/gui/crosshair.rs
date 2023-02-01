@@ -1,57 +1,45 @@
-use crate::client::renderer::{IndexedMesh, Renderer, Vertex};
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::{ImageTexture, Program, Renderer, Uniform},
+};
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Point3;
+use nalgebra::{vector, Matrix4};
+use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Crosshair {
-    mesh: IndexedMesh<CrossVertex, u16>,
-    render_pipeline: wgpu::RenderPipeline,
+    uniform: Uniform<CrosshairUniformData>,
+    texture: ImageTexture,
+    program: Program,
+    is_resized: bool,
 }
 
 impl Crosshair {
-    pub fn new(
-        renderer @ Renderer { device, config, .. }: &Renderer,
-        output_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        let cross = Cross::new(18, 2);
-        let mesh = IndexedMesh::new(
+    pub fn new(renderer: &Renderer, output_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+        let uniform = Uniform::new(renderer);
+        let texture = ImageTexture::new(
             renderer,
-            &cross.vertices().collect::<Vec<_>>(),
-            &cross.indices().collect::<Vec<_>>(),
+            include_bytes!("../../../../assets/textures/crosshair.png"),
+            true,
         );
-        let shader = device.create_shader_module(wgpu::include_wgsl!(
-            "../../../../assets/shaders/crosshair.wgsl"
-        ));
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[output_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[CrossVertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: Default::default(),
-            depth_stencil: None,
-            multisample: Default::default(),
-            multiview: None,
-        });
+        let program = Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../../../assets/shaders/crosshair.wgsl"),
+            &[],
+            &[
+                uniform.bind_group_layout(),
+                texture.bind_group_layout(),
+                output_bind_group_layout,
+            ],
+            &[],
+            None,
+            None,
+            None,
+        );
         Self {
-            mesh,
-            render_pipeline,
+            uniform,
+            texture,
+            program,
+            is_resized: true,
         }
     }
 
@@ -60,43 +48,61 @@ impl Crosshair {
         render_pass: &mut wgpu::RenderPass<'a>,
         output_bind_group: &'a wgpu::BindGroup,
     ) {
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, output_bind_group, &[]);
-        self.mesh.draw(render_pass);
+        self.program.draw(
+            render_pass,
+            [
+                self.uniform.bind_group(),
+                self.texture.bind_group(),
+                output_bind_group,
+            ],
+        );
+        render_pass.draw(0..6, 0..1);
     }
 }
 
-pub struct Cross {
-    size: u32,
-    thickness: u32,
-}
+impl EventHandler for Crosshair {
+    type Context<'a> = &'a Renderer;
 
-impl Cross {
-    pub fn new(size: u32, thickness: u32) -> Self {
-        Self { size, thickness }
-    }
-
-    pub fn vertices(&self) -> impl Iterator<Item = CrossVertex> {
-        std::iter::empty()
-    }
-
-    pub fn indices(&self) -> impl Iterator<Item = u16> {
-        std::iter::empty()
+    fn handle(&mut self, event: &Event, renderer @ Renderer { config, .. }: Self::Context<'_>) {
+        match event {
+            Event::WindowEvent {
+                event:
+                    WindowEvent::Resized(PhysicalSize { width, height })
+                    | WindowEvent::ScaleFactorChanged {
+                        new_inner_size: PhysicalSize { width, height },
+                        ..
+                    },
+                ..
+            } if *width != 0 && *height != 0 => {
+                self.is_resized = true;
+            }
+            Event::RedrawRequested(_) if self.is_resized => {
+                let size = (config.height as f32 * 0.065).max(36.0);
+                self.uniform.update(
+                    renderer,
+                    &CrosshairUniformData::new(Matrix4::new_nonuniform_scaling(&vector![
+                        size / config.width as f32,
+                        size / config.height as f32,
+                        1.0
+                    ])),
+                );
+            }
+            Event::RedrawEventsCleared => {
+                self.is_resized = false;
+            }
+            _ => {}
+        }
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-pub struct CrossVertex {
-    coords: Point3<f32>,
+struct CrosshairUniformData {
+    transform: Matrix4<f32>,
 }
 
-impl CrossVertex {
-    fn new(coords: Point3<f32>) -> Self {
-        Self { coords }
+impl CrosshairUniformData {
+    fn new(transform: Matrix4<f32>) -> Self {
+        Self { transform }
     }
-}
-
-impl Vertex for CrossVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
 }

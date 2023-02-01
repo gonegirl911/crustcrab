@@ -100,7 +100,7 @@ pub struct Mesh<V> {
     phantom: PhantomData<V>,
 }
 
-impl<V: Pod> Mesh<V> {
+impl<V: Vertex> Mesh<V> {
     pub fn new(Renderer { device, .. }: &Renderer, vertices: &[V]) -> Self {
         Self {
             vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
@@ -325,6 +325,256 @@ impl ImageTexture {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+}
+
+pub struct ScreenTexture {
+    view: wgpu::TextureView,
+    format: wgpu::TextureFormat,
+    usage: wgpu::TextureUsages,
+    is_resized: bool,
+}
+
+impl ScreenTexture {
+    pub fn new(
+        Renderer { device, config, .. }: &Renderer,
+        format: wgpu::TextureFormat,
+        usage: wgpu::TextureUsages,
+    ) -> Self {
+        Self {
+            view: device
+                .create_texture(&wgpu::TextureDescriptor {
+                    label: None,
+                    size: wgpu::Extent3d {
+                        width: config.width,
+                        height: config.height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format,
+                    usage,
+                    view_formats: &[],
+                })
+                .create_view(&Default::default()),
+            format,
+            usage,
+            is_resized: false,
+        }
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        &self.view
+    }
+}
+
+impl EventHandler for ScreenTexture {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        match event {
+            Event::WindowEvent {
+                event:
+                    WindowEvent::Resized(PhysicalSize { width, height })
+                    | WindowEvent::ScaleFactorChanged {
+                        new_inner_size: PhysicalSize { width, height },
+                        ..
+                    },
+                ..
+            } if *width != 0 && *height != 0 => {
+                self.is_resized = true;
+            }
+            Event::RedrawRequested(_) if self.is_resized => {
+                *self = Self::new(renderer, self.format, self.usage);
+            }
+            _ => {}
+        }
+    }
+}
+
+pub struct InputOutputTexture {
+    texture: ScreenTexture,
+    sampler: wgpu::Sampler,
+    bind_group_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+    is_resized: bool,
+}
+
+impl InputOutputTexture {
+    pub fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
+        let texture = ScreenTexture::new(
+            renderer,
+            config.format,
+            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        );
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+            ],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(texture.view()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        Self {
+            texture,
+            sampler,
+            bind_group_layout,
+            bind_group,
+            is_resized: false,
+        }
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.texture.view()
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.bind_group_layout
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+}
+
+impl EventHandler for InputOutputTexture {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer @ Renderer { device, .. }: Self::Context<'_>) {
+        self.texture.handle(event, renderer);
+
+        match event {
+            Event::WindowEvent {
+                event:
+                    WindowEvent::Resized(PhysicalSize { width, height })
+                    | WindowEvent::ScaleFactorChanged {
+                        new_inner_size: PhysicalSize { width, height },
+                        ..
+                    },
+                ..
+            } if *width != 0 && *height != 0 => {
+                self.is_resized = true;
+            }
+            Event::RedrawRequested(_) if self.is_resized => {
+                self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &self.bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(self.texture.view()),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        },
+                    ],
+                });
+            }
+            Event::RedrawEventsCleared => {
+                self.is_resized = false;
+            }
+            _ => {}
+        }
+    }
+}
+
+pub struct Program {
+    render_pipeline: wgpu::RenderPipeline,
+}
+
+impl Program {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        Renderer { device, config, .. }: &Renderer,
+        desc: wgpu::ShaderModuleDescriptor,
+        buffers: &[wgpu::VertexBufferLayout],
+        bind_group_layouts: &[&wgpu::BindGroupLayout],
+        push_constant_ranges: &[wgpu::PushConstantRange],
+        blend: Option<wgpu::BlendState>,
+        cull_mode: Option<wgpu::Face>,
+        depth_stencil: Option<wgpu::DepthStencilState>,
+    ) -> Self {
+        let shader = device.create_shader_module(desc);
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts,
+                push_constant_ranges,
+            });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers,
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend,
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                cull_mode,
+                ..Default::default()
+            },
+            depth_stencil,
+            multisample: Default::default(),
+            multiview: None,
+        });
+        Self { render_pipeline }
+    }
+
+    pub fn draw<'a, I>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, bind_groups: I)
+    where
+        I: IntoIterator<Item = &'a wgpu::BindGroup>,
+    {
+        render_pass.set_pipeline(&self.render_pipeline);
+        for (bind_group, i) in bind_groups.into_iter().zip(0..) {
+            render_pass.set_bind_group(i, bind_group, &[]);
+        }
     }
 }
 

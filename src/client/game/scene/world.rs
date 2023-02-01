@@ -5,7 +5,7 @@ use super::{
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{ImageTexture, Mesh, Renderer, Vertex},
+        renderer::{ImageTexture, Mesh, Program, Renderer, Vertex},
     },
     server::{
         scene::world::chunk::{Chunk, ChunkData},
@@ -21,12 +21,12 @@ use std::{mem, sync::Arc, thread, time::Instant};
 pub struct World {
     meshes: ChunkMeshPool,
     atlas: ImageTexture,
-    render_pipeline: wgpu::RenderPipeline,
+    program: Program,
 }
 
 impl World {
     pub fn new(
-        renderer @ Renderer { device, config, .. }: &Renderer,
+        renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         clock_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
@@ -37,57 +37,34 @@ impl World {
             include_bytes!("../../../../assets/textures/atlas.png"),
             true,
         );
-        let shader = device
-            .create_shader_module(wgpu::include_wgsl!("../../../../assets/shaders/block.wgsl"));
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[
-                    player_bind_group_layout,
-                    clock_bind_group_layout,
-                    atlas.bind_group_layout(),
-                    sky_bind_group_layout,
-                ],
-                push_constant_ranges: &[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStages::VERTEX,
-                    range: 0..mem::size_of::<BlockPushConstants>() as u32,
-                }],
-            });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[BlockVertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                cull_mode: Some(wgpu::Face::Back),
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DepthBuffer::DEPTH_FORMAT,
+        let program = Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../../../assets/shaders/block.wgsl"),
+            &[BlockVertex::desc()],
+            &[
+                player_bind_group_layout,
+                clock_bind_group_layout,
+                atlas.bind_group_layout(),
+                sky_bind_group_layout,
+            ],
+            &[wgpu::PushConstantRange {
+                stages: wgpu::ShaderStages::VERTEX,
+                range: 0..mem::size_of::<BlockPushConstants>() as u32,
+            }],
+            None,
+            Some(wgpu::Face::Back),
+            Some(wgpu::DepthStencilState {
+                format: DepthBuffer::FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
-            multisample: Default::default(),
-            multiview: None,
-        });
+        );
         Self {
             meshes,
             atlas,
-            render_pipeline,
+            program,
         }
     }
 
@@ -99,11 +76,15 @@ impl World {
         sky_bind_group: &'a wgpu::BindGroup,
         frustum: &Frustum,
     ) {
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, player_bind_group, &[]);
-        render_pass.set_bind_group(1, clock_bind_group, &[]);
-        render_pass.set_bind_group(2, self.atlas.bind_group(), &[]);
-        render_pass.set_bind_group(3, sky_bind_group, &[]);
+        self.program.draw(
+            render_pass,
+            [
+                player_bind_group,
+                clock_bind_group,
+                self.atlas.bind_group(),
+                sky_bind_group,
+            ],
+        );
         self.meshes.draw(render_pass, frustum);
     }
 }

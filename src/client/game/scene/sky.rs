@@ -1,5 +1,5 @@
 use super::depth_buffer::DepthBuffer;
-use crate::client::renderer::{ImageTexture, IndexedMesh, Renderer, Vertex};
+use crate::client::renderer::{ImageTexture, IndexedMesh, Program, Renderer, Vertex};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, Point3};
 use std::f32::consts::{PI, TAU};
@@ -7,12 +7,12 @@ use std::f32::consts::{PI, TAU};
 pub struct Sky {
     mesh: IndexedMesh<SphereVertex, u16>,
     color_map: ImageTexture,
-    render_pipeline: wgpu::RenderPipeline,
+    program: Program,
 }
 
 impl Sky {
     pub fn new(
-        renderer @ Renderer { device, config, .. }: &Renderer,
+        renderer: &Renderer,
         camera_bind_group_layout: &wgpu::BindGroupLayout,
         clock_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
@@ -27,53 +27,30 @@ impl Sky {
             include_bytes!("../../../../assets/textures/sky.png"),
             false,
         );
-        let shader =
-            device.create_shader_module(wgpu::include_wgsl!("../../../../assets/shaders/sky.wgsl"));
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[
-                    camera_bind_group_layout,
-                    clock_bind_group_layout,
-                    color_map.bind_group_layout(),
-                ],
-                push_constant_ranges: &[],
-            });
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[SphereVertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                cull_mode: Some(wgpu::Face::Front),
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DepthBuffer::DEPTH_FORMAT,
+        let program = Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../../../assets/shaders/sky.wgsl"),
+            &[SphereVertex::desc()],
+            &[
+                camera_bind_group_layout,
+                clock_bind_group_layout,
+                color_map.bind_group_layout(),
+            ],
+            &[],
+            None,
+            Some(wgpu::Face::Front),
+            Some(wgpu::DepthStencilState {
+                format: DepthBuffer::FORMAT,
                 depth_write_enabled: false,
                 depth_compare: wgpu::CompareFunction::Always,
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
-            multisample: Default::default(),
-            multiview: None,
-        });
+        );
         Self {
             mesh,
             color_map,
-            render_pipeline,
+            program,
         }
     }
 
@@ -91,10 +68,14 @@ impl Sky {
         camera_bind_group: &'a wgpu::BindGroup,
         clock_bind_group: &'a wgpu::BindGroup,
     ) {
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, camera_bind_group, &[]);
-        render_pass.set_bind_group(1, clock_bind_group, &[]);
-        render_pass.set_bind_group(2, self.color_map.bind_group(), &[]);
+        self.program.draw(
+            render_pass,
+            [
+                camera_bind_group,
+                clock_bind_group,
+                self.color_map.bind_group(),
+            ],
+        );
         self.mesh.draw(render_pass);
     }
 }

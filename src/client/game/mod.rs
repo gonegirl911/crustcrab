@@ -45,6 +45,7 @@ impl EventHandler for Game {
     ) {
         self.scene.handle(event, (client_tx, renderer, dt));
         self.output.handle(event, renderer);
+        self.gui.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {
