@@ -1,8 +1,7 @@
-pub mod clock;
 pub mod player;
-pub mod world;
+pub mod scene;
 
-use self::{clock::Clock, player::Player, world::World};
+use self::{player::Player, scene::Scene};
 use super::{
     event_loop::{Event, EventHandler},
     ServerEvent,
@@ -10,18 +9,16 @@ use super::{
 use flume::Sender;
 
 #[derive(Default)]
-pub struct Scene {
+pub struct Game {
     player: Player,
-    clock: Clock,
-    world: World,
+    scene: Scene,
 }
 
-impl EventHandler<Event> for Scene {
+impl EventHandler<Event> for Game {
     type Context<'a> = Sender<ServerEvent>;
 
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, ());
-        self.clock.handle(event, server_tx.clone());
-        self.world.handle(event, (server_tx, &self.player));
+        self.scene.handle(event, (server_tx, &self.player));
     }
 }

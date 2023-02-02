@@ -6,7 +6,7 @@ use crate::{
     client::{game::scene::world::BlockVertex, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
-        scene::player::{
+        game::player::{
             ray::{BlockIntersection, Ray},
             Player, WorldArea,
         },

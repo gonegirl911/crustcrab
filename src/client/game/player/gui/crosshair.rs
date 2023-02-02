@@ -18,12 +18,12 @@ impl Crosshair {
         let uniform = Uniform::new(renderer);
         let texture = ImageTexture::new(
             renderer,
-            include_bytes!("../../../../assets/textures/crosshair.png"),
+            include_bytes!("../../../../../assets/textures/crosshair.png"),
             true,
         );
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/crosshair.wgsl"),
+            wgpu::include_wgsl!("../../../../../assets/shaders/crosshair.wgsl"),
             &[],
             &[
                 uniform.bind_group_layout(),

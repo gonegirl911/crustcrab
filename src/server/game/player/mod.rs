@@ -1,7 +1,7 @@
 pub mod ray;
 
 use self::ray::Ray;
-use super::world::chunk::{Chunk, ChunkMap};
+use super::scene::world::chunk::{Chunk, ChunkMap};
 use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},

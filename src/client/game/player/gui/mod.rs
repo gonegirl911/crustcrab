@@ -17,6 +17,10 @@ impl Gui {
         }
     }
 
+    pub fn render_distance(&self) -> u32 {
+        36
+    }
+
     pub fn draw(
         &self,
         view: &wgpu::TextureView,

@@ -1,3 +1,4 @@
+use super::event_loop::Event;
 use std::time::{Duration, Instant};
 
 pub struct Ticker {
@@ -14,9 +15,9 @@ impl Ticker {
         }
     }
 
-    pub fn wait<T, F: FnOnce() -> T>(&mut self, on_finish: F) -> T {
+    pub fn tick(&mut self) -> Event {
         spin_sleep::sleep(Self::TICK_DURATION.saturating_sub(self.prev.elapsed()));
         self.prev = Instant::now();
-        on_finish()
+        Event::Tick
     }
 }

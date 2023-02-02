@@ -1,10 +1,12 @@
 pub mod camera;
 pub mod frustum;
+pub mod gui;
 pub mod projection;
 
 use self::{
     camera::{Camera, CameraController, Changes},
     frustum::Frustum,
+    gui::Gui,
     projection::Projection,
 };
 use crate::{
@@ -13,7 +15,7 @@ use crate::{
         renderer::{Renderer, Uniform},
         ClientEvent,
     },
-    server::scene::world::{block::Block, chunk::Chunk},
+    server::game::scene::world::{block::Block, chunk::Chunk},
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
@@ -22,25 +24,32 @@ use std::time::Duration;
 use winit::event::StartCause;
 
 pub struct Player {
+    gui: Gui,
     camera: Camera,
     controller: CameraController,
     projection: Projection,
-    render_distance: u32,
     uniform: Uniform<PlayerUniformData>,
     is_updated: bool,
 }
 
 impl Player {
-    pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
+    pub fn new(
+        renderer @ Renderer { config, .. }: &Renderer,
+        output_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let gui = Gui::new(renderer, output_bind_group_layout);
+        let camera = Camera::new(point![0.0, 100.0, 0.0], Vector3::z(), Vector3::y());
+        let controller = CameraController::new(25.0, 0.25);
         let aspect = config.width as f32 / config.height as f32;
-        let render_distance = 36;
-        let zfar = (render_distance * Chunk::DIM) as f32;
+        let zfar = (gui.render_distance() * Chunk::DIM as u32) as f32;
+        let projection = Projection::new(90.0, aspect, 0.1, zfar);
+        let uniform = Uniform::new(renderer);
         Self {
-            camera: Camera::new(point![0.0, 100.0, 0.0], Vector3::z(), Vector3::y()),
-            controller: CameraController::new(20.0, 0.4),
-            projection: Projection::new(90.0, aspect, 0.1, zfar),
-            render_distance: render_distance as u32,
-            uniform: Uniform::new(renderer),
+            camera,
+            controller,
+            projection,
+            gui,
+            uniform,
             is_updated: true,
         }
     }
@@ -65,12 +74,22 @@ impl Player {
             self.projection.zfar(),
         )
     }
+
+    pub fn draw(
+        &self,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        output_bind_group: &wgpu::BindGroup,
+    ) {
+        self.gui.draw(view, encoder, output_bind_group);
+    }
 }
 
 impl EventHandler for Player {
     type Context<'a> = (Sender<ClientEvent>, &'a Renderer, Duration);
 
     fn handle(&mut self, event: &Event, (client_tx, renderer, dt): Self::Context<'_>) {
+        self.gui.handle(event, renderer);
         self.controller.handle(event, ());
         self.projection.handle(event, ());
 
@@ -80,7 +99,7 @@ impl EventHandler for Player {
                     .send(ClientEvent::InitialRenderRequested {
                         player_dir: self.camera.forward(),
                         player_coords: self.camera.origin(),
-                        render_distance: self.render_distance,
+                        render_distance: self.gui.render_distance(),
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
@@ -124,7 +143,7 @@ impl EventHandler for Player {
                     &PlayerUniformData::new(
                         self.projection.mat() * self.camera.mat(),
                         self.camera.origin(),
-                        self.render_distance,
+                        self.gui.render_distance(),
                     ),
                 );
             }

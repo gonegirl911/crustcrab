@@ -1,14 +1,12 @@
-use super::{
-    depth_buffer::DepthBuffer,
-    player::frustum::{BoundingSphere, Frustum, FrustumCheck},
-};
+use super::depth_buffer::DepthBuffer;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
+        game::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
         renderer::{ImageTexture, Mesh, Program, Renderer, Vertex},
     },
     server::{
-        scene::world::chunk::{Chunk, ChunkData},
+        game::scene::world::chunk::{Chunk, ChunkData},
         ServerEvent,
     },
 };

@@ -1,10 +1,10 @@
 pub mod event_loop;
-pub mod scene;
+pub mod game;
 pub mod ticker;
 
 use self::{
     event_loop::EventLoop,
-    scene::{world::chunk::ChunkData, Scene},
+    game::{scene::world::chunk::ChunkData, Game},
 };
 use crate::{
     client::ClientEvent,
@@ -16,31 +16,31 @@ use std::sync::Arc;
 
 pub struct Server {
     event_loop: EventLoop,
-    scene: Scene,
+    game: Game,
 }
 
 impl Server {
     pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
         Self {
             event_loop: EventLoop::new(server_tx, client_rx),
-            scene: Scene::default(),
+            game: Game::default(),
         }
     }
 
     pub fn run(self) -> ! {
         struct MiniServer {
-            scene: Scene,
+            game: Game,
         }
 
         impl EventHandler<Event> for MiniServer {
             type Context<'a> = Sender<ServerEvent>;
 
             fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
-                self.scene.handle(event, server_tx);
+                self.game.handle(event, server_tx);
             }
         }
 
-        self.event_loop.run(MiniServer { scene: self.scene })
+        self.event_loop.run(MiniServer { game: self.game })
     }
 }
 

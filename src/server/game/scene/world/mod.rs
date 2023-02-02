@@ -3,9 +3,9 @@ pub mod chunk;
 pub mod loader;
 
 use self::chunk::{ChunkMap, ChunkMapEvent};
-use super::player::{ray::Ray, Player};
 use crate::server::{
     event_loop::{Event, EventHandler},
+    game::player::{ray::Ray, Player},
     ServerEvent,
 };
 use flume::Sender;
