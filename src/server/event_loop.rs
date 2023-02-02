@@ -34,7 +34,7 @@ impl EventLoop {
 pub trait EventHandler<E> {
     type Context<'a>;
 
-    fn handle(&mut self, event: &E, ctx: Self::Context<'_>);
+    fn handle(&mut self, event: &E, cx: Self::Context<'_>);
 }
 
 pub enum Event {

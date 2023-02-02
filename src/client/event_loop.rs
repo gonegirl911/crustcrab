@@ -63,7 +63,7 @@ impl AsRef<RawEventLoop<ServerEvent>> for EventLoop {
 pub trait EventHandler {
     type Context<'a>;
 
-    fn handle(&mut self, event: &Event, ctx: Self::Context<'_>);
+    fn handle(&mut self, event: &Event, cx: Self::Context<'_>);
 }
 
 pub type Event<'a> = RawEvent<'a, ServerEvent>;
