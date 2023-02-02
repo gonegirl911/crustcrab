@@ -19,14 +19,14 @@ impl EventLoop {
     where
         H: for<'a> EventHandler<Event, Context<'a> = Sender<ServerEvent>> + Send,
     {
-        let mut ticker = Ticker::start();
+        let mut ticker = Ticker::start(20);
 
         handler.handle(&Event::Init, self.server_tx.clone());
         loop {
             for event in self.client_rx.try_iter() {
                 handler.handle(&Event::ClientEvent(event), self.server_tx.clone());
             }
-            handler.handle(&ticker.tick(), self.server_tx.clone());
+            ticker.wait(|| handler.handle(&Event::Tick, self.server_tx.clone()));
         }
     }
 }

@@ -1,23 +1,30 @@
-use super::event_loop::Event;
+use spin_sleep::SpinSleeper;
 use std::time::{Duration, Instant};
 
 pub struct Ticker {
+    sleeper: SpinSleeper,
+    duration: Duration,
     prev: Instant,
 }
 
 impl Ticker {
-    const TICKS_PER_SECOND: u64 = 20;
-    const TICK_DURATION: Duration = Duration::from_millis(1000 / Self::TICKS_PER_SECOND);
+    const NATIVE_ACCURACY: Duration = Duration::from_millis(5);
 
-    pub fn start() -> Self {
+    pub fn start(ticks_per_second: u64) -> Self {
         Self {
+            sleeper: SpinSleeper::new(Self::NATIVE_ACCURACY.as_nanos() as u32),
+            duration: Duration::from_millis(1000 / ticks_per_second),
             prev: Instant::now(),
         }
     }
 
-    pub fn tick(&mut self) -> Event {
-        spin_sleep::sleep(Self::TICK_DURATION.saturating_sub(self.prev.elapsed()));
+    pub fn wait<T, F: FnOnce() -> T>(&mut self, f: F) -> T {
+        self.sleeper.sleep(self.rem());
         self.prev = Instant::now();
-        Event::Tick
+        f()
+    }
+
+    fn rem(&self) -> Duration {
+        self.duration.saturating_sub(self.prev.elapsed())
     }
 }
