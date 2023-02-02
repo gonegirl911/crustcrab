@@ -7,18 +7,18 @@ use crate::{
     server::ServerEvent,
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Point3;
+use nalgebra::{point, Point3};
 use std::mem;
 
-pub struct BlockSelection {
-    mesh: IndexedMesh<BlockShellVertex, u16>,
+pub struct BlockHover {
+    mesh: IndexedMesh<BlockHighlightVertex, u16>,
     coords: Option<Point3<i32>>,
     program: Program,
 }
 
-impl BlockSelection {
+impl BlockHover {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let outline = BlockShell::new(0.001);
+        let outline = BlockHighlight::new(0.001);
         let mesh = IndexedMesh::new(
             renderer,
             &outline.vertices().collect::<Vec<_>>(),
@@ -27,12 +27,12 @@ impl BlockSelection {
         let coords = None;
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/selection.wgsl"),
-            &[BlockShellVertex::desc()],
+            wgpu::include_wgsl!("../../../../assets/shaders/highlight.wgsl"),
+            &[BlockHighlightVertex::desc()],
             &[player_bind_group_layout],
             &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::VERTEX,
-                range: 0..mem::size_of::<BlockSelectionPushConstants>() as u32,
+                range: 0..mem::size_of::<BlockHoverPushConstants>() as u32,
             }],
             Some(wgpu::BlendState::ALPHA_BLENDING),
             Some(wgpu::Face::Back),
@@ -61,18 +61,18 @@ impl BlockSelection {
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX,
                 0,
-                bytemuck::cast_slice(&[BlockSelectionPushConstants::new(coords)]),
+                bytemuck::cast_slice(&[BlockHoverPushConstants::new(coords)]),
             );
             self.mesh.draw(render_pass);
         }
     }
 }
 
-impl EventHandler for BlockSelection {
+impl EventHandler for BlockHover {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
-        if let Event::UserEvent(ServerEvent::BlockSelected { coords }) = event {
+        if let Event::UserEvent(ServerEvent::BlockHovered { coords }) = event {
             self.coords = *coords;
         }
     }
@@ -80,11 +80,11 @@ impl EventHandler for BlockSelection {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockSelectionPushConstants {
+struct BlockHoverPushConstants {
     coords: Point3<f32>,
 }
 
-impl BlockSelectionPushConstants {
+impl BlockHoverPushConstants {
     fn new(coords: Point3<i32>) -> Self {
         Self {
             coords: coords.cast(),
@@ -92,36 +92,58 @@ impl BlockSelectionPushConstants {
     }
 }
 
-struct BlockShell {
+struct BlockHighlight {
     padding: f32,
 }
 
-impl BlockShell {
+impl BlockHighlight {
     fn new(padding: f32) -> Self {
         Self { padding }
     }
 
-    fn vertices(&self) -> impl Iterator<Item = BlockShellVertex> {
-        std::iter::empty()
+    fn vertices(&self) -> impl Iterator<Item = BlockHighlightVertex> {
+        let min = -self.padding;
+        let max = 1.0 + self.padding;
+        [
+            point![min, min, min],
+            point![max, min, min],
+            point![max, max, min],
+            point![min, max, min],
+            point![min, min, max],
+            point![max, min, max],
+            point![max, max, max],
+            point![min, max, max],
+        ]
+        .into_iter()
+        .map(BlockHighlightVertex::new)
     }
 
-    fn indices(&self) -> impl Iterator<Item = u16> {
-        std::iter::empty()
+    #[rustfmt::skip]
+    fn indices(&self) -> impl Iterator<Item = u16> {    
+        [
+            0, 1, 2, 0, 2, 3,
+            1, 5, 6, 1, 6, 2,
+            5, 4, 7, 5, 7, 6,
+            4, 0, 3, 4, 3, 7,
+            3, 2, 6, 3, 6, 7,
+            4, 5, 1, 4, 1, 0,
+        ]
+        .into_iter()
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockShellVertex {
+struct BlockHighlightVertex {
     coords: Point3<f32>,
 }
 
-impl BlockShellVertex {
+impl BlockHighlightVertex {
     fn new(coords: Point3<f32>) -> Self {
         Self { coords }
     }
 }
 
-impl Vertex for BlockShellVertex {
+impl Vertex for BlockHighlightVertex {
     const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
 }

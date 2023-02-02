@@ -59,7 +59,7 @@ pub enum ServerEvent {
         coords: Point3<i32>,
         data: Arc<ChunkData>,
     },
-    BlockSelected {
+    BlockHovered {
         coords: Option<Point3<i32>>,
     },
 }

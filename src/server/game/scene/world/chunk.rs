@@ -30,7 +30,7 @@ use std::{
 pub struct ChunkMap {
     cells: FxHashMap<Point3<i32>, ChunkCell>,
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
-    selected_block: Option<BlockIntersection>,
+    hovered_block: Option<BlockIntersection>,
     loader: ChunkLoader,
 }
 
@@ -310,7 +310,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 self.par_send_loads(loaded, server_tx);
             }
             ChunkMapEvent::BlockSelectionRequested => {
-                self.selected_block = ray.cast(Player::BUILDING_REACH).find(
+                self.hovered_block = ray.cast(Player::BUILDING_REACH).find(
                     |BlockIntersection { coords, .. }| {
                         let coords = coords.cast();
                         let chunk_coords = Player::chunk_coords(coords);
@@ -323,18 +323,18 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 );
 
                 server_tx
-                    .send(ServerEvent::BlockSelected {
-                        coords: self.selected_block.map(|data| data.coords),
+                    .send(ServerEvent::BlockHovered {
+                        coords: self.hovered_block.map(|data| data.coords),
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
             ChunkMapEvent::BlockDestroyed => {
-                if let Some(BlockIntersection { coords, .. }) = self.selected_block {
+                if let Some(BlockIntersection { coords, .. }) = self.hovered_block {
                     self.apply(coords, BlockAction::Destroy, server_tx, ray);
                 }
             }
             ChunkMapEvent::BlockPlaced { block } => {
-                if let Some(BlockIntersection { coords, normal }) = self.selected_block {
+                if let Some(BlockIntersection { coords, normal }) = self.hovered_block {
                     self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
                 }
             }
