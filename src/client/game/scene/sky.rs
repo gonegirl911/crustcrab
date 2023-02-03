@@ -80,17 +80,17 @@ impl Sky {
     }
 }
 
-pub struct Sphere {
+struct Sphere {
     sectors: u16,
     stacks: u16,
 }
 
 impl Sphere {
-    pub fn new(sectors: u16, stacks: u16) -> Self {
+    fn new(sectors: u16, stacks: u16) -> Self {
         Self { sectors, stacks }
     }
 
-    pub fn vertices(&self) -> impl Iterator<Item = SphereVertex> + '_ {
+    fn vertices(&self) -> impl Iterator<Item = SphereVertex> + '_ {
         (0..=self.stacks).flat_map(move |y| {
             let lat = PI * (0.5 - y as f32 / self.stacks as f32);
             (0..=self.sectors).map(move |x| {
@@ -103,7 +103,7 @@ impl Sphere {
         })
     }
 
-    pub fn indices(&self) -> impl Iterator<Item = u16> + '_ {
+    fn indices(&self) -> impl Iterator<Item = u16> + '_ {
         (0..self.stacks).flat_map(move |y| {
             (0..self.sectors).flat_map(move |x| {
                 let k1 = y * (self.sectors + 1) + x;
@@ -120,7 +120,7 @@ impl Sphere {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-pub struct SphereVertex {
+struct SphereVertex {
     coords: Point3<f32>,
     tex_v: f32,
 }

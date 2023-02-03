@@ -95,7 +95,7 @@ impl EventHandler for World {
     }
 }
 
-pub struct ChunkMeshPool {
+struct ChunkMeshPool {
     meshes: FxHashMap<Point3<i32>, (Mesh<BlockVertex>, Instant)>,
     unloaded: FxHashSet<Point3<i32>>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
@@ -103,7 +103,7 @@ pub struct ChunkMeshPool {
 }
 
 impl ChunkMeshPool {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let meshes = FxHashMap::default();
         let unloaded = FxHashSet::default();
         let (data_tx, data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
@@ -200,7 +200,7 @@ impl EventHandler for ChunkMeshPool {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-pub struct BlockPushConstants {
+struct BlockPushConstants {
     chunk_coords: Point3<f32>,
 }
 
