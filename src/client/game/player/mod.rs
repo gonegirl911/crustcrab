@@ -15,7 +15,7 @@ use crate::{
         renderer::{Renderer, Uniform},
         ClientEvent,
     },
-    server::game::scene::world::{block::Block, chunk::Chunk},
+    server::game::scene::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
@@ -129,7 +129,7 @@ impl EventHandler for Player {
                 } else if changes.contains(Changes::BLOCK_PLACED) {
                     client_tx
                         .send(ClientEvent::BlockPlaced {
-                            block: Block::Grass,
+                            block: self.gui.selected_block(),
                         })
                         .unwrap_or_else(|_| unreachable!());
                 }

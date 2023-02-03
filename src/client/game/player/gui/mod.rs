@@ -1,8 +1,11 @@
 mod crosshair;
 
-use crate::client::{
-    event_loop::{Event, EventHandler},
-    renderer::Renderer,
+use crate::{
+    client::{
+        event_loop::{Event, EventHandler},
+        renderer::Renderer,
+    },
+    server::game::scene::world::block::Block,
 };
 use crosshair::Crosshair;
 
@@ -15,6 +18,10 @@ impl Gui {
         Self {
             crosshair: Crosshair::new(renderer, output_bind_group_layout),
         }
+    }
+
+    pub fn selected_block(&self) -> Block {
+        Block::Grass
     }
 
     pub fn render_distance(&self) -> u32 {
