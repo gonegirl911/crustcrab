@@ -147,18 +147,18 @@ impl BlockArea {
 #[repr(u8)]
 #[derive(Clone, Copy)]
 pub enum Face {
-    Ypos = 0,
-    X = 1,
-    Y = 2,
+    X = 0,
+    Ypos = 1,
+    Yneg = 2,
     Z = 3,
 }
 
 impl From<Side> for Face {
     fn from(side: Side) -> Self {
         match side {
-            Side::Up => Face::Ypos,
             Side::Left | Side::Right => Face::X,
-            Side::Down => Face::Y,
+            Side::Up => Face::Ypos,
+            Side::Down => Face::Yneg,
             Side::Front | Side::Back => Face::Z,
         }
     }

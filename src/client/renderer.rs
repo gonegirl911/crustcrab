@@ -46,12 +46,9 @@ impl Renderer {
             )
             .await
             .expect("device should be available");
-        let config = wgpu::SurfaceConfiguration {
-            present_mode: wgpu::PresentMode::Fifo,
-            ..surface
-                .get_default_config(&adapter, width, height)
-                .expect("surface should be supported by adapter")
-        };
+        let config = surface
+            .get_default_config(&adapter, width, height)
+            .expect("surface should be supported by adapter");
         Self {
             surface,
             device,
@@ -220,7 +217,12 @@ pub struct ImageTexture {
 
 impl ImageTexture {
     pub fn new(
-        Renderer { device, queue, .. }: &Renderer,
+        Renderer {
+            device,
+            queue,
+            config,
+            ..
+        }: &Renderer,
         bytes: &[u8],
         is_pixelated: bool,
     ) -> Self {
@@ -237,7 +239,11 @@ impl ImageTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: if config.format.describe().srgb {
+                wgpu::TextureFormat::Rgba8UnormSrgb
+            } else {
+                wgpu::TextureFormat::Rgba8Unorm
+            },
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });

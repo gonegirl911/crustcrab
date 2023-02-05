@@ -54,7 +54,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let dy = coords.y - player.origin.y;
     let fog_height = 0.5 - atan2(dy, dx) / 22.0 * 7.0;
 
-    let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 0.6, f32(face == 1u)), 1.0, f32(face == 0u));
+    let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 1.0, f32(face == 1u)), 0.6, f32(face == 0u));
     let ambient_light = (0.75 + ambient_occlusion) / 3.75;
     let light_factor = face_light * ambient_light;
 
