@@ -224,6 +224,7 @@ impl ImageTexture {
             ..
         }: &Renderer,
         bytes: &[u8],
+        is_srgb: bool,
         is_pixelated: bool,
     ) -> Self {
         let image = image::load_from_memory(bytes).unwrap().to_rgba8();
@@ -239,7 +240,7 @@ impl ImageTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: if config.format.describe().srgb {
+            format: if is_srgb && config.format.describe().srgb {
                 wgpu::TextureFormat::Rgba8UnormSrgb
             } else {
                 wgpu::TextureFormat::Rgba8Unorm

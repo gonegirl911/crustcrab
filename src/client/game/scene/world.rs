@@ -37,6 +37,7 @@ impl World {
             renderer,
             include_bytes!("../../../../assets/textures/atlas.png"),
             true,
+            true,
         );
         let program = Program::new(
             renderer,

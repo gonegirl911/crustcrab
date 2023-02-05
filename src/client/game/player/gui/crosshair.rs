@@ -19,6 +19,7 @@ impl Crosshair {
         let texture = ImageTexture::new(
             renderer,
             include_bytes!("../../../../../assets/textures/crosshair.png"),
+            false,
             true,
         );
         let program = Program::new(

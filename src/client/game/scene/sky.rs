@@ -25,6 +25,7 @@ impl Sky {
         let color_map = ImageTexture::new(
             renderer,
             include_bytes!("../../../../assets/textures/sky.png"),
+            true,
             false,
         );
         let program = Program::new(
