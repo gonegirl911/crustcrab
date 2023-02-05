@@ -47,13 +47,16 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data, 17u, 4u)),
         f32(extractBits(vertex.data, 21u, 4u)),
     );
-    let ambient_occlusion = f32(extractBits(vertex.data, 25u, 2u));
+    let face = extractBits(vertex.data, 25u, 2u);
+    let ambient_occlusion = f32(extractBits(vertex.data, 27u, 2u));
 
     let dx = distance(player.origin.xz, coords.xz);
     let dy = coords.y - player.origin.y;
     let fog_height = 0.5 - atan2(dy, dx) / 22.0 * 7.0;
 
-    let light_factor = (0.75 + ambient_occlusion) / 3.75;
+    let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 0.6, f32(face == 1u)), 1.0, f32(face == 0u));
+    let ambient_light = (0.75 + ambient_occlusion) / 3.75;
+    let light_factor = face_light * ambient_light;
 
     let distance = distance(player.origin, coords);
     let fog_distance = f32(player.render_distance) * 16.0 * 0.8;

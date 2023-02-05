@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use std::ops::Range;
 
 #[repr(u8)]
-#[derive(Clone, Copy, Default, Enum)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Enum)]
 pub enum Block {
     #[default]
     Air,
@@ -14,6 +14,7 @@ pub enum Block {
     Dirt,
     Stone,
     Bedrock,
+    Glowstone,
 }
 
 impl Block {
@@ -27,33 +28,23 @@ impl Block {
             .flat_map(move |side_atlas_coords| {
                 SIDE_DELTAS
                     .iter()
-                    .filter_map(move |(side, delta)| {
-                        (!unsafe { area.get_unchecked(*delta) }).then_some(side)
-                    })
-                    .flat_map(move |side| {
+                    .filter(move |(_, delta)| unsafe { !area.get_unchecked(**delta) })
+                    .flat_map(move |(side, _)| {
                         let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
                         let atlas_coords = side_atlas_coords[side];
-
+                        let face = side.into();
                         let corner_aos = enum_map! {
-                            corner => Self::ambient_occlusion(side, corner, area),
+                            corner if self.is_not_glowing() => {
+                                Self::ambient_occlusion(side, corner, area)
+                            },
+                            _ => 3,
                         };
-                        let [a00, a10, a11, a01] = [
-                            corner_aos[Corner::LowerLeft],
-                            corner_aos[Corner::LowerRight],
-                            corner_aos[Corner::UpperRight],
-                            corner_aos[Corner::UpperLeft],
-                        ];
-                        let indices = if a00 + a11 > a10 + a01 {
-                            FLIPPED_INDICES
-                        } else {
-                            INDICES
-                        };
-
-                        indices.into_iter().map(move |corner| {
+                        Self::indices(&corner_aos).into_iter().map(move |corner| {
                             BlockVertex::new(
                                 coords + corner_vertex_coords[corner].coords,
                                 CORNER_TEX_COORDS[corner],
                                 atlas_coords,
+                                face,
                                 corner_aos[corner],
                             )
                         })
@@ -61,8 +52,16 @@ impl Block {
             })
     }
 
+    pub fn luminosity(self) -> u8 {
+        if self == Block::Glowstone {
+            15
+        } else {
+            0
+        }
+    }
+
     pub fn is_air(self) -> bool {
-        matches!(self, Block::Air)
+        self == Block::Air
     }
 
     pub fn is_not_air(self) -> bool {
@@ -70,27 +69,45 @@ impl Block {
     }
 
     pub fn is_transparent(self) -> bool {
-        matches!(self, Block::Air)
+        self == Block::Air
     }
 
     pub fn is_opaque(self) -> bool {
         !self.is_transparent()
     }
 
+    pub fn is_glowing(self) -> bool {
+        self.luminosity() != 0
+    }
+
+    pub fn is_not_glowing(self) -> bool {
+        !self.is_glowing()
+    }
+
     fn ambient_occlusion(side: Side, corner: Corner, area: BlockArea) -> u8 {
-        let component_deltas = SIDE_CORNER_COMPONENT_DELTAS[side][corner]
+        let components = SIDE_CORNER_COMPONENT_DELTAS[side][corner]
             .map(|_, delta| unsafe { area.get_unchecked(delta) });
 
         let [edge1, edge2, corner] = [
-            component_deltas[Component::Edge1],
-            component_deltas[Component::Edge2],
-            component_deltas[Component::Corner],
+            components[Component::Edge1],
+            components[Component::Edge2],
+            components[Component::Corner],
         ];
 
         if edge1 && edge2 {
             0
         } else {
             3 - (edge1 as u8 + edge2 as u8 + corner as u8)
+        }
+    }
+
+    fn indices(corner_aos: &EnumMap<Corner, u8>) -> [Corner; 6] {
+        if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
+            > corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
+        {
+            FLIPPED_INDICES
+        } else {
+            INDICES
         }
     }
 }
@@ -124,6 +141,26 @@ impl BlockArea {
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
         let coords = coords.map(|c| (c - Self::RANGE.start) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum Face {
+    Ypos = 0,
+    X = 1,
+    Y = 2,
+    Z = 3,
+}
+
+impl From<Side> for Face {
+    fn from(side: Side) -> Self {
+        match side {
+            Side::Up => Face::Ypos,
+            Side::Left | Side::Right => Face::X,
+            Side::Down => Face::Y,
+            Side::Front | Side::Back => Face::Z,
+        }
     }
 }
 
@@ -168,6 +205,7 @@ static BLOCK_SIDE_ATLAS_COORDS: Lazy<EnumMap<Block, Option<EnumMap<Side, Point2<
             Block::Dirt => Some(enum_map! { _ => point![2, 0] }),
             Block::Stone => Some(enum_map! { _ => point![1, 0] }),
             Block::Bedrock => Some(enum_map! { _ => point![1, 1] }),
+            Block::Glowstone => Some(enum_map! { _ => point![9, 6] })
         }
     });
 

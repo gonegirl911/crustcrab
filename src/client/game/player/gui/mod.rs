@@ -21,7 +21,7 @@ impl Gui {
     }
 
     pub fn selected_block(&self) -> Block {
-        Block::Grass
+        Block::Glowstone
     }
 
     pub fn render_distance(&self) -> u32 {

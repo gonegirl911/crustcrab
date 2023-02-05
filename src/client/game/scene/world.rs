@@ -6,7 +6,10 @@ use crate::{
         renderer::{ImageTexture, Mesh, Program, Renderer, Vertex},
     },
     server::{
-        game::scene::world::chunk::{Chunk, ChunkData},
+        game::scene::world::{
+            block::Face,
+            chunk::{Chunk, ChunkData},
+        },
         ServerEvent,
     },
 };
@@ -221,6 +224,7 @@ impl BlockVertex {
         coords: Point3<u8>,
         tex_coords: Point2<u8>,
         atlas_coords: Point2<u8>,
+        face: Face,
         ambient_occlusion: u8,
     ) -> Self {
         let mut data = 0;
@@ -231,7 +235,8 @@ impl BlockVertex {
         data |= (tex_coords.y as u32) << 16;
         data |= (atlas_coords.x as u32) << 17;
         data |= (atlas_coords.y as u32) << 21;
-        data |= (ambient_occlusion as u32) << 25;
+        data |= (face as u32) << 25;
+        data |= (ambient_occlusion as u32) << 27;
         Self(data)
     }
 }
