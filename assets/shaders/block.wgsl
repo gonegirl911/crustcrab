@@ -12,6 +12,10 @@ struct ClockUniform {
     time: f32,
 }
 
+struct SkylightUniform {
+    light_intensity: f32,
+}
+
 struct PushConstants {
     chunk_coords: vec3<f32>,
 }
@@ -29,6 +33,9 @@ var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
 var<uniform> clock: ClockUniform;
+
+@group(2) @binding(0)
+var<uniform> skylight: SkylightUniform;
 
 var<push_constant> pc: PushConstants;
 
@@ -56,7 +63,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
     let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 1.0, f32(face == 1u)), 0.6, f32(face == 0u));
     let ambient_light = (0.75 + ambient_occlusion) / 3.75;
-    let light_factor = face_light * ambient_light;
+    let light_factor = skylight.light_intensity * face_light * ambient_light;
 
     let distance = distance(player.origin, coords);
     let fog_distance = f32(player.render_distance) * 16.0 * 0.8;
@@ -71,16 +78,16 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     );
 }
 
-@group(2) @binding(0)
+@group(3) @binding(0)
 var t_atlas: texture_2d<f32>;
 
-@group(2) @binding(1)
+@group(3) @binding(1)
 var s_atlas: sampler;
 
-@group(3) @binding(0)
+@group(4) @binding(0)
 var t_sky: texture_2d<f32>;
 
-@group(3) @binding(1)
+@group(4) @binding(1)
 var s_sky: sampler;
 
 @fragment

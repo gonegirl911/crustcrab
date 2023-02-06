@@ -1,10 +1,14 @@
 pub mod clock;
 pub mod depth_buffer;
 pub mod hover;
+pub mod light;
 pub mod sky;
 pub mod world;
 
-use self::{clock::Clock, depth_buffer::DepthBuffer, hover::BlockHover, sky::Sky, world::World};
+use self::{
+    clock::Clock, depth_buffer::DepthBuffer, hover::BlockHover, light::Skylight, sky::Sky,
+    world::World,
+};
 use super::player::frustum::Frustum;
 use crate::client::{
     event_loop::{Event, EventHandler},
@@ -13,6 +17,7 @@ use crate::client::{
 
 pub struct Scene {
     clock: Clock,
+    skylight: Skylight,
     sky: Sky,
     world: World,
     block_hover: BlockHover,
@@ -22,6 +27,7 @@ pub struct Scene {
 impl Scene {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let clock = Clock::new(renderer);
+        let skylight = Skylight::new(renderer);
         let sky = Sky::new(
             renderer,
             player_bind_group_layout,
@@ -31,12 +37,14 @@ impl Scene {
             renderer,
             player_bind_group_layout,
             clock.bind_group_layout(),
+            skylight.bind_group_layout(),
             sky.bind_group_layout(),
         );
         let block_hover = BlockHover::new(renderer, player_bind_group_layout);
         let depth_buffer = DepthBuffer::new(renderer);
         Self {
             clock,
+            skylight,
             sky,
             world,
             block_hover,
@@ -76,6 +84,7 @@ impl Scene {
             render_pass,
             player_bind_group,
             self.clock.bind_group(),
+            self.skylight.bind_group(),
             self.sky.bind_group(),
             frustum,
         );
@@ -88,6 +97,7 @@ impl EventHandler for Scene {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         self.clock.handle(event, renderer);
+        self.skylight.handle(event, renderer);
         self.world.handle(event, renderer);
         self.block_hover.handle(event, ());
         self.depth_buffer.handle(event, renderer);

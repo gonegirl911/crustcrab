@@ -30,6 +30,7 @@ impl World {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         clock_bind_group_layout: &wgpu::BindGroupLayout,
+        skylight_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let meshes = ChunkMeshPool::new();
@@ -46,6 +47,7 @@ impl World {
             &[
                 player_bind_group_layout,
                 clock_bind_group_layout,
+                skylight_bind_group_layout,
                 atlas.bind_group_layout(),
                 sky_bind_group_layout,
             ],
@@ -75,6 +77,7 @@ impl World {
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
         clock_bind_group: &'a wgpu::BindGroup,
+        skylight_bind_group: &'a wgpu::BindGroup,
         sky_bind_group: &'a wgpu::BindGroup,
         frustum: &Frustum,
     ) {
@@ -83,6 +86,7 @@ impl World {
             [
                 player_bind_group,
                 clock_bind_group,
+                skylight_bind_group,
                 self.atlas.bind_group(),
                 sky_bind_group,
             ],

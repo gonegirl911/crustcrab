@@ -52,11 +52,11 @@ impl Block {
             })
     }
 
-    pub fn luminosity(self) -> u8 {
+    pub fn luminosity(self) -> Point3<u8> {
         if self == Block::Glowstone {
-            15
+            point![15, 15, 0]
         } else {
-            0
+            point![0, 0, 0]
         }
     }
 
@@ -77,7 +77,7 @@ impl Block {
     }
 
     pub fn is_glowing(self) -> bool {
-        self.luminosity() != 0
+        self.luminosity() != point![0, 0, 0]
     }
 
     pub fn is_not_glowing(self) -> bool {

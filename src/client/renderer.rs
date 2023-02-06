@@ -38,6 +38,7 @@ impl Renderer {
                     label: None,
                     features: wgpu::Features::PUSH_CONSTANTS,
                     limits: wgpu::Limits {
+                        max_bind_groups: 5,
                         max_push_constant_size: 128,
                         ..Default::default()
                     },
@@ -46,9 +47,12 @@ impl Renderer {
             )
             .await
             .expect("device should be available");
-        let config = surface
-            .get_default_config(&adapter, width, height)
-            .expect("surface should be supported by adapter");
+        let config = wgpu::SurfaceConfiguration {
+            present_mode: wgpu::PresentMode::Fifo,
+            ..surface
+                .get_default_config(&adapter, width, height)
+                .expect("surface should be supported by adapter")
+        };
         Self {
             surface,
             device,

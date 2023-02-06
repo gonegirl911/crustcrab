@@ -7,6 +7,7 @@ use crate::{
 };
 use flume::Sender;
 
+#[derive(Default)]
 pub struct Clock {
     ticks: u16,
 }
@@ -16,14 +17,6 @@ impl Clock {
 
     fn time(&self) -> f32 {
         self.ticks as f32 / Self::TICKS_PER_DAY as f32
-    }
-}
-
-impl Default for Clock {
-    fn default() -> Self {
-        Self {
-            ticks: Self::TICKS_PER_DAY / 4,
-        }
     }
 }
 
