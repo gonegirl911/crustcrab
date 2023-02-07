@@ -15,7 +15,7 @@ pub struct Crosshair {
 
 impl Crosshair {
     pub fn new(renderer: &Renderer, output_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let uniform = Uniform::new(renderer);
+        let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::new(
             renderer,
             include_bytes!("../../../../../assets/textures/crosshair.png"),

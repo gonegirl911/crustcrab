@@ -3,20 +3,26 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{Renderer, Uniform},
     },
-    server::ServerEvent,
+    server::{
+        game::scene::clock::{Stage, TimeData},
+        ServerEvent,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 
 pub struct Skylight {
     uniform: Uniform<SkylightUniformData>,
-    updated_time: Option<f32>,
+    updated_data: Option<TimeData>,
 }
 
 impl Skylight {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
-            uniform: Uniform::new(renderer),
-            updated_time: Some(0.0),
+            uniform: Uniform::new(
+                renderer,
+                wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            ),
+            updated_data: Some(Default::default()),
         }
     }
 
@@ -27,6 +33,19 @@ impl Skylight {
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.uniform.bind_group()
     }
+
+    fn light_intensity(TimeData { stage, .. }: TimeData) -> f32 {
+        match stage {
+            Stage::Night => 0.2,
+            Stage::Dawn { progress } => Self::lerp(0.2, 1.0, progress),
+            Stage::Day => 1.0,
+            Stage::Dusk { progress } => Self::lerp(1.0, 0.2, progress),
+        }
+    }
+
+    fn lerp(start: f32, end: f32, t: f32) -> f32 {
+        start * (1.0 - t) + end * t
+    }
 }
 
 impl EventHandler for Skylight {
@@ -34,17 +53,19 @@ impl EventHandler for Skylight {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated { time }) => {
-                self.updated_time = Some(*time);
+            Event::UserEvent(ServerEvent::TimeUpdated(data)) => {
+                self.updated_data = Some(*data);
             }
             Event::RedrawRequested(_) => {
-                if let Some(time) = self.updated_time {
-                    self.uniform
-                        .update(renderer, &SkylightUniformData::new(todo!()));
+                if let Some(data) = self.updated_data {
+                    self.uniform.update(
+                        renderer,
+                        &SkylightUniformData::new(Self::light_intensity(data)),
+                    );
                 }
             }
             Event::RedrawEventsCleared => {
-                self.updated_time = None;
+                self.updated_data = None;
             }
             _ => {}
         }

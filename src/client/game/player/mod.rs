@@ -43,7 +43,7 @@ impl Player {
         let aspect = config.width as f32 / config.height as f32;
         let zfar = (gui.render_distance() * Chunk::DIM as u32) as f32;
         let projection = Projection::new(90.0, aspect, 0.1, zfar);
-        let uniform = Uniform::new(renderer);
+        let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX);
         Self {
             camera,
             controller,

@@ -26,7 +26,14 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     return VertexOutput(player.vp * vec4(pc.coords + vertex.coords, 1.0));
 }
 
+struct SkylightUniform {
+    intensity: f32,
+}
+
+@group(1) @binding(0)
+var<uniform> skylight: SkylightUniform;
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4(vec3(1.0), 0.15);
+    return vec4(vec3(1.0), 0.15 * skylight.intensity);
 }

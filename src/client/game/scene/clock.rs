@@ -3,7 +3,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{Renderer, Uniform},
     },
-    server::ServerEvent,
+    server::{game::scene::clock::TimeData, ServerEvent},
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -15,7 +15,7 @@ pub struct Clock {
 impl Clock {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
-            uniform: Uniform::new(renderer),
+            uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX),
             updated_time: Some(0.0),
         }
     }
@@ -34,7 +34,7 @@ impl EventHandler for Clock {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated { time }) => {
+            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { time, .. })) => {
                 self.updated_time = Some(*time);
             }
             Event::RedrawRequested(_) => {

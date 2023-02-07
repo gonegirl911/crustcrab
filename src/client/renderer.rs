@@ -165,7 +165,7 @@ pub struct Uniform<T> {
 }
 
 impl<T: Pod> Uniform<T> {
-    pub fn new(Renderer { device, .. }: &Renderer) -> Self {
+    pub fn new(Renderer { device, .. }: &Renderer, visibility: wgpu::ShaderStages) -> Self {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: mem::size_of::<T>() as u64,
@@ -176,7 +176,7 @@ impl<T: Pod> Uniform<T> {
             label: None,
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,

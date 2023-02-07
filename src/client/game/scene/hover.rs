@@ -17,7 +17,11 @@ pub struct BlockHover {
 }
 
 impl BlockHover {
-    pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        player_bind_group_layout: &wgpu::BindGroupLayout, 
+        skylight_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let outline = BlockHighlight::new(0.001);
         let mesh = IndexedMesh::new(
             renderer,
@@ -29,7 +33,7 @@ impl BlockHover {
             renderer,
             wgpu::include_wgsl!("../../../../assets/shaders/highlight.wgsl"),
             &[BlockHighlightVertex::desc()],
-            &[player_bind_group_layout],
+            &[player_bind_group_layout, skylight_bind_group_layout],
             &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::VERTEX,
                 range: 0..mem::size_of::<BlockHoverPushConstants>() as u32,
@@ -55,9 +59,10 @@ impl BlockHover {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
+        skylight_bind_group: &'a wgpu::BindGroup,
     ) {
         if let Some(coords) = self.coords {
-            self.program.draw(render_pass, [player_bind_group]);
+            self.program.draw(render_pass, [player_bind_group, skylight_bind_group]);
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX,
                 0,

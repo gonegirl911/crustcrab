@@ -40,7 +40,11 @@ impl Scene {
             skylight.bind_group_layout(),
             sky.bind_group_layout(),
         );
-        let block_hover = BlockHover::new(renderer, player_bind_group_layout);
+        let block_hover = BlockHover::new(
+            renderer,
+            player_bind_group_layout,
+            skylight.bind_group_layout(),
+        );
         let depth_buffer = DepthBuffer::new(renderer);
         Self {
             clock,
@@ -88,7 +92,7 @@ impl Scene {
             self.sky.bind_group(),
             frustum,
         );
-        self.block_hover.draw(render_pass, player_bind_group);
+        self.block_hover.draw(render_pass, player_bind_group, self.skylight.bind_group());
     }
 }
 

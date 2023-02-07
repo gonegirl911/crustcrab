@@ -13,7 +13,7 @@ struct ClockUniform {
 }
 
 struct SkylightUniform {
-    light_intensity: f32,
+    intensity: f32,
 }
 
 struct PushConstants {
@@ -63,7 +63,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
     let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 1.0, f32(face == 1u)), 0.6, f32(face == 0u));
     let ambient_light = (0.75 + ambient_occlusion) / 3.75;
-    let light_factor = skylight.light_intensity * face_light * ambient_light;
+    let light_factor = skylight.intensity * face_light * ambient_light;
 
     let distance = distance(player.origin, coords);
     let fog_distance = f32(player.render_distance) * 16.0 * 0.8;
