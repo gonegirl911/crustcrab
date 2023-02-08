@@ -1,4 +1,4 @@
-use super::depth_buffer::DepthBuffer;
+use super::depth::DepthBuffer;
 use crate::client::renderer::{ImageTexture, IndexedMesh, Program, Renderer, Vertex};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, Point3};

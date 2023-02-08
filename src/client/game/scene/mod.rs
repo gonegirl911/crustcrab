@@ -1,13 +1,12 @@
 pub mod clock;
-pub mod depth_buffer;
+pub mod depth;
 pub mod hover;
 pub mod light;
 pub mod sky;
 pub mod world;
 
 use self::{
-    clock::Clock, depth_buffer::DepthBuffer, hover::BlockHover, light::Skylight, sky::Sky,
-    world::World,
+    clock::Clock, depth::DepthBuffer, hover::BlockHover, light::Skylight, sky::Sky, world::World,
 };
 use super::player::frustum::Frustum;
 use crate::client::{

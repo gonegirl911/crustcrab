@@ -14,11 +14,11 @@ pub struct Clock {
 impl Clock {
     const TICKS_PER_DAY: u16 = 24000;
     const DAWN_START: u16 = Self::TICKS_PER_DAY / 150 * 30;
-    const DAWN_END: u16 = Self::TICKS_PER_DAY / 150 * 40;
+    const DAWN_END: u16 = Self::TICKS_PER_DAY / 150 * 41;
     const DAY_START: u16 = Self::DAWN_END + 1;
     const DAY_END: u16 = Self::DUSK_START - 1;
     const DUSK_START: u16 = Self::TICKS_PER_DAY / 150 * 117;
-    const DUSK_END: u16 = Self::TICKS_PER_DAY / 150 * 138;
+    const DUSK_END: u16 = Self::TICKS_PER_DAY / 150 * 135;
 
     fn data(&self) -> TimeData {
         TimeData {
