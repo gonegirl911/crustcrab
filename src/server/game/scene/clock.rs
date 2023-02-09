@@ -88,7 +88,6 @@ pub struct TimeData {
     pub stage: Stage,
 }
 
-#[repr(u8)]
 #[derive(Clone, Copy, Default)]
 pub enum Stage {
     #[default]
