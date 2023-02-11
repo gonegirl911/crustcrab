@@ -1,5 +1,6 @@
 pub mod block;
 pub mod chunk;
+pub mod light;
 pub mod loader;
 
 use self::chunk::{ChunkMap, ChunkMapEvent};
