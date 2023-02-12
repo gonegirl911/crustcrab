@@ -249,3 +249,22 @@ impl BlockVertex {
 impl Vertex for BlockVertex {
     const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32];
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Zeroable, Pod)]
+pub struct BlockVertexLight(u32);
+
+impl BlockVertexLight {
+    pub fn new(skylight: u8, red: u8, blue: u8, green: u8) -> Self {
+        let mut data = 0;
+        data |= skylight as u32;
+        data |= (red as u32) << 4;
+        data |= (blue as u32) << 8;
+        data |= (green as u32) << 12;
+        Self(data)
+    }
+}
+
+impl Vertex for BlockVertexLight {
+    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32];
+}

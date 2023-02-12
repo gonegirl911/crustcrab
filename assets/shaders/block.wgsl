@@ -1,5 +1,6 @@
 struct VertexInput {
     @location(0) data: u32,
+    @location(1) light: u32,
 }
 
 struct PlayerUniform {
@@ -24,7 +25,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) sky_coords: vec2<f32>,
-    @location(2) light_factor: f32,
+    @location(2) light_factor: vec3<f32>,
     @location(3) fog_factor: f32,
 }
 
@@ -55,15 +56,22 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data, 21u, 4u)),
     );
     let face = extractBits(vertex.data, 25u, 2u);
-    let ambient_occlusion = f32(extractBits(vertex.data, 27u, 2u));
+    let ambient_occlusion = f32(extractBits(vertex.data, 27u, 2u)) / 3.0;
+    let skylight_intensity = skylight.intensity;
+    let skylight = f32(extractBits(vertex.light, 0u, 4u));
+    let red = f32(extractBits(vertex.light, 4u, 4u));
+    let blue = f32(extractBits(vertex.light, 8u, 4u));
+    let green = f32(extractBits(vertex.light, 12u, 4u));
 
     let dx = distance(player.origin.xz, coords.xz);
     let dy = coords.y - player.origin.y;
     let fog_height = 0.5 - atan2(dy, dx) / 22.0 * 7.0;
 
+    let global_light = pow(0.8, (15.0 - skylight)) * skylight_intensity;
+    let local_light = pow(vec3(0.8), (15.0 - vec3(red, blue, green)));
     let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 1.0, f32(face == 1u)), 0.6, f32(face == 0u));
-    let ambient_light = (0.75 + ambient_occlusion) / 3.75;
-    let light_factor = skylight.intensity * face_light * ambient_light;
+    let ambient_light = mix(0.2, 1.0, ambient_occlusion);
+    let light_factor = (global_light + local_light) * face_light * ambient_light;
 
     let distance = distance(player.origin, coords);
     let fog_distance = f32(player.render_distance) * 16.0 * 0.8;
@@ -93,7 +101,7 @@ var s_sky: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return mix(
-        textureSample(t_atlas, s_atlas, in.tex_coords) * in.light_factor,
+        textureSample(t_atlas, s_atlas, in.tex_coords) * vec4(in.light_factor, 1.0),
         textureSample(t_sky, s_sky, in.sky_coords),
         in.fog_factor,
     );
