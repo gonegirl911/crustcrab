@@ -9,6 +9,7 @@ use crate::{
         game::scene::world::{
             block::Face,
             chunk::{Chunk, ChunkData},
+            light::BlockLight,
         },
         ServerEvent,
     },
@@ -222,7 +223,10 @@ impl BlockPushConstants {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-pub struct BlockVertex(u32);
+pub struct BlockVertex {
+    data: u32,
+    light: u32,
+}
 
 impl BlockVertex {
     pub fn new(
@@ -230,7 +234,8 @@ impl BlockVertex {
         tex_coords: Point2<u8>,
         atlas_coords: Point2<u8>,
         face: Face,
-        ambient_occlusion: u8,
+        ao: u8,
+        light: BlockLight,
     ) -> Self {
         let mut data = 0;
         data |= coords.x as u32;
@@ -241,30 +246,15 @@ impl BlockVertex {
         data |= (atlas_coords.x as u32) << 17;
         data |= (atlas_coords.y as u32) << 21;
         data |= (face as u32) << 25;
-        data |= (ambient_occlusion as u32) << 27;
-        Self(data)
+        data |= (ao as u32) << 27;
+        Self {
+            data,
+            light: light.0.into(),
+        }
     }
 }
 
 impl Vertex for BlockVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32];
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
-pub struct BlockVertexLight(u32);
-
-impl BlockVertexLight {
-    pub fn new(skylight: u8, red: u8, blue: u8, green: u8) -> Self {
-        let mut data = 0;
-        data |= skylight as u32;
-        data |= (red as u32) << 4;
-        data |= (blue as u32) << 8;
-        data |= (green as u32) << 12;
-        Self(data)
-    }
-}
-
-impl Vertex for BlockVertexLight {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32];
+    const ATTRIBS: &'static [wgpu::VertexAttribute] =
+        &wgpu::vertex_attr_array![0 => Uint32, 1 => Uint32];
 }

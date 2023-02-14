@@ -31,12 +31,7 @@ impl Block {
                     let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
                     let atlas_coords = side_atlas_coords[side];
                     let face = side.into();
-                    let corner_aos = enum_map! {
-                        corner if data.is_not_glowing() => {
-                            Self::ambient_occlusion(side, corner, area)
-                        },
-                        _ => 3,
-                    };
+                    let corner_aos = Self::corner_aos(data, side, area);
                     Self::indices(&corner_aos).into_iter().map(move |corner| {
                         BlockVertex::new(
                             coords + corner_vertex_coords[corner].coords,
@@ -44,6 +39,7 @@ impl Block {
                             atlas_coords,
                             face,
                             corner_aos[corner],
+                            Default::default(),
                         )
                     })
                 })
@@ -62,20 +58,10 @@ impl Block {
         !self.is_air()
     }
 
-    fn ambient_occlusion(side: Side, corner: Corner, area: BlockArea) -> u8 {
-        let components = SIDE_CORNER_COMPONENT_DELTAS[side][corner]
-            .map(|_, delta| unsafe { area.get_unchecked(delta) });
-
-        let [edge1, edge2, corner] = [
-            components[Component::Edge1],
-            components[Component::Edge2],
-            components[Component::Corner],
-        ];
-
-        if edge1 && edge2 {
-            0
-        } else {
-            3 - (edge1 as u8 + edge2 as u8 + corner as u8)
+    fn corner_aos(data: &BlockData, side: Side, area: BlockArea) -> EnumMap<Corner, u8> {
+        enum_map! {
+            corner if data.is_not_glowing() => Self::ao(side, corner, area),
+            _ => 3,
         }
     }
 
@@ -86,6 +72,22 @@ impl Block {
             FLIPPED_INDICES
         } else {
             INDICES
+        }
+    }
+
+    fn ao(side: Side, corner: Corner, area: BlockArea) -> u8 {
+        let components = &SIDE_CORNER_COMPONENT_DELTAS[side][corner];
+
+        let [edge1, edge2, corner] = [
+            unsafe { area.get_unchecked(components[Component::Edge1]) },
+            unsafe { area.get_unchecked(components[Component::Edge2]) },
+            unsafe { area.get_unchecked(components[Component::Corner]) },
+        ];
+
+        if edge1 && edge2 {
+            0
+        } else {
+            3 - (edge1 as u8 + edge2 as u8 + corner as u8)
         }
     }
 }

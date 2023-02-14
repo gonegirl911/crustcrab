@@ -427,13 +427,8 @@ impl Chunk {
     }
 
     fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
-        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
-            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
-                blocks.iter().zip(0..).flat_map(move |(block, z)| {
-                    let coords = point![x, y, z];
-                    block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
-                })
-            })
+        self.blocks().flat_map(|(coords, block)| {
+            block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
         })
     }
 
@@ -443,6 +438,17 @@ impl Chunk {
             BlockAction::Destroy => prev.is_not_air().then(|| *prev = Block::Air).is_some(),
             BlockAction::Place(block) => prev.is_air().then(|| *prev = *block).is_some(),
         }
+    }
+
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> + '_ {
+        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
+            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
+                blocks
+                    .iter()
+                    .zip(0..)
+                    .map(move |(block, z)| (point![x, y, z], block))
+            })
+        })
     }
 
     fn is_empty(&self) -> bool {
