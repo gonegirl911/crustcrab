@@ -5,8 +5,17 @@ use rustc_hash::FxHashMap;
 use std::ops::{Index, IndexMut};
 
 #[derive(Default)]
-pub struct ChunkLightMap(FxHashMap<Point3<i32>, ChunkLight>);
+pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
 
+impl Index<Point3<i32>> for ChunkMapLight {
+    type Output = ChunkLight;
+
+    fn index(&self, coords: Point3<i32>) -> &Self::Output {
+        &self.0[&coords]
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
 impl Index<Point3<u8>> for ChunkLight {

@@ -1,3 +1,4 @@
+use super::light::BlockLight;
 use crate::client::game::scene::world::BlockVertex;
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
@@ -21,6 +22,7 @@ impl Block {
         self,
         coords: Point3<u8>,
         area: BlockArea,
+        light: BlockLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
         data.atlas_coords().map(move |side_atlas_coords| {
@@ -29,14 +31,14 @@ impl Block {
                 let atlas_coords = side_atlas_coords[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
-                Self::indices(&corner_aos).into_iter().map(move |corner| {
+                Self::indices(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
                         CORNER_TEX_COORDS[corner],
                         atlas_coords,
                         face,
                         corner_aos[corner],
-                        Default::default(),
+                        light,
                     )
                 })
             })
@@ -56,13 +58,14 @@ impl Block {
     }
 
     fn corner_aos(data: &BlockData, side: Side, area: BlockArea) -> EnumMap<Corner, u8> {
-        enum_map! {
-            corner if data.is_not_glowing() => Self::ao(side, corner, area),
-            _ => 3,
+        if data.is_not_glowing() {
+            enum_map! { corner => Self::ao(side, corner, area) }
+        } else {
+            enum_map! { _ => 3 }
         }
     }
 
-    fn indices(corner_aos: &EnumMap<Corner, u8>) -> [Corner; 6] {
+    fn indices(corner_aos: EnumMap<Corner, u8>) -> [Corner; 6] {
         if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
             > corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
         {

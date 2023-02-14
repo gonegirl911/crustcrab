@@ -63,7 +63,7 @@ impl Renderer {
     }
 
     pub fn recreate_surface(&self) {
-        self.surface.configure(&self.device, &self.config)
+        self.surface.configure(&self.device, &self.config);
     }
 }
 
@@ -210,7 +210,7 @@ impl<T: Pod> Uniform<T> {
     }
 
     pub fn update(&self, Renderer { queue, .. }: &Renderer, data: &T) {
-        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(slice::from_ref(data)))
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(slice::from_ref(data)));
     }
 }
 

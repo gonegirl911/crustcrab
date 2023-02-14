@@ -1,4 +1,4 @@
-mod crosshair;
+pub mod crosshair;
 
 use crate::{
     client::{
