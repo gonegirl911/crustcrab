@@ -258,7 +258,7 @@ impl ChunkMap {
             let block_coords = delta.map(|c| (c + Chunk::DIM as i8) as u8 % Chunk::DIM as u8);
             self.cells
                 .get(&chunk_coords)
-                .map(|cell| cell[block_coords].is_opaque())
+                .map(|cell| cell[block_coords].data().is_opaque())
                 .unwrap_or_default()
         })
     }

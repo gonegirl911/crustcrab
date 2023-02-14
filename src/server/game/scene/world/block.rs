@@ -3,17 +3,16 @@ use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
+use serde::Deserialize;
 use std::ops::Range;
 
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, Default, Enum)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Block {
     #[default]
     Air,
     Grass,
-    Dirt,
-    Stone,
-    Bedrock,
     Glowstone,
 }
 
@@ -23,37 +22,36 @@ impl Block {
         coords: Point3<u8>,
         area: BlockArea,
     ) -> impl Iterator<Item = BlockVertex> {
-        BLOCK_SIDE_ATLAS_COORDS[self]
-            .iter()
-            .flat_map(move |side_atlas_coords| {
-                SIDE_DELTAS
-                    .iter()
-                    .filter(move |(_, delta)| unsafe { !area.get_unchecked(**delta) })
-                    .flat_map(move |(side, _)| {
-                        let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
-                        let atlas_coords = side_atlas_coords[side];
-                        let face = side.into();
-                        let corner_aos = enum_map! {
-                            corner if self.is_not_glowing() => {
-                                Self::ambient_occlusion(side, corner, area)
-                            },
-                            _ => 3,
-                        };
-                        Self::indices(&corner_aos).into_iter().map(move |corner| {
-                            BlockVertex::new(
-                                coords + corner_vertex_coords[corner].coords,
-                                CORNER_TEX_COORDS[corner],
-                                atlas_coords,
-                                face,
-                                corner_aos[corner],
-                            )
-                        })
+        let data = self.data();
+        data.tex_coords().iter().flat_map(move |side_atlas_coords| {
+            SIDE_DELTAS
+                .iter()
+                .filter(move |(_, delta)| unsafe { !area.get_unchecked(**delta) })
+                .flat_map(move |(side, _)| {
+                    let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
+                    let atlas_coords = side_atlas_coords[side];
+                    let face = side.into();
+                    let corner_aos = enum_map! {
+                        corner if data.is_not_glowing() => {
+                            Self::ambient_occlusion(side, corner, area)
+                        },
+                        _ => 3,
+                    };
+                    Self::indices(&corner_aos).into_iter().map(move |corner| {
+                        BlockVertex::new(
+                            coords + corner_vertex_coords[corner].coords,
+                            CORNER_TEX_COORDS[corner],
+                            atlas_coords,
+                            face,
+                            corner_aos[corner],
+                        )
                     })
-            })
+                })
+        })
     }
 
-    pub fn data(self) -> BlockData {
-        todo!()
+    pub fn data(self) -> &'static BlockData {
+        &BLOCK_DATA[self]
     }
 
     pub fn is_air(self) -> bool {
@@ -62,14 +60,6 @@ impl Block {
 
     pub fn is_not_air(self) -> bool {
         !self.is_air()
-    }
-
-    pub fn is_transparent(self) -> bool {
-        self == Block::Air
-    }
-
-    pub fn is_opaque(self) -> bool {
-        !self.is_transparent()
     }
 
     fn ambient_occlusion(side: Side, corner: Corner, area: BlockArea) -> u8 {
@@ -100,22 +90,43 @@ impl Block {
     }
 }
 
+#[derive(Deserialize)]
 pub struct BlockData {
-    tex_coords: EnumMap<Side, Point2<u8>>,
+    #[serde(default)]
+    tex_coords: Option<EnumMap<Side, Point2<u8>>>,
+    #[serde(default)]
     luminance: Point3<u8>,
+    #[serde(default)]
+    light_filter: Point3<f32>,
 }
 
 impl BlockData {
+    fn tex_coords(&self) -> &Option<EnumMap<Side, Point2<u8>>> {
+        &self.tex_coords
+    }
+
     pub fn luminance(&self) -> Point3<u8> {
         self.luminance
     }
 
-    pub fn is_not_glowing(self) -> bool {
-        self.luminance == point![0, 0, 0]
+    pub fn light_filter(&self) -> Point3<f32> {
+        self.light_filter
     }
 
-    pub fn is_glowing(self) -> bool {
-        !self.is_not_glowing()
+    pub fn is_transparent(&self) -> bool {
+        self.light_filter != point![0.0, 0.0, 0.0]
+    }
+
+    pub fn is_opaque(&self) -> bool {
+        !self.is_transparent()
+    }
+
+    pub fn is_glowing(&self) -> bool {
+        self.luminance != point![0, 0, 0]
+    }
+
+    pub fn is_not_glowing(&self) -> bool {
+        !self.is_glowing()
     }
 }
 
@@ -172,7 +183,8 @@ impl From<Side> for Face {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Enum)]
+#[derive(Clone, Copy, Enum, Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum Side {
     Front,
     Right,
@@ -199,22 +211,10 @@ enum Component {
     Corner,
 }
 
-#[allow(clippy::type_complexity)]
-static BLOCK_SIDE_ATLAS_COORDS: Lazy<EnumMap<Block, Option<EnumMap<Side, Point2<u8>>>>> =
-    Lazy::new(|| {
-        enum_map! {
-            Block::Air => None,
-            Block::Grass => Some(enum_map! {
-                Side::Front | Side::Right | Side::Back | Side::Left => point![3, 0],
-                Side::Up => point![0, 0],
-                Side::Down => point![2, 0],
-            }),
-            Block::Dirt => Some(enum_map! { _ => point![2, 0] }),
-            Block::Stone => Some(enum_map! { _ => point![1, 0] }),
-            Block::Bedrock => Some(enum_map! { _ => point![1, 1] }),
-            Block::Glowstone => Some(enum_map! { _ => point![9, 6] })
-        }
-    });
+static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
+    toml::from_str(include_str!("../../../../../assets/blocks.toml"))
+        .expect("blocks.toml should be valid")
+});
 
 static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy::new(|| {
     enum_map! {
