@@ -52,12 +52,8 @@ impl Block {
             })
     }
 
-    pub fn luminosity(self) -> Point3<u8> {
-        if self == Block::Glowstone {
-            point![15, 15, 0]
-        } else {
-            point![0, 0, 0]
-        }
+    pub fn data(self) -> BlockData {
+        todo!()
     }
 
     pub fn is_air(self) -> bool {
@@ -74,14 +70,6 @@ impl Block {
 
     pub fn is_opaque(self) -> bool {
         !self.is_transparent()
-    }
-
-    pub fn is_glowing(self) -> bool {
-        self.luminosity() != point![0, 0, 0]
-    }
-
-    pub fn is_not_glowing(self) -> bool {
-        !self.is_glowing()
     }
 
     fn ambient_occlusion(side: Side, corner: Corner, area: BlockArea) -> u8 {
@@ -109,6 +97,25 @@ impl Block {
         } else {
             INDICES
         }
+    }
+}
+
+pub struct BlockData {
+    tex_coords: EnumMap<Side, Point2<u8>>,
+    luminance: Point3<u8>,
+}
+
+impl BlockData {
+    pub fn luminance(&self) -> Point3<u8> {
+        self.luminance
+    }
+
+    pub fn is_not_glowing(self) -> bool {
+        self.luminance == point![0, 0, 0]
+    }
+
+    pub fn is_glowing(self) -> bool {
+        !self.is_not_glowing()
     }
 }
 

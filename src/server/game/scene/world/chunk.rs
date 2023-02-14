@@ -349,7 +349,7 @@ struct ChunkCell {
 
 impl ChunkCell {
     fn load_new(chunk: Chunk) -> Option<Self> {
-        chunk.is_not_empty().then_some(Self {
+        chunk.is_not_empty().then(|| Self {
             chunk: Box::new(chunk),
             players_count: 1,
         })
