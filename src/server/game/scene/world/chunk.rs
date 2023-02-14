@@ -428,7 +428,10 @@ impl Chunk {
 
     fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
         self.blocks().flat_map(|(coords, block)| {
-            block.vertices(coords, unsafe { area.block_area_unchecked(coords) })
+            block
+                .vertices(coords, unsafe { area.block_area_unchecked(coords) })
+                .into_iter()
+                .flatten()
         })
     }
 

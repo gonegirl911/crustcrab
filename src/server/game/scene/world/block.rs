@@ -21,28 +21,25 @@ impl Block {
         self,
         coords: Point3<u8>,
         area: BlockArea,
-    ) -> impl Iterator<Item = BlockVertex> {
+    ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
-        data.tex_coords().iter().flat_map(move |side_atlas_coords| {
-            SIDE_DELTAS
-                .iter()
-                .filter(move |(_, delta)| unsafe { !area.get_unchecked(**delta) })
-                .flat_map(move |(side, _)| {
-                    let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
-                    let atlas_coords = side_atlas_coords[side];
-                    let face = side.into();
-                    let corner_aos = Self::corner_aos(data, side, area);
-                    Self::indices(&corner_aos).into_iter().map(move |corner| {
-                        BlockVertex::new(
-                            coords + corner_vertex_coords[corner].coords,
-                            CORNER_TEX_COORDS[corner],
-                            atlas_coords,
-                            face,
-                            corner_aos[corner],
-                            Default::default(),
-                        )
-                    })
+        data.atlas_coords().map(move |side_atlas_coords| {
+            area.visible_sides().flat_map(move |side| {
+                let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
+                let atlas_coords = side_atlas_coords[side];
+                let face = side.into();
+                let corner_aos = Self::corner_aos(data, side, area);
+                Self::indices(&corner_aos).into_iter().map(move |corner| {
+                    BlockVertex::new(
+                        coords + corner_vertex_coords[corner].coords,
+                        CORNER_TEX_COORDS[corner],
+                        atlas_coords,
+                        face,
+                        corner_aos[corner],
+                        Default::default(),
+                    )
                 })
+            })
         })
     }
 
@@ -95,7 +92,7 @@ impl Block {
 #[derive(Deserialize)]
 pub struct BlockData {
     #[serde(default)]
-    tex_coords: Option<EnumMap<Side, Point2<u8>>>,
+    atlas_coords: Option<EnumMap<Side, Point2<u8>>>,
     #[serde(default)]
     luminance: Point3<u8>,
     #[serde(default)]
@@ -103,8 +100,8 @@ pub struct BlockData {
 }
 
 impl BlockData {
-    fn tex_coords(&self) -> &Option<EnumMap<Side, Point2<u8>>> {
-        &self.tex_coords
+    fn atlas_coords(&self) -> &Option<EnumMap<Side, Point2<u8>>> {
+        &self.atlas_coords
     }
 
     pub fn luminance(&self) -> Point3<u8> {
@@ -152,6 +149,13 @@ impl BlockArea {
             }
         }
         Self(data)
+    }
+
+    fn visible_sides(self) -> impl Iterator<Item = Side> {
+        SIDE_DELTAS
+            .iter()
+            .filter(move |(_, delta)| unsafe { !self.get_unchecked(**delta) })
+            .map(|(side, _)| side)
     }
 
     unsafe fn get_unchecked(&self, coords: Point3<i8>) -> bool {
