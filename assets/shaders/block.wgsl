@@ -56,7 +56,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data, 21u, 4u)),
     );
     let face = extractBits(vertex.data, 25u, 2u);
-    let ao = f32(extractBits(vertex.data, 27u, 2u)) / 3.0;
+    let ao = f32(extractBits(vertex.data, 27u, 2u));
     let skylight_intensity = skylight.intensity;
     let skylight = f32(extractBits(vertex.light, 0u, 4u));
     let red = f32(extractBits(vertex.light, 4u, 4u));
@@ -70,7 +70,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let global_light = pow(0.8, (15.0 - skylight)) * skylight_intensity;
     let local_light = pow(vec3(0.8), (15.0 - vec3(red, blue, green)));
     let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 1.0, f32(face == 1u)), 0.6, f32(face == 0u));
-    let ambient_light = mix(0.2, 1.0, ao);
+    let ambient_light = mix(0.2, 1.0, ao / 3.0);
     let light_factor = (global_light + local_light) * face_light * ambient_light;
 
     let distance = distance(player.origin, coords);

@@ -403,12 +403,6 @@ impl Index<Point3<u8>> for ChunkCell {
     }
 }
 
-impl IndexMut<Point3<u8>> for ChunkCell {
-    fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
-        &mut self.chunk[coords]
-    }
-}
-
 pub struct ChunkData {
     chunk: Chunk,
     area: ChunkArea,

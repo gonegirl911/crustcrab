@@ -103,8 +103,8 @@ pub struct BlockData {
 }
 
 impl BlockData {
-    fn atlas_coords(&self) -> &Option<EnumMap<Side, Point2<u8>>> {
-        &self.atlas_coords
+    fn atlas_coords(&self) -> Option<&EnumMap<Side, Point2<u8>>> {
+        self.atlas_coords.as_ref()
     }
 
     pub fn luminance(&self) -> Point3<u8> {
