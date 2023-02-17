@@ -9,6 +9,7 @@ use crate::{
         game::scene::world::{
             block::Face,
             chunk::{Chunk, ChunkData},
+            light::BlockLight,
         },
         ServerEvent,
     },
@@ -234,6 +235,7 @@ impl BlockVertex {
         atlas_coords: Point2<u8>,
         face: Face,
         ao: u8,
+        light: BlockLight,
     ) -> Self {
         let mut data = 0;
         data |= coords.x as u32;
@@ -245,7 +247,10 @@ impl BlockVertex {
         data |= (atlas_coords.y as u32) << 21;
         data |= (face as u32) << 25;
         data |= (ao as u32) << 27;
-        Self { data, light: 0xF }
+        Self {
+            data,
+            light: light.0.into(),
+        }
     }
 }
 

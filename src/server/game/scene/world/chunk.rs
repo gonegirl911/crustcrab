@@ -1,5 +1,6 @@
 use super::{
     block::{Block, BlockArea},
+    light::{ChunkAreaLight, ChunkMapLight},
     loader::ChunkLoader,
 };
 use crate::{
@@ -32,6 +33,7 @@ pub struct ChunkMap {
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
     hovered_block: Option<BlockIntersection>,
     loader: ChunkLoader,
+    light: ChunkMapLight,
 }
 
 impl ChunkMap {
@@ -147,6 +149,7 @@ impl ChunkMap {
                 data: Arc::new(ChunkData {
                     chunk: self.cells[&coords].as_ref().clone(),
                     area: self.chunk_area(coords),
+                    light: self.light.chunk_area_light(coords),
                 }),
             })
             .for_each(|event| {
@@ -165,6 +168,7 @@ impl ChunkMap {
                 data: Arc::new(ChunkData {
                     chunk: self.cells[&coords].as_ref().clone(),
                     area: self.chunk_area(coords),
+                    light: self.light.chunk_area_light(coords),
                 }),
             })
             .collect::<LinkedList<_>>()
@@ -198,6 +202,7 @@ impl ChunkMap {
                     data: Arc::new(ChunkData {
                         chunk: self.cells.get(&coords)?.as_ref().clone(),
                         area: self.chunk_area(coords),
+                        light: self.light.chunk_area_light(coords),
                     }),
                 })
             })
@@ -219,6 +224,7 @@ impl ChunkMap {
                     data: Arc::new(ChunkData {
                         chunk: self.cells.get(&coords)?.as_ref().clone(),
                         area: self.chunk_area(coords),
+                        light: self.light.chunk_area_light(coords),
                     }),
                 })
             })
@@ -408,11 +414,12 @@ impl Index<Point3<u8>> for ChunkCell {
 pub struct ChunkData {
     chunk: Chunk,
     area: ChunkArea,
+    light: ChunkAreaLight,
 }
 
 impl ChunkData {
     pub fn vertices(&self) -> impl Iterator<Item = BlockVertex> + '_ {
-        self.chunk.vertices(&self.area)
+        self.chunk.vertices(&self.area, &self.light)
     }
 }
 
@@ -428,10 +435,18 @@ impl Chunk {
         }))
     }
 
-    fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
+    fn vertices<'a>(
+        &'a self,
+        area: &'a ChunkArea,
+        light: &'a ChunkAreaLight,
+    ) -> impl Iterator<Item = BlockVertex> + 'a {
         self.blocks().flat_map(|(coords, block)| {
             block
-                .vertices(coords, unsafe { area.block_area_unchecked(coords) })
+                .vertices(
+                    coords,
+                    unsafe { area.block_area_unchecked(coords) },
+                    light.block_area_light(coords),
+                )
                 .into_iter()
                 .flatten()
         })
@@ -484,11 +499,11 @@ impl IndexMut<Point3<u8>> for Chunk {
     }
 }
 
-struct ChunkArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in usize));
+pub struct ChunkArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in usize));
 
 impl ChunkArea {
-    const DIM: usize = (Self::RANGE.end - Self::RANGE.start) as usize;
-    const RANGE: Range<i8> = -1..Chunk::DIM as i8 + 1;
+    pub const DIM: usize = (Self::RANGE.end - Self::RANGE.start) as usize;
+    pub const RANGE: Range<i8> = -1..Chunk::DIM as i8 + 1;
 
     fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
         let mut data = BitArray::ZERO;

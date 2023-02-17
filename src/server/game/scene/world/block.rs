@@ -1,3 +1,4 @@
+use super::light::BlockAreaLight;
 use crate::client::game::scene::world::BlockVertex;
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
@@ -21,14 +22,17 @@ impl Block {
         self,
         coords: Point3<u8>,
         area: BlockArea,
+        light: BlockAreaLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
+        let side_lights = light.side_lights();
         data.atlas_coords().map(move |side_atlas_coords| {
             area.visible_sides().flat_map(move |side| {
                 let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
                 let atlas_coords = side_atlas_coords[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
+                let light = side_lights[side];
                 Self::indices(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
@@ -36,6 +40,7 @@ impl Block {
                         atlas_coords,
                         face,
                         corner_aos[corner],
+                        light,
                     )
                 })
             })
@@ -133,8 +138,8 @@ impl BlockData {
 pub struct BlockArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in u32));
 
 impl BlockArea {
-    const DIM: usize = (Self::RANGE.end - Self::RANGE.start) as usize;
-    const RANGE: Range<i8> = -1..2;
+    pub const DIM: usize = (Self::RANGE.end - Self::RANGE.start) as usize;
+    pub const RANGE: Range<i8> = -1..2;
 
     pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
         let mut data = BitArray::ZERO;
@@ -191,7 +196,7 @@ impl From<Side> for Face {
 #[repr(u8)]
 #[derive(Clone, Copy, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum Side {
+pub enum Side {
     Front,
     Right,
     Back,
@@ -263,7 +268,7 @@ static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy
     }
 });
 
-static SIDE_DELTAS: Lazy<EnumMap<Side, Point3<i8>>> = Lazy::new(|| {
+pub static SIDE_DELTAS: Lazy<EnumMap<Side, Point3<i8>>> = Lazy::new(|| {
     enum_map! {
         Side::Front => point![0, 0, -1],
         Side::Right => point![1, 0, 0],
