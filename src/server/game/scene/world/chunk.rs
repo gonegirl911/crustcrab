@@ -1,6 +1,5 @@
 use super::{
     block::{Block, BlockArea},
-    light::{ChunkLight, ChunkMapLight},
     loader::ChunkLoader,
 };
 use crate::{
@@ -33,7 +32,6 @@ pub struct ChunkMap {
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
     hovered_block: Option<BlockIntersection>,
     loader: ChunkLoader,
-    light: ChunkMapLight,
 }
 
 impl ChunkMap {
@@ -149,7 +147,6 @@ impl ChunkMap {
                 data: Arc::new(ChunkData {
                     chunk: self.cells[&coords].as_ref().clone(),
                     area: self.chunk_area(coords),
-                    light: self.light[coords].clone(),
                 }),
             })
             .for_each(|event| {
@@ -168,7 +165,6 @@ impl ChunkMap {
                 data: Arc::new(ChunkData {
                     chunk: self.cells[&coords].as_ref().clone(),
                     area: self.chunk_area(coords),
-                    light: self.light[coords].clone(),
                 }),
             })
             .collect::<LinkedList<_>>()
@@ -202,7 +198,6 @@ impl ChunkMap {
                     data: Arc::new(ChunkData {
                         chunk: self.cells.get(&coords)?.as_ref().clone(),
                         area: self.chunk_area(coords),
-                        light: self.light[coords].clone(),
                     }),
                 })
             })
@@ -224,7 +219,6 @@ impl ChunkMap {
                     data: Arc::new(ChunkData {
                         chunk: self.cells.get(&coords)?.as_ref().clone(),
                         area: self.chunk_area(coords),
-                        light: self.light[coords].clone(),
                     }),
                 })
             })
@@ -348,6 +342,14 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     }
 }
 
+impl Index<Point3<i32>> for ChunkMap {
+    type Output = Chunk;
+
+    fn index(&self, coords: Point3<i32>) -> &Self::Output {
+        self.cells[&coords].as_ref()
+    }
+}
+
 struct ChunkCell {
     chunk: Box<Chunk>,
     players_count: usize,
@@ -406,12 +408,11 @@ impl Index<Point3<u8>> for ChunkCell {
 pub struct ChunkData {
     chunk: Chunk,
     area: ChunkArea,
-    light: ChunkLight,
 }
 
 impl ChunkData {
     pub fn vertices(&self) -> impl Iterator<Item = BlockVertex> + '_ {
-        self.chunk.vertices(&self.area, &self.light)
+        self.chunk.vertices(&self.area)
     }
 }
 
@@ -427,18 +428,10 @@ impl Chunk {
         }))
     }
 
-    fn vertices<'a>(
-        &'a self,
-        area: &'a ChunkArea,
-        light: &'a ChunkLight,
-    ) -> impl Iterator<Item = BlockVertex> + 'a {
+    fn vertices<'a>(&'a self, area: &'a ChunkArea) -> impl Iterator<Item = BlockVertex> + 'a {
         self.blocks().flat_map(|(coords, block)| {
             block
-                .vertices(
-                    coords,
-                    unsafe { area.block_area_unchecked(coords) },
-                    light[coords],
-                )
+                .vertices(coords, unsafe { area.block_area_unchecked(coords) })
                 .into_iter()
                 .flatten()
         })

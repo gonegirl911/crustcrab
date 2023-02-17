@@ -1,4 +1,3 @@
-use super::light::BlockLight;
 use crate::client::game::scene::world::BlockVertex;
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
@@ -22,7 +21,6 @@ impl Block {
         self,
         coords: Point3<u8>,
         area: BlockArea,
-        light: BlockLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
         data.atlas_coords().map(move |side_atlas_coords| {
@@ -38,7 +36,6 @@ impl Block {
                         atlas_coords,
                         face,
                         corner_aos[corner],
-                        light,
                     )
                 })
             })
@@ -76,12 +73,12 @@ impl Block {
     }
 
     fn ao(side: Side, corner: Corner, area: BlockArea) -> u8 {
-        let components = &SIDE_CORNER_COMPONENT_DELTAS[side][corner];
+        let component_deltas = &SIDE_CORNER_COMPONENT_DELTAS[side][corner];
 
         let [edge1, edge2, corner] = [
-            unsafe { area.get_unchecked(components[Component::Edge1]) },
-            unsafe { area.get_unchecked(components[Component::Edge2]) },
-            unsafe { area.get_unchecked(components[Component::Corner]) },
+            unsafe { area.get_unchecked(component_deltas[Component::Edge1]) },
+            unsafe { area.get_unchecked(component_deltas[Component::Edge2]) },
+            unsafe { area.get_unchecked(component_deltas[Component::Corner]) },
         ];
 
         if edge1 && edge2 {
