@@ -112,9 +112,7 @@ impl ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
-                let prev = std::time::Instant::now();
                 let light_updates = self.light.apply(&self.cells, coords, &action);
-                dbg!(prev.elapsed());
 
                 self.actions
                     .entry(chunk_coords)
@@ -127,7 +125,7 @@ impl ChunkMap {
                             &Self::area_deltas(1)
                                 .filter(|delta| !is_loaded || *delta != Vector3::zeros())
                                 .map(|delta| Player::chunk_coords(coords + delta.cast()))
-                                .collect::<FxHashSet<_>>(),
+                                .collect(),
                         )
                         .copied()
                         .collect::<FxHashSet<_>>(),

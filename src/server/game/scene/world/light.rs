@@ -35,7 +35,7 @@ impl ChunkMapLight {
         action: &BlockAction,
     ) -> FxHashSet<Point3<i32>> {
         match action {
-            BlockAction::Destroy => Default::default(),
+            BlockAction::Destroy => self.destroy(cells, coords),
             BlockAction::Place(block) => self.place(cells, coords, *block),
         }
     }
@@ -46,7 +46,20 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         block: Block,
     ) -> FxHashSet<Point3<i32>> {
-        self.spread_torchlight(cells, coords, block.data().luminance().into())
+        let block_data = block.data();
+        if block_data.is_glowing() {
+            self.spread_torchlight(cells, coords, block_data.luminance().into())
+        } else {
+            self.unspread_torchlight(cells, coords)
+        }
+    }
+
+    fn destroy(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+    ) -> FxHashSet<Point3<i32>> {
+        self.unspread_torchlight(cells, coords)
     }
 
     fn spread_torchlight(
@@ -68,6 +81,14 @@ impl ChunkMapLight {
             }
         }
         updates
+    }
+
+    fn unspread_torchlight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+    ) -> FxHashSet<Point3<i32>> {
+        todo!()
     }
 
     fn set_torchlight(&mut self, coords: Point3<f32>, torchlight: Torchlight) -> bool {
