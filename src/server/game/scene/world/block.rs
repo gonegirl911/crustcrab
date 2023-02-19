@@ -22,10 +22,10 @@ impl Block {
         self,
         coords: Point3<u8>,
         area: BlockArea,
-        light: BlockAreaLight,
+        area_light: BlockAreaLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
-        let side_lights = light.side_lights();
+        let side_lights = area_light.side_lights();
         data.atlas_coords().map(move |side_atlas_coords| {
             area.visible_sides().flat_map(move |side| {
                 let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
@@ -99,9 +99,9 @@ pub struct BlockData {
     #[serde(default)]
     atlas_coords: Option<EnumMap<Side, Point2<u8>>>,
     #[serde(default)]
-    luminance: Point3<u8>,
+    luminance: [u8; 3],
     #[serde(default)]
-    light_filter: Point3<f32>,
+    light_filter: [f32; 3],
 }
 
 impl BlockData {
@@ -109,16 +109,16 @@ impl BlockData {
         self.atlas_coords.as_ref()
     }
 
-    pub fn luminance(&self) -> Point3<u8> {
+    pub fn luminance(&self) -> [u8; 3] {
         self.luminance
     }
 
-    pub fn light_filter(&self) -> Point3<f32> {
+    pub fn light_filter(&self) -> [f32; 3] {
         self.light_filter
     }
 
     pub fn is_transparent(&self) -> bool {
-        self.light_filter != point![0.0, 0.0, 0.0]
+        self.light_filter != [0.0, 0.0, 0.0]
     }
 
     pub fn is_opaque(&self) -> bool {
@@ -126,7 +126,7 @@ impl BlockData {
     }
 
     pub fn is_glowing(&self) -> bool {
-        self.luminance != point![0, 0, 0]
+        self.luminance != [0, 0, 0]
     }
 
     pub fn is_not_glowing(&self) -> bool {

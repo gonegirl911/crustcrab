@@ -71,7 +71,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let local_light = pow(vec3(0.8), (15.0 - vec3(red, blue, green)));
     let face_light = mix(mix(mix(mix(0.0, 0.8, f32(face == 3u)), 0.5, f32(face == 2u)), 1.0, f32(face == 1u)), 0.6, f32(face == 0u));
     let ambient_light = mix(0.2, 1.0, ao / 3.0);
-    let light_factor = (global_light + local_light) * face_light * ambient_light;
+    let light_factor = clamp(global_light + local_light, vec3(0.0), vec3(1.0)) * face_light * ambient_light;
 
     let distance = distance(player.origin, coords);
     let fog_distance = f32(player.render_distance) * 16.0 * 0.8;

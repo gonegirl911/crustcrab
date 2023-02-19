@@ -23,7 +23,7 @@ use std::{
     array,
     collections::LinkedList,
     num::NonZeroUsize,
-    ops::{Index, IndexMut, Range},
+    ops::{Deref, Index, IndexMut, Range},
     sync::Arc,
 };
 
@@ -112,15 +112,24 @@ impl ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
+                let prev = std::time::Instant::now();
+                let light_updates = self.light.apply(&self.cells, coords, &action);
+                dbg!(prev.elapsed());
+
                 self.actions
                     .entry(chunk_coords)
                     .or_default()
                     .insert(block_coords, action);
 
                 self.send_updates(
-                    Self::area_deltas()
-                        .filter(|delta| !is_loaded || *delta != Vector3::zeros())
-                        .map(|delta| Player::chunk_coords(coords + delta.cast()))
+                    light_updates
+                        .union(
+                            &Self::area_deltas(1)
+                                .filter(|delta| !is_loaded || *delta != Vector3::zeros())
+                                .map(|delta| Player::chunk_coords(coords + delta.cast()))
+                                .collect::<FxHashSet<_>>(),
+                        )
+                        .copied()
                         .collect::<FxHashSet<_>>(),
                     server_tx.clone(),
                 );
@@ -147,9 +156,9 @@ impl ChunkMap {
             .map(|coords| ServerEvent::ChunkLoaded {
                 coords,
                 data: Arc::new(ChunkData {
-                    chunk: self.cells[&coords].as_ref().clone(),
+                    chunk: (*self.cells[&coords]).clone(),
                     area: self.chunk_area(coords),
-                    light: self.light.chunk_area_light(coords),
+                    area_light: self.light.chunk_area_light(coords),
                 }),
             })
             .for_each(|event| {
@@ -166,9 +175,9 @@ impl ChunkMap {
             .map(|coords| ServerEvent::ChunkLoaded {
                 coords,
                 data: Arc::new(ChunkData {
-                    chunk: self.cells[&coords].as_ref().clone(),
+                    chunk: (*self.cells[&coords]).clone(),
                     area: self.chunk_area(coords),
-                    light: self.light.chunk_area_light(coords),
+                    area_light: self.light.chunk_area_light(coords),
                 }),
             })
             .collect::<LinkedList<_>>()
@@ -200,9 +209,9 @@ impl ChunkMap {
                 Some(ServerEvent::ChunkUpdated {
                     coords,
                     data: Arc::new(ChunkData {
-                        chunk: self.cells.get(&coords)?.as_ref().clone(),
+                        chunk: (*self.cells.get(&coords)?).clone(),
                         area: self.chunk_area(coords),
-                        light: self.light.chunk_area_light(coords),
+                        area_light: self.light.chunk_area_light(coords),
                     }),
                 })
             })
@@ -222,9 +231,9 @@ impl ChunkMap {
                 Some(ServerEvent::ChunkUpdated {
                     coords,
                     data: Arc::new(ChunkData {
-                        chunk: self.cells.get(&coords)?.as_ref().clone(),
+                        chunk: (*self.cells.get(&coords)?).clone(),
                         area: self.chunk_area(coords),
-                        light: self.light.chunk_area_light(coords),
+                        area_light: self.light.chunk_area_light(coords),
                     }),
                 })
             })
@@ -251,7 +260,7 @@ impl ChunkMap {
         let points = points.into_iter().collect::<FxHashSet<_>>();
         points
             .iter()
-            .flat_map(|coords| Self::area_deltas().map(move |delta| coords + delta))
+            .flat_map(|coords| Self::area_deltas(1).map(move |delta| coords + delta))
             .collect::<FxHashSet<_>>()
             .difference(&points)
             .copied()
@@ -269,9 +278,12 @@ impl ChunkMap {
         })
     }
 
-    fn area_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        (-1..=1)
-            .flat_map(|dx| (-1..=1).flat_map(move |dy| (-1..=1).map(move |dz| vector![dx, dy, dz])))
+    fn area_deltas(radius: u32) -> impl Iterator<Item = Vector3<i32>> {
+        let radius = radius as i32;
+        (-radius..=radius).flat_map(move |dx| {
+            (-radius..=radius)
+                .flat_map(move |dy| (-radius..=radius).map(move |dz| vector![dx, dy, dz]))
+        })
     }
 }
 
@@ -281,25 +293,25 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     fn handle(&mut self, event: &ChunkMapEvent, (server_tx, ray): Self::Context<'_>) {
         match event {
             ChunkMapEvent::InitialRenderRequested { area } => {
-                let mut loaded = self.load_many(area.points()).collect::<Vec<_>>();
+                let mut loads = self.load_many(area.points()).collect::<Vec<_>>();
 
                 self.handle(
                     &ChunkMapEvent::BlockSelectionRequested,
                     (server_tx.clone(), ray),
                 );
 
-                loaded.par_sort_unstable_by_key(|coords| {
+                loads.par_sort_unstable_by_key(|coords| {
                     (coords - area.center).map(|c| c.pow(2)).sum()
                 });
 
-                self.par_send_loads(loaded, server_tx);
+                self.par_send_loads(loads, server_tx);
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
-                let unloaded = self
+                let unloads = self
                     .unload_many(prev.exclusive_points(curr))
                     .collect::<FxHashSet<_>>();
 
-                let loaded = self
+                let loads = self
                     .load_many(curr.exclusive_points(prev))
                     .collect::<FxHashSet<_>>();
 
@@ -309,11 +321,11 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 );
 
                 self.par_send_updates(
-                    Self::outline(loaded.union(&unloaded).copied()),
+                    Self::outline(loads.union(&unloads).copied()),
                     server_tx.clone(),
                 );
-                self.send_unloads(unloaded, server_tx.clone());
-                self.par_send_loads(loaded, server_tx);
+                self.send_unloads(unloads, server_tx.clone());
+                self.par_send_loads(loads, server_tx);
             }
             ChunkMapEvent::BlockSelectionRequested => {
                 self.hovered_block = ray.cast(Player::BUILDING_REACH).find(
@@ -348,15 +360,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     }
 }
 
-impl Index<Point3<i32>> for ChunkMap {
-    type Output = Chunk;
-
-    fn index(&self, coords: Point3<i32>) -> &Self::Output {
-        self.cells[&coords].as_ref()
-    }
-}
-
-struct ChunkCell {
+pub struct ChunkCell {
     chunk: Box<Chunk>,
     players_count: usize,
 }
@@ -397,29 +401,23 @@ impl ChunkCell {
     }
 }
 
-impl AsRef<Chunk> for ChunkCell {
-    fn as_ref(&self) -> &Chunk {
+impl Deref for ChunkCell {
+    type Target = Chunk;
+
+    fn deref(&self) -> &Self::Target {
         &self.chunk
-    }
-}
-
-impl Index<Point3<u8>> for ChunkCell {
-    type Output = Block;
-
-    fn index(&self, coords: Point3<u8>) -> &Self::Output {
-        &self.chunk[coords]
     }
 }
 
 pub struct ChunkData {
     chunk: Chunk,
     area: ChunkArea,
-    light: ChunkAreaLight,
+    area_light: ChunkAreaLight,
 }
 
 impl ChunkData {
     pub fn vertices(&self) -> impl Iterator<Item = BlockVertex> + '_ {
-        self.chunk.vertices(&self.area, &self.light)
+        self.chunk.vertices(&self.area, &self.area_light)
     }
 }
 
@@ -438,14 +436,14 @@ impl Chunk {
     fn vertices<'a>(
         &'a self,
         area: &'a ChunkArea,
-        light: &'a ChunkAreaLight,
+        area_light: &'a ChunkAreaLight,
     ) -> impl Iterator<Item = BlockVertex> + 'a {
         self.blocks().flat_map(|(coords, block)| {
             block
                 .vertices(
                     coords,
                     unsafe { area.block_area_unchecked(coords) },
-                    light.block_area_light(coords),
+                    area_light.block_area_light(coords),
                 )
                 .into_iter()
                 .flatten()
@@ -535,7 +533,7 @@ impl ChunkArea {
     }
 }
 
-enum BlockAction {
+pub enum BlockAction {
     Destroy,
     Place(Block),
 }
