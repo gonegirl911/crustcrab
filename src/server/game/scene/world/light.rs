@@ -3,7 +3,7 @@ use super::{
     chunk::{BlockAction, Chunk, ChunkArea, ChunkCell},
 };
 use crate::server::game::{player::Player, scene::world::block::SIDE_DELTAS};
-use bitfield::bitfield;
+use bitfield::{bitfield, BitRange, BitRangeMut};
 use enum_map::{enum_map, EnumMap};
 use nalgebra::{point, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -46,55 +46,48 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         block: Block,
     ) -> FxHashSet<Point3<i32>> {
-        block
-            .data()
-            .luminance()
-            .into_iter()
-            .enumerate()
-            .flat_map(|(i, c)| self.spread_torchlight(cells, coords, i, c))
-            .collect()
+        self.spread_torchlight(cells, coords, block.data().luminance().into())
     }
 
     fn spread_torchlight(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
-        index: usize,
-        value: u8,
+        torchlight: Torchlight,
     ) -> FxHashSet<Point3<i32>> {
-        let mut deq = VecDeque::from([(coords, value)]);
+        let mut deq = VecDeque::from([(coords, torchlight)]);
         let mut updates = FxHashSet::default();
-        while let Some((coords, value)) = deq.pop_front() {
-            if self.set_torchlight(coords, index, value) {
-                if let Some(value) = value.checked_sub(1) {
-                    deq.extend(SIDE_DELTAS.values().map(|delta| {
-                        let coords = coords + delta.coords.cast();
-                        updates.insert(Player::chunk_coords(coords));
-                        (coords, Self::filter(cells, coords, index, value))
-                    }));
-                }
+        while let Some((coords, torchlight)) = deq.pop_front() {
+            if self.set_torchlight(coords, torchlight) {
+                let torchlight = torchlight.saturating_component_sub(1);
+                deq.extend(SIDE_DELTAS.values().map(|delta| {
+                    let coords = coords + delta.coords.cast();
+                    updates.insert(Player::chunk_coords(coords));
+                    (coords, Self::apply_filter(cells, coords, torchlight))
+                }));
             }
         }
         updates
     }
 
-    fn set_torchlight(&mut self, coords: Point3<f32>, index: usize, value: u8) -> bool {
+    fn set_torchlight(&mut self, coords: Point3<f32>, torchlight: Torchlight) -> bool {
         let block_light = self.block_light_mut(coords);
-        if block_light.torchlight(index) < value {
-            block_light.set_torchlight(index, value);
+        let prev = block_light.torchlight();
+        let curr = prev.component_max(torchlight);
+        if prev != curr {
+            block_light.set_torchlight(curr);
             true
         } else {
             false
         }
     }
 
-    fn filter(
+    fn apply_filter(
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
-        index: usize,
-        value: u8,
-    ) -> u8 {
-        (value as f32 * Self::block_data(cells, coords).light_filter()[index]).round() as u8
+        torchlight: Torchlight,
+    ) -> Torchlight {
+        torchlight.component_mul(Self::block_data(cells, coords).light_filter())
     }
 
     fn block_data(
@@ -162,9 +155,8 @@ impl Index<Point3<i8>> for ChunkAreaLight {
 bitfield! {
     #[derive(Clone, Copy)]
     pub struct BlockLight(u16);
-    u8;
-    skylight, set_skylight: 3, 0;
-    torchlight, set_torchlight: 7, 4, 3;
+    u8, skylight, set_skylight: 3, 0;
+    Torchlight, torchlight, set_torchlight: 15, 4;
 }
 
 impl Default for BlockLight {
@@ -197,5 +189,59 @@ impl Index<Point3<i8>> for BlockAreaLight {
     fn index(&self, coords: Point3<i8>) -> &Self::Output {
         let coords = coords.map(|c| c - BlockArea::RANGE.start);
         &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+    }
+}
+
+bitfield! {
+    #[derive(Clone, Copy, PartialEq, Eq, Default)]
+    struct Torchlight(u16);
+    u8, channel, set_channel: 3, 0, 3;
+}
+
+impl Torchlight {
+    fn saturating_component_sub(self, value: u8) -> Self {
+        self.map(|c| c.saturating_sub(value))
+    }
+
+    fn component_mul(self, values: [f32; 3]) -> Self {
+        self.map_with_location(|i, c| (c as f32 * values[i]).round() as u8)
+    }
+
+    fn component_max(self, other: Torchlight) -> Self {
+        self.zip(other, |a, b| a.max(b))
+    }
+
+    fn map<F: FnMut(u8) -> u8>(self, mut f: F) -> Self {
+        array::from_fn(|i| f(self.channel(i))).into()
+    }
+
+    fn map_with_location<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
+        array::from_fn(|i| f(i, self.channel(i))).into()
+    }
+
+    fn zip<F: FnMut(u8, u8) -> u8>(self, other: Torchlight, mut f: F) -> Self {
+        array::from_fn(|i| f(self.channel(i), other.channel(i))).into()
+    }
+}
+
+impl From<[u8; 3]> for Torchlight {
+    fn from([r, g, b]: [u8; 3]) -> Self {
+        let mut value = Torchlight::default();
+        value.set_channel(0, r);
+        value.set_channel(1, g);
+        value.set_channel(2, b);
+        value
+    }
+}
+
+impl BitRange<Torchlight> for u16 {
+    fn bit_range(&self, msb: usize, lsb: usize) -> Torchlight {
+        Torchlight(self.bit_range(msb, lsb))
+    }
+}
+
+impl BitRangeMut<Torchlight> for u16 {
+    fn set_bit_range(&mut self, msb: usize, lsb: usize, value: Torchlight) {
+        self.set_bit_range(msb, lsb, value.0);
     }
 }
