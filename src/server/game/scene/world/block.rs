@@ -5,7 +5,6 @@ use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::ops::Range;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
@@ -138,22 +137,16 @@ impl BlockData {
 pub struct BlockArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in u32));
 
 impl BlockArea {
-    pub const DIM: usize = (Self::RANGE.end - Self::RANGE.start) as usize;
-    pub const RANGE: Range<i8> = -1..2;
+    pub const DIM: usize = 3;
 
     pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
-        let mut data = BitArray::ZERO;
-        for x in Self::RANGE {
-            for y in Self::RANGE {
-                for z in Self::RANGE {
-                    let coords = point![x, y, z];
-                    unsafe {
-                        data.set_unchecked(Self::index_unchecked(coords), f(coords));
-                    }
-                }
+        let mut value = Self(BitArray::ZERO);
+        for delta in AREA_DELTAS {
+            unsafe {
+                value.set_unchecked(delta, f(delta));
             }
         }
-        Self(data)
+        value
     }
 
     fn visible_sides(self) -> impl Iterator<Item = Side> {
@@ -167,8 +160,14 @@ impl BlockArea {
         unsafe { *self.0.get_unchecked(Self::index_unchecked(coords)) }
     }
 
+    unsafe fn set_unchecked(&mut self, coords: Point3<i8>, value: bool) {
+        unsafe {
+            self.0.set_unchecked(Self::index_unchecked(coords), value);
+        }
+    }
+
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
-        let coords = coords.map(|c| (c - Self::RANGE.start) as usize);
+        let coords = coords.map(|c| (c + 1) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
     }
 }
@@ -330,4 +329,63 @@ const FLIPPED_INDICES: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::UpperRight,
     Corner::UpperLeft,
+];
+
+const AREA_DELTAS: [Point3<i8>; 27] = [
+    point![-1, -1, -1],
+    point![-1, -1, 0],
+    point![-1, -1, 1],
+    point![-1, 0, -1],
+    point![-1, 0, 0],
+    point![-1, 0, 1],
+    point![-1, 1, -1],
+    point![-1, 1, 0],
+    point![-1, 1, 1],
+    point![0, -1, -1],
+    point![0, -1, 0],
+    point![0, -1, 1],
+    point![0, 0, -1],
+    point![0, 0, 0],
+    point![0, 0, 1],
+    point![0, 1, -1],
+    point![0, 1, 0],
+    point![0, 1, 1],
+    point![1, -1, -1],
+    point![1, -1, 0],
+    point![1, -1, 1],
+    point![1, 0, -1],
+    point![1, 0, 0],
+    point![1, 0, 1],
+    point![1, 1, -1],
+    point![1, 1, 0],
+    point![1, 1, 1],
+];
+
+pub const NEIGHBOR_DELTAS: [Point3<i8>; 26] = [
+    point![-1, -1, -1],
+    point![-1, -1, 0],
+    point![-1, -1, 1],
+    point![-1, 0, -1],
+    point![-1, 0, 0],
+    point![-1, 0, 1],
+    point![-1, 1, -1],
+    point![-1, 1, 0],
+    point![-1, 1, 1],
+    point![0, -1, -1],
+    point![0, -1, 0],
+    point![0, -1, 1],
+    point![0, 0, -1],
+    point![0, 0, 1],
+    point![0, 1, -1],
+    point![0, 1, 0],
+    point![0, 1, 1],
+    point![1, -1, -1],
+    point![1, -1, 0],
+    point![1, -1, 1],
+    point![1, 0, -1],
+    point![1, 0, 0],
+    point![1, 0, 1],
+    point![1, 1, -1],
+    point![1, 1, 0],
+    point![1, 1, 1],
 ];

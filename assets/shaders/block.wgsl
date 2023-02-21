@@ -58,7 +58,8 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let face = extractBits(vertex.data, 25u, 2u);
     let ao = f32(extractBits(vertex.data, 27u, 2u));
     let skylight_intensity = skylight.intensity;
-    let skylight = f32(extractBits(vertex.light, 0u, 4u));
+    // let skylight = f32(extractBits(vertex.light, 0u, 4u));
+    let skylight = 15.0;
     let red = f32(extractBits(vertex.light, 4u, 4u));
     let blue = f32(extractBits(vertex.light, 8u, 4u));
     let green = f32(extractBits(vertex.light, 12u, 4u));
