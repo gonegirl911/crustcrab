@@ -39,43 +39,70 @@ pub struct ChunkMap {
 impl ChunkMap {
     pub const Y_RANGE: Range<i32> = 0..16;
 
-    fn load_many<I>(&mut self, points: I) -> impl Iterator<Item = Point3<i32>> + '_
+    fn load_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        let points = points.into_iter().collect::<Vec<_>>();
+        // let points = points.into_iter().collect::<Vec<_>>();
 
-        let new = points
-            .iter()
-            .copied()
-            .filter(|coords| self.cells.get_mut(coords).map(ChunkCell::load).is_none())
-            .collect::<Vec<_>>();
+        // let new = points
+        //     .iter()
+        //     .copied()
+        //     .filter(|coords| self.cells.get_mut(coords).map(ChunkCell::load).is_none())
+        //     .collect::<Vec<_>>();
 
-        self.cells.extend(
-            new.into_par_iter()
-                .filter_map(|coords| self.get_new(coords).map(|cell| (coords, cell)))
-                .collect::<LinkedList<_>>(),
-        );
+        // self.cells.extend(
+        //     new.into_par_iter()
+        //         .filter_map(|coords| self.get_new(coords).map(|cell| (coords, cell)))
+        //         .collect::<LinkedList<_>>(),
+        // );
 
+        // points
+        //     .into_iter()
+        //     .filter(|coords| self.cells.contains_key(coords))
+        //     .collect()
         points
             .into_iter()
-            .filter(|coords| self.cells.contains_key(coords))
+            .map(|coords| {
+                if self.cells.get_mut(&coords).map(ChunkCell::load).is_some() {
+                    Ok(coords)
+                } else {
+                    Err(coords)
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .map(|coords| coords.map_err(|coords| self.get_new(coords).map(|cell| (coords, cell))))
+            .collect::<LinkedList<_>>()
+            .into_iter()
+            .filter_map(|x| match x {
+                Ok(coords) => Some(coords),
+                Err(Some((coords, cell))) => {
+                    self.cells.insert(coords, cell);
+                    Some(coords)
+                }
+                Err(None) => None,
+            })
+            .collect()
     }
 
-    fn unload_many<'a, I>(&'a mut self, points: I) -> impl Iterator<Item = Point3<i32>> + 'a
+    fn unload_many<'a, I>(&'a mut self, points: I) -> Vec<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>> + 'a,
     {
-        points.into_iter().filter(|coords| {
-            self.cells
-                .remove_entry(coords)
-                .map(|(coords, cell)| {
-                    if let Some(cell) = cell.unload() {
-                        self.cells.insert(coords, cell);
-                    }
-                })
-                .is_some()
-        })
+        points
+            .into_iter()
+            .filter(|coords| {
+                self.cells
+                    .remove_entry(coords)
+                    .map(|(coords, cell)| {
+                        if let Some(cell) = cell.unload() {
+                            self.cells.insert(coords, cell);
+                        }
+                    })
+                    .is_some()
+            })
+            .collect()
     }
 
     fn apply(
@@ -112,6 +139,10 @@ impl ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
+                let prev = std::time::Instant::now();
+                let light_updates = self.light.apply(&self.cells, coords, &action);
+                dbg!(prev.elapsed());
+
                 self.actions
                     .entry(chunk_coords)
                     .or_default()
@@ -122,6 +153,7 @@ impl ChunkMap {
                         .into_iter()
                         .map(|delta| Player::chunk_coords(coords + delta.coords.cast()))
                         .chain((!is_loaded).then_some(chunk_coords))
+                        .chain(light_updates)
                         .collect::<FxHashSet<_>>(),
                     server_tx.clone(),
                 );
@@ -248,8 +280,11 @@ impl ChunkMap {
         ChunkCell::load_new(chunk)
     }
 
-    fn outline<I: IntoIterator<Item = Point3<i32>>>(points: I) -> FxHashSet<Point3<i32>> {
-        let points = points.into_iter().collect::<FxHashSet<_>>();
+    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
+        ChunkArea::new(&self.cells, coords)
+    }
+
+    fn outline(points: &FxHashSet<Point3<i32>>) -> FxHashSet<Point3<i32>> {
         points
             .iter()
             .flat_map(|coords| {
@@ -257,14 +292,8 @@ impl ChunkMap {
                     .into_iter()
                     .map(move |delta| coords + delta.coords.cast())
             })
-            .collect::<FxHashSet<_>>()
-            .difference(&points)
-            .copied()
+            .filter(|coords| !points.contains(coords))
             .collect()
-    }
-
-    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
-        ChunkArea::new(&self.cells, coords)
     }
 }
 
@@ -274,7 +303,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     fn handle(&mut self, event: &ChunkMapEvent, (server_tx, ray): Self::Context<'_>) {
         match event {
             ChunkMapEvent::InitialRenderRequested { area } => {
-                let mut loads = self.load_many(area.points()).collect::<Vec<_>>();
+                let mut loads = self.load_many(area.points());
 
                 self.handle(
                     &ChunkMapEvent::BlockSelectionRequested,
@@ -288,23 +317,16 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 self.par_send_loads(loads, server_tx);
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
-                let unloads = self
-                    .unload_many(prev.exclusive_points(curr))
-                    .collect::<FxHashSet<_>>();
-
-                let loads = self
-                    .load_many(curr.exclusive_points(prev))
-                    .collect::<FxHashSet<_>>();
+                let unloads = self.unload_many(prev.exclusive_points(curr));
+                let loads = self.load_many(curr.exclusive_points(prev));
+                let updates = Self::outline(&loads.iter().chain(&unloads).copied().collect());
 
                 self.handle(
                     &ChunkMapEvent::BlockSelectionRequested,
                     (server_tx.clone(), ray),
                 );
 
-                self.par_send_updates(
-                    Self::outline(loads.union(&unloads).copied()),
-                    server_tx.clone(),
-                );
+                self.par_send_updates(updates, server_tx.clone());
                 self.send_unloads(unloads, server_tx.clone());
                 self.par_send_loads(loads, server_tx);
             }
@@ -475,6 +497,12 @@ impl Index<Point3<u8>> for Chunk {
 impl IndexMut<Point3<u8>> for Chunk {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
         &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+    }
+}
+
+impl Default for &'_ Chunk {
+    fn default() -> Self {
+        &Chunk([[[Block::Air; Chunk::DIM]; Chunk::DIM]; Chunk::DIM])
     }
 }
 
