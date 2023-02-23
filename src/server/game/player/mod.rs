@@ -97,7 +97,6 @@ impl WorldArea {
 
     fn y_range(&self) -> RangeInclusive<i32> {
         let radius = self.radius as i32;
-        (-radius).max(ChunkMap::Y_RANGE.start - self.center.y)
-            ..=radius.min(ChunkMap::Y_RANGE.end - 1 - self.center.y)
+        (-radius).max(ChunkMap::Y_RANGE.start - self.center.y)..=radius
     }
 }

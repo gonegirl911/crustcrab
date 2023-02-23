@@ -10,8 +10,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
     collections::VecDeque,
-    num::NonZeroU8,
-    ops::{Deref, Index, IndexMut},
+    ops::{Index, IndexMut},
 };
 
 #[derive(Default)]
@@ -29,9 +28,20 @@ impl ChunkMapLight {
         action: &BlockAction,
     ) -> FxHashSet<Point3<i32>> {
         match action {
-            BlockAction::Destroy => todo!(),
+            BlockAction::Destroy => self.destroy(cells, coords),
             BlockAction::Place(block) => self.place(cells, coords, *block),
         }
+    }
+
+    fn destroy(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+    ) -> FxHashSet<Point3<i32>> {
+        let block_light = *self.block_light(coords);
+        (0..3)
+            .flat_map(|i| self.unspread_channel(cells, coords, i, block_light.channel(i)))
+            .collect()
     }
 
     fn place(
@@ -40,12 +50,17 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         block: Block,
     ) -> FxHashSet<Point3<i32>> {
+        let block_light = *self.block_light(coords);
         block
             .data()
             .luminance()
             .into_iter()
             .enumerate()
-            .flat_map(|(i, v)| self.spread_channel(cells, coords, i, v))
+            .flat_map(|(i, v)| {
+                self.unspread_channel(cells, coords, i, block_light.channel(i))
+                    .into_iter()
+                    .chain(self.spread_channel(cells, coords, i, v))
+            })
             .collect()
     }
 
@@ -56,17 +71,51 @@ impl ChunkMapLight {
         index: usize,
         value: u8,
     ) -> FxHashSet<Point3<i32>> {
-        let mut deq = VecDeque::from([LightNode::new(cells, coords, value)]);
+        let mut deq = VecDeque::from([LightNode::new(coords, value)]);
         let mut updates = FxHashSet::default();
         while let Some(node) = deq.pop_front() {
             if node.set_channel(&mut self.0, index) {
-                deq.extend(SIDE_DELTAS.values().filter_map(|delta| {
-                    node.visit_next(cells, &mut updates, *delta)?
-                        .apply_filter(index)
+                deq.extend(SIDE_DELTAS.values().map(|delta| {
+                    let node = node.visit_next(*delta);
+                    updates.insert(node.chunk_coords);
+                    node.apply_filter(cells, index)
                 }));
             }
         }
         updates
+    }
+
+    fn unspread_channel(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+        index: usize,
+        value: u8,
+    ) -> FxHashSet<Point3<i32>> {
+        // let mut deq = VecDeque::from([LightNode::new(coords, value)]);
+        // let mut sources = vec![];
+        // let mut updates = FxHashSet::default();
+        // while let Some(node) = deq.pop_front() {
+        //     if node.unset_channel(&mut self.0, index) {
+        //         deq.extend(SIDE_DELTAS.values().filter_map(|delta| {
+        //             let node = node.visit_next(*delta)?;
+        //             updates.insert(node.chunk_coords);
+        //             Some(node)
+        //         }));
+        //     } else {
+        //         sources.push((node.coords, node.value));
+        //     }
+        // }
+        // sources
+        //     .into_iter()
+        //     .flat_map(|(coords, value)| self.spread_channel(cells, coords, index, value))
+        //     .chain(updates)
+        //     .collect()
+        todo!()
+    }
+
+    fn block_light(&mut self, coords: Point3<f32>) -> &BlockLight {
+        &self.0.entry(Player::chunk_coords(coords)).or_default()[Player::block_coords(coords)]
     }
 }
 
@@ -221,21 +270,18 @@ impl Index<Point3<i8>> for BlockAreaLight {
     }
 }
 
-struct LightNode<'a> {
-    chunk: &'a Chunk,
+struct LightNode {
     coords: Point3<f32>,
     chunk_coords: Point3<i32>,
     block_coords: Point3<u8>,
     value: u8,
 }
 
-impl<'a> LightNode<'a> {
-    fn new(cells: &'a FxHashMap<Point3<i32>, ChunkCell>, coords: Point3<f32>, value: u8) -> Self {
+impl LightNode {
+    fn new(coords: Point3<f32>, value: u8) -> Self {
         let chunk_coords = Player::chunk_coords(coords);
         let block_coords = Player::block_coords(coords);
-        let chunk = Self::chunk(cells, chunk_coords);
         Self {
-            chunk,
             coords,
             chunk_coords,
             block_coords,
@@ -244,7 +290,7 @@ impl<'a> LightNode<'a> {
     }
 
     fn set_channel(&self, lights: &mut FxHashMap<Point3<i32>, ChunkLight>, index: usize) -> bool {
-        let block_light = &mut self.light(lights)[self.block_coords];
+        let block_light = self.block_light_mut(lights);
         if block_light.channel(index) < self.value {
             block_light.set_channel(index, self.value);
             true
@@ -253,52 +299,40 @@ impl<'a> LightNode<'a> {
         }
     }
 
-    fn visit_next(
-        &self,
-        cells: &'a FxHashMap<Point3<i32>, ChunkCell>,
-        updates: &mut FxHashSet<Point3<i32>>,
-        delta: Point3<i8>,
-    ) -> Option<Self> {
-        let value = self.value.saturating_sub(1);
-        let coords = self.coords + delta.coords.cast();
-        let chunk_coords = Player::chunk_coords(coords);
-        let block_coords = Player::block_coords(coords);
-        let chunk = if self.chunk_coords == chunk_coords {
-            self.chunk
-        } else if updates.contains(&chunk_coords) {
-            return None;
+    fn unset_channel(&self, lights: &mut FxHashMap<Point3<i32>, ChunkLight>, index: usize) -> bool {
+        let block_light = self.block_light_mut(lights);
+        if block_light.channel(index) <= self.value {
+            block_light.set_channel(index, 0);
+            true
         } else {
-            updates.insert(chunk_coords);
-            Self::chunk(cells, chunk_coords)
-        };
-        Some(Self {
-            chunk,
-            coords,
-            chunk_coords,
-            block_coords,
-            value,
-        })
+            false
+        }
     }
 
-    fn apply_filter(mut self, index: usize) -> Option<Self> {
-        let value = (self.value as f32 * self.block_data().light_filter()[index]).round() as u8;
-        NonZeroU8::new(value).map(|value| {
-            self.value = value.get();
-            self
-        })
+    fn visit_next(&self, delta: Point3<i8>) -> Self {
+        Self::new(
+            self.coords + delta.coords.cast(),
+            self.value.saturating_sub(1),
+        )
     }
 
-    fn block_data(&self) -> &'static BlockData {
-        self.chunk[self.block_coords].data()
+    fn apply_filter(mut self, cells: &FxHashMap<Point3<i32>, ChunkCell>, index: usize) -> Self {
+        let filter = self.block_data(cells).light_filter()[index];
+        self.value = (self.value as f32 * filter).round() as u8;
+        self
     }
 
-    fn light<'b>(&self, lights: &'b mut FxHashMap<Point3<i32>, ChunkLight>) -> &'b mut ChunkLight {
-        lights.entry(self.chunk_coords).or_default()
-    }
-
-    fn chunk(cells: &'a FxHashMap<Point3<i32>, ChunkCell>, chunk_coords: Point3<i32>) -> &'a Chunk {
+    fn block_data(&self, cells: &FxHashMap<Point3<i32>, ChunkCell>) -> &'static BlockData {
         cells
-            .get(&chunk_coords)
-            .map_or_else(Default::default, Deref::deref)
+            .get(&self.chunk_coords)
+            .map_or(Block::Air, |cell| cell[self.block_coords])
+            .data()
+    }
+
+    fn block_light_mut<'a>(
+        &self,
+        lights: &'a mut FxHashMap<Point3<i32>, ChunkLight>,
+    ) -> &'a mut BlockLight {
+        &mut lights.entry(self.chunk_coords).or_default()[self.block_coords]
     }
 }

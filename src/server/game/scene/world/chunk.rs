@@ -23,7 +23,7 @@ use std::{
     array,
     collections::LinkedList,
     num::NonZeroUsize,
-    ops::{Deref, Index, IndexMut, Mul, Range},
+    ops::{Deref, Index, IndexMut, Mul, RangeFrom},
     sync::Arc,
 };
 
@@ -37,52 +37,25 @@ pub struct ChunkMap {
 }
 
 impl ChunkMap {
-    pub const Y_RANGE: Range<i32> = 0..16;
+    pub const Y_RANGE: RangeFrom<i32> = 0..;
 
-    fn load_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        // let points = points.into_iter().collect::<Vec<_>>();
+    fn load_many(&mut self, points: &[Point3<i32>]) -> Vec<Point3<i32>> {
+        let new = points
+            .iter()
+            .copied()
+            .filter(|coords| self.cells.get_mut(coords).map(ChunkCell::load).is_none())
+            .collect::<Vec<_>>();
 
-        // let new = points
-        //     .iter()
-        //     .copied()
-        //     .filter(|coords| self.cells.get_mut(coords).map(ChunkCell::load).is_none())
-        //     .collect::<Vec<_>>();
+        self.cells.extend(
+            new.into_par_iter()
+                .filter_map(|coords| self.get_new(coords).map(|cell| (coords, cell)))
+                .collect::<LinkedList<_>>(),
+        );
 
-        // self.cells.extend(
-        //     new.into_par_iter()
-        //         .filter_map(|coords| self.get_new(coords).map(|cell| (coords, cell)))
-        //         .collect::<LinkedList<_>>(),
-        // );
-
-        // points
-        //     .into_iter()
-        //     .filter(|coords| self.cells.contains_key(coords))
-        //     .collect()
         points
-            .into_iter()
-            .map(|coords| {
-                if self.cells.get_mut(&coords).map(ChunkCell::load).is_some() {
-                    Ok(coords)
-                } else {
-                    Err(coords)
-                }
-            })
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .map(|coords| coords.map_err(|coords| self.get_new(coords).map(|cell| (coords, cell))))
-            .collect::<LinkedList<_>>()
-            .into_iter()
-            .filter_map(|x| match x {
-                Ok(coords) => Some(coords),
-                Err(Some((coords, cell))) => {
-                    self.cells.insert(coords, cell);
-                    Some(coords)
-                }
-                Err(None) => None,
-            })
+            .iter()
+            .copied()
+            .filter(|coords| self.cells.contains_key(coords))
             .collect()
     }
 
@@ -139,9 +112,7 @@ impl ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
-                let prev = std::time::Instant::now();
                 let light_updates = self.light.apply(&self.cells, coords, &action);
-                dbg!(prev.elapsed());
 
                 self.actions
                     .entry(chunk_coords)
@@ -303,7 +274,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     fn handle(&mut self, event: &ChunkMapEvent, (server_tx, ray): Self::Context<'_>) {
         match event {
             ChunkMapEvent::InitialRenderRequested { area } => {
-                let mut loads = self.load_many(area.points());
+                let mut loads = self.load_many(&area.points().collect::<Vec<_>>());
 
                 self.handle(
                     &ChunkMapEvent::BlockSelectionRequested,
@@ -318,7 +289,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
-                let loads = self.load_many(curr.exclusive_points(prev));
+                let loads = self.load_many(&curr.exclusive_points(prev).collect::<Vec<_>>());
                 let updates = Self::outline(&loads.iter().chain(&unloads).copied().collect());
 
                 self.handle(
@@ -497,12 +468,6 @@ impl Index<Point3<u8>> for Chunk {
 impl IndexMut<Point3<u8>> for Chunk {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
         &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
-    }
-}
-
-impl Default for &'_ Chunk {
-    fn default() -> Self {
-        &Chunk([[[Block::Air; Chunk::DIM]; Chunk::DIM]; Chunk::DIM])
     }
 }
 
