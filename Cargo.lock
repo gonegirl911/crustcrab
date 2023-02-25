@@ -395,6 +395,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "crustcrab"
+version = "0.1.0"
+dependencies = [
+ "bitfield",
+ "bitflags",
+ "bitvec",
+ "bytemuck",
+ "enum-map",
+ "env_logger",
+ "flume",
+ "image",
+ "mimalloc",
+ "nalgebra",
+ "num_cpus",
+ "once_cell",
+ "pollster",
+ "rayon",
+ "rustc-hash",
+ "serde",
+ "spin_sleep",
+ "toml",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "cty"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1488,32 +1514,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustcraft"
-version = "0.1.0"
-dependencies = [
- "bitfield",
- "bitflags",
- "bitvec",
- "bytemuck",
- "enum-map",
- "env_logger",
- "flume",
- "image",
- "mimalloc",
- "nalgebra",
- "num_cpus",
- "once_cell",
- "pollster",
- "rayon",
- "rustc-hash",
- "serde",
- "spin_sleep",
- "toml",
- "wgpu",
- "winit",
-]
 
 [[package]]
 name = "rustix"

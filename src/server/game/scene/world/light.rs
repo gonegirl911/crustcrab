@@ -10,6 +10,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
     collections::VecDeque,
+    iter::Sum,
     num::NonZeroU8,
     ops::{Index, IndexMut},
 };
@@ -95,10 +96,13 @@ impl ChunkMapLight {
                 let coords = coords + delta.coords.cast();
                 let chunk_coords = Player::chunk_coords(coords);
                 let block_coords = Player::block_coords(coords);
+
                 updates.insert(chunk_coords);
+
                 let block_light = self.block_light_mut(chunk_coords, block_coords);
                 let filter = Self::filter(cells, chunk_coords, block_coords, index);
                 let value = Self::filtered(value, filter);
+
                 if block_light.channel(index) < value {
                     block_light.set_channel(index, value);
                     Some((coords, value - 1))
@@ -149,16 +153,20 @@ impl ChunkMapLight {
         let mut deq = VecDeque::from([(coords, value)]);
         let mut sources = vec![];
         let mut updates = FxHashSet::default();
+
         while let Some((coords, expected)) = deq.pop_front() {
             deq.extend(SIDE_DELTAS.values().filter_map(|delta| {
                 let coords = coords + delta.coords.cast();
                 let chunk_coords = Player::chunk_coords(coords);
                 let block_coords = Player::block_coords(coords);
+
                 updates.insert(chunk_coords);
+
                 let block_light = self.block_light_mut(chunk_coords, block_coords);
                 let value = NonZeroU8::new(block_light.take_channel(index))?.get();
                 let filter = Self::filter(cells, chunk_coords, block_coords, index);
                 let expected = Self::filtered(expected, filter);
+
                 if value == expected {
                     Some((coords, value - 1))
                 } else {
@@ -167,6 +175,7 @@ impl ChunkMapLight {
                 }
             }));
         }
+
         sources
             .into_iter()
             .flat_map(|(coords, value)| self.spread_channel(cells, coords, index, Some(value)))
@@ -352,16 +361,6 @@ impl BlockLight {
     }
 }
 
-impl From<[u8; 4]> for BlockLight {
-    fn from(components: [u8; 4]) -> Self {
-        let mut value = Self::default();
-        for (i, component) in components.into_iter().enumerate() {
-            value.set_component(i, component);
-        }
-        value
-    }
-}
-
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {
@@ -378,15 +377,8 @@ impl BlockAreaLight {
                 .into_values()
                 .map(|delta| self[delta])
                 .chain([side_light])
-                .fold([(0, 0); 4], |accum, light| {
-                    array::from_fn(|i| {
-                        let (sum, count) = accum[i];
-                        let component = light.component(i);
-                        (sum + component, count + (component != 0) as u8)
-                    })
-                })
-                .map(|(sum, count)| sum / count.max(1))
-                .into()
+                .sum::<BlockLightSum>()
+                .avg()
         })
     }
 }
@@ -397,5 +389,29 @@ impl Index<Point3<i8>> for BlockAreaLight {
     fn index(&self, coords: Point3<i8>) -> &Self::Output {
         let coords = coords.map(|c| c + 1);
         &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+    }
+}
+
+struct BlockLightSum([(u8, u8); 4]);
+
+impl BlockLightSum {
+    fn avg(self) -> BlockLight {
+        let mut value = BlockLight::default();
+        for (i, (sum, count)) in self.0.into_iter().enumerate() {
+            value.set_component(i, sum / count.max(1))
+        }
+        value
+    }
+}
+
+impl Sum<BlockLight> for BlockLightSum {
+    fn sum<I: Iterator<Item = BlockLight>>(iter: I) -> Self {
+        Self(iter.fold(Default::default(), |accum, light| {
+            array::from_fn(|i| {
+                let (sum, count) = accum[i];
+                let component = light.component(i);
+                (sum + component, count + (component != 0) as u8)
+            })
+        }))
     }
 }
