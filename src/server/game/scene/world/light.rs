@@ -1,10 +1,10 @@
 use super::{
-    block::{Block, BlockArea, BlockData, Side, SIDE_DELTAS},
+    block::{Block, BlockArea, BlockData, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS},
     chunk::{BlockAction, Chunk, ChunkArea, ChunkCell, Permutation},
 };
 use crate::server::game::player::Player;
 use bitfield::bitfield;
-use enum_map::{enum_map, EnumMap};
+use enum_map::EnumMap;
 use nalgebra::{point, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -91,30 +91,21 @@ impl ChunkMapLight {
         let mut updates = FxHashSet::default();
 
         while let Some((coords, value)) = deq.pop_front() {
-            deq.extend(
-                SIDE_DELTAS
-                    .values()
-                    .map(|delta| {
-                        let coords = coords + delta.coords.cast();
-                        let chunk_coords = Player::chunk_coords(coords);
-                        let block_coords = Player::block_coords(coords);
-                        (coords, chunk_coords, block_coords)
-                    })
-                    .inspect(|(_, chunk_coords, _)| {
-                        updates.insert(*chunk_coords);
-                    })
-                    .filter_map(|(coords, chunk_coords, block_coords)| {
-                        let block_light = self.block_light_mut(chunk_coords, block_coords);
-                        let filter = Self::filter(cells, chunk_coords, block_coords, index);
-                        let value = Self::filtered(value, filter);
-                        if block_light.channel(index) < value {
-                            block_light.set_channel(index, value);
-                            Some((coords, value - 1))
-                        } else {
-                            None
-                        }
-                    }),
-            );
+            deq.extend(SIDE_DELTAS.values().filter_map(|delta| {
+                let coords = coords + delta.coords.cast();
+                let chunk_coords = Player::chunk_coords(coords);
+                let block_coords = Player::block_coords(coords);
+                updates.insert(chunk_coords);
+                let block_light = self.block_light_mut(chunk_coords, block_coords);
+                let filter = Self::filter(cells, chunk_coords, block_coords, index);
+                let value = Self::filtered(value, filter);
+                if block_light.channel(index) < value {
+                    block_light.set_channel(index, value);
+                    Some((coords, value - 1))
+                } else {
+                    None
+                }
+            }));
         }
 
         updates
@@ -158,35 +149,24 @@ impl ChunkMapLight {
         let mut deq = VecDeque::from([(coords, value)]);
         let mut sources = vec![];
         let mut updates = FxHashSet::default();
-
         while let Some((coords, expected)) = deq.pop_front() {
-            deq.extend(
-                SIDE_DELTAS
-                    .values()
-                    .map(|delta| {
-                        let coords = coords + delta.coords.cast();
-                        let chunk_coords = Player::chunk_coords(coords);
-                        let block_coords = Player::block_coords(coords);
-                        (coords, chunk_coords, block_coords)
-                    })
-                    .inspect(|(_, chunk_coords, _)| {
-                        updates.insert(*chunk_coords);
-                    })
-                    .filter_map(|(coords, chunk_coords, block_coords)| {
-                        let block_light = self.block_light_mut(chunk_coords, block_coords);
-                        let value = NonZeroU8::new(block_light.take_channel(index))?.get();
-                        let filter = Self::filter(cells, chunk_coords, block_coords, index);
-                        let expected = Self::filtered(expected, filter);
-                        if value == expected {
-                            Some((coords, value - 1))
-                        } else {
-                            sources.push((coords, value));
-                            None
-                        }
-                    }),
-            );
+            deq.extend(SIDE_DELTAS.values().filter_map(|delta| {
+                let coords = coords + delta.coords.cast();
+                let chunk_coords = Player::chunk_coords(coords);
+                let block_coords = Player::block_coords(coords);
+                updates.insert(chunk_coords);
+                let block_light = self.block_light_mut(chunk_coords, block_coords);
+                let value = NonZeroU8::new(block_light.take_channel(index))?.get();
+                let filter = Self::filter(cells, chunk_coords, block_coords, index);
+                let expected = Self::filtered(expected, filter);
+                if value == expected {
+                    Some((coords, value - 1))
+                } else {
+                    sources.push((coords, value));
+                    None
+                }
+            }));
         }
-
         sources
             .into_iter()
             .flat_map(|(coords, value)| self.spread_channel(cells, coords, index, Some(value)))
@@ -202,6 +182,10 @@ impl ChunkMapLight {
         &mut self.0.entry(chunk_coords).or_default()[block_coords]
     }
 
+    fn filtered(value: u8, filter: f32) -> u8 {
+        (value as f32 * filter).round() as u8
+    }
+
     fn filter(
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         chunk_coords: Point3<i32>,
@@ -209,10 +193,6 @@ impl ChunkMapLight {
         index: usize,
     ) -> f32 {
         Self::block_data(cells, chunk_coords, block_coords).light_filter()[index]
-    }
-
-    fn filtered(value: u8, filter: f32) -> u8 {
-        (value as f32 * filter).round() as u8
     }
 
     fn block_data(
@@ -355,14 +335,29 @@ bitfield! {
     #[derive(Clone, Copy, Default)]
     pub struct BlockLight(u16);
     u8;
+    component, set_component: 3, 0, 4;
     skylight, set_skylight: 3, 0;
     channel, set_channel: 7, 4, 3;
 }
 
 impl BlockLight {
+    fn take_component(&mut self, index: usize) -> u8 {
+        let value = self.component(index);
+        self.set_component(index, 0);
+        value
+    }
+
     fn take_channel(&mut self, index: usize) -> u8 {
-        let value = self.channel(index);
-        self.set_channel(index, 0);
+        self.take_component(index + 1)
+    }
+}
+
+impl From<[u8; 4]> for BlockLight {
+    fn from(components: [u8; 4]) -> Self {
+        let mut value = Self::default();
+        for (i, component) in components.into_iter().enumerate() {
+            value.set_component(i, component);
+        }
         value
     }
 }
@@ -376,17 +371,23 @@ impl BlockAreaLight {
         }))
     }
 
-    pub fn side_lights(&self) -> EnumMap<Side, BlockLight> {
-        let light = self[Point3::origin()];
-        enum_map! {
-            side => {
-                let mut side_light = self[SIDE_DELTAS[side]];
-                for i in 0..3 {
-                    side_light.set_channel(i, side_light.channel(i).max(light.channel(i)));
-                }
-                side_light
-            }
-        }
+    pub fn corner_lights(&self, side: Side) -> EnumMap<Corner, BlockLight> {
+        let side_light = self[SIDE_DELTAS[side]];
+        SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
+            component_deltas
+                .into_values()
+                .map(|delta| self[delta])
+                .chain([side_light])
+                .fold([(0, 0); 4], |accum, light| {
+                    array::from_fn(|i| {
+                        let (sum, count) = accum[i];
+                        let component = light.component(i);
+                        (sum + component, count + (component != 0) as u8)
+                    })
+                })
+                .map(|(sum, count)| sum / count.max(1))
+                .into()
+        })
     }
 }
 

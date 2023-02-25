@@ -24,14 +24,13 @@ impl Block {
         area_light: BlockAreaLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
-        let side_lights = area_light.side_lights();
         data.atlas_coords().map(move |side_atlas_coords| {
             area.visible_sides().flat_map(move |side| {
                 let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
                 let atlas_coords = side_atlas_coords[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
-                let light = side_lights[side];
+                let corner_lights = area_light.corner_lights(side);
                 Self::indices(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
@@ -39,7 +38,7 @@ impl Block {
                         atlas_coords,
                         face,
                         corner_aos[corner],
-                        light,
+                        corner_lights[corner],
                     )
                 })
             })
@@ -206,7 +205,7 @@ pub enum Side {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Enum)]
-enum Corner {
+pub enum Corner {
     LowerLeft,
     LowerRight,
     UpperRight,
@@ -215,7 +214,7 @@ enum Corner {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Enum)]
-enum Component {
+pub enum Component {
     Edge1,
     Edge2,
     Corner,
@@ -289,7 +288,7 @@ static SIDE_CORNER_VERTEX_COORDS: Lazy<EnumMap<Side, EnumMap<Corner, Point3<u8>>
     });
 
 #[allow(clippy::type_complexity)]
-static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
+pub static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
     EnumMap<Side, EnumMap<Corner, EnumMap<Component, Point3<i8>>>>,
 > = Lazy::new(|| {
     SIDE_CORNER_SIDES.map(|s1, corner_sides| {
