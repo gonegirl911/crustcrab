@@ -508,7 +508,11 @@ impl ChunkArea {
             }
         }
 
-        for perm in [Permutation([0, 1, 2]), Permutation([0, 2, 1])] {
+        for perm in [
+            Permutation([0, 1, 2]),
+            Permutation([0, 2, 1]),
+            Permutation([2, 0, 1]),
+        ] {
             for x in [-1, Chunk::DIM as i8] {
                 for y in [-1, Chunk::DIM as i8] {
                     let delta = perm * point![x, y, 0];
