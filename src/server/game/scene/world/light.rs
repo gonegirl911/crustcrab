@@ -89,23 +89,6 @@ impl ChunkMapLight {
         }
     }
 
-    fn spread_neighbors(
-        &mut self,
-        cells: &FxHashMap<Point3<i32>, ChunkCell>,
-        coords: Point3<f32>,
-        index: usize,
-    ) -> FxHashSet<Point3<i32>> {
-        SIDE_DELTAS
-            .values()
-            .filter_map(|delta| {
-                let coords = coords + delta.coords.cast();
-                let channel = self.channel(coords, index);
-                (channel != 0).then(|| self.spread_channel(cells, coords, index, channel))
-            })
-            .flatten()
-            .collect()
-    }
-
     fn spread_channel(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
@@ -150,6 +133,23 @@ impl ChunkMapLight {
             .into_iter()
             .flat_map(|(coords, channel)| self.spread_channel(cells, coords, index, channel))
             .chain(updates)
+            .collect()
+    }
+
+    fn spread_neighbors(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+        index: usize,
+    ) -> FxHashSet<Point3<i32>> {
+        SIDE_DELTAS
+            .values()
+            .filter_map(|delta| {
+                let coords = coords + delta.coords.cast();
+                let channel = self.channel(coords, index);
+                (channel != 0).then(|| self.spread_channel(cells, coords, index, channel))
+            })
+            .flatten()
             .collect()
     }
 
