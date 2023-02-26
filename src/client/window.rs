@@ -13,7 +13,7 @@ impl Window {
     pub fn new(event_loop: &EventLoop) -> Self {
         Self {
             window: RawWindowBuilder::new()
-                .with_title("Rustcraft")
+                .with_title("Crustcrab")
                 .build(event_loop.as_ref())
                 .expect("window should be creatable"),
         }
