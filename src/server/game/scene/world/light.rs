@@ -81,7 +81,7 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         index: usize,
     ) -> FxHashSet<Point3<i32>> {
-        let channel = self.replace_channel(coords, index, 0);
+        let channel = self.take_channel(coords, index);
         if channel != 0 {
             self.unspread_channel(cells, coords, index, channel)
         } else {
@@ -158,6 +158,10 @@ impl ChunkMapLight {
         let block_coords = Player::block_coords(coords);
         self.block_light_mut(chunk_coords, block_coords)
             .replace_channel(index, value)
+    }
+
+    fn take_channel(&mut self, coords: Point3<f32>, index: usize) -> u8 {
+        self.replace_channel(coords, index, 0)
     }
 
     fn channel(&mut self, coords: Point3<f32>, index: usize) -> u8 {
