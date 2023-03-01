@@ -75,7 +75,7 @@ impl ChunkMapLight {
     ) -> FxHashSet<Point3<i32>> {
         block
             .data()
-            .luminance()
+            .luminance
             .into_iter()
             .zip(BlockLight::TORCHLIGHT_RANGE)
             .flat_map(|(v, i)| self.set_torchlight(cells, coords, i, v))
@@ -475,7 +475,7 @@ impl LightNode {
     }
 
     fn filter(&self, cells: &FxHashMap<Point3<i32>, ChunkCell>, index: usize) -> f32 {
-        self.block_data(cells).light_filter()[index % 3]
+        self.block_data(cells).light_filter[index % 3]
     }
 
     fn block_data(&self, cells: &FxHashMap<Point3<i32>, ChunkCell>) -> &'static BlockData {

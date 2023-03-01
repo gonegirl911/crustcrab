@@ -24,7 +24,7 @@ impl Block {
         area_light: BlockAreaLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
-        data.atlas_coords().map(move |side_atlas_coords| {
+        data.atlas_coords.map(move |side_atlas_coords| {
             area.visible_sides().flat_map(move |side| {
                 let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
                 let atlas_coords = side_atlas_coords[side];
@@ -97,24 +97,12 @@ pub struct BlockData {
     #[serde(default)]
     atlas_coords: Option<EnumMap<Side, Point2<u8>>>,
     #[serde(default)]
-    luminance: [u8; 3],
+    pub luminance: [u8; 3],
     #[serde(default)]
-    light_filter: [f32; 3],
+    pub light_filter: [f32; 3],
 }
 
 impl BlockData {
-    fn atlas_coords(&self) -> Option<&EnumMap<Side, Point2<u8>>> {
-        self.atlas_coords.as_ref()
-    }
-
-    pub fn luminance(&self) -> [u8; 3] {
-        self.luminance
-    }
-
-    pub fn light_filter(&self) -> [f32; 3] {
-        self.light_filter
-    }
-
     pub fn is_transparent(&self) -> bool {
         self.light_filter != [0.0, 0.0, 0.0]
     }
