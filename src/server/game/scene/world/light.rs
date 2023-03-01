@@ -40,7 +40,7 @@ impl ChunkMapLight {
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
     ) -> FxHashSet<Point3<i32>> {
-        self.place_skylight(cells, coords)
+        self.unblock_skylight(cells, coords)
             .into_iter()
             .chain(self.destroy_torchlight(cells, coords))
             .collect()
@@ -52,16 +52,17 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         block: Block,
     ) -> FxHashSet<Point3<i32>> {
-        self.destroy_skylight(cells, coords, block)
+        self.block_skylight(cells, coords, block)
             .into_iter()
             .chain(self.place_torchlight(cells, coords, block))
             .collect()
     }
 
-    fn place_skylight(
+    fn block_skylight(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
+        block: Block,
     ) -> FxHashSet<Point3<i32>> {
         todo!()
     }
@@ -81,11 +82,10 @@ impl ChunkMapLight {
             .collect()
     }
 
-    fn destroy_skylight(
+    fn unblock_skylight(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
-        block: Block,
     ) -> FxHashSet<Point3<i32>> {
         todo!()
     }
@@ -98,16 +98,6 @@ impl ChunkMapLight {
         BlockLight::TORCHLIGHT_RANGE
             .flat_map(|i| self.unset_torchlight(cells, coords, i))
             .collect()
-    }
-
-    fn set_skylight(
-        &mut self,
-        cells: &FxHashMap<Point3<i32>, ChunkCell>,
-        coords: Point3<f32>,
-        index: usize,
-        value: u8,
-    ) -> FxHashSet<Point3<i32>> {
-        todo!()
     }
 
     fn set_torchlight(
@@ -123,15 +113,6 @@ impl ChunkMapLight {
             Ordering::Equal => Default::default(),
             Ordering::Greater => self.unspread_component(cells, coords, index, component),
         }
-    }
-
-    fn unset_skylight(
-        &mut self,
-        cells: &FxHashMap<Point3<i32>, ChunkCell>,
-        coords: Point3<f32>,
-        index: usize,
-    ) -> FxHashSet<Point3<i32>> {
-        todo!()
     }
 
     fn unset_torchlight(
@@ -407,7 +388,6 @@ bitfield! {
 }
 
 impl BlockLight {
-    const COMPONENT_MAX: u8 = 15;
     const SKYLIGHT_RANGE: Range<usize> = 0..3;
     const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
