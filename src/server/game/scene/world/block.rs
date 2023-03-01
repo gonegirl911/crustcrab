@@ -95,7 +95,7 @@ impl Block {
 #[derive(Deserialize)]
 pub struct BlockData {
     #[serde(default)]
-    atlas_coords: Option<EnumMap<Side, Point2<u8>>>,
+    pub atlas_coords: Option<EnumMap<Side, Point2<u8>>>,
     #[serde(default)]
     pub luminance: [u8; 3],
     #[serde(default)]
