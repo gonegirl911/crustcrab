@@ -249,7 +249,7 @@ impl BlockVertex {
         data |= (ao as u32) << 27;
         Self {
             data,
-            light: light.0.into(),
+            light: light.0,
         }
     }
 }

@@ -12,7 +12,7 @@ use std::{
     cmp::Ordering,
     collections::VecDeque,
     iter::Sum,
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut, Range},
 };
 
 #[derive(Default)]
@@ -40,8 +40,9 @@ impl ChunkMapLight {
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
     ) -> FxHashSet<Point3<i32>> {
-        (0..3)
-            .flat_map(|i| self.destroy_channel(cells, coords, i))
+        self.place_skylight(cells, coords)
+            .into_iter()
+            .chain(self.destroy_torchlight(cells, coords))
             .collect()
     }
 
@@ -51,45 +52,103 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         block: Block,
     ) -> FxHashSet<Point3<i32>> {
+        self.destroy_skylight(cells, coords, block)
+            .into_iter()
+            .chain(self.place_torchlight(cells, coords, block))
+            .collect()
+    }
+
+    fn place_skylight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+    ) -> FxHashSet<Point3<i32>> {
+        todo!()
+    }
+
+    fn place_torchlight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+        block: Block,
+    ) -> FxHashSet<Point3<i32>> {
         block
             .data()
             .luminance()
             .into_iter()
-            .enumerate()
-            .flat_map(|(i, v)| self.place_channel(cells, coords, i, v))
+            .zip(BlockLight::TORCHLIGHT_RANGE)
+            .flat_map(|(v, i)| self.set_torchlight(cells, coords, i, v))
             .collect()
     }
 
-    fn place_channel(
+    fn destroy_skylight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+        block: Block,
+    ) -> FxHashSet<Point3<i32>> {
+        todo!()
+    }
+
+    fn destroy_torchlight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+    ) -> FxHashSet<Point3<i32>> {
+        BlockLight::TORCHLIGHT_RANGE
+            .flat_map(|i| self.unset_torchlight(cells, coords, i))
+            .collect()
+    }
+
+    fn set_skylight(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
         index: usize,
         value: u8,
     ) -> FxHashSet<Point3<i32>> {
-        let channel = self.replace_channel(coords, index, value);
-        match channel.cmp(&value) {
-            Ordering::Less => self.spread_channel(cells, coords, index, value),
+        todo!()
+    }
+
+    fn set_torchlight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+        index: usize,
+        value: u8,
+    ) -> FxHashSet<Point3<i32>> {
+        let component = self.replace_component(coords, index, value);
+        match component.cmp(&value) {
+            Ordering::Less => self.spread_component(cells, coords, index, value),
             Ordering::Equal => Default::default(),
-            Ordering::Greater => self.unspread_channel(cells, coords, index, channel),
+            Ordering::Greater => self.unspread_component(cells, coords, index, component),
         }
     }
 
-    fn destroy_channel(
+    fn unset_skylight(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
         index: usize,
     ) -> FxHashSet<Point3<i32>> {
-        let channel = self.take_channel(coords, index);
-        if channel != 0 {
-            self.unspread_channel(cells, coords, index, channel)
+        todo!()
+    }
+
+    fn unset_torchlight(
+        &mut self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        coords: Point3<f32>,
+        index: usize,
+    ) -> FxHashSet<Point3<i32>> {
+        let component = self.take_component(coords, index);
+        if component != 0 {
+            self.unspread_component(cells, coords, index, component)
         } else {
             self.spread_neighbors(cells, coords, index)
         }
     }
 
-    fn spread_channel(
+    fn spread_component(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
@@ -101,7 +160,7 @@ impl ChunkMapLight {
 
         while let Some(node) = deq.pop_front() {
             updates.insert(node.chunk_coords);
-            if let Some(value) = self.set_channel(cells, &node, index) {
+            if let Some(value) = self.set_component(cells, &node, index) {
                 deq.extend(Self::neighbors(node.coords, value - 1));
             }
         }
@@ -109,7 +168,7 @@ impl ChunkMapLight {
         updates
     }
 
-    fn unspread_channel(
+    fn unspread_component(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
@@ -122,16 +181,16 @@ impl ChunkMapLight {
 
         while let Some(node) = deq.pop_front() {
             updates.insert(node.chunk_coords);
-            match self.unset_channel(cells, &node, index) {
-                Ok(channel) => deq.extend(Self::neighbors(node.coords, channel - 1)),
+            match self.unset_component(cells, &node, index) {
+                Ok(component) => deq.extend(Self::neighbors(node.coords, component - 1)),
                 Err(0) => {}
-                Err(channel) => sources.push((node.coords, channel)),
+                Err(component) => sources.push((node.coords, component)),
             }
         }
 
         sources
             .into_iter()
-            .flat_map(|(coords, channel)| self.spread_channel(cells, coords, index, channel))
+            .flat_map(|(coords, component)| self.spread_component(cells, coords, index, component))
             .chain(updates)
             .collect()
     }
@@ -146,59 +205,59 @@ impl ChunkMapLight {
             .values()
             .filter_map(|delta| {
                 let coords = coords + delta.coords.cast();
-                let channel = self.channel(coords, index);
-                (channel != 0).then(|| self.spread_channel(cells, coords, index, channel))
+                let component = self.component(coords, index);
+                (component != 0).then(|| self.spread_component(cells, coords, index, component))
             })
             .flatten()
             .collect()
     }
 
-    fn replace_channel(&mut self, coords: Point3<f32>, index: usize, value: u8) -> u8 {
+    fn replace_component(&mut self, coords: Point3<f32>, index: usize, value: u8) -> u8 {
         let chunk_coords = Player::chunk_coords(coords);
         let block_coords = Player::block_coords(coords);
         self.block_light_mut(chunk_coords, block_coords)
-            .replace_channel(index, value)
+            .replace_component(index, value)
     }
 
-    fn take_channel(&mut self, coords: Point3<f32>, index: usize) -> u8 {
-        self.replace_channel(coords, index, 0)
+    fn take_component(&mut self, coords: Point3<f32>, index: usize) -> u8 {
+        self.replace_component(coords, index, 0)
     }
 
-    fn channel(&mut self, coords: Point3<f32>, index: usize) -> u8 {
+    fn component(&mut self, coords: Point3<f32>, index: usize) -> u8 {
         let chunk_coords = Player::chunk_coords(coords);
         let block_coords = Player::block_coords(coords);
         self.block_light_mut(chunk_coords, block_coords)
-            .channel(index)
+            .component(index)
     }
 
-    fn set_channel(
+    fn set_component(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         node: &LightNode,
         index: usize,
     ) -> Option<u8> {
         let block_light = self.block_light_mut(node.chunk_coords, node.block_coords);
-        let channel = block_light.channel(index);
+        let component = block_light.component(index);
         let value = node.filtered_value(cells, index);
-        (channel < value).then(|| {
-            block_light.set_channel(index, value);
+        (component < value).then(|| {
+            block_light.set_component(index, value);
             value
         })
     }
 
-    fn unset_channel(
+    fn unset_component(
         &mut self,
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         node: &LightNode,
         index: usize,
     ) -> Result<u8, u8> {
         let block_light = self.block_light_mut(node.chunk_coords, node.block_coords);
-        let channel = block_light.channel(index);
-        if channel != 0 && channel == node.filtered_value(cells, index) {
-            block_light.set_channel(index, 0);
-            Ok(channel)
+        let component = block_light.component(index);
+        if component != 0 && component == node.filtered_value(cells, index) {
+            block_light.set_component(index, 0);
+            Ok(component)
         } else {
-            Err(channel)
+            Err(component)
         }
     }
 
@@ -343,18 +402,19 @@ impl IndexMut<Point3<i8>> for ChunkAreaLight {
 
 bitfield! {
     #[derive(Clone, Copy, Default)]
-    pub struct BlockLight(u16);
-    u8;
-    component, set_component: 3, 0, 4;
-    skylight, set_skylight: 3, 0;
-    channel, set_channel: 7, 4, 3;
+    pub struct BlockLight(u32);
+    u8, component, set_component: 3, 0, 6;
 }
 
 impl BlockLight {
-    fn replace_channel(&mut self, index: usize, value: u8) -> u8 {
-        let channel = self.channel(index);
-        self.set_channel(index, value);
-        channel
+    const COMPONENT_MAX: u8 = 15;
+    const SKYLIGHT_RANGE: Range<usize> = 0..3;
+    const TORCHLIGHT_RANGE: Range<usize> = 3..6;
+
+    fn replace_component(&mut self, index: usize, value: u8) -> u8 {
+        let component = self.component(index);
+        self.set_component(index, value);
+        component
     }
 }
 
@@ -389,7 +449,7 @@ impl Index<Point3<i8>> for BlockAreaLight {
     }
 }
 
-struct BlockLightSum([(u8, u8); 4]);
+struct BlockLightSum([(u8, u8); 6]);
 
 impl BlockLightSum {
     fn avg(self) -> BlockLight {
@@ -435,7 +495,7 @@ impl LightNode {
     }
 
     fn filter(&self, cells: &FxHashMap<Point3<i32>, ChunkCell>, index: usize) -> f32 {
-        self.block_data(cells).light_filter()[index]
+        self.block_data(cells).light_filter()[index % 3]
     }
 
     fn block_data(&self, cells: &FxHashMap<Point3<i32>, ChunkCell>) -> &'static BlockData {

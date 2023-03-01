@@ -64,6 +64,7 @@ impl Camera {
     }
 }
 
+#[derive(Default)]
 pub struct CameraController {
     dx: f32,
     dy: f32,
@@ -78,14 +79,9 @@ pub struct CameraController {
 impl CameraController {
     pub fn new(speed: f32, sensitivity: f32) -> Self {
         Self {
-            dx: 0.0,
-            dy: 0.0,
-            relevant_keys: Keys::empty(),
-            key_history: Keys::empty(),
-            relevant_buttons: MouseButtons::empty(),
-            button_history: MouseButtons::empty(),
             speed,
             sensitivity,
+            ..Default::default()
         }
     }
 
@@ -104,12 +100,10 @@ impl CameraController {
             changes.insert(Changes::MOVED);
         }
 
-        if !self.relevant_buttons.is_empty() {
-            if self.relevant_buttons.contains(MouseButtons::LEFT) {
-                changes.insert(Changes::BLOCK_DESTROYED);
-            } else if self.relevant_buttons.contains(MouseButtons::RIGHT) {
-                changes.insert(Changes::BLOCK_PLACED);
-            }
+        if self.relevant_buttons.contains(MouseButtons::LEFT) {
+            changes.insert(Changes::BLOCK_DESTROYED);
+        } else if self.relevant_buttons.contains(MouseButtons::RIGHT) {
+            changes.insert(Changes::BLOCK_PLACED);
         }
 
         changes
@@ -243,6 +237,7 @@ bitflags! {
         const BLOCK_PLACED = 1 << 2;
     }
 
+    #[derive(Default)]
     struct Keys: u8 {
         const W = 1 << 0;
         const A = 1 << 1;
@@ -252,6 +247,7 @@ bitflags! {
         const SPACE = 1 << 5;
     }
 
+    #[derive(Default)]
     struct MouseButtons: u8 {
         const LEFT = 1 << 0;
         const RIGHT = 1 << 1;
