@@ -26,7 +26,7 @@ impl Block {
         let data = self.data();
         data.atlas_coords.map(move |side_atlas_coords| {
             area.visible_sides().flat_map(move |side| {
-                let corner_vertex_coords = &SIDE_CORNER_VERTEX_COORDS[side];
+                let corner_vertex_coords = SIDE_CORNER_VERTEX_COORDS[side];
                 let atlas_coords = side_atlas_coords[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
