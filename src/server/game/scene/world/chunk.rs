@@ -23,7 +23,8 @@ use std::{
     array,
     collections::LinkedList,
     num::NonZeroUsize,
-    ops::{Deref, Index, IndexMut, Mul, RangeFrom},
+    ops::{Deref, Index, IndexMut, Mul},
+    slice,
     sync::Arc,
 };
 
@@ -37,8 +38,6 @@ pub struct ChunkMap {
 }
 
 impl ChunkMap {
-    pub const Y_RANGE: RangeFrom<i32> = 0..;
-
     fn load_many(&mut self, points: &[Point3<i32>]) -> Vec<Point3<i32>> {
         let new = points
             .iter()
@@ -444,16 +443,18 @@ impl Chunk {
     }
 
     fn is_empty(&self) -> bool {
-        self.0
-            .iter()
-            .flatten()
-            .flatten()
-            .copied()
-            .all(Block::is_air)
+        let (prefix, aligned, suffix) = unsafe { self.flatten().align_to::<u128>() };
+        prefix.iter().copied().all(Block::is_air)
+            && aligned.iter().copied().all(|v| v == 0)
+            && suffix.iter().copied().all(Block::is_air)
     }
 
     fn is_not_empty(&self) -> bool {
         !self.is_empty()
+    }
+
+    fn flatten(&self) -> &[Block] {
+        unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), Self::DIM.pow(3)) }
     }
 }
 

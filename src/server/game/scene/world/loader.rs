@@ -6,11 +6,10 @@ pub struct ChunkLoader;
 
 impl ChunkLoader {
     pub fn get(&self, coords: Point3<i32>) -> Chunk {
-        let fill = if coords.y == 0 {
-            Block::Grass
+        if coords.y == 0 {
+            Chunk::from_fn(|_| Block::Grass)
         } else {
-            Block::Air
-        };
-        Chunk::from_fn(|_| fill)
+            Default::default()
+        }
     }
 }

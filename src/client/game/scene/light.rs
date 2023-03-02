@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use bytemuck::{Pod, Zeroable};
+use std::ops::RangeInclusive;
 
 pub struct Skylight {
     uniform: Uniform<SkylightUniformData>,
@@ -37,14 +38,14 @@ impl Skylight {
     fn light_intensity(TimeData { stage, .. }: TimeData) -> f32 {
         match stage {
             Stage::Night => 0.2,
-            Stage::Dawn { progress } => Self::lerp(0.2, 1.0, progress),
+            Stage::Dawn { progress } => Self::lerp(0.2..=1.0, progress),
             Stage::Day => 1.0,
-            Stage::Dusk { progress } => Self::lerp(1.0, 0.2, progress),
+            Stage::Dusk { progress } => Self::lerp(1.0..=0.2, progress),
         }
     }
 
-    fn lerp(start: f32, end: f32, t: f32) -> f32 {
-        start * (1.0 - t) + end * t
+    fn lerp(range: RangeInclusive<f32>, t: f32) -> f32 {
+        range.start() * (1.0 - t) + range.end() * t
     }
 }
 

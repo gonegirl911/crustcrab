@@ -11,7 +11,7 @@ use serde::Deserialize;
 #[serde(rename_all = "snake_case")]
 pub enum Block {
     #[default]
-    Air,
+    Air = 0,
     Grass,
     Glowstone,
 }
@@ -76,12 +76,13 @@ impl Block {
     }
 
     fn ao(side: Side, corner: Corner, area: BlockArea) -> u8 {
-        let component_deltas = &SIDE_CORNER_COMPONENT_DELTAS[side][corner];
+        let components = SIDE_CORNER_COMPONENT_DELTAS[side][corner]
+            .map(|_, delta| unsafe { area.get_unchecked(delta) });
 
         let [edge1, edge2, corner] = [
-            unsafe { area.get_unchecked(component_deltas[Component::Edge1]) },
-            unsafe { area.get_unchecked(component_deltas[Component::Edge2]) },
-            unsafe { area.get_unchecked(component_deltas[Component::Corner]) },
+            components[Component::Edge1],
+            components[Component::Edge2],
+            components[Component::Corner],
         ];
 
         if edge1 && edge2 {

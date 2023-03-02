@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use flume::Sender;
+use std::ops::RangeInclusive;
 
 pub struct Clock {
     ticks: u16,
@@ -13,12 +14,13 @@ pub struct Clock {
 
 impl Clock {
     const TICKS_PER_DAY: u16 = 24000;
-    const DAWN_START: u16 = Self::TICKS_PER_DAY / 150 * 30;
-    const DAWN_END: u16 = Self::TICKS_PER_DAY / 150 * 41;
-    const DAY_START: u16 = Self::DAWN_END + 1;
-    const DAY_END: u16 = Self::DUSK_START - 1;
+    const DAWN_START: u16 = Self::TICKS_PER_DAY / 150 * 31;
+    const DAY_START: u16 = Self::TICKS_PER_DAY / 150 * 41;
     const DUSK_START: u16 = Self::TICKS_PER_DAY / 150 * 117;
-    const DUSK_END: u16 = Self::TICKS_PER_DAY / 150 * 135;
+    const NIGHT_START: u16 = Self::TICKS_PER_DAY / 150 * 135;
+    const DAWN_RANGE: RangeInclusive<u16> = Self::DAWN_START..=Self::DAY_START - 1;
+    const DAY_RANGE: RangeInclusive<u16> = Self::DAY_START..=Self::DUSK_START - 1;
+    const DUSK_RANGE: RangeInclusive<u16> = Self::DUSK_START..=Self::NIGHT_START - 1;
 
     fn data(&self) -> TimeData {
         TimeData {
@@ -28,28 +30,23 @@ impl Clock {
     }
 
     fn stage(&self) -> Stage {
-        match self.ticks {
-            Self::DAWN_START..=Self::DAWN_END => Stage::Dawn {
-                progress: Self::inv_lerp(
-                    Self::DAWN_START as f32,
-                    Self::DAWN_END as f32,
-                    self.ticks as f32,
-                ),
-            },
-            Self::DAY_START..=Self::DAY_END => Stage::Day,
-            Self::DUSK_START..=Self::DUSK_END => Stage::Dusk {
-                progress: Self::inv_lerp(
-                    Self::DUSK_START as f32,
-                    Self::DUSK_END as f32,
-                    self.ticks as f32,
-                ),
-            },
-            _ => Stage::Night,
+        if Self::DAWN_RANGE.contains(&self.ticks) {
+            Stage::Dawn {
+                progress: Self::inv_lerp(Self::DAWN_RANGE, self.ticks),
+            }
+        } else if Self::DAY_RANGE.contains(&self.ticks) {
+            Stage::Day
+        } else if Self::DUSK_RANGE.contains(&self.ticks) {
+            Stage::Dusk {
+                progress: Self::inv_lerp(Self::DUSK_RANGE, self.ticks),
+            }
+        } else {
+            Stage::Night
         }
     }
 
-    fn inv_lerp(start: f32, end: f32, value: f32) -> f32 {
-        (value - start) / (end - start)
+    fn inv_lerp(range: RangeInclusive<u16>, value: u16) -> f32 {
+        (value - range.start()) as f32 / (range.end() - range.start()) as f32
     }
 }
 
