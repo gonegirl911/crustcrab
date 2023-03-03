@@ -23,7 +23,6 @@ use std::{
     array,
     collections::LinkedList,
     mem,
-    num::NonZeroUsize,
     ops::{Deref, Index, IndexMut, Mul},
     sync::Arc,
 };
@@ -335,14 +334,12 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
 
 pub struct ChunkCell {
     chunk: Box<Chunk>,
-    players_count: usize,
 }
 
 impl ChunkCell {
     fn load_new(chunk: Chunk) -> Option<Self> {
         chunk.is_not_empty().then(|| Self {
             chunk: Box::new(chunk),
-            players_count: 1,
         })
     }
 
@@ -354,15 +351,10 @@ impl ChunkCell {
             .ok_or(())
     }
 
-    fn load(&mut self) {
-        self.players_count += 1;
-    }
+    fn load(&mut self) {}
 
     fn unload(self) -> Option<Self> {
-        Some(Self {
-            players_count: NonZeroUsize::new(self.players_count - 1)?.get(),
-            ..self
-        })
+        None
     }
 
     fn apply(mut self, coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, Self> {
