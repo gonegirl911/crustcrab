@@ -76,8 +76,7 @@ impl Block {
     }
 
     fn ao(side: Side, corner: Corner, area: BlockArea) -> u8 {
-        let components = SIDE_CORNER_COMPONENT_DELTAS[side][corner]
-            .map(|_, delta| unsafe { area.get_unchecked(delta) });
+        let components = area.components(side, corner);
 
         let [edge1, edge2, corner] = [
             components[Component::Edge1],
@@ -142,6 +141,11 @@ impl BlockArea {
             .iter()
             .filter(move |(_, delta)| !unsafe { self.get_unchecked(**delta) })
             .map(|(side, _)| side)
+    }
+
+    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
+        SIDE_CORNER_COMPONENT_DELTAS[side][corner]
+            .map(|_, delta| unsafe { self.get_unchecked(delta) })
     }
 
     unsafe fn get_unchecked(&self, coords: Point3<i8>) -> bool {
