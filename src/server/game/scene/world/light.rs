@@ -64,7 +64,7 @@ impl ChunkMapLight {
         coords: Point3<f32>,
         block: Block,
     ) -> FxHashSet<Point3<i32>> {
-        todo!()
+        Default::default()
     }
 
     fn place_torchlight(
@@ -87,7 +87,7 @@ impl ChunkMapLight {
         cells: &FxHashMap<Point3<i32>, ChunkCell>,
         coords: Point3<f32>,
     ) -> FxHashSet<Point3<i32>> {
-        todo!()
+        Default::default()
     }
 
     fn destroy_torchlight(

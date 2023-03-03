@@ -140,7 +140,7 @@ impl BlockArea {
     fn visible_sides(self) -> impl Iterator<Item = Side> {
         SIDE_DELTAS
             .iter()
-            .filter(move |(_, delta)| unsafe { !self.get_unchecked(**delta) })
+            .filter(move |(_, delta)| !unsafe { self.get_unchecked(**delta) })
             .map(|(side, _)| side)
     }
 
