@@ -22,9 +22,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
     collections::LinkedList,
+    mem,
     num::NonZeroUsize,
     ops::{Deref, Index, IndexMut, Mul},
-    slice,
     sync::Arc,
 };
 
@@ -444,18 +444,14 @@ impl Chunk {
     }
 
     fn is_empty(&self) -> bool {
-        let (prefix, aligned, suffix) = unsafe { self.flatten().align_to::<u128>() };
-        prefix.iter().copied().all(Block::is_air)
-            && aligned.iter().copied().all(|v| v == 0)
-            && suffix.iter().copied().all(Block::is_air)
+        self.0
+            .iter()
+            .flatten()
+            .all(|blocks| *unsafe { mem::transmute::<_, &u128>(blocks) } == 0)
     }
 
     fn is_not_empty(&self) -> bool {
         !self.is_empty()
-    }
-
-    fn flatten(&self) -> &[Block] {
-        unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), Self::DIM.pow(3)) }
     }
 }
 
