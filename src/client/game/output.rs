@@ -13,7 +13,7 @@ impl Output {
         let texture = InputOutputTexture::new(renderer);
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/output.wgsl"),
+            wgpu::include_wgsl!("../../../assets/shaders/blit.wgsl"),
             &[],
             &[texture.bind_group_layout()],
             &[],

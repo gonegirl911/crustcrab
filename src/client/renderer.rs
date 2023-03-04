@@ -373,7 +373,7 @@ impl ImageTexture {
         });
         let program = Program::new(
             renderer,
-            include_wgsl!("../../assets/shaders/output.wgsl"),
+            include_wgsl!("../../assets/shaders/blit.wgsl"),
             &[],
             &[&bind_group_layout],
             &[],
