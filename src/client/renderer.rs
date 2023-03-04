@@ -3,7 +3,12 @@ use super::{
     window::Window,
 };
 use bytemuck::Pod;
-use std::{marker::PhantomData, mem, num::NonZeroU32, slice};
+use std::{
+    marker::PhantomData,
+    mem,
+    num::{NonZeroU32, NonZeroU8},
+    slice,
+};
 use wgpu::{
     include_wgsl,
     util::{BufferInitDescriptor, DeviceExt},
@@ -267,6 +272,11 @@ impl ImageTexture {
             },
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Linear,
+            anisotropy_clamp: if mipmap_levels > 1 {
+                NonZeroU8::new(16)
+            } else {
+                None
+            },
             ..Default::default()
         });
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
