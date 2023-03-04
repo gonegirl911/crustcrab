@@ -264,12 +264,13 @@ impl ImageTexture {
             view_formats: &[],
         });
         let view = texture.create_view(&Default::default());
+        let mag_filter = if is_pixelated {
+            wgpu::FilterMode::Nearest
+        } else {
+            wgpu::FilterMode::Linear
+        };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter: if is_pixelated {
-                wgpu::FilterMode::Nearest
-            } else {
-                wgpu::FilterMode::Linear
-            },
+            mag_filter,
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Linear,
             anisotropy_clamp: if mipmap_levels > 1 {
@@ -335,7 +336,7 @@ impl ImageTexture {
             Self::generate_mipmaps(
                 renderer,
                 &texture,
-                &sampler,
+                mag_filter,
                 &bind_group_layout,
                 mipmap_levels,
             );
@@ -358,7 +359,7 @@ impl ImageTexture {
     fn generate_mipmaps(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
-        sampler: &wgpu::Sampler,
+        mag_filter: wgpu::FilterMode,
         bind_group_layout: &wgpu::BindGroupLayout,
         levels: u32,
     ) {
@@ -373,6 +374,12 @@ impl ImageTexture {
             None,
             None,
         );
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
         let mut encoder = device.create_command_encoder(&Default::default());
 
         (0..levels)
@@ -396,7 +403,7 @@ impl ImageTexture {
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
-                            resource: wgpu::BindingResource::Sampler(sampler),
+                            resource: wgpu::BindingResource::Sampler(&sampler),
                         },
                     ],
                 });
