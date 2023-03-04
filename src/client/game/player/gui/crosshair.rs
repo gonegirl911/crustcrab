@@ -21,6 +21,7 @@ impl Crosshair {
             include_bytes!("../../../../../assets/textures/crosshair.png"),
             false,
             true,
+            1,
         );
         let program = Program::new(
             renderer,
@@ -32,6 +33,7 @@ impl Crosshair {
                 output_bind_group_layout,
             ],
             &[],
+            None,
             None,
             None,
             None,

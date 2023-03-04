@@ -20,6 +20,7 @@ impl Output {
             None,
             None,
             None,
+            None,
         );
         Self { texture, program }
     }

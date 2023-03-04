@@ -27,6 +27,7 @@ impl Sky {
             include_bytes!("../../../../assets/textures/sky.png"),
             true,
             false,
+            1,
         );
         let program = Program::new(
             renderer,
@@ -38,6 +39,7 @@ impl Sky {
                 color_map.bind_group_layout(),
             ],
             &[],
+            None,
             None,
             Some(wgpu::Face::Front),
             Some(wgpu::DepthStencilState {

@@ -40,6 +40,7 @@ impl World {
             include_bytes!("../../../../assets/textures/atlas.png"),
             true,
             true,
+            4,
         );
         let program = Program::new(
             renderer,
@@ -56,6 +57,7 @@ impl World {
                 stages: wgpu::ShaderStages::VERTEX,
                 range: 0..mem::size_of::<BlockPushConstants>() as u32,
             }],
+            None,
             None,
             Some(wgpu::Face::Back),
             Some(wgpu::DepthStencilState {

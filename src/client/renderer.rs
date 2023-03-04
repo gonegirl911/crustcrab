@@ -4,7 +4,10 @@ use super::{
 };
 use bytemuck::Pod;
 use std::{marker::PhantomData, mem, num::NonZeroU32, slice};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::{
+    include_wgsl,
+    util::{BufferInitDescriptor, DeviceExt},
+};
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Renderer {
@@ -221,7 +224,7 @@ pub struct ImageTexture {
 
 impl ImageTexture {
     pub fn new(
-        Renderer {
+        renderer @ Renderer {
             device,
             queue,
             config,
@@ -230,6 +233,7 @@ impl ImageTexture {
         bytes: &[u8],
         is_srgb: bool,
         is_pixelated: bool,
+        mipmap_levels: u32,
     ) -> Self {
         let image = image::load_from_memory(bytes).unwrap().to_rgba8();
         let dimensions = image.dimensions();
@@ -241,7 +245,7 @@ impl ImageTexture {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size,
-            mip_level_count: 1,
+            mip_level_count: mipmap_levels,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: if is_srgb && config.format.describe().srgb {
@@ -249,21 +253,20 @@ impl ImageTexture {
             } else {
                 wgpu::TextureFormat::Rgba8Unorm
             },
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
         let view = texture.create_view(&Default::default());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: if is_pixelated {
                 wgpu::FilterMode::Nearest
             } else {
                 wgpu::FilterMode::Linear
             },
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -275,20 +278,14 @@ impl ImageTexture {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float {
-                            filterable: !is_pixelated,
-                        },
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(if is_pixelated {
-                        wgpu::SamplerBindingType::NonFiltering
-                    } else {
-                        wgpu::SamplerBindingType::Filtering
-                    }),
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -324,6 +321,16 @@ impl ImageTexture {
             size,
         );
 
+        if mipmap_levels > 1 {
+            Self::generate_mipmaps(
+                renderer,
+                &texture,
+                &sampler,
+                &bind_group_layout,
+                mipmap_levels,
+            );
+        }
+
         Self {
             bind_group_layout,
             bind_group,
@@ -336,6 +343,70 @@ impl ImageTexture {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+
+    fn generate_mipmaps(
+        renderer @ Renderer { device, queue, .. }: &Renderer,
+        texture: &wgpu::Texture,
+        sampler: &wgpu::Sampler,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        levels: u32,
+    ) {
+        let program = Program::new(
+            renderer,
+            include_wgsl!("../../assets/shaders/output.wgsl"),
+            &[],
+            &[bind_group_layout],
+            &[],
+            Some(texture.format()),
+            None,
+            None,
+            None,
+        );
+        let mut encoder = device.create_command_encoder(&Default::default());
+
+        (0..levels)
+            .map(|level| {
+                texture.create_view(&wgpu::TextureViewDescriptor {
+                    base_mip_level: level,
+                    mip_level_count: NonZeroU32::new(1),
+                    ..Default::default()
+                })
+            })
+            .collect::<Vec<_>>()
+            .windows(2)
+            .for_each(|views| {
+                let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: bind_group_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&views[0]),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(sampler),
+                        },
+                    ],
+                });
+                let render_pass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: None,
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &views[1],
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: true,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                });
+                program.draw(render_pass, [&bind_group]);
+                render_pass.draw(0..3, 0..1);
+            });
+
+        queue.submit([encoder.finish()]);
     }
 }
 
@@ -539,6 +610,7 @@ impl Program {
         buffers: &[wgpu::VertexBufferLayout],
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         push_constant_ranges: &[wgpu::PushConstantRange],
+        format: Option<wgpu::TextureFormat>,
         blend: Option<wgpu::BlendState>,
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
@@ -562,7 +634,7 @@ impl Program {
                 module: &shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: format.unwrap_or(config.format),
                     blend,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],

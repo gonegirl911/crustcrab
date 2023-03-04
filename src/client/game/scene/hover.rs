@@ -38,6 +38,7 @@ impl BlockHover {
                 stages: wgpu::ShaderStages::VERTEX,
                 range: 0..mem::size_of::<BlockHoverPushConstants>() as u32,
             }],
+            None,
             Some(wgpu::BlendState::ALPHA_BLENDING),
             Some(wgpu::Face::Back),
             Some(wgpu::DepthStencilState {
