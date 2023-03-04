@@ -7,7 +7,7 @@ pub struct ChunkLoader;
 impl ChunkLoader {
     pub fn get(&self, coords: Point3<i32>) -> Chunk {
         if coords.y == 0 {
-            Chunk::from_fn(|_| Block::Grass)
+            Chunk::from_fn(|_| Block::Sand)
         } else {
             Default::default()
         }

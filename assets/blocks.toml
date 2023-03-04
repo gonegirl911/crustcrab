@@ -1,19 +1,19 @@
 [air]
 light_filter = [1.0, 1.0, 1.0]
 
-[grass]
+[sand]
+side_tex_indices.front = 0
+side_tex_indices.right = 0
+side_tex_indices.back = 0
+side_tex_indices.left = 0
+side_tex_indices.up = 0
+side_tex_indices.down = 0
+
+[glowstone]
 side_tex_indices.front = 1
 side_tex_indices.right = 1
 side_tex_indices.back = 1
 side_tex_indices.left = 1
-side_tex_indices.up = 0
-side_tex_indices.down = 2
-
-[glowstone]
-side_tex_indices.front = 3
-side_tex_indices.right = 3
-side_tex_indices.back = 3
-side_tex_indices.left = 3
-side_tex_indices.up = 3
-side_tex_indices.down = 3
+side_tex_indices.up = 1
+side_tex_indices.down = 1
 luminance = [15, 15, 15]

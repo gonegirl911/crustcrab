@@ -12,7 +12,7 @@ use serde::Deserialize;
 pub enum Block {
     #[default]
     Air = 0,
-    Grass,
+    Sand,
     Glowstone,
 }
 
