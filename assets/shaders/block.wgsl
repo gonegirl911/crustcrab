@@ -24,9 +24,10 @@ struct PushConstants {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
-    @location(1) sky_coords: vec2<f32>,
-    @location(2) light_factor: vec3<f32>,
-    @location(3) fog_factor: f32,
+    @location(1) tex_index: u32,
+    @location(2) sky_coords: vec2<f32>,
+    @location(3) light_factor: vec3<f32>,
+    @location(4) fog_factor: f32,
 }
 
 @group(0) @binding(0)
@@ -51,10 +52,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data, 15u, 1u)),
         f32(extractBits(vertex.data, 16u, 1u)),
     );
-    let atlas_coords = vec2(
-        f32(extractBits(vertex.data, 17u, 4u)),
-        f32(extractBits(vertex.data, 21u, 4u)),
-    );
+    let tex_index = extractBits(vertex.data, 17u, 8u);
     let face = extractBits(vertex.data, 25u, 2u);
     let ao = f32(extractBits(vertex.data, 27u, 2u));
     let skylight_intensity = skylight.intensity;
@@ -86,7 +84,8 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
     return VertexOutput(
         player.vp * vec4(coords, 1.0),
-        (atlas_coords + tex_coords) / 16.0,
+        tex_coords,
+        tex_index,
         vec2(clock.time, fog_height),
         light_factor,
         fog_factor,
@@ -94,10 +93,10 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 }
 
 @group(3) @binding(0)
-var t_atlas: texture_2d<f32>;
+var t_blocks: binding_array<texture_2d<f32>>;
 
 @group(3) @binding(1)
-var s_atlas: sampler;
+var s_block: sampler;
 
 @group(4) @binding(0)
 var t_sky: texture_2d<f32>;
@@ -108,7 +107,7 @@ var s_sky: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return mix(
-        textureSample(t_atlas, s_atlas, in.tex_coords) * vec4(in.light_factor, 1.0),
+        textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0),
         textureSample(t_sky, s_sky, in.sky_coords),
         in.fog_factor,
     );

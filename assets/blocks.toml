@@ -2,18 +2,18 @@
 light_filter = [1.0, 1.0, 1.0]
 
 [grass]
-atlas_coords.front = [3, 0]
-atlas_coords.right = [3, 0]
-atlas_coords.back = [3, 0]
-atlas_coords.left = [3, 0]
-atlas_coords.up = [0, 0]
-atlas_coords.down = [2, 0]
+side_tex_indices.front = 1
+side_tex_indices.right = 1
+side_tex_indices.back = 1
+side_tex_indices.left = 1
+side_tex_indices.up = 0
+side_tex_indices.down = 2
 
 [glowstone]
-atlas_coords.front = [9, 6]
-atlas_coords.right = [9, 6]
-atlas_coords.back = [9, 6]
-atlas_coords.left = [9, 6]
-atlas_coords.up = [9, 6]
-atlas_coords.down = [9, 6]
+side_tex_indices.front = 3
+side_tex_indices.right = 3
+side_tex_indices.back = 3
+side_tex_indices.left = 3
+side_tex_indices.up = 3
+side_tex_indices.down = 3
 luminance = [15, 15, 15]

@@ -3,7 +3,7 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         game::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
-        renderer::{ImageTexture, Mesh, Program, Renderer, Vertex},
+        renderer::{ImageTextureArray, Mesh, Program, Renderer, Vertex},
     },
     server::{
         game::scene::world::{
@@ -18,11 +18,12 @@ use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
 use nalgebra::{Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde::Deserialize;
 use std::{mem, sync::Arc, thread, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
-    atlas: ImageTexture,
+    textures: ImageTextureArray,
     program: Program,
 }
 
@@ -34,10 +35,20 @@ impl World {
         skylight_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
+        #[derive(Deserialize)]
+        struct Indices {
+            indices: Vec<String>,
+        }
         let meshes = ChunkMeshPool::new();
-        let atlas = ImageTexture::new(
+        let textures = ImageTextureArray::new(
             renderer,
-            include_bytes!("../../../../assets/textures/atlas.png"),
+            toml::from_str::<Indices>(include_str!(
+                "../../../../assets/textures/blocks/indices.toml"
+            ))
+            .unwrap()
+            .indices
+            .into_iter()
+            .map(|path| std::fs::read(format!("assets/textures/blocks/{path}")).unwrap()),
             true,
             true,
             4,
@@ -50,7 +61,7 @@ impl World {
                 player_bind_group_layout,
                 clock_bind_group_layout,
                 skylight_bind_group_layout,
-                atlas.bind_group_layout(),
+                textures.bind_group_layout(),
                 sky_bind_group_layout,
             ],
             &[wgpu::PushConstantRange {
@@ -70,7 +81,7 @@ impl World {
         );
         Self {
             meshes,
-            atlas,
+            textures,
             program,
         }
     }
@@ -90,7 +101,7 @@ impl World {
                 player_bind_group,
                 clock_bind_group,
                 skylight_bind_group,
-                self.atlas.bind_group(),
+                self.textures.bind_group(),
                 sky_bind_group,
             ],
         );
@@ -234,7 +245,7 @@ impl BlockVertex {
     pub fn new(
         coords: Point3<u8>,
         tex_coords: Point2<u8>,
-        atlas_coords: Point2<u8>,
+        tex_index: u8,
         face: Face,
         ao: u8,
         light: BlockLight,
@@ -245,8 +256,7 @@ impl BlockVertex {
         data |= (coords.z as u32) << 10;
         data |= (tex_coords.x as u32) << 15;
         data |= (tex_coords.y as u32) << 16;
-        data |= (atlas_coords.x as u32) << 17;
-        data |= (atlas_coords.y as u32) << 21;
+        data |= (tex_index as u32) << 17;
         data |= (face as u32) << 25;
         data |= (ao as u32) << 27;
         Self {

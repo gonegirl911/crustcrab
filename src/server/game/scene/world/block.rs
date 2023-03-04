@@ -24,10 +24,10 @@ impl Block {
         area_light: BlockAreaLight,
     ) -> Option<impl Iterator<Item = BlockVertex>> {
         let data = self.data();
-        data.atlas_coords.map(move |side_atlas_coords| {
+        data.side_tex_indices.map(move |side_tex_indices| {
             area.visible_sides().flat_map(move |side| {
                 let corner_vertex_coords = SIDE_CORNER_VERTEX_COORDS[side];
-                let atlas_coords = side_atlas_coords[side];
+                let tex_index = side_tex_indices[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
                 let corner_lights = area_light.corner_lights(side);
@@ -35,7 +35,7 @@ impl Block {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
                         CORNER_TEX_COORDS[corner],
-                        atlas_coords,
+                        tex_index,
                         face,
                         corner_aos[corner],
                         corner_lights[corner],
@@ -95,7 +95,7 @@ impl Block {
 #[derive(Deserialize)]
 pub struct BlockData {
     #[serde(default)]
-    atlas_coords: Option<EnumMap<Side, Point2<u8>>>,
+    side_tex_indices: Option<EnumMap<Side, u8>>,
     #[serde(default)]
     pub luminance: [u8; 3],
     #[serde(default)]
