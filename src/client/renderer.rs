@@ -3,12 +3,7 @@ use super::{
     window::Window,
 };
 use bytemuck::Pod;
-use std::{
-    marker::PhantomData,
-    mem,
-    num::{NonZeroU32, NonZeroU8},
-    slice,
-};
+use std::{marker::PhantomData, mem, num::NonZeroU32, slice};
 use wgpu::{
     include_wgsl,
     util::{BufferInitDescriptor, DeviceExt},
@@ -264,20 +259,14 @@ impl ImageTexture {
             view_formats: &[],
         });
         let view = texture.create_view(&Default::default());
-        let mag_filter = if is_pixelated {
-            wgpu::FilterMode::Nearest
-        } else {
-            wgpu::FilterMode::Linear
-        };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            anisotropy_clamp: if mipmap_levels > 1 {
-                NonZeroU8::new(16)
+            mag_filter: if is_pixelated {
+                wgpu::FilterMode::Nearest
             } else {
-                None
+                wgpu::FilterMode::Linear
             },
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -289,14 +278,20 @@ impl ImageTexture {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: wgpu::TextureSampleType::Float {
+                            filterable: !is_pixelated,
+                        },
                     },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    ty: wgpu::BindingType::Sampler(if is_pixelated {
+                        wgpu::SamplerBindingType::NonFiltering
+                    } else {
+                        wgpu::SamplerBindingType::Filtering
+                    }),
                     count: None,
                 },
             ],
@@ -333,13 +328,7 @@ impl ImageTexture {
         );
 
         if mipmap_levels > 1 {
-            Self::generate_mipmaps(
-                renderer,
-                &texture,
-                mag_filter,
-                &bind_group_layout,
-                mipmap_levels,
-            );
+            Self::generate_mipmaps(renderer, &texture, mipmap_levels);
         }
 
         Self {
@@ -359,15 +348,34 @@ impl ImageTexture {
     fn generate_mipmaps(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
-        mag_filter: wgpu::FilterMode,
-        bind_group_layout: &wgpu::BindGroupLayout,
         levels: u32,
     ) {
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
         let program = Program::new(
             renderer,
             include_wgsl!("../../assets/shaders/output.wgsl"),
             &[],
-            &[bind_group_layout],
+            &[&bind_group_layout],
             &[],
             Some(texture.format()),
             None,
@@ -375,11 +383,10 @@ impl ImageTexture {
             None,
         );
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+
         let mut encoder = device.create_command_encoder(&Default::default());
 
         (0..levels)
@@ -395,7 +402,7 @@ impl ImageTexture {
             .for_each(|views| {
                 let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: None,
-                    layout: bind_group_layout,
+                    layout: &bind_group_layout,
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
