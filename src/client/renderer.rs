@@ -328,7 +328,7 @@ impl ImageTexture {
         );
 
         if mipmap_levels > 1 {
-            Self::generate_mipmaps(renderer, &texture, mipmap_levels);
+            Self::gen_mipmaps(renderer, &texture, mipmap_levels);
         }
 
         Self {
@@ -345,7 +345,7 @@ impl ImageTexture {
         &self.bind_group
     }
 
-    fn generate_mipmaps(
+    fn gen_mipmaps(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
         levels: u32,
@@ -386,7 +386,6 @@ impl ImageTexture {
             min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-
         let mut encoder = device.create_command_encoder(&Default::default());
 
         (0..levels)
