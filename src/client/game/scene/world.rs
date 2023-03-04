@@ -40,7 +40,7 @@ impl World {
             include_bytes!("../../../../assets/textures/atlas.png"),
             true,
             true,
-            1,
+            4,
         );
         let program = Program::new(
             renderer,

@@ -377,7 +377,7 @@ impl ImageTexture {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             mag_filter,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
         let mut encoder = device.create_command_encoder(&Default::default());

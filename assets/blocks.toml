@@ -2,12 +2,12 @@
 light_filter = [1.0, 1.0, 1.0]
 
 [grass]
-atlas_coords.front = [0, 11]
-atlas_coords.right = [0, 11]
-atlas_coords.back = [0, 11]
-atlas_coords.left = [0, 11]
-atlas_coords.up = [0, 11]
-atlas_coords.down = [0, 11]
+atlas_coords.front = [3, 0]
+atlas_coords.right = [3, 0]
+atlas_coords.back = [3, 0]
+atlas_coords.left = [3, 0]
+atlas_coords.up = [0, 0]
+atlas_coords.down = [2, 0]
 
 [glowstone]
 atlas_coords.front = [9, 6]
