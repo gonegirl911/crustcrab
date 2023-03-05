@@ -304,7 +304,6 @@ impl ImageTexture {
                 | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
-        let view = texture.create_view(&Default::default());
 
         queue.write_texture(
             wgpu::ImageCopyTexture {
@@ -326,7 +325,7 @@ impl ImageTexture {
             Self::generate_mipmaps(renderer, &texture, mipmap_levels);
         }
 
-        view
+        texture.create_view(&Default::default())
     }
 
     fn create_sampler(

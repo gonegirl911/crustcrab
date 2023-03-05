@@ -136,13 +136,13 @@ impl ChunkMapLight {
         index: usize,
         value: u8,
     ) -> FxHashSet<Point3<i32>> {
-        let mut deq = Self::neighbors(coords, value - 1).collect::<VecDeque<_>>();
+        let mut deq = Self::neighbors(coords, value).collect::<VecDeque<_>>();
         let mut updates = FxHashSet::default();
 
         while let Some(node) = deq.pop_front() {
             updates.insert(node.chunk_coords);
             if let Some(value) = self.set_component(cells, &node, index) {
-                deq.extend(Self::neighbors(node.coords, value - 1));
+                deq.extend(Self::neighbors(node.coords, value));
             }
         }
 
@@ -156,14 +156,14 @@ impl ChunkMapLight {
         index: usize,
         value: u8,
     ) -> FxHashSet<Point3<i32>> {
-        let mut deq = Self::neighbors(coords, value - 1).collect::<VecDeque<_>>();
+        let mut deq = Self::neighbors(coords, value).collect::<VecDeque<_>>();
         let mut sources = vec![];
         let mut updates = FxHashSet::default();
 
         while let Some(node) = deq.pop_front() {
             updates.insert(node.chunk_coords);
             match self.unset_component(cells, &node, index) {
-                Ok(component) => deq.extend(Self::neighbors(node.coords, component - 1)),
+                Ok(component) => deq.extend(Self::neighbors(node.coords, component)),
                 Err(0) => {}
                 Err(component) => sources.push((node.coords, component)),
             }
@@ -253,7 +253,7 @@ impl ChunkMapLight {
     fn neighbors(coords: Point3<f32>, value: u8) -> impl Iterator<Item = LightNode> {
         SIDE_DELTAS
             .values()
-            .map(move |delta| LightNode::new(coords + delta.coords.cast(), value))
+            .map(move |delta| LightNode::new(coords + delta.coords.cast(), value - 1))
     }
 }
 
@@ -435,7 +435,7 @@ impl BlockLightSum {
     fn avg(self) -> BlockLight {
         let mut value = BlockLight::default();
         for (i, (sum, count)) in self.0.into_iter().enumerate() {
-            value.set_component(i, sum / count.max(1))
+            value.set_component(i, sum / count.max(2))
         }
         value
     }
