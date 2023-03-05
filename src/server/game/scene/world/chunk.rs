@@ -121,7 +121,7 @@ impl ChunkMap {
                     NEIGHBOR_DELTAS
                         .into_iter()
                         .map(|delta| Player::chunk_coords(coords + delta.coords.cast()))
-                        .chain((!is_loaded).then_some(chunk_coords))
+                        .chain((!is_loaded && !is_unloaded).then_some(chunk_coords))
                         .chain(light_updates)
                         .collect::<FxHashSet<_>>(),
                     server_tx.clone(),
