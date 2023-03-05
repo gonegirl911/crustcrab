@@ -118,6 +118,16 @@ impl BlockData {
     }
 }
 
+impl From<RawBlockData> for BlockData {
+    fn from(data: RawBlockData) -> Self {
+        Self {
+            luminance: data.luminance,
+            light_filter: data.light_filter,
+            side_tex_indices: data.into_side_tex_indices(),
+        }
+    }
+}
+
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
     #[serde(default)]
@@ -126,6 +136,13 @@ struct RawBlockData {
     pub luminance: [u8; 3],
     #[serde(default)]
     pub light_filter: [f32; 3],
+}
+
+impl RawBlockData {
+    fn into_side_tex_indices(self) -> Option<EnumMap<Side, u8>> {
+        self.side_textures
+            .map(|side_textures| side_textures.map(|_, texture| TEX_INDICES[&texture]))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -221,20 +238,8 @@ pub enum Component {
     Corner,
 }
 
-static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
-    enum_map! {
-        block => {
-            let data = &RAW_BLOCK_DATA[block];
-            BlockData {
-                side_tex_indices: data.side_textures.as_ref().map(|side_textures| {
-                    enum_map! { side => TEX_INDICES[&side_textures[side]]}
-                }),
-                luminance: data.luminance,
-                light_filter: data.light_filter,
-            }
-        }
-    }
-});
+static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
+    Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
 
 pub static TEXTURES: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
     let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
