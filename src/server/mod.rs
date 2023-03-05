@@ -52,6 +52,7 @@ pub enum ServerEvent {
     ChunkLoaded {
         coords: Point3<i32>,
         data: Arc<ChunkData>,
+        is_important: bool,
     },
     ChunkUnloaded {
         coords: Point3<i32>,
@@ -59,6 +60,7 @@ pub enum ServerEvent {
     ChunkUpdated {
         coords: Point3<i32>,
         data: Arc<ChunkData>,
+        is_important: bool,
     },
     BlockHovered {
         coords: Option<Point3<i32>>,

@@ -113,6 +113,7 @@ impl EventHandler for World {
 struct ChunkMeshPool {
     meshes: FxHashMap<Point3<i32>, (Mesh<BlockVertex>, Instant)>,
     unloaded: FxHashSet<Point3<i32>>,
+    priority_data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Instant)>,
 }
@@ -121,10 +122,24 @@ impl ChunkMeshPool {
     fn new() -> Self {
         let meshes = FxHashMap::default();
         let unloaded = FxHashSet::default();
+        let (priority_data_tx, priority_data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
         let (data_tx, data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
         let (vertices_tx, vertices_rx) = flume::unbounded();
+        let num_cpus = num_cpus::get();
 
-        for _ in 0..num_cpus::get() {
+        for _ in 0..num_cpus {
+            let priority_data_rx = priority_data_rx.clone();
+            let vertices_tx = vertices_tx.clone();
+            thread::spawn(move || {
+                for (coords, data, updated_at) in priority_data_rx {
+                    vertices_tx
+                        .send((coords, data.vertices().collect(), updated_at))
+                        .unwrap_or_else(|_| unreachable!());
+                }
+            });
+        }
+
+        for _ in 0..num_cpus {
             let data_rx = data_rx.clone();
             let vertices_tx = vertices_tx.clone();
             thread::spawn(move || {
@@ -139,6 +154,7 @@ impl ChunkMeshPool {
         Self {
             meshes,
             unloaded,
+            priority_data_tx,
             data_tx,
             vertices_rx,
         }
@@ -164,6 +180,14 @@ impl ChunkMeshPool {
             radius: dim * 3.0f32.sqrt() * 0.5,
         }
     }
+
+    fn data_tx(&self, is_important: bool) -> &Sender<(Point3<i32>, Arc<ChunkData>, Instant)> {
+        if is_important {
+            &self.priority_data_tx
+        } else {
+            &self.data_tx
+        }
+    }
 }
 
 impl EventHandler for ChunkMeshPool {
@@ -172,9 +196,13 @@ impl EventHandler for ChunkMeshPool {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::UserEvent(event) => match event {
-                ServerEvent::ChunkLoaded { coords, data } => {
+                ServerEvent::ChunkLoaded {
+                    coords,
+                    data,
+                    is_important,
+                } => {
                     self.unloaded.remove(coords);
-                    self.data_tx
+                    self.data_tx(*is_important)
                         .send((*coords, data.clone(), Instant::now()))
                         .unwrap_or_else(|_| unreachable!());
                 }
@@ -182,8 +210,12 @@ impl EventHandler for ChunkMeshPool {
                     self.meshes.remove(coords);
                     self.unloaded.insert(*coords);
                 }
-                ServerEvent::ChunkUpdated { coords, data } => {
-                    self.data_tx
+                ServerEvent::ChunkUpdated {
+                    coords,
+                    data,
+                    is_important,
+                } => {
+                    self.data_tx(*is_important)
                         .send((*coords, data.clone(), Instant::now()))
                         .unwrap_or_else(|_| unreachable!());
                 }

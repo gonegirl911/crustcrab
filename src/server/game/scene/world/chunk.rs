@@ -125,10 +125,11 @@ impl ChunkMap {
                         .chain(light_updates)
                         .collect::<FxHashSet<_>>(),
                     server_tx.clone(),
+                    true,
                 );
 
                 if is_loaded {
-                    self.send_loads([chunk_coords], server_tx);
+                    self.send_loads([chunk_coords], server_tx, true);
                 } else if is_unloaded {
                     self.send_unloads([chunk_coords], server_tx);
                 }
@@ -140,7 +141,7 @@ impl ChunkMap {
         }
     }
 
-    fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>)
+    fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -153,13 +154,14 @@ impl ChunkMap {
                     area: self.chunk_area(coords),
                     area_light: self.light.chunk_area_light(coords),
                 }),
+                is_important,
             })
             .for_each(|event| {
                 server_tx.send(event).unwrap_or_else(|_| unreachable!());
             });
     }
 
-    fn par_send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>)
+    fn par_send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
@@ -172,6 +174,7 @@ impl ChunkMap {
                     area: self.chunk_area(coords),
                     area_light: self.light.chunk_area_light(coords),
                 }),
+                is_important,
             })
             .collect::<LinkedList<_>>()
             .into_iter()
@@ -195,6 +198,7 @@ impl ChunkMap {
         &self,
         points: I,
         server_tx: Sender<ServerEvent>,
+        is_important: bool,
     ) {
         points
             .into_iter()
@@ -206,6 +210,7 @@ impl ChunkMap {
                         area: self.chunk_area(coords),
                         area_light: self.light.chunk_area_light(coords),
                     }),
+                    is_important,
                 })
             })
             .for_each(|event| {
@@ -217,6 +222,7 @@ impl ChunkMap {
         &self,
         points: I,
         server_tx: Sender<ServerEvent>,
+        is_important: bool,
     ) {
         points
             .into_par_iter()
@@ -228,6 +234,7 @@ impl ChunkMap {
                         area: self.chunk_area(coords),
                         area_light: self.light.chunk_area_light(coords),
                     }),
+                    is_important,
                 })
             })
             .collect::<LinkedList<_>>()
@@ -283,7 +290,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     (coords - area.center).map(|c| c.pow(2)).sum()
                 });
 
-                self.par_send_loads(loads, server_tx);
+                self.par_send_loads(loads, server_tx, false);
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
@@ -295,9 +302,9 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
-                self.par_send_updates(updates, server_tx.clone());
+                self.par_send_updates(updates, server_tx.clone(), false);
                 self.send_unloads(unloads, server_tx.clone());
-                self.par_send_loads(loads, server_tx);
+                self.par_send_loads(loads, server_tx, false);
             }
             ChunkMapEvent::BlockSelectionRequested => {
                 self.hovered_block = ray.cast(Player::BUILDING_REACH).find(
