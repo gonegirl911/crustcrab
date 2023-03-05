@@ -118,16 +118,6 @@ impl BlockData {
     }
 }
 
-impl From<RawBlockData> for BlockData {
-    fn from(data: RawBlockData) -> Self {
-        Self {
-            luminance: data.luminance,
-            light_filter: data.light_filter,
-            side_tex_indices: data.into_side_tex_indices(),
-        }
-    }
-}
-
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
     #[serde(default)]
@@ -139,9 +129,12 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn into_side_tex_indices(self) -> Option<EnumMap<Side, u8>> {
-        self.side_textures
-            .map(|side_textures| side_textures.map(|_, texture| TEX_INDICES[&texture]))
+    fn side_tex_indices(&self) -> Option<EnumMap<Side, u8>> {
+        self.side_textures.as_ref().map(|side_textures| {
+            enum_map! {
+                side => TEX_INDICES[&side_textures[side]],
+            }
+        })
     }
 }
 
@@ -238,13 +231,23 @@ pub enum Component {
     Corner,
 }
 
-static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
-    Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
+static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
+    enum_map! {
+        block => {
+            let data = &RAW_BLOCK_DATA[block];
+            BlockData {
+                side_tex_indices: data.side_tex_indices(),
+                luminance: data.luminance,
+                light_filter: data.light_filter,
+            }
+        }
+    }
+});
 
 pub static TEXTURES: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
     let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
     v.sort_unstable_by_key(|(_, idx)| *idx);
-    v.into_iter().map(|(texture, _)| texture.clone()).collect()
+    v.into_iter().map(|(texture, _)| texture).cloned().collect()
 });
 
 static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
@@ -252,8 +255,8 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|data| data.side_textures.clone())
-        .flat_map(|side_textures| side_textures.into_values())
+        .filter_map(|data| data.side_textures.as_ref())
+        .flat_map(|side_textures| side_textures.values().cloned())
         .for_each(|texture| {
             indices.entry(texture).or_insert_with(|| {
                 let i = idx;
