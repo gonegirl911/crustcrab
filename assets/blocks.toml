@@ -2,18 +2,18 @@
 light_filter = [1.0, 1.0, 1.0]
 
 [sand]
-side_tex_indices.front = 0
-side_tex_indices.right = 0
-side_tex_indices.back = 0
-side_tex_indices.left = 0
-side_tex_indices.up = 0
-side_tex_indices.down = 0
+side_textures.front = "sand.png"
+side_textures.right = "sand.png"
+side_textures.back = "sand.png"
+side_textures.left = "sand.png"
+side_textures.up = "sand.png"
+side_textures.down = "sand.png"
 
 [glowstone]
-side_tex_indices.front = 1
-side_tex_indices.right = 1
-side_tex_indices.back = 1
-side_tex_indices.left = 1
-side_tex_indices.up = 1
-side_tex_indices.down = 1
+side_textures.front = "glowstone.png"
+side_textures.right = "glowstone.png"
+side_textures.back = "glowstone.png"
+side_textures.left = "glowstone.png"
+side_textures.up = "glowstone.png"
+side_textures.down = "glowstone.png"
 luminance = [15, 15, 15]

@@ -19,7 +19,7 @@ once_cell = "1.16.0"
 pollster = "0.3.0"
 rayon = "1.6.1"
 rustc-hash = "1.1.0"
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.152", features = ["derive", "rc"] }
 spin_sleep = "1.1.1"
 toml = "0.7.2"
 wgpu = "0.15.0"

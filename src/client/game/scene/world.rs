@@ -7,7 +7,7 @@ use crate::{
     },
     server::{
         game::scene::world::{
-            block::Face,
+            block::{Face, TEXTURES},
             chunk::{Chunk, ChunkData},
             light::BlockLight,
         },
@@ -18,8 +18,7 @@ use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
 use nalgebra::{Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::Deserialize;
-use std::{mem, sync::Arc, thread, time::Instant};
+use std::{fs, mem, sync::Arc, thread, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
@@ -35,20 +34,10 @@ impl World {
         skylight_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        #[derive(Deserialize)]
-        struct Indices {
-            indices: Vec<String>,
-        }
         let meshes = ChunkMeshPool::new();
         let textures = ImageTextureArray::new(
             renderer,
-            toml::from_str::<Indices>(include_str!(
-                "../../../../assets/textures/blocks/indices.toml"
-            ))
-            .unwrap()
-            .indices
-            .into_iter()
-            .map(|path| std::fs::read(format!("assets/textures/blocks/{path}")).unwrap()),
+            TEXTURES.iter().map(|texture| Self::read_texture(texture)),
             true,
             true,
             4,
@@ -106,6 +95,10 @@ impl World {
             ],
         );
         self.meshes.draw(render_pass, frustum);
+    }
+
+    fn read_texture(texture: &str) -> Vec<u8> {
+        fs::read(format!("assets/textures/blocks/{texture}")).expect("texture should exist")
     }
 }
 

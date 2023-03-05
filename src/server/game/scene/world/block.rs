@@ -4,7 +4,9 @@ use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
+use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
@@ -92,13 +94,9 @@ impl Block {
     }
 }
 
-#[derive(Deserialize)]
 pub struct BlockData {
-    #[serde(default)]
     side_tex_indices: Option<EnumMap<Side, u8>>,
-    #[serde(default)]
     pub luminance: [u8; 3],
-    #[serde(default)]
     pub light_filter: [f32; 3],
 }
 
@@ -118,6 +116,16 @@ impl BlockData {
     pub fn is_not_glowing(&self) -> bool {
         !self.is_glowing()
     }
+}
+
+#[derive(Clone, Deserialize)]
+struct RawBlockData {
+    #[serde(default)]
+    side_textures: Option<EnumMap<Side, Arc<String>>>,
+    #[serde(default)]
+    pub luminance: [u8; 3],
+    #[serde(default)]
+    pub light_filter: [f32; 3],
 }
 
 #[derive(Clone, Copy)]
@@ -214,6 +222,44 @@ pub enum Component {
 }
 
 static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
+    enum_map! {
+        block => {
+            let data = &RAW_BLOCK_DATA[block];
+            BlockData {
+                side_tex_indices: data.side_textures.as_ref().map(|side_textures| {
+                    enum_map! { side => TEX_INDICES[&side_textures[side]]}
+                }),
+                luminance: data.luminance,
+                light_filter: data.light_filter,
+            }
+        }
+    }
+});
+
+pub static TEXTURES: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
+    let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
+    v.sort_unstable_by_key(|(_, idx)| *idx);
+    v.into_iter().map(|(texture, _)| texture.clone()).collect()
+});
+
+static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
+    let mut indices = FxHashMap::default();
+    let mut idx = 0;
+    RAW_BLOCK_DATA
+        .values()
+        .filter_map(|data| data.side_textures.clone())
+        .flat_map(|side_textures| side_textures.into_values())
+        .for_each(|texture| {
+            indices.entry(texture).or_insert_with(|| {
+                let i = idx;
+                idx += 1;
+                i
+            });
+        });
+    indices
+});
+
+static RAW_BLOCK_DATA: Lazy<EnumMap<Block, RawBlockData>> = Lazy::new(|| {
     toml::from_str(include_str!("../../../../../assets/blocks.toml"))
         .expect("blocks.toml should be valid")
 });

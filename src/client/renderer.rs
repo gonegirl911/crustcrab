@@ -44,7 +44,9 @@ impl Renderer {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::PUSH_CONSTANTS | wgpu::Features::TEXTURE_BINDING_ARRAY | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
+                    features: wgpu::Features::PUSH_CONSTANTS
+                        | wgpu::Features::TEXTURE_BINDING_ARRAY
+                        | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
                     limits: wgpu::Limits {
                         max_bind_groups: 5,
                         max_push_constant_size: 128,
@@ -229,6 +231,44 @@ pub struct ImageTexture {
 
 impl ImageTexture {
     pub fn new(
+        renderer @ Renderer { device, .. }: &Renderer,
+        bytes: &[u8],
+        is_srgb: bool,
+        is_pixelated: bool,
+        mipmap_levels: u32,
+    ) -> Self {
+        let view = Self::create_view(renderer, bytes, is_srgb, mipmap_levels);
+        let sampler = Self::create_sampler(renderer, is_pixelated, mipmap_levels);
+        let bind_group_layout = Self::create_bind_group_layout(renderer, is_pixelated, None);
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        Self {
+            bind_group_layout,
+            bind_group,
+        }
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.bind_group_layout
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+
+    fn create_view(
         renderer @ Renderer {
             device,
             queue,
@@ -237,10 +277,11 @@ impl ImageTexture {
         }: &Renderer,
         bytes: &[u8],
         is_srgb: bool,
-        is_pixelated: bool,
         mipmap_levels: u32,
-    ) -> Self {
-        let image = image::load_from_memory(bytes).unwrap().to_rgba8();
+    ) -> wgpu::TextureView {
+        let image = image::load_from_memory(bytes)
+            .expect("bytes should be a valid image")
+            .to_rgba8();
         let dimensions = image.dimensions();
         let size = wgpu::Extent3d {
             width: dimensions.0,
@@ -264,62 +305,6 @@ impl ImageTexture {
             view_formats: &[],
         });
         let view = texture.create_view(&Default::default());
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter: if is_pixelated {
-                wgpu::FilterMode::Nearest
-            } else {
-                wgpu::FilterMode::Linear
-            },
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            anisotropy_clamp: if mipmap_levels > 1 {
-                NonZeroU8::new(16)
-            } else {
-                None
-            },
-            ..Default::default()
-        });
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float {
-                            filterable: !is_pixelated,
-                        },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(if is_pixelated {
-                        wgpu::SamplerBindingType::NonFiltering
-                    } else {
-                        wgpu::SamplerBindingType::Filtering
-                    }),
-                    count: None,
-                },
-            ],
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
 
         queue.write_texture(
             wgpu::ImageCopyTexture {
@@ -338,24 +323,69 @@ impl ImageTexture {
         );
 
         if mipmap_levels > 1 {
-            Self::gen_mipmaps(renderer, &texture, mipmap_levels);
+            Self::generate_mipmaps(renderer, &texture, mipmap_levels);
         }
 
-        Self {
-            bind_group_layout,
-            bind_group,
-        }
+        view
     }
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
+    fn create_sampler(
+        Renderer { device, .. }: &Renderer,
+        is_pixelated: bool,
+        mipmap_levels: u32,
+    ) -> wgpu::Sampler {
+        device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: if is_pixelated {
+                wgpu::FilterMode::Nearest
+            } else {
+                wgpu::FilterMode::Linear
+            },
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            anisotropy_clamp: if mipmap_levels > 1 {
+                NonZeroU8::new(16)
+            } else {
+                None
+            },
+            ..Default::default()
+        })
     }
 
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
+    fn create_bind_group_layout(
+        Renderer { device, .. }: &Renderer,
+        is_pixelated: bool,
+        count: Option<NonZeroU32>,
+    ) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float {
+                            filterable: !is_pixelated,
+                        },
+                    },
+                    count,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(if is_pixelated {
+                        wgpu::SamplerBindingType::NonFiltering
+                    } else {
+                        wgpu::SamplerBindingType::Filtering
+                    }),
+                    count: None,
+                },
+            ],
+        })
     }
 
-    fn gen_mipmaps(
+    fn generate_mipmaps(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
         levels: u32,
@@ -449,112 +479,25 @@ pub struct ImageTextureArray {
 }
 
 impl ImageTextureArray {
-    pub fn new<I: IntoIterator<Item = impl AsRef<[u8]>>>(
-        renderer @ Renderer {
-            device,
-            queue,
-            config,
-            ..
-        }: &Renderer,
-        data: I,
+    pub fn new(
+        renderer @ Renderer { device, .. }: &Renderer,
+        data: impl IntoIterator<Item = impl AsRef<[u8]>>,
         is_srgb: bool,
         is_pixelated: bool,
         mipmap_levels: u32,
     ) -> Self {
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter: if is_pixelated {
-                wgpu::FilterMode::Nearest
-            } else {
-                wgpu::FilterMode::Linear
-            },
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            anisotropy_clamp: if mipmap_levels > 1 {
-                NonZeroU8::new(16)
-            } else {
-                None
-            },
-            ..Default::default()
-        });
-
-        let v = data
+        let views = data
             .into_iter()
             .map(|bytes| {
-                let image = image::load_from_memory(bytes.as_ref()).unwrap().to_rgba8();
-                let dimensions = image.dimensions();
-                let size = wgpu::Extent3d {
-                    width: dimensions.0,
-                    height: dimensions.1,
-                    depth_or_array_layers: 1,
-                };
-                let texture = device.create_texture(&wgpu::TextureDescriptor {
-                    label: None,
-                    size,
-                    mip_level_count: mipmap_levels,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: if is_srgb && config.format.describe().srgb {
-                        wgpu::TextureFormat::Rgba8UnormSrgb
-                    } else {
-                        wgpu::TextureFormat::Rgba8Unorm
-                    },
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING
-                        | wgpu::TextureUsages::COPY_DST
-                        | wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    view_formats: &[],
-                });
-                let view = texture.create_view(&Default::default());
-
-                queue.write_texture(
-                    wgpu::ImageCopyTexture {
-                        texture: &texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &image,
-                    wgpu::ImageDataLayout {
-                        offset: 0,
-                        bytes_per_row: NonZeroU32::new(4 * dimensions.0),
-                        rows_per_image: NonZeroU32::new(dimensions.1),
-                    },
-                    size,
-                );
-
-                if mipmap_levels > 1 {
-                    ImageTexture::gen_mipmaps(renderer, &texture, mipmap_levels);
-                }
-
-                view
+                ImageTexture::create_view(renderer, bytes.as_ref(), is_srgb, mipmap_levels)
             })
             .collect::<Vec<_>>();
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float {
-                            filterable: !is_pixelated,
-                        },
-                    },
-                    count: NonZeroU32::new(v.len() as u32),
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(if is_pixelated {
-                        wgpu::SamplerBindingType::NonFiltering
-                    } else {
-                        wgpu::SamplerBindingType::Filtering
-                    }),
-                    count: None,
-                },
-            ],
-        });
+        let sampler = ImageTexture::create_sampler(renderer, is_pixelated, mipmap_levels);
+        let bind_group_layout = ImageTexture::create_bind_group_layout(
+            renderer,
+            is_pixelated,
+            NonZeroU32::new(views.len() as u32),
+        );
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -562,7 +505,7 @@ impl ImageTextureArray {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::TextureViewArray(
-                        &v.iter().collect::<Vec<_>>(),
+                        &views.iter().collect::<Vec<_>>(),
                     ),
                 },
                 wgpu::BindGroupEntry {
@@ -571,7 +514,6 @@ impl ImageTextureArray {
                 },
             ],
         });
-
         Self {
             bind_group_layout,
             bind_group,
