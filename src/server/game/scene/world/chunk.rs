@@ -474,7 +474,7 @@ impl ChunkArea {
     pub const DIM: usize = Chunk::DIM + Self::PADDING * 2;
     pub const PADDING: usize = 1;
     pub const NEG_PADDING_RANGE: Range<i8> = -(Self::PADDING as i8)..0;
-    pub const POS_PADDING_RANGE: Range<i8> = Chunk::DIM as i8..Self::PADDING as i8;
+    pub const POS_PADDING_RANGE: Range<i8> = Chunk::DIM as i8..(Chunk::DIM + Self::PADDING) as i8;
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;
 
     fn new(cells: &FxHashMap<Point3<i32>, ChunkCell>, coords: Point3<i32>) -> Self {
