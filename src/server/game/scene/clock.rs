@@ -53,7 +53,7 @@ impl Clock {
 impl Default for Clock {
     fn default() -> Self {
         Self {
-            ticks: Self::DAWN_START,
+            ticks: Self::NIGHT_START,
         }
     }
 }

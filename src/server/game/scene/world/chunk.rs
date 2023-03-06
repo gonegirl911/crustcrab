@@ -23,7 +23,7 @@ use std::{
     array,
     collections::LinkedList,
     mem,
-    ops::{Deref, Index, IndexMut, Mul},
+    ops::{Deref, Index, IndexMut, Mul, RangeInclusive},
     sync::Arc,
 };
 
@@ -415,7 +415,7 @@ impl Chunk {
             block
                 .vertices(
                     coords,
-                    unsafe { area.block_area_unchecked(coords) },
+                    area.block_area(coords),
                     area_light.block_area_light(coords),
                 )
                 .into_iter()
@@ -477,9 +477,7 @@ impl ChunkArea {
         let mut value = Self(Default::default());
 
         for (delta, block) in cells[&coords].blocks() {
-            unsafe {
-                value.set_unchecked(delta.cast(), block.data().is_opaque());
-            }
+            value.set(delta.cast(), block.data().is_opaque());
         }
 
         for perm in [
@@ -497,9 +495,7 @@ impl ChunkArea {
                         let rest = perm * point![0, y, z];
                         let delta = delta + rest.coords.cast();
                         let block_coords = block_coords + rest.coords;
-                        unsafe {
-                            value.set_unchecked(delta, cell[block_coords].data().is_opaque());
-                        }
+                        value.set(delta, cell[block_coords].data().is_opaque());
                     }
                 }
             }
@@ -520,9 +516,7 @@ impl ChunkArea {
                         let rest = perm * point![0, 0, z];
                         let delta = delta + rest.coords.cast();
                         let block_coords = block_coords + rest.coords;
-                        unsafe {
-                            value.set_unchecked(delta, cell[block_coords].data().is_opaque());
-                        }
+                        value.set(delta, cell[block_coords].data().is_opaque());
                     }
                 }
             }
@@ -535,9 +529,7 @@ impl ChunkArea {
                     let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                     let block_coords = Player::block_coords(delta.cast());
                     let Some(cell) = cells.get(&chunk_coords) else { continue };
-                    unsafe {
-                        value.set_unchecked(delta, cell[block_coords].data().is_opaque());
-                    }
+                    value.set(delta, cell[block_coords].data().is_opaque());
                 }
             }
         }
@@ -545,19 +537,29 @@ impl ChunkArea {
         value
     }
 
-    unsafe fn block_area_unchecked(&self, coords: Point3<u8>) -> BlockArea {
+    fn block_area(&self, coords: Point3<u8>) -> BlockArea {
         let coords = coords.cast();
-        BlockArea::from_fn(|delta| unsafe { self.get_unchecked(coords + delta.coords) })
+        BlockArea::from_fn(|delta| self.is_opaque(coords + delta.coords))
     }
 
-    unsafe fn get_unchecked(&self, coords: Point3<i8>) -> bool {
-        unsafe { *self.0.get_unchecked(Self::index_unchecked(coords)) }
+    fn is_opaque(&self, coords: Point3<i8>) -> bool {
+        unsafe { *self.0.get_unchecked(Self::index(coords)) }
     }
 
-    unsafe fn set_unchecked(&mut self, coords: Point3<i8>, value: bool) {
+    fn set(&mut self, coords: Point3<i8>, is_opaque: bool) {
         unsafe {
-            self.0.set_unchecked(Self::index_unchecked(coords), value);
+            self.0.set_unchecked(Self::index(coords), is_opaque);
         }
+    }
+
+    fn index(coords: Point3<i8>) -> usize {
+        const AXIS_RANGE: RangeInclusive<i8> = -1..=Chunk::DIM as i8;
+        assert!(
+            AXIS_RANGE.contains(&coords.x)
+                && AXIS_RANGE.contains(&coords.y)
+                && AXIS_RANGE.contains(&coords.z)
+        );
+        unsafe { Self::index_unchecked(coords) }
     }
 
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {

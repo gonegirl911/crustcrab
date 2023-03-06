@@ -407,13 +407,14 @@ impl BlockAreaLight {
         }))
     }
 
-    pub fn corner_lights(&self, side: Side) -> EnumMap<Corner, BlockLight> {
-        let side_light = self[SIDE_DELTAS[side]];
+    pub fn corner_lights(&self, side: Side, area: BlockArea) -> EnumMap<Corner, BlockLight> {
+        let side_delta = SIDE_DELTAS[side];
         SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
             component_deltas
                 .into_values()
+                .chain([side_delta])
+                .filter(|delta| area.is_transparent(*delta))
                 .map(|delta| self[delta])
-                .chain([side_light])
                 .sum::<BlockLightSum>()
                 .avg()
         })
@@ -429,13 +430,16 @@ impl Index<Point3<i8>> for BlockAreaLight {
     }
 }
 
-struct BlockLightSum([(u8, u8); 6]);
+struct BlockLightSum {
+    sum: [u8; 6],
+    count: u8,
+}
 
 impl BlockLightSum {
     fn avg(self) -> BlockLight {
         let mut value = BlockLight::default();
-        for (i, (sum, count)) in self.0.into_iter().enumerate() {
-            value.set_component(i, sum / count.max(2))
+        for (i, sum) in self.sum.into_iter().enumerate() {
+            value.set_component(i, sum / self.count.max(1))
         }
         value
     }
@@ -443,13 +447,10 @@ impl BlockLightSum {
 
 impl Sum<BlockLight> for BlockLightSum {
     fn sum<I: Iterator<Item = BlockLight>>(iter: I) -> Self {
-        Self(iter.fold(Default::default(), |accum, light| {
-            array::from_fn(|i| {
-                let (sum, count) = accum[i];
-                let component = light.component(i);
-                (sum + component, count + (component != 0) as u8)
-            })
-        }))
+        let (sum, count) = iter.fold(([0; 6], 0), |(sum, count), light| {
+            (array::from_fn(|i| sum[i] + light.component(i)), count + 1)
+        });
+        Self { sum, count }
     }
 }
 

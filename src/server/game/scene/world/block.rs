@@ -6,7 +6,7 @@ use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{ops::RangeInclusive, sync::Arc};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
@@ -32,7 +32,7 @@ impl Block {
                 let tex_index = side_tex_indices[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
-                let corner_lights = area_light.corner_lights(side);
+                let corner_lights = area_light.corner_lights(side, area);
                 Self::indices(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
@@ -147,9 +147,7 @@ impl BlockArea {
     pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
         let mut value = Self(BitArray::ZERO);
         for delta in AREA_DELTAS {
-            unsafe {
-                value.set_unchecked(delta, f(delta));
-            }
+            value.set(delta, f(delta));
         }
         value
     }
@@ -157,23 +155,36 @@ impl BlockArea {
     fn visible_sides(self) -> impl Iterator<Item = Side> {
         SIDE_DELTAS
             .iter()
-            .filter(move |(_, delta)| !unsafe { self.get_unchecked(**delta) })
+            .filter(move |(_, delta)| self.is_transparent(**delta))
             .map(|(side, _)| side)
     }
 
     fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
-        SIDE_CORNER_COMPONENT_DELTAS[side][corner]
-            .map(|_, delta| unsafe { self.get_unchecked(delta) })
+        SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self.is_opaque(delta))
     }
 
-    unsafe fn get_unchecked(&self, coords: Point3<i8>) -> bool {
-        unsafe { *self.0.get_unchecked(Self::index_unchecked(coords)) }
+    pub fn is_transparent(&self, coords: Point3<i8>) -> bool {
+        !self.is_opaque(coords)
     }
 
-    unsafe fn set_unchecked(&mut self, coords: Point3<i8>, value: bool) {
+    fn is_opaque(&self, coords: Point3<i8>) -> bool {
+        unsafe { *self.0.get_unchecked(Self::index(coords)) }
+    }
+
+    fn set(&mut self, coords: Point3<i8>, is_opaque: bool) {
         unsafe {
-            self.0.set_unchecked(Self::index_unchecked(coords), value);
+            self.0.set_unchecked(Self::index(coords), is_opaque);
         }
+    }
+
+    fn index(coords: Point3<i8>) -> usize {
+        const AXIS_RANGE: RangeInclusive<i8> = -1..=1;
+        assert!(
+            AXIS_RANGE.contains(&coords.x)
+                && AXIS_RANGE.contains(&coords.y)
+                && AXIS_RANGE.contains(&coords.z)
+        );
+        unsafe { Self::index_unchecked(coords) }
     }
 
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
