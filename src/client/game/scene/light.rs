@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use bytemuck::{Pod, Zeroable};
-use std::ops::RangeInclusive;
+use std::{array, ops::RangeInclusive};
 
 pub struct Skylight {
     uniform: Uniform<SkylightUniformData>,
@@ -17,12 +17,14 @@ pub struct Skylight {
 }
 
 impl Skylight {
+    const NIGHT_INTENSITY: [f32; 3] = [0.15, 0.15, 0.3];
+    const DAWN_INTENSITY: RangeInclusive<[f32; 3]> = Self::NIGHT_INTENSITY..=Self::DAY_INTENSITY;
+    const DAY_INTENSITY: [f32; 3] = [1.0; 3];
+    const DUSK_INTENSITY: RangeInclusive<[f32; 3]> = Self::DAY_INTENSITY..=Self::NIGHT_INTENSITY;
+
     pub fn new(renderer: &Renderer) -> Self {
         Self {
-            uniform: Uniform::new(
-                renderer,
-                wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-            ),
+            uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX),
             updated_data: Some(Default::default()),
         }
     }
@@ -35,17 +37,17 @@ impl Skylight {
         self.uniform.bind_group()
     }
 
-    fn light_intensity(TimeData { stage, .. }: TimeData) -> f32 {
+    fn light_intensity(TimeData { stage, .. }: TimeData) -> [f32; 3] {
         match stage {
-            Stage::Night => 0.01,
-            Stage::Dawn { progress } => Self::lerp(0.01..=1.0, progress),
-            Stage::Day => 1.0,
-            Stage::Dusk { progress } => Self::lerp(1.0..=0.01, progress),
+            Stage::Night => Self::NIGHT_INTENSITY,
+            Stage::Dawn { progress } => Self::lerp(Self::DAWN_INTENSITY, progress),
+            Stage::Day => Self::DAY_INTENSITY,
+            Stage::Dusk { progress } => Self::lerp(Self::DUSK_INTENSITY, progress),
         }
     }
 
-    fn lerp(range: RangeInclusive<f32>, t: f32) -> f32 {
-        range.start() * (1.0 - t) + range.end() * t
+    fn lerp(range: RangeInclusive<[f32; 3]>, t: f32) -> [f32; 3] {
+        array::from_fn(|i| range.start()[i] * (1.0 - t) + range.end()[i] * t)
     }
 }
 
@@ -76,11 +78,15 @@ impl EventHandler for Skylight {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct SkylightUniformData {
-    light_intensity: f32,
+    light_intensity: [f32; 3],
+    padding: f32,
 }
 
 impl SkylightUniformData {
-    fn new(light_intensity: f32) -> Self {
-        Self { light_intensity }
+    fn new(light_intensity: [f32; 3]) -> Self {
+        Self {
+            light_intensity,
+            padding: 0.0,
+        }
     }
 }
