@@ -360,7 +360,8 @@ impl ChunkAreaLight {
     }
 
     pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
-        BlockAreaLight::from_fn(|delta| self[coords.cast() + delta.coords])
+        let coords = coords.cast();
+        BlockAreaLight::from_fn(|delta| self[coords + delta.coords])
     }
 }
 
@@ -432,14 +433,14 @@ impl Index<Point3<i8>> for BlockAreaLight {
 }
 
 struct BlockLightSum {
-    sum: [u8; 6],
+    sums: [u8; 6],
     count: u8,
 }
 
 impl BlockLightSum {
     fn avg(self) -> BlockLight {
         let mut value = BlockLight::default();
-        for (i, sum) in self.sum.into_iter().enumerate() {
+        for (i, sum) in self.sums.into_iter().enumerate() {
             value.set_component(i, sum / self.count.max(1))
         }
         value
@@ -448,10 +449,10 @@ impl BlockLightSum {
 
 impl Sum<BlockLight> for BlockLightSum {
     fn sum<I: Iterator<Item = BlockLight>>(iter: I) -> Self {
-        let (sum, count) = iter.fold(([0; 6], 0), |(sum, count), light| {
-            (array::from_fn(|i| sum[i] + light.component(i)), count + 1)
+        let (sums, count) = iter.fold(([0; 6], 0), |(sums, count), light| {
+            (array::from_fn(|i| sums[i] + light.component(i)), count + 1)
         });
-        Self { sum, count }
+        Self { sums, count }
     }
 }
 

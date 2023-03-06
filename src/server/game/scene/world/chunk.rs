@@ -542,7 +542,8 @@ impl ChunkArea {
     }
 
     fn block_area(&self, coords: Point3<u8>) -> BlockArea {
-        BlockArea::from_fn(|delta| self.is_opaque(coords.cast() + delta.coords))
+        let coords = coords.cast();
+        BlockArea::from_fn(|delta| self.is_opaque(coords + delta.coords))
     }
 
     fn is_opaque(&self, coords: Point3<i8>) -> bool {
