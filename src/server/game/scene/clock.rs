@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use flume::Sender;
-use std::ops::RangeInclusive;
+use std::ops::Range;
 
 pub struct Clock {
     ticks: u16,
@@ -18,9 +18,9 @@ impl Clock {
     const DAY_START: u16 = Self::TICKS_PER_DAY / 150 * 41;
     const DUSK_START: u16 = Self::TICKS_PER_DAY / 150 * 117;
     const NIGHT_START: u16 = Self::TICKS_PER_DAY / 150 * 135;
-    const DAWN_RANGE: RangeInclusive<u16> = Self::DAWN_START..=Self::DAY_START - 1;
-    const DAY_RANGE: RangeInclusive<u16> = Self::DAY_START..=Self::DUSK_START - 1;
-    const DUSK_RANGE: RangeInclusive<u16> = Self::DUSK_START..=Self::NIGHT_START - 1;
+    const DAWN_RANGE: Range<u16> = Self::DAWN_START..Self::DAY_START;
+    const DAY_RANGE: Range<u16> = Self::DAY_START..Self::DUSK_START;
+    const DUSK_RANGE: Range<u16> = Self::DUSK_START..Self::NIGHT_START;
 
     fn data(&self) -> TimeData {
         TimeData {
@@ -45,8 +45,8 @@ impl Clock {
         }
     }
 
-    fn inv_lerp(range: RangeInclusive<u16>, value: u16) -> f32 {
-        (value - range.start()) as f32 / (range.end() - range.start()) as f32
+    fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
+        (value - start) as f32 / (end - 1 - start) as f32
     }
 }
 

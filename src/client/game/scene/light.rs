@@ -37,10 +37,10 @@ impl Skylight {
 
     fn light_intensity(TimeData { stage, .. }: TimeData) -> f32 {
         match stage {
-            Stage::Night => 0.2,
-            Stage::Dawn { progress } => Self::lerp(0.2..=1.0, progress),
+            Stage::Night => 0.01,
+            Stage::Dawn { progress } => Self::lerp(0.01..=1.0, progress),
             Stage::Day => 1.0,
-            Stage::Dusk { progress } => Self::lerp(1.0..=0.2, progress),
+            Stage::Dusk { progress } => Self::lerp(1.0..=0.01, progress),
         }
     }
 
