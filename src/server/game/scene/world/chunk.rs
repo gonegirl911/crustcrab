@@ -472,7 +472,7 @@ pub struct ChunkArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in usize));
 
 impl ChunkArea {
     pub const DIM: usize = Chunk::DIM + Self::PADDING * 2;
-    pub const PADDING: usize = 1;
+    pub const PADDING: usize = BlockArea::PADDING;
     pub const NEG_PADDING_RANGE: Range<i8> = -(Self::PADDING as i8)..0;
     pub const POS_PADDING_RANGE: Range<i8> = Chunk::DIM as i8..(Chunk::DIM + Self::PADDING) as i8;
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;

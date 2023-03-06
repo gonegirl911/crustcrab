@@ -131,9 +131,7 @@ struct RawBlockData {
 impl RawBlockData {
     fn side_tex_indices(&self) -> Option<EnumMap<Side, u8>> {
         self.side_textures.as_ref().map(|side_textures| {
-            enum_map! {
-                side => TEX_INDICES[&side_textures[side]],
-            }
+            enum_map! { side => TEX_INDICES[&side_textures[side]] }
         })
     }
 }
