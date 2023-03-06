@@ -6,7 +6,7 @@ use nalgebra::{point, Point2, Point3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{ops::RangeInclusive, sync::Arc};
+use std::{ops::Range, sync::Arc};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
@@ -102,7 +102,7 @@ pub struct BlockData {
 
 impl BlockData {
     pub fn is_transparent(&self) -> bool {
-        self.light_filter != [0.0, 0.0, 0.0]
+        self.light_filter != [0.0; 3]
     }
 
     pub fn is_opaque(&self) -> bool {
@@ -110,7 +110,7 @@ impl BlockData {
     }
 
     pub fn is_glowing(&self) -> bool {
-        self.luminance != [0, 0, 0]
+        self.luminance != [0; 3]
     }
 
     pub fn is_not_glowing(&self) -> bool {
@@ -142,12 +142,19 @@ impl RawBlockData {
 pub struct BlockArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in u32));
 
 impl BlockArea {
-    pub const DIM: usize = 3;
+    pub const DIM: usize = 1 + Self::PADDING * 2;
+    pub const PADDING: usize = 1;
+    const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(1 + Self::PADDING) as i8;
 
     pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
         let mut value = Self(BitArray::ZERO);
-        for delta in AREA_DELTAS {
-            value.set(delta, f(delta));
+        for dx in Self::AXIS_RANGE {
+            for dy in Self::AXIS_RANGE {
+                for dz in Self::AXIS_RANGE {
+                    let delta = point![dx, dy, dz];
+                    value.set(delta, f(delta));
+                }
+            }
         }
         value
     }
@@ -163,11 +170,11 @@ impl BlockArea {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self.is_opaque(delta))
     }
 
-    pub fn is_transparent(&self, coords: Point3<i8>) -> bool {
+    pub fn is_transparent(self, coords: Point3<i8>) -> bool {
         !self.is_opaque(coords)
     }
 
-    fn is_opaque(&self, coords: Point3<i8>) -> bool {
+    fn is_opaque(self, coords: Point3<i8>) -> bool {
         unsafe { *self.0.get_unchecked(Self::index(coords)) }
     }
 
@@ -178,17 +185,16 @@ impl BlockArea {
     }
 
     fn index(coords: Point3<i8>) -> usize {
-        const AXIS_RANGE: RangeInclusive<i8> = -1..=1;
         assert!(
-            AXIS_RANGE.contains(&coords.x)
-                && AXIS_RANGE.contains(&coords.y)
-                && AXIS_RANGE.contains(&coords.z)
+            Self::AXIS_RANGE.contains(&coords.x)
+                && Self::AXIS_RANGE.contains(&coords.y)
+                && Self::AXIS_RANGE.contains(&coords.z)
         );
         unsafe { Self::index_unchecked(coords) }
     }
 
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
-        let coords = coords.map(|c| (c + 1) as usize);
+        let coords = coords.map(|c| (c + Self::PADDING as i8) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
     }
 }
@@ -386,36 +392,6 @@ const FLIPPED_INDICES: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::UpperRight,
     Corner::UpperLeft,
-];
-
-const AREA_DELTAS: [Point3<i8>; 27] = [
-    point![-1, -1, -1],
-    point![-1, -1, 0],
-    point![-1, -1, 1],
-    point![-1, 0, -1],
-    point![-1, 0, 0],
-    point![-1, 0, 1],
-    point![-1, 1, -1],
-    point![-1, 1, 0],
-    point![-1, 1, 1],
-    point![0, -1, -1],
-    point![0, -1, 0],
-    point![0, -1, 1],
-    point![0, 0, -1],
-    point![0, 0, 0],
-    point![0, 0, 1],
-    point![0, 1, -1],
-    point![0, 1, 0],
-    point![0, 1, 1],
-    point![1, -1, -1],
-    point![1, -1, 0],
-    point![1, -1, 1],
-    point![1, 0, -1],
-    point![1, 0, 0],
-    point![1, 0, 1],
-    point![1, 1, -1],
-    point![1, 1, 0],
-    point![1, 1, 1],
 ];
 
 pub const NEIGHBOR_DELTAS: [Point3<i8>; 26] = [

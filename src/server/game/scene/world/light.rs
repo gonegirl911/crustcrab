@@ -307,7 +307,7 @@ impl ChunkAreaLight {
             Permutation([1, 0, 2]),
             Permutation([1, 2, 0]),
         ] {
-            for x in [-1, Chunk::DIM as i8] {
+            for x in ChunkArea::NEG_PADDING_RANGE.chain(ChunkArea::POS_PADDING_RANGE) {
                 let delta = perm * point![x, 0, 0];
                 let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                 let block_coords = Player::block_coords(delta.cast());
@@ -328,8 +328,8 @@ impl ChunkAreaLight {
             Permutation([0, 2, 1]),
             Permutation([2, 0, 1]),
         ] {
-            for x in [-1, Chunk::DIM as i8] {
-                for y in [-1, Chunk::DIM as i8] {
+            for x in ChunkArea::NEG_PADDING_RANGE.chain(ChunkArea::POS_PADDING_RANGE) {
+                for y in ChunkArea::NEG_PADDING_RANGE.chain(ChunkArea::POS_PADDING_RANGE) {
                     let delta = perm * point![x, y, 0];
                     let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                     let block_coords = Player::block_coords(delta.cast());
@@ -344,9 +344,9 @@ impl ChunkAreaLight {
             }
         }
 
-        for x in [-1, Chunk::DIM as i8] {
-            for y in [-1, Chunk::DIM as i8] {
-                for z in [-1, Chunk::DIM as i8] {
+        for x in ChunkArea::NEG_PADDING_RANGE.chain(ChunkArea::POS_PADDING_RANGE) {
+            for y in ChunkArea::NEG_PADDING_RANGE.chain(ChunkArea::POS_PADDING_RANGE) {
+                for z in ChunkArea::NEG_PADDING_RANGE.chain(ChunkArea::POS_PADDING_RANGE) {
                     let delta = point![x, y, z];
                     let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                     let block_coords = Player::block_coords(delta.cast());
@@ -360,8 +360,7 @@ impl ChunkAreaLight {
     }
 
     pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
-        let coords = coords.cast();
-        BlockAreaLight::from_fn(|delta| self[coords + delta.coords])
+        BlockAreaLight::from_fn(|delta| self[coords.cast() + delta.coords])
     }
 }
 
@@ -369,15 +368,15 @@ impl Index<Point3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
     fn index(&self, coords: Point3<i8>) -> &Self::Output {
-        let coords = coords.map(|c| c + 1);
-        &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+        let coords = coords.map(|c| (c + ChunkArea::PADDING as i8) as usize);
+        &self.0[coords.x][coords.y][coords.z]
     }
 }
 
 impl IndexMut<Point3<i8>> for ChunkAreaLight {
     fn index_mut(&mut self, coords: Point3<i8>) -> &mut Self::Output {
-        let coords = coords.map(|c| c + 1);
-        &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+        let coords = coords.map(|c| (c + ChunkArea::PADDING as i8) as usize);
+        &mut self.0[coords.x][coords.y][coords.z]
     }
 }
 
@@ -403,7 +402,9 @@ pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; Block
 impl BlockAreaLight {
     fn from_fn<F: FnMut(Point3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
-            array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].map(|c| c as i8 - 1))))
+            array::from_fn(|y| {
+                array::from_fn(|z| f(point![x, y, z].map(|c| c as i8 - BlockArea::PADDING as i8)))
+            })
         }))
     }
 
@@ -425,8 +426,8 @@ impl Index<Point3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, coords: Point3<i8>) -> &Self::Output {
-        let coords = coords.map(|c| c + 1);
-        &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+        let coords = coords.map(|c| (c + BlockArea::PADDING as i8) as usize);
+        &self.0[coords.x][coords.y][coords.z]
     }
 }
 

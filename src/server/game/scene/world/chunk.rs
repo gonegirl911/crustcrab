@@ -23,7 +23,7 @@ use std::{
     array,
     collections::LinkedList,
     mem,
-    ops::{Deref, Index, IndexMut, Mul, RangeInclusive},
+    ops::{Deref, Index, IndexMut, Mul, Range},
     sync::Arc,
 };
 
@@ -471,7 +471,11 @@ impl IndexMut<Point3<u8>> for Chunk {
 pub struct ChunkArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in usize));
 
 impl ChunkArea {
-    pub const DIM: usize = Chunk::DIM + 2;
+    pub const DIM: usize = Chunk::DIM + Self::PADDING * 2;
+    pub const PADDING: usize = 1;
+    pub const NEG_PADDING_RANGE: Range<i8> = -(Self::PADDING as i8)..0;
+    pub const POS_PADDING_RANGE: Range<i8> = Chunk::DIM as i8..Self::PADDING as i8;
+    const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;
 
     fn new(cells: &FxHashMap<Point3<i32>, ChunkCell>, coords: Point3<i32>) -> Self {
         let mut value = Self(Default::default());
@@ -485,7 +489,7 @@ impl ChunkArea {
             Permutation([1, 0, 2]),
             Permutation([1, 2, 0]),
         ] {
-            for x in [-1, Chunk::DIM as i8] {
+            for x in Self::NEG_PADDING_RANGE.chain(Self::POS_PADDING_RANGE) {
                 let delta = perm * point![x, 0, 0];
                 let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                 let block_coords = Player::block_coords(delta.cast());
@@ -506,8 +510,8 @@ impl ChunkArea {
             Permutation([0, 2, 1]),
             Permutation([2, 0, 1]),
         ] {
-            for x in [-1, Chunk::DIM as i8] {
-                for y in [-1, Chunk::DIM as i8] {
+            for x in Self::NEG_PADDING_RANGE.chain(Self::POS_PADDING_RANGE) {
+                for y in Self::NEG_PADDING_RANGE.chain(Self::POS_PADDING_RANGE) {
                     let delta = perm * point![x, y, 0];
                     let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                     let block_coords = Player::block_coords(delta.cast());
@@ -522,9 +526,9 @@ impl ChunkArea {
             }
         }
 
-        for x in [-1, Chunk::DIM as i8] {
-            for y in [-1, Chunk::DIM as i8] {
-                for z in [-1, Chunk::DIM as i8] {
+        for x in Self::NEG_PADDING_RANGE.chain(Self::POS_PADDING_RANGE) {
+            for y in Self::NEG_PADDING_RANGE.chain(Self::POS_PADDING_RANGE) {
+                for z in Self::NEG_PADDING_RANGE.chain(Self::POS_PADDING_RANGE) {
                     let delta = point![x, y, z];
                     let chunk_coords = coords + Player::chunk_coords(delta.cast()).coords;
                     let block_coords = Player::block_coords(delta.cast());
@@ -538,8 +542,7 @@ impl ChunkArea {
     }
 
     fn block_area(&self, coords: Point3<u8>) -> BlockArea {
-        let coords = coords.cast();
-        BlockArea::from_fn(|delta| self.is_opaque(coords + delta.coords))
+        BlockArea::from_fn(|delta| self.is_opaque(coords.cast() + delta.coords))
     }
 
     fn is_opaque(&self, coords: Point3<i8>) -> bool {
@@ -553,17 +556,16 @@ impl ChunkArea {
     }
 
     fn index(coords: Point3<i8>) -> usize {
-        const AXIS_RANGE: RangeInclusive<i8> = -1..=Chunk::DIM as i8;
         assert!(
-            AXIS_RANGE.contains(&coords.x)
-                && AXIS_RANGE.contains(&coords.y)
-                && AXIS_RANGE.contains(&coords.z)
+            Self::AXIS_RANGE.contains(&coords.x)
+                && Self::AXIS_RANGE.contains(&coords.y)
+                && Self::AXIS_RANGE.contains(&coords.z)
         );
         unsafe { Self::index_unchecked(coords) }
     }
 
     unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
-        let coords = coords.map(|c| (c + 1) as usize);
+        let coords = coords.map(|c| (c + Self::PADDING as i8) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
     }
 }
