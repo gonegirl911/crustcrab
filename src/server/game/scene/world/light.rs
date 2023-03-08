@@ -160,13 +160,14 @@ impl ChunkMapLight {
         value: u8,
     ) -> FxHashSet<Point3<i64>> {
         let mut deq = VecDeque::from([(coords, value)]);
-        let mut visits = FxHashSet::default();
+        let mut visits = FxHashSet::from_iter([coords]);
 
         while let Some((coords, value)) = deq.pop_front() {
-            visits.insert(coords);
             for coords in Self::neighbors(coords) {
-                if let Some(value) = self.set_component(cells, coords, index, value - 1) {
-                    deq.push_back((coords, value));
+                if visits.insert(coords) {
+                    if let Some(value) = self.set_component(cells, coords, index, value - 1) {
+                        deq.push_back((coords, value));
+                    }
                 }
             }
         }
@@ -183,15 +184,16 @@ impl ChunkMapLight {
     ) -> FxHashSet<Point3<i64>> {
         let mut deq = VecDeque::from([(coords, value)]);
         let mut sources = vec![];
-        let mut visits = FxHashSet::default();
+        let mut visits = FxHashSet::from_iter([coords]);
 
         while let Some((coords, value)) = deq.pop_front() {
-            visits.insert(coords);
             for coords in Self::neighbors(coords) {
-                match self.unset_component(cells, coords, index, value - 1) {
-                    Ok(value) => deq.push_back((coords, value)),
-                    Err(0) => {}
-                    Err(component) => sources.push((coords, component)),
+                if visits.insert(coords) {
+                    match self.unset_component(cells, coords, index, value - 1) {
+                        Ok(value) => deq.push_back((coords, value)),
+                        Err(0) => {}
+                        Err(component) => sources.push((coords, component)),
+                    }
                 }
             }
         }
@@ -242,7 +244,7 @@ impl ChunkMapLight {
         let node = LightNode::new(coords);
         let block_light = self.block_light_mut(&node);
         let component = block_light.component(index);
-        let value = node.filtered(cells, index, value);
+        let value = node.apply_filter(cells, index, value);
         (component < value).then(|| {
             block_light.set_component(index, value);
             value
@@ -259,7 +261,7 @@ impl ChunkMapLight {
         let node = LightNode::new(coords);
         let block_light = self.block_light_mut(&node);
         let component = block_light.component(index);
-        if component != 0 && component == node.filtered(cells, index, value) {
+        if component != 0 && component == node.apply_filter(cells, index, value) {
             block_light.set_component(index, 0);
             Ok(value)
         } else {
@@ -409,7 +411,12 @@ impl LightNode {
         }
     }
 
-    fn filtered(&self, cells: &FxHashMap<Point3<i32>, ChunkCell>, index: usize, value: u8) -> u8 {
+    fn apply_filter(
+        &self,
+        cells: &FxHashMap<Point3<i32>, ChunkCell>,
+        index: usize,
+        value: u8,
+    ) -> u8 {
         (value as f32 * self.filter(cells, index)).round() as u8
     }
 
