@@ -181,8 +181,8 @@ impl ChunkMapLight {
         value: u8,
     ) -> FxHashSet<Point3<i64>> {
         let mut deq = VecDeque::from([(coords, value)]);
-        let mut sources = vec![];
         let mut visits = FxHashSet::from_iter([coords]);
+        let mut sources = vec![];
 
         while let Some((coords, value)) = deq.pop_front() {
             for coords in Self::unvisited_neighbors(coords, &mut visits) {
