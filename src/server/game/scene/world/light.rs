@@ -269,17 +269,17 @@ impl ChunkMapLight {
         &mut self.0.entry(node.chunk_coords).or_default()[node.block_coords]
     }
 
-    fn neighbors(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
-        SIDE_DELTAS
-            .values()
-            .map(move |delta| coords + delta.coords.cast())
-    }
-
     fn unvisited_neighbors(
         coords: Point3<i64>,
         visits: &mut FxHashSet<Point3<i64>>,
     ) -> impl Iterator<Item = Point3<i64>> + '_ {
         Self::neighbors(coords).filter(|coords| visits.insert(*coords))
+    }
+
+    fn neighbors(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
+        SIDE_DELTAS
+            .values()
+            .map(move |delta| coords + delta.coords.cast())
     }
 }
 
