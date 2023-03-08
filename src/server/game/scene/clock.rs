@@ -22,6 +22,16 @@ impl Clock {
     const DAY_RANGE: Range<u16> = Self::DAY_START..Self::DUSK_START;
     const DUSK_RANGE: Range<u16> = Self::DUSK_START..Self::NIGHT_START;
 
+    fn advance_by(&mut self, ticks: u16) {
+        self.ticks = (self.ticks + ticks) % Self::TICKS_PER_DAY;
+    }
+
+    fn send_data(&self, server_tx: Sender<ServerEvent>) {
+        server_tx
+            .send(ServerEvent::TimeUpdated(self.data()))
+            .unwrap_or_else(|_| unreachable!());
+    }
+
     fn data(&self) -> TimeData {
         TimeData {
             time: self.ticks as f32 / Self::TICKS_PER_DAY as f32,
@@ -64,15 +74,11 @@ impl EventHandler<Event> for Clock {
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         match event {
             Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
-                server_tx
-                    .send(ServerEvent::TimeUpdated(self.data()))
-                    .unwrap_or_else(|_| unreachable!());
+                self.send_data(server_tx);
             }
             Event::Tick => {
-                self.ticks = (self.ticks + 1) % Self::TICKS_PER_DAY;
-                server_tx
-                    .send(ServerEvent::TimeUpdated(self.data()))
-                    .unwrap_or_else(|_| unreachable!());
+                self.advance_by(1);
+                self.send_data(server_tx);
             }
             _ => {}
         }
