@@ -163,11 +163,9 @@ impl ChunkMapLight {
         let mut visits = FxHashSet::from_iter([coords]);
 
         while let Some((coords, value)) = deq.pop_front() {
-            for coords in Self::neighbors(coords) {
-                if visits.insert(coords) {
-                    if let Some(value) = self.set_component(cells, coords, index, value - 1) {
-                        deq.push_back((coords, value));
-                    }
+            for coords in Self::neighbors(coords).filter(|coords| visits.insert(*coords)) {
+                if let Some(value) = self.set_component(cells, coords, index, value - 1) {
+                    deq.push_back((coords, value));
                 }
             }
         }
@@ -187,13 +185,11 @@ impl ChunkMapLight {
         let mut visits = FxHashSet::from_iter([coords]);
 
         while let Some((coords, value)) = deq.pop_front() {
-            for coords in Self::neighbors(coords) {
-                if visits.insert(coords) {
-                    match self.unset_component(cells, coords, index, value - 1) {
-                        Ok(value) => deq.push_back((coords, value)),
-                        Err(0) => {}
-                        Err(component) => sources.push((coords, component)),
-                    }
+            for coords in Self::neighbors(coords).filter(|coords| visits.insert(*coords)) {
+                match self.unset_component(cells, coords, index, value - 1) {
+                    Ok(value) => deq.push_back((coords, value)),
+                    Err(0) => {}
+                    Err(component) => sources.push((coords, component)),
                 }
             }
         }
