@@ -12,7 +12,7 @@ use std::mem;
 
 pub struct BlockHover {
     mesh: IndexedMesh<BlockHighlightVertex, u16>,
-    coords: Option<Point3<i32>>,
+    coords: Option<Point3<i64>>,
     program: Program,
 }
 
@@ -91,7 +91,7 @@ struct BlockHoverPushConstants {
 }
 
 impl BlockHoverPushConstants {
-    fn new(coords: Point3<i32>) -> Self {
+    fn new(coords: Point3<i64>) -> Self {
         Self {
             coords: coords.cast(),
         }

@@ -63,6 +63,6 @@ pub enum ServerEvent {
         is_important: bool,
     },
     BlockHovered {
-        coords: Option<Point3<i32>>,
+        coords: Option<Point3<i64>>,
     },
 }

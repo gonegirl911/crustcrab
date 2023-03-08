@@ -136,7 +136,7 @@ impl RawBlockData {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct BlockArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in u32));
 
 impl BlockArea {
@@ -145,14 +145,9 @@ impl BlockArea {
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(1 + Self::PADDING) as i8;
 
     pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
-        let mut value = Self(BitArray::ZERO);
-        for dx in Self::AXIS_RANGE {
-            for dy in Self::AXIS_RANGE {
-                for dz in Self::AXIS_RANGE {
-                    let delta = point![dx, dy, dz];
-                    value.set(delta, f(delta));
-                }
-            }
+        let mut value = Self::default();
+        for delta in Self::deltas() {
+            value.set(delta, f(delta));
         }
         value
     }
@@ -180,6 +175,12 @@ impl BlockArea {
         unsafe {
             self.0.set_unchecked(Self::index(coords), is_opaque);
         }
+    }
+
+    pub fn deltas() -> impl Iterator<Item = Point3<i8>> {
+        Self::AXIS_RANGE.flat_map(|dx| {
+            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| point![dx, dy, dz]))
+        })
     }
 
     fn index(coords: Point3<i8>) -> usize {
@@ -390,33 +391,4 @@ const FLIPPED_INDICES: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::UpperRight,
     Corner::UpperLeft,
-];
-
-pub const NEIGHBOR_DELTAS: [Point3<i8>; 26] = [
-    point![-1, -1, -1],
-    point![-1, -1, 0],
-    point![-1, -1, 1],
-    point![-1, 0, -1],
-    point![-1, 0, 0],
-    point![-1, 0, 1],
-    point![-1, 1, -1],
-    point![-1, 1, 0],
-    point![-1, 1, 1],
-    point![0, -1, -1],
-    point![0, -1, 0],
-    point![0, -1, 1],
-    point![0, 0, -1],
-    point![0, 0, 1],
-    point![0, 1, -1],
-    point![0, 1, 0],
-    point![0, 1, 1],
-    point![1, -1, -1],
-    point![1, -1, 0],
-    point![1, -1, 1],
-    point![1, 0, -1],
-    point![1, 0, 0],
-    point![1, 0, 1],
-    point![1, 1, -1],
-    point![1, 1, 0],
-    point![1, 1, 1],
 ];

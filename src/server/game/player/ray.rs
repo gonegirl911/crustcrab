@@ -19,34 +19,31 @@ impl Ray {
                 Ordering::Greater => (1, if o == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
             }
         });
-        let curr = self.origin.map(|c| c.floor() as i32);
+        let coords = self.origin.map(|c| c.floor() as i64);
         let step = values.map(|c| c.0);
         let tmax = values.map(|c| c.1 * c.2);
         let tdelta = values.map(|c| c.2);
         iter::successors(
-            Some((curr, tmax, Vector3::zeros())),
-            move |(curr, tmax, _)| {
+            Some((coords, tmax, Vector3::zeros())),
+            move |(coords, tmax, _)| {
                 let i = tmax.imin();
                 reach.contains(&tmax[i]).then(|| {
-                    let mut curr = *curr;
+                    let mut coords = *coords;
                     let mut tmax = *tmax;
                     let mut normal = Vector3::zeros();
-                    curr[i] += step[i];
+                    coords[i] += step[i];
                     tmax[i] += tdelta[i];
                     normal[i] -= step[i];
-                    (curr, tmax, normal)
+                    (coords, tmax, normal)
                 })
             },
         )
-        .map(|(curr, _, normal)| BlockIntersection {
-            coords: curr,
-            normal,
-        })
+        .map(|(coords, _, normal)| BlockIntersection { coords, normal })
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct BlockIntersection {
-    pub coords: Point3<i32>,
-    pub normal: Vector3<i32>,
+    pub coords: Point3<i64>,
+    pub normal: Vector3<i64>,
 }
