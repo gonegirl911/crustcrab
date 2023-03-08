@@ -163,7 +163,7 @@ impl ChunkMapLight {
         let mut visits = FxHashSet::from_iter([coords]);
 
         while let Some((coords, value)) = deq.pop_front() {
-            for coords in Self::neighbors(coords).filter(|coords| visits.insert(*coords)) {
+            for coords in Self::unvisited_neighbors(coords, &mut visits) {
                 if let Some(value) = self.set_component(cells, coords, index, value - 1) {
                     deq.push_back((coords, value));
                 }
@@ -185,7 +185,7 @@ impl ChunkMapLight {
         let mut visits = FxHashSet::from_iter([coords]);
 
         while let Some((coords, value)) = deq.pop_front() {
-            for coords in Self::neighbors(coords).filter(|coords| visits.insert(*coords)) {
+            for coords in Self::unvisited_neighbors(coords, &mut visits) {
                 match self.unset_component(cells, coords, index, value - 1) {
                     Ok(value) => deq.push_back((coords, value)),
                     Err(0) => {}
@@ -273,6 +273,13 @@ impl ChunkMapLight {
         SIDE_DELTAS
             .values()
             .map(move |delta| coords + delta.coords.cast())
+    }
+
+    fn unvisited_neighbors(
+        coords: Point3<i64>,
+        visits: &mut FxHashSet<Point3<i64>>,
+    ) -> impl Iterator<Item = Point3<i64>> + '_ {
+        Self::neighbors(coords).filter(|coords| visits.insert(*coords))
     }
 }
 
