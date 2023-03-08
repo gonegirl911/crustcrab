@@ -50,9 +50,11 @@ impl ChunkMap {
             .collect::<LinkedList<_>>();
 
         let block_updates = new
-            .into_iter()
-            .flat_map(|(coords, cell)| self.insert(coords, cell))
+            .iter()
+            .flat_map(|(coords, _)| self.light.insert(&self.cells, *coords))
             .collect();
+
+        self.cells.extend(new);
 
         let loads = points
             .iter()
@@ -67,33 +69,21 @@ impl ChunkMap {
     where
         I: IntoIterator<Item = Point3<i32>> + 'a,
     {
-        let entries = points
-            .into_iter()
-            .filter_map(|coords| self.cells.remove_entry(&coords))
-            .collect::<Vec<_>>();
+        let mut unloads = vec![];
+        let mut block_updates = FxHashSet::default();
 
-        let unloads = entries.iter().map(|(coords, _)| *coords).collect();
-
-        let block_updates = entries
-            .into_iter()
-            .flat_map(|(coords, cell)| self.unload(coords, cell))
-            .collect();
+        for coords in points {
+            if let Some(cell) = self.cells.remove(&coords) {
+                unloads.push(coords);
+                if let Some(cell) = cell.unload() {
+                    self.cells.insert(coords, cell);
+                } else {
+                    block_updates.extend(self.light.remove(&self.cells, coords));
+                }
+            }
+        }
 
         (unloads, block_updates)
-    }
-
-    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) -> FxHashSet<Point3<i64>> {
-        self.cells.insert(coords, cell);
-        self.light.insert(&self.cells, coords)
-    }
-
-    fn unload(&mut self, coords: Point3<i32>, cell: ChunkCell) -> FxHashSet<Point3<i64>> {
-        if let Some(cell) = cell.unload() {
-            self.cells.insert(coords, cell);
-            Default::default()
-        } else {
-            self.light.remove(&self.cells, coords)
-        }
     }
 
     fn apply(
