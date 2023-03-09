@@ -55,6 +55,7 @@ impl Scene {
         }
     }
 
+    #[rustfmt::skip]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -81,10 +82,7 @@ impl Scene {
                 stencil_ops: None,
             }),
         });
-
-        self.sky
-            .draw(render_pass, player_bind_group, self.clock.bind_group());
-
+        self.sky.draw(render_pass, player_bind_group, self.clock.bind_group());
         self.world.draw(
             render_pass,
             player_bind_group,
@@ -93,9 +91,7 @@ impl Scene {
             self.sky.bind_group(),
             frustum,
         );
-
-        self.block_hover
-            .draw(render_pass, player_bind_group, self.skylight.bind_group());
+        self.block_hover.draw(render_pass, player_bind_group, self.skylight.bind_group());
     }
 }
 

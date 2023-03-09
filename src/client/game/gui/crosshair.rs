@@ -14,23 +14,23 @@ pub struct Crosshair {
 }
 
 impl Crosshair {
-    pub fn new(renderer: &Renderer, output_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::new(
             renderer,
-            include_bytes!("../../../../../assets/textures/crosshair.png"),
+            include_bytes!("../../../../assets/textures/crosshair.png"),
             false,
             true,
             1,
         );
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../../assets/shaders/crosshair.wgsl"),
+            wgpu::include_wgsl!("../../../../assets/shaders/crosshair.wgsl"),
             &[],
             &[
                 uniform.bind_group_layout(),
                 texture.bind_group_layout(),
-                output_bind_group_layout,
+                input_bind_group_layout,
             ],
             &[],
             None,
@@ -49,14 +49,14 @@ impl Crosshair {
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        output_bind_group: &'a wgpu::BindGroup,
+        input_bind_group: &'a wgpu::BindGroup,
     ) {
         self.program.draw(
             render_pass,
             [
                 self.uniform.bind_group(),
                 self.texture.bind_group(),
-                output_bind_group,
+                input_bind_group,
             ],
         );
         render_pass.draw(0..6, 0..1);

@@ -1,12 +1,16 @@
-use crate::client::event_loop::{Event, EventHandler};
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::Renderer,
+};
 use bitflags::bitflags;
 use nalgebra::{matrix, vector, Matrix4, Point3, Vector3};
 use std::{
     f32::consts::{FRAC_PI_2, TAU},
     time::Duration,
 };
-use winit::event::{
-    DeviceEvent, ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent,
+use winit::{
+    dpi::PhysicalSize,
+    event::{DeviceEvent, ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
 };
 
 pub struct Camera {
@@ -64,19 +68,66 @@ impl Camera {
     }
 }
 
+pub struct Projection {
+    fovy: f32,
+    aspect: f32,
+    znear: f32,
+    zfar: f32,
+}
+
+impl Projection {
+    pub fn new(fovy: f32, aspect: f32, znear: f32, zfar: f32) -> Self {
+        Self {
+            fovy: fovy.to_radians(),
+            aspect,
+            znear,
+            zfar,
+        }
+    }
+
+    pub fn fovy(&self) -> f32 {
+        self.fovy
+    }
+
+    pub fn aspect(&self) -> f32 {
+        self.aspect
+    }
+
+    pub fn znear(&self) -> f32 {
+        self.znear
+    }
+
+    pub fn zfar(&self) -> f32 {
+        self.zfar
+    }
+
+    pub fn mat(&self) -> Matrix4<f32> {
+        let h = 1.0 / (self.fovy * 0.5).tan();
+        let w = h / self.aspect;
+        let r = self.zfar / (self.zfar - self.znear);
+        matrix![
+            w,   0.0, 0.0, 0.0;
+            0.0, h,   0.0, 0.0;
+            0.0, 0.0, r,  -r * self.znear;
+            0.0, 0.0, 1.0, 0.0;
+        ]
+    }
+}
+
 #[derive(Default)]
-pub struct CameraController {
+pub struct Controller {
     dx: f32,
     dy: f32,
     relevant_keys: Keys,
     key_history: Keys,
+    aspect: f32,
     relevant_buttons: MouseButtons,
     button_history: MouseButtons,
     speed: f32,
     sensitivity: f32,
 }
 
-impl CameraController {
+impl Controller {
     pub fn new(speed: f32, sensitivity: f32) -> Self {
         Self {
             speed,
@@ -85,7 +136,12 @@ impl CameraController {
         }
     }
 
-    pub fn apply_updates(&mut self, camera: &mut Camera, dt: Duration) -> Changes {
+    pub fn apply_updates(
+        &mut self,
+        camera: &mut Camera,
+        projection: &mut Projection,
+        dt: Duration,
+    ) -> Changes {
         let mut changes = Changes::empty();
 
         if self.dx != 0.0 || self.dy != 0.0 {
@@ -98,6 +154,12 @@ impl CameraController {
         if !self.relevant_keys.is_empty() {
             self.apply_movement(camera, dt);
             changes.insert(Changes::MOVED);
+        }
+
+        if self.aspect != 0.0 {
+            projection.aspect = self.aspect;
+            self.aspect = 0.0;
+            changes.insert(Changes::RESIZED);
         }
 
         if self.relevant_buttons.contains(MouseButtons::LEFT) {
@@ -155,10 +217,10 @@ impl CameraController {
     }
 }
 
-impl EventHandler for CameraController {
-    type Context<'a> = ();
+impl EventHandler for Controller {
+    type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, Renderer { config, .. }: Self::Context<'_>) {
         match event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta: (dx, dy) },
@@ -201,6 +263,13 @@ impl EventHandler for CameraController {
                         }
                     }
                 }
+                WindowEvent::Resized(PhysicalSize { width, height })
+                | WindowEvent::ScaleFactorChanged {
+                    new_inner_size: PhysicalSize { width, height },
+                    ..
+                } if *width != 0 && !height != 0 => {
+                    self.aspect = config.width as f32 / config.height as f32;
+                }
                 WindowEvent::MouseInput { button, state, .. } => {
                     let (button, opp) = match button {
                         MouseButton::Left => (MouseButtons::LEFT, MouseButtons::RIGHT),
@@ -233,8 +302,10 @@ bitflags! {
     pub struct Changes: u8 {
         const ROTATED = 1 << 0;
         const MOVED = 1 << 1;
+        const RESIZED = 1 << 2;
         const BLOCK_DESTROYED = 1 << 3;
-        const BLOCK_PLACED = 1 << 2;
+        const BLOCK_PLACED = 1 << 4;
+        const MATRIX_CHANGES = Self::ROTATED.bits | Self::MOVED.bits | Self::RESIZED.bits;
     }
 
     #[derive(Default)]

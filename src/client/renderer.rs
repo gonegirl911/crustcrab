@@ -4,15 +4,13 @@ use super::{
 };
 use bytemuck::Pod;
 use std::{
+    array,
     marker::PhantomData,
     mem,
     num::{NonZeroU32, NonZeroU8},
     slice,
 };
-use wgpu::{
-    include_wgsl,
-    util::{BufferInitDescriptor, DeviceExt},
-};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Renderer {
@@ -282,10 +280,10 @@ impl ImageTexture {
         let image = image::load_from_memory(bytes)
             .expect("bytes should be a valid image")
             .to_rgba8();
-        let dimensions = image.dimensions();
+        let (width, height) = image.dimensions();
         let size = wgpu::Extent3d {
-            width: dimensions.0,
-            height: dimensions.1,
+            width,
+            height,
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -315,8 +313,8 @@ impl ImageTexture {
             &image,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: NonZeroU32::new(4 * dimensions.0),
-                rows_per_image: NonZeroU32::new(dimensions.1),
+                bytes_per_row: NonZeroU32::new(4 * width),
+                rows_per_image: NonZeroU32::new(height),
             },
             size,
         );
@@ -389,6 +387,10 @@ impl ImageTexture {
         texture: &wgpu::Texture,
         levels: u32,
     ) {
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -410,21 +412,7 @@ impl ImageTexture {
                 },
             ],
         });
-        let program = Program::new(
-            renderer,
-            include_wgsl!("../../assets/shaders/blit.wgsl"),
-            &[],
-            &[&bind_group_layout],
-            &[],
-            Some(texture.format()),
-            None,
-            None,
-            None,
-        );
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
+        let blit = Blit::new(renderer, &bind_group_layout, Some(texture.format()));
         let mut encoder = device.create_command_encoder(&Default::default());
 
         (0..levels)
@@ -452,20 +440,21 @@ impl ImageTexture {
                         },
                     ],
                 });
-                let render_pass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &views[1],
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: true,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                });
-                program.draw(render_pass, [&bind_group]);
-                render_pass.draw(0..3, 0..1);
+                blit.draw(
+                    &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &views[1],
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: true,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                    }),
+                    &bind_group,
+                );
             });
 
         queue.submit([encoder.finish()]);
@@ -593,30 +582,24 @@ impl EventHandler for ScreenTexture {
     }
 }
 
-pub struct InputOutputTexture {
-    texture: ScreenTexture,
+pub struct InputOutputTextureArray<const N: usize> {
+    textures: [ScreenTexture; N],
     sampler: wgpu::Sampler,
     bind_group_layout: wgpu::BindGroupLayout,
-    bind_group: wgpu::BindGroup,
+    bind_groups: [wgpu::BindGroup; N],
     is_resized: bool,
 }
 
-impl InputOutputTexture {
+impl<const N: usize> InputOutputTextureArray<N> {
     pub fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
-        let texture = ScreenTexture::new(
-            renderer,
-            config.format,
-            wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-        );
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
+        let textures = array::from_fn(|_| {
+            ScreenTexture::new(
+                renderer,
+                config.format,
+                wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            )
         });
+        let sampler = device.create_sampler(&Default::default());
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -638,47 +621,61 @@ impl InputOutputTexture {
                 },
             ],
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(texture.view()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
+        let bind_groups =
+            Self::create_bind_groups(renderer, &textures, &sampler, &bind_group_layout);
         Self {
-            texture,
+            textures,
             sampler,
             bind_group_layout,
-            bind_group,
+            bind_groups,
             is_resized: false,
         }
     }
 
-    pub fn view(&self) -> &wgpu::TextureView {
-        self.texture.view()
+    pub fn view(&self, index: usize) -> &wgpu::TextureView {
+        self.textures[index].view()
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
     }
 
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
+    pub fn bind_group(&self, index: usize) -> &wgpu::BindGroup {
+        &self.bind_groups[index]
+    }
+
+    fn create_bind_groups(
+        Renderer { device, .. }: &Renderer,
+        textures: &[ScreenTexture; N],
+        sampler: &wgpu::Sampler,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> [wgpu::BindGroup; N] {
+        array::from_fn(|i| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(textures[i].view()),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                ],
+            })
+        })
     }
 }
 
-impl EventHandler for InputOutputTexture {
+impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, renderer @ Renderer { device, .. }: Self::Context<'_>) {
-        self.texture.handle(event, renderer);
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        for texture in &mut self.textures {
+            texture.handle(event, renderer);
+        }
 
         match event {
             Event::WindowEvent {
@@ -693,26 +690,113 @@ impl EventHandler for InputOutputTexture {
                 self.is_resized = true;
             }
             Event::RedrawRequested(_) if self.is_resized => {
-                self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: None,
-                    layout: &self.bind_group_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(self.texture.view()),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&self.sampler),
-                        },
-                    ],
-                });
+                self.bind_groups = Self::create_bind_groups(
+                    renderer,
+                    &self.textures,
+                    &self.sampler,
+                    &self.bind_group_layout,
+                );
             }
             Event::RedrawEventsCleared => {
                 self.is_resized = false;
             }
             _ => {}
         }
+    }
+}
+
+pub struct PostProcessor {
+    textures: InputOutputTextureArray<2>,
+    blit: Blit,
+    index: bool,
+}
+
+impl PostProcessor {
+    pub fn new(renderer: &Renderer) -> Self {
+        let textures = InputOutputTextureArray::new(renderer);
+        let blit = Blit::new(renderer, textures.bind_group_layout(), None);
+        Self {
+            textures,
+            blit,
+            index: false,
+        }
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.main_view()
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.textures.bind_group_layout()
+    }
+
+    pub fn apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
+        effect.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: self.secondary_view(),
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            }),
+            self.main_bind_group(),
+        );
+        self.swap();
+    }
+
+    pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
+        self.blit.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            }),
+            self.main_bind_group(),
+        );
+    }
+
+    fn swap(&mut self) {
+        self.index = !self.index;
+    }
+
+    fn main_bind_group(&self) -> &wgpu::BindGroup {
+        self.textures.bind_group(self.main_index())
+    }
+
+    fn main_view(&self) -> &wgpu::TextureView {
+        self.textures.view(self.main_index())
+    }
+
+    fn secondary_view(&self) -> &wgpu::TextureView {
+        self.textures.view(self.secondary_index())
+    }
+
+    fn main_index(&self) -> usize {
+        self.index.into()
+    }
+
+    fn secondary_index(&self) -> usize {
+        (!self.index).into()
+    }
+}
+
+impl EventHandler for PostProcessor {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        self.textures.handle(event, renderer);
     }
 }
 
@@ -779,6 +863,37 @@ impl Program {
     }
 }
 
+pub struct Blit(Program);
+
+impl Blit {
+    pub fn new(
+        renderer: &Renderer,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
+        format: Option<wgpu::TextureFormat>,
+    ) -> Self {
+        Self(Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../assets/shaders/blit.wgsl"),
+            &[],
+            &[input_bind_group_layout],
+            &[],
+            format,
+            None,
+            None,
+            None,
+        ))
+    }
+
+    pub fn draw<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        input_bind_group_layout: &'a wgpu::BindGroup,
+    ) {
+        self.0.draw(render_pass, [input_bind_group_layout]);
+        render_pass.draw(0..3, 0..1);
+    }
+}
+
 pub trait Vertex: Pod {
     const ATTRIBS: &'static [wgpu::VertexAttribute];
 
@@ -801,4 +916,12 @@ impl Index for u16 {
 
 impl Index for u32 {
     const FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
+}
+
+pub trait Effect {
+    fn draw<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        input_bind_group: &'a wgpu::BindGroup,
+    );
 }

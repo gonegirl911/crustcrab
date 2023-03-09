@@ -1,11 +1,11 @@
-pub mod output;
+pub mod gui;
 pub mod player;
 pub mod scene;
 
-use self::{output::Output, player::Player, scene::Scene};
+use self::{gui::Gui, player::Player, scene::Scene};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::Renderer,
+    renderer::{PostProcessor, Renderer},
     ClientEvent,
 };
 use flume::Sender;
@@ -14,36 +14,40 @@ use std::time::Duration;
 pub struct Game {
     player: Player,
     scene: Scene,
-    output: Output,
+    gui: Gui,
+    processor: PostProcessor,
 }
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
-        let output = Output::new(renderer);
-        let player = Player::new(renderer, output.bind_group_layout());
+        let processor = PostProcessor::new(renderer);
+        let gui = Gui::new(renderer, processor.bind_group_layout());
+        let player = Player::new(renderer, &gui);
         let scene = Scene::new(renderer, player.bind_group_layout());
         Self {
             player,
             scene,
-            output,
+            gui,
+            processor,
         }
     }
 
-    fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
+    fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         self.scene.draw(
-            self.output.view(),
+            self.processor.view(),
             encoder,
             self.player.bind_group(),
             &self.player.frustum(),
         );
-        self.output.draw(view, encoder);
-        self.player.draw(view, encoder, self.output.bind_group());
+        self.processor.apply(encoder, &self.gui);
+        self.processor.draw(view, encoder);
     }
 }
 
 impl EventHandler for Game {
     type Context<'a> = (Sender<ClientEvent>, &'a Renderer, Duration);
 
+    #[rustfmt::skip]
     fn handle(
         &mut self,
         event: &Event,
@@ -58,9 +62,10 @@ impl EventHandler for Game {
             dt,
         ): Self::Context<'_>,
     ) {
-        self.player.handle(event, (client_tx, renderer, dt));
+        self.player.handle(event, (client_tx, renderer, &self.gui, dt));
         self.scene.handle(event, renderer);
-        self.output.handle(event, renderer);
+        self.gui.handle(event, renderer);
+        self.processor.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {
