@@ -16,8 +16,8 @@ impl Sky {
         Self {
             uniform: Uniform::with_data(
                 renderer,
-                &SkyUniformData::new(Self::COLOR, Self::LIGHT_INTENSITY),
                 wgpu::ShaderStages::VERTEX_FRAGMENT,
+                &SkyUniformData::new(Self::COLOR, Self::LIGHT_INTENSITY),
             ),
         }
     }
