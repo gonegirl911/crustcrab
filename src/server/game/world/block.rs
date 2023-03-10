@@ -36,8 +36,8 @@ impl Block {
                 Self::indices(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
-                        CORNER_TEX_COORDS[corner],
                         tex_index,
+                        CORNER_TEX_COORDS[corner],
                         face,
                         corner_aos[corner],
                         corner_lights[corner],

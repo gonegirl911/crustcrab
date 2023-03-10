@@ -20,10 +20,10 @@ struct PushConstants {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) tex_coords: vec2<f32>,
-    @location(1) tex_index: u32,
-    @location(3) light_factor: vec3<f32>,
-    @location(4) fog_factor: f32,
+    @location(0) tex_index: u32,
+    @location(1) tex_coords: vec2<f32>,
+    @location(2) light_factor: vec3<f32>,
+    @location(3) fog_factor: f32,
 }
 
 @group(0) @binding(0)
@@ -41,11 +41,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data, 5u, 5u)),
         f32(extractBits(vertex.data, 10u, 5u)),
     );
+    let tex_index = extractBits(vertex.data, 15u, 8u);
     let tex_coords = vec2(
-        f32(extractBits(vertex.data, 15u, 1u)),
-        f32(extractBits(vertex.data, 16u, 1u)),
+        f32(extractBits(vertex.data, 23u, 1u)),
+        f32(extractBits(vertex.data, 24u, 1u)),
     );
-    let tex_index = extractBits(vertex.data, 17u, 8u);
     let face = extractBits(vertex.data, 25u, 2u);
     let ao = f32(extractBits(vertex.data, 27u, 2u));
     // let skylight = vec3(
@@ -76,8 +76,8 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
     return VertexOutput(
         player.vp * vec4(coords, 1.0),
-        tex_coords,
         tex_index,
+        tex_coords,
         light_factor,
         fog_factor,
     );

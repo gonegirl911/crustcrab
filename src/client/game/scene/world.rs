@@ -13,6 +13,7 @@ use crate::{
         ServerEvent,
     },
 };
+use bitfield::bitfield;
 use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
 use nalgebra::{Point2, Point3};
@@ -236,35 +237,40 @@ impl EventHandler for ChunkMeshPool {
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
-pub struct BlockVertex {
-    data: u32,
-    light: u32,
+bitfield! {
+    #[repr(C)]
+    #[derive(Clone, Copy, Zeroable, Pod)]
+    pub struct BlockVertex(u64);
+    u8;
+    _, set_coords: 4, 0, 3;
+    _, set_tex_index: 22, 15;
+    _, set_tex_coords: 23, 23, 2;
+    _, set_face: 26, 25;
+    _, set_ao: 28, 27;
+    u32;
+    _, set_light: 63, 32;
 }
 
 impl BlockVertex {
     pub fn new(
         coords: Point3<u8>,
-        tex_coords: Point2<u8>,
         tex_index: u8,
+        tex_coords: Point2<u8>,
         face: Face,
         ao: u8,
         light: BlockLight,
     ) -> Self {
-        let mut data = 0;
-        data |= coords.x as u32;
-        data |= (coords.y as u32) << 5;
-        data |= (coords.z as u32) << 10;
-        data |= (tex_coords.x as u32) << 15;
-        data |= (tex_coords.y as u32) << 16;
-        data |= (tex_index as u32) << 17;
-        data |= (face as u32) << 25;
-        data |= (ao as u32) << 27;
-        Self {
-            data,
-            light: light.0,
-        }
+        let mut value = Self(0);
+        value.set_coords(0, coords.x);
+        value.set_coords(1, coords.y);
+        value.set_coords(2, coords.z);
+        value.set_tex_index(tex_index);
+        value.set_tex_coords(0, tex_coords.x);
+        value.set_tex_coords(1, tex_coords.y);
+        value.set_face(face as u8);
+        value.set_ao(ao);
+        value.set_light(light.0);
+        value
     }
 }
 
