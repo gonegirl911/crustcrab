@@ -8,8 +8,9 @@ struct PlayerUniform {
     render_distance: u32,
 }
 
-struct SkylightUniform {
-    intensity: vec3<f32>,
+struct SkyUniform {
+    color: vec3<f32>,
+    light_intensity: vec3<f32>,
 }
 
 struct PushConstants {
@@ -25,7 +26,7 @@ struct VertexOutput {
 var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
-var<uniform> skylight: SkylightUniform;
+var<uniform> sky: SkyUniform;
 
 var<push_constant> pc: PushConstants;
 
@@ -33,7 +34,7 @@ var<push_constant> pc: PushConstants;
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     return VertexOutput(
         player.vp * vec4(pc.coords + vertex.coords, 1.0),
-        vec4(vec3(1.0), 0.1 * min3(skylight.intensity)),
+        vec4(vec3(1.0), 0.1 * min3(sky.light_intensity)),
     );
 }
 

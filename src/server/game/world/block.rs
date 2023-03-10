@@ -1,5 +1,5 @@
 use super::light::BlockAreaLight;
-use crate::client::game::scene::world::BlockVertex;
+use crate::{client::game::scene::world::BlockVertex, color::Rgb};
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
@@ -96,13 +96,13 @@ impl Block {
 
 pub struct BlockData {
     side_tex_indices: Option<EnumMap<Side, u8>>,
-    pub luminance: [u8; 3],
-    pub light_filter: [f32; 3],
+    pub luminance: Rgb<u8>,
+    pub light_filter: Rgb<f32>,
 }
 
 impl BlockData {
     pub fn is_transparent(&self) -> bool {
-        self.light_filter != [0.0; 3]
+        self.light_filter != Rgb::splat(0.0)
     }
 
     pub fn is_opaque(&self) -> bool {
@@ -110,7 +110,7 @@ impl BlockData {
     }
 
     pub fn is_glowing(&self) -> bool {
-        self.luminance != [0; 3]
+        self.luminance != Rgb::splat(0)
     }
 
     pub fn is_not_glowing(&self) -> bool {
@@ -123,9 +123,9 @@ struct RawBlockData {
     #[serde(default)]
     side_textures: Option<EnumMap<Side, Arc<String>>>,
     #[serde(default)]
-    pub luminance: [u8; 3],
+    pub luminance: Rgb<u8>,
     #[serde(default)]
-    pub light_filter: [f32; 3],
+    pub light_filter: Rgb<f32>,
 }
 
 impl RawBlockData {
@@ -284,7 +284,7 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
 });
 
 static RAW_BLOCK_DATA: Lazy<EnumMap<Block, RawBlockData>> = Lazy::new(|| {
-    toml::from_str(include_str!("../../../../../assets/blocks.toml"))
+    toml::from_str(include_str!("../../../../assets/blocks.toml"))
         .expect("blocks.toml should be valid")
 });
 

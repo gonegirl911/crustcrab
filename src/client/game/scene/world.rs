@@ -1,12 +1,11 @@
-use super::depth::DepthBuffer;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
         game::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
-        renderer::{ImageTextureArray, Mesh, Program, Renderer, Vertex},
+        renderer::{DepthBuffer, ImageTextureArray, Mesh, Program, Renderer, Vertex},
     },
     server::{
-        game::scene::world::{
+        game::world::{
             block::{Face, TEXTURES},
             chunk::{Chunk, ChunkData},
             light::BlockLight,
@@ -30,8 +29,6 @@ impl World {
     pub fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
-        clock_bind_group_layout: &wgpu::BindGroupLayout,
-        skylight_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let meshes = ChunkMeshPool::new();
@@ -48,10 +45,8 @@ impl World {
             &[BlockVertex::desc()],
             &[
                 player_bind_group_layout,
-                clock_bind_group_layout,
-                skylight_bind_group_layout,
-                textures.bind_group_layout(),
                 sky_bind_group_layout,
+                textures.bind_group_layout(),
             ],
             &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::VERTEX,
@@ -79,8 +74,6 @@ impl World {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
-        clock_bind_group: &'a wgpu::BindGroup,
-        skylight_bind_group: &'a wgpu::BindGroup,
         sky_bind_group: &'a wgpu::BindGroup,
         frustum: &Frustum,
     ) {
@@ -88,10 +81,8 @@ impl World {
             render_pass,
             [
                 player_bind_group,
-                clock_bind_group,
-                skylight_bind_group,
-                self.textures.bind_group(),
                 sky_bind_group,
+                self.textures.bind_group(),
             ],
         );
         self.meshes.draw(render_pass, frustum);
@@ -247,20 +238,6 @@ impl EventHandler for ChunkMeshPool {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockPushConstants {
-    chunk_coords: Point3<f32>,
-}
-
-impl BlockPushConstants {
-    fn new(chunk_coords: Point3<i32>) -> Self {
-        Self {
-            chunk_coords: chunk_coords.cast(),
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
 pub struct BlockVertex {
     data: u32,
     light: u32,
@@ -294,4 +271,18 @@ impl BlockVertex {
 impl Vertex for BlockVertex {
     const ATTRIBS: &'static [wgpu::VertexAttribute] =
         &wgpu::vertex_attr_array![0 => Uint32, 1 => Uint32];
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Zeroable, Pod)]
+struct BlockPushConstants {
+    chunk_coords: Point3<f32>,
+}
+
+impl BlockPushConstants {
+    fn new(chunk_coords: Point3<i32>) -> Self {
+        Self {
+            chunk_coords: chunk_coords.cast(),
+        }
+    }
 }

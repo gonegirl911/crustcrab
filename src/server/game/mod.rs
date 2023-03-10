@@ -1,7 +1,7 @@
 pub mod player;
-pub mod scene;
+pub mod world;
 
-use self::{player::Player, scene::Scene};
+use self::{player::Player, world::World};
 use super::{
     event_loop::{Event, EventHandler},
     ServerEvent,
@@ -11,7 +11,7 @@ use flume::Sender;
 #[derive(Default)]
 pub struct Game {
     player: Player,
-    scene: Scene,
+    world: World,
 }
 
 impl EventHandler<Event> for Game {
@@ -19,6 +19,6 @@ impl EventHandler<Event> for Game {
 
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, ());
-        self.scene.handle(event, (server_tx, &self.player));
+        self.world.handle(event, (server_tx, &self.player));
     }
 }

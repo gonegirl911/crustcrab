@@ -9,12 +9,9 @@ struct PlayerUniform {
     render_distance: u32,
 }
 
-struct ClockUniform {
-    time: f32,
-}
-
-struct SkylightUniform {
-    intensity: vec3<f32>,
+struct SkyUniform {
+    color: vec3<f32>,
+    light_intensity: vec3<f32>,
 }
 
 struct PushConstants {
@@ -25,7 +22,6 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
     @location(1) tex_index: u32,
-    @location(2) sky_coords: vec2<f32>,
     @location(3) light_factor: vec3<f32>,
     @location(4) fog_factor: f32,
 }
@@ -34,10 +30,7 @@ struct VertexOutput {
 var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
-var<uniform> clock: ClockUniform;
-
-@group(2) @binding(0)
-var<uniform> skylight: SkylightUniform;
+var<uniform> sky: SkyUniform;
 
 var<push_constant> pc: PushConstants;
 
@@ -55,7 +48,6 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let tex_index = extractBits(vertex.data, 17u, 8u);
     let face = extractBits(vertex.data, 25u, 2u);
     let ao = f32(extractBits(vertex.data, 27u, 2u));
-    let skylight_intensity = skylight.intensity;
     // let skylight = vec3(
     //     f32(extractBits(vertex.light, 0u, 4u)),
     //     f32(extractBits(vertex.light, 4u, 4u)),
@@ -72,7 +64,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let dy = coords.y - player.origin.y;
     let fog_height = 0.5 - atan2(dy, dx) / 22.0 * 7.0;
 
-    let global_light = pow(vec3(0.8), (15.0 - skylight)) * skylight_intensity;
+    let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     let face_light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     let ambient_light = mix(0.2, 1.0, ao / 3.0);
@@ -86,29 +78,22 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         player.vp * vec4(coords, 1.0),
         tex_coords,
         tex_index,
-        vec2(clock.time, fog_height),
         light_factor,
         fog_factor,
     );
 }
 
-@group(3) @binding(0)
+@group(2) @binding(0)
 var t_blocks: binding_array<texture_2d<f32>>;
 
-@group(3) @binding(1)
+@group(2) @binding(1)
 var s_block: sampler;
-
-@group(4) @binding(0)
-var t_sky: texture_2d<f32>;
-
-@group(4) @binding(1)
-var s_sky: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return mix(
         textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0),
-        textureSample(t_sky, s_sky, in.sky_coords),
+        vec4(sky.color, 1.0),
         in.fog_factor,
     );
 }

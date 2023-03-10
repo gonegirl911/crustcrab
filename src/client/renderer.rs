@@ -3,6 +3,7 @@ use super::{
     window::Window,
 };
 use bytemuck::Pod;
+use image::RgbaImage;
 use std::{
     array,
     marker::PhantomData,
@@ -46,7 +47,6 @@ impl Renderer {
                         | wgpu::Features::TEXTURE_BINDING_ARRAY
                         | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
                     limits: wgpu::Limits {
-                        max_bind_groups: 5,
                         max_push_constant_size: 128,
                         ..Default::default()
                     },
@@ -209,6 +209,45 @@ impl<T: Pod> Uniform<T> {
         }
     }
 
+    pub fn with_data(
+        Renderer { device, .. }: &Renderer,
+        data: &T,
+        visibility: wgpu::ShaderStages,
+    ) -> Self {
+        let buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(slice::from_ref(data)),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        Self {
+            buffer,
+            bind_group_layout,
+            bind_group,
+            phantom: PhantomData,
+        }
+    }
+
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
     }
@@ -277,9 +316,7 @@ impl ImageTexture {
         is_srgb: bool,
         mipmap_levels: u32,
     ) -> wgpu::TextureView {
-        let image = image::load_from_memory(bytes)
-            .expect("bytes should be a valid image")
-            .to_rgba8();
+        let image = Self::load_rgba(bytes);
         let (width, height) = image.dimensions();
         let size = wgpu::Extent3d {
             width,
@@ -459,6 +496,12 @@ impl ImageTexture {
 
         queue.submit([encoder.finish()]);
     }
+
+    fn load_rgba(bytes: &[u8]) -> RgbaImage {
+        image::load_from_memory(bytes)
+            .expect("bytes should be a valid image")
+            .to_rgba8()
+    }
 }
 
 pub struct ImageTextureArray {
@@ -474,12 +517,7 @@ impl ImageTextureArray {
         is_pixelated: bool,
         mipmap_levels: u32,
     ) -> Self {
-        let views = data
-            .into_iter()
-            .map(|bytes| {
-                ImageTexture::create_view(renderer, bytes.as_ref(), is_srgb, mipmap_levels)
-            })
-            .collect::<Vec<_>>();
+        let views = Self::create_views(renderer, data, is_srgb, mipmap_levels);
         let sampler = ImageTexture::create_sampler(renderer, is_pixelated, mipmap_levels);
         let bind_group_layout = ImageTexture::create_bind_group_layout(
             renderer,
@@ -514,6 +552,19 @@ impl ImageTextureArray {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+
+    fn create_views(
+        renderer: &Renderer,
+        data: impl IntoIterator<Item = impl AsRef<[u8]>>,
+        is_srgb: bool,
+        mipmap_levels: u32,
+    ) -> Vec<wgpu::TextureView> {
+        data.into_iter()
+            .map(|bytes| {
+                ImageTexture::create_view(renderer, bytes.as_ref(), is_srgb, mipmap_levels)
+            })
+            .collect::<Vec<_>>()
     }
 }
 
@@ -582,6 +633,36 @@ impl EventHandler for ScreenTexture {
     }
 }
 
+pub struct DepthBuffer {
+    texture: ScreenTexture,
+}
+
+impl DepthBuffer {
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+    pub fn new(renderer: &Renderer) -> Self {
+        Self {
+            texture: ScreenTexture::new(
+                renderer,
+                Self::FORMAT,
+                wgpu::TextureUsages::RENDER_ATTACHMENT,
+            ),
+        }
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.texture.view()
+    }
+}
+
+impl EventHandler for DepthBuffer {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        self.texture.handle(event, renderer);
+    }
+}
+
 pub struct InputOutputTextureArray<const N: usize> {
     textures: [ScreenTexture; N],
     sampler: wgpu::Sampler,
@@ -591,6 +672,7 @@ pub struct InputOutputTextureArray<const N: usize> {
 }
 
 impl<const N: usize> InputOutputTextureArray<N> {
+    #[rustfmt::skip]
     pub fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
         let textures = array::from_fn(|_| {
             ScreenTexture::new(
@@ -621,8 +703,7 @@ impl<const N: usize> InputOutputTextureArray<N> {
                 },
             ],
         });
-        let bind_groups =
-            Self::create_bind_groups(renderer, &textures, &sampler, &bind_group_layout);
+        let bind_groups = Self::create_bind_groups(renderer, &textures, &sampler, &bind_group_layout);
         Self {
             textures,
             sampler,
@@ -771,16 +852,16 @@ impl PostProcessor {
         self.index = !self.index;
     }
 
-    fn main_bind_group(&self) -> &wgpu::BindGroup {
-        self.textures.bind_group(self.main_index())
-    }
-
     fn main_view(&self) -> &wgpu::TextureView {
         self.textures.view(self.main_index())
     }
 
     fn secondary_view(&self) -> &wgpu::TextureView {
         self.textures.view(self.secondary_index())
+    }
+
+    fn main_bind_group(&self) -> &wgpu::BindGroup {
+        self.textures.bind_group(self.main_index())
     }
 
     fn main_index(&self) -> usize {

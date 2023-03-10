@@ -12,7 +12,7 @@ use crate::{
         renderer::{Renderer, Uniform},
         ClientEvent,
     },
-    server::game::scene::world::chunk::Chunk,
+    server::game::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;

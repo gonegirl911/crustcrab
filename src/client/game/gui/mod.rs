@@ -5,7 +5,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{Blit, Effect, Renderer},
     },
-    server::game::scene::world::block::Block,
+    server::game::world::block::Block,
 };
 use crosshair::Crosshair;
 

@@ -1,5 +1,6 @@
 mod app;
 mod client;
+mod color;
 mod server;
 
 fn main() -> ! {

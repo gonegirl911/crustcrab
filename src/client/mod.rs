@@ -10,7 +10,7 @@ use self::{
     renderer::Renderer,
     window::Window,
 };
-use crate::server::{game::scene::world::block::Block, ServerEvent};
+use crate::server::{game::world::block::Block, ServerEvent};
 use flume::{Receiver, Sender};
 use nalgebra::{Point3, Vector3};
 use std::time::Duration;
