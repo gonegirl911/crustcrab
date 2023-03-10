@@ -60,19 +60,15 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.light, 20u, 4u)),
     );
 
-    let dx = distance(player.origin.xz, coords.xz);
-    let dy = coords.y - player.origin.y;
-    let fog_height = 0.5 - atan2(dy, dx) / 22.0 * 7.0;
-
-    let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
-    let local_light = pow(vec3(0.8), (15.0 - torchlight));
     let face_light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     let ambient_light = mix(0.2, 1.0, ao / 3.0);
-    let light_factor = clamp(global_light + local_light, vec3(0.0), vec3(1.0)) * face_light * ambient_light;
+    let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
+    let local_light = pow(vec3(0.8), (15.0 - torchlight));
+    let light_factor = saturate(global_light + local_light) * ambient_light * face_light;
 
     let distance = distance(player.origin, coords);
-    let fog_distance = f32(player.render_distance * 16u) * 0.8;
-    let fog_factor = pow(clamp(distance / fog_distance, 0.0, 1.0), 4.0);
+    let fog_distance = f32((player.render_distance - 2u) * 16u);
+    let fog_factor = pow(saturate(distance / fog_distance), 4.0);
 
     return VertexOutput(
         player.vp * vec4(coords, 1.0),

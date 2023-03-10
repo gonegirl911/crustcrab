@@ -34,7 +34,7 @@ var<push_constant> pc: PushConstants;
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     return VertexOutput(
         player.vp * vec4(pc.coords + vertex.coords, 1.0),
-        vec4(vec3(1.0), 0.1 * min3(sky.light_intensity)),
+        vec4(vec3(1.0), 0.15 * min3(sky.light_intensity)),
     );
 }
 

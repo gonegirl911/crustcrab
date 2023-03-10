@@ -34,7 +34,7 @@ impl Crosshair {
             ],
             &[],
             None,
-            None,
+            Some(wgpu::BlendState::ALPHA_BLENDING),
             None,
             None,
         );
