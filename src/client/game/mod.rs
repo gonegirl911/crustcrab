@@ -77,7 +77,7 @@ impl EventHandler for Game {
                     surface.present();
                 }
                 Err(wgpu::SurfaceError::Lost) => renderer.recreate_surface(),
-                _ => {}
+                Err(_) => {},
             }
         }
     }
