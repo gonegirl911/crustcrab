@@ -14,10 +14,10 @@ impl Sky {
 
     pub fn new(renderer: &Renderer) -> Self {
         Self {
-            uniform: Uniform::with_data(
+            uniform: Uniform::with_constant_data(
                 renderer,
-                wgpu::ShaderStages::VERTEX_FRAGMENT,
                 &SkyUniformData::new(Self::COLOR, Self::LIGHT_INTENSITY),
+                wgpu::ShaderStages::VERTEX_FRAGMENT,
             ),
         }
     }

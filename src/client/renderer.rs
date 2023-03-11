@@ -173,34 +173,18 @@ pub struct Uniform<T> {
 }
 
 impl<T: Pod> Uniform<T> {
-    pub fn new(Renderer { device, .. }: &Renderer, visibility: wgpu::ShaderStages) -> Self {
+    pub fn new(
+        renderer @ Renderer { device, .. }: &Renderer,
+        visibility: wgpu::ShaderStages,
+    ) -> Self {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: mem::size_of::<T>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        });
+        let bind_group_layout = Self::create_bind_group_layout(renderer, visibility);
+        let bind_group = Self::create_bind_group(renderer, &buffer, &bind_group_layout);
         Self {
             buffer,
             bind_group_layout,
@@ -209,37 +193,18 @@ impl<T: Pod> Uniform<T> {
         }
     }
 
-    pub fn with_data(
-        Renderer { device, .. }: &Renderer,
-        visibility: wgpu::ShaderStages,
+    pub fn with_constant_data(
+        renderer @ Renderer { device, .. }: &Renderer,
         data: &T,
+        visibility: wgpu::ShaderStages,
     ) -> Self {
         let buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(slice::from_ref(data)),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::UNIFORM,
         });
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        });
+        let bind_group_layout = Self::create_bind_group_layout(renderer, visibility);
+        let bind_group = Self::create_bind_group(renderer, &buffer, &bind_group_layout);
         Self {
             buffer,
             bind_group_layout,
@@ -256,8 +221,42 @@ impl<T: Pod> Uniform<T> {
         &self.bind_group
     }
 
-    pub fn update(&self, Renderer { queue, .. }: &Renderer, data: &T) {
+    pub fn write(&self, Renderer { queue, .. }: &Renderer, data: &T) {
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(slice::from_ref(data)));
+    }
+
+    fn create_bind_group_layout(
+        Renderer { device, .. }: &Renderer,
+        visibility: wgpu::ShaderStages,
+    ) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        })
+    }
+
+    fn create_bind_group(
+        Renderer { device, .. }: &Renderer,
+        buffer: &wgpu::Buffer,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        })
     }
 }
 
@@ -933,7 +932,7 @@ impl Program {
         Self { render_pipeline }
     }
 
-    pub fn draw<'a, I>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, bind_groups: I)
+    pub fn bind<'a, I>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, bind_groups: I)
     where
         I: IntoIterator<Item = &'a wgpu::BindGroup>,
     {
@@ -968,9 +967,9 @@ impl Blit {
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_group_layout: &'a wgpu::BindGroup,
+        input_bind_group: &'a wgpu::BindGroup,
     ) {
-        self.0.draw(render_pass, [input_bind_group_layout]);
+        self.0.bind(render_pass, [input_bind_group]);
         render_pass.draw(0..3, 0..1);
     }
 }

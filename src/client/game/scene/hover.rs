@@ -62,7 +62,7 @@ impl BlockHover {
         sky_bind_group: &'a wgpu::BindGroup,
     ) {
         if let Some(coords) = self.coords {
-            self.program.draw(render_pass, [player_bind_group, sky_bind_group]);
+            self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX,
                 0,

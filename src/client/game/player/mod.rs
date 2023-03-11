@@ -119,7 +119,7 @@ impl EventHandler for Player {
                 self.is_updated = self.is_updated || changes.intersects(Changes::MATRIX_CHANGES);
             }
             Event::RedrawRequested(_) if self.is_updated => {
-                self.uniform.update(
+                self.uniform.write(
                     renderer,
                     &PlayerUniformData::new(
                         self.projection.mat() * self.camera.mat(),

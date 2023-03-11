@@ -51,7 +51,7 @@ impl Crosshair {
         render_pass: &mut wgpu::RenderPass<'a>,
         input_bind_group: &'a wgpu::BindGroup,
     ) {
-        self.program.draw(
+        self.program.bind(
             render_pass,
             [
                 self.uniform.bind_group(),
@@ -81,7 +81,7 @@ impl EventHandler for Crosshair {
             }
             Event::RedrawRequested(_) if self.is_resized => {
                 let size = (config.height as f32 * 0.065).max(27.0);
-                self.uniform.update(
+                self.uniform.write(
                     renderer,
                     &CrosshairUniformData::new(Matrix4::new_nonuniform_scaling(&vector![
                         size / config.width as f32,

@@ -78,7 +78,7 @@ impl World {
         sky_bind_group: &'a wgpu::BindGroup,
         frustum: &Frustum,
     ) {
-        self.program.draw(
+        self.program.bind(
             render_pass,
             [
                 player_bind_group,
