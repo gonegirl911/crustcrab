@@ -1,5 +1,5 @@
 use super::light::BlockAreaLight;
-use crate::{client::game::scene::world::BlockVertex, color::Rgb};
+use crate::{client::game::world::BlockVertex, color::Rgb};
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3};
@@ -33,7 +33,7 @@ impl Block {
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
                 let corner_lights = area_light.corner_lights(side, area);
-                Self::indices(corner_aos).into_iter().map(move |corner| {
+                Self::corners(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_vertex_coords[corner].coords,
                         tex_index,
@@ -67,13 +67,13 @@ impl Block {
         }
     }
 
-    fn indices(corner_aos: EnumMap<Corner, u8>) -> [Corner; 6] {
+    fn corners(corner_aos: EnumMap<Corner, u8>) -> [Corner; 6] {
         if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
             > corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
         {
-            FLIPPED_INDICES
+            FLIPPED_CORNERS
         } else {
-            INDICES
+            CORNERS
         }
     }
 
@@ -375,7 +375,7 @@ static CORNER_TEX_COORDS: Lazy<EnumMap<Corner, Point2<u8>>> = Lazy::new(|| {
     }
 });
 
-const INDICES: [Corner; 6] = [
+const CORNERS: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
     Corner::UpperLeft,
@@ -384,7 +384,7 @@ const INDICES: [Corner; 6] = [
     Corner::UpperLeft,
 ];
 
-const FLIPPED_INDICES: [Corner; 6] = [
+const FLIPPED_CORNERS: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
     Corner::UpperRight,

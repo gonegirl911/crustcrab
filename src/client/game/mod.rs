@@ -1,11 +1,13 @@
 pub mod gui;
+pub mod hover;
 pub mod player;
-pub mod scene;
+pub mod sky;
+pub mod world;
 
-use self::{gui::Gui, player::Player, scene::Scene};
+use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{PostProcessor, Renderer},
+    renderer::{DepthBuffer, PostProcessor, Renderer},
     ClientEvent,
 };
 use flume::Sender;
@@ -13,9 +15,12 @@ use std::time::Duration;
 
 pub struct Game {
     player: Player,
-    scene: Scene,
+    sky: Sky,
+    world: World,
+    hover: BlockHover,
     gui: Gui,
     processor: PostProcessor,
+    depth_buffer: DepthBuffer,
 }
 
 impl Game {
@@ -23,21 +28,45 @@ impl Game {
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
-        let scene = Scene::new(renderer, player.bind_group_layout());
+        let sky = Sky::new(renderer);
+        let world = World::new(
+            renderer,
+            player.bind_group_layout(),
+            sky.bind_group_layout(),
+        );
+        let hover = BlockHover::new(
+            renderer,
+            player.bind_group_layout(),
+            sky.bind_group_layout(),
+        );
+        let depth_buffer = DepthBuffer::new(renderer);
         Self {
             player,
-            scene,
+            sky,
+            world,
+            hover,
             gui,
             processor,
+            depth_buffer,
         }
     }
 
     fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.scene.draw(
+        self.sky.draw(self.processor.view(), encoder);
+        self.world.draw(
             self.processor.view(),
             encoder,
             self.player.bind_group(),
+            self.sky.bind_group(),
+            self.depth_buffer.view(),
             &self.player.frustum(),
+        );
+        self.hover.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.sky.bind_group(),
+            self.depth_buffer.view(),
         );
         self.processor.apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
@@ -63,9 +92,11 @@ impl EventHandler for Game {
         ): Self::Context<'_>,
     ) {
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-        self.scene.handle(event, renderer);
+        self.world.handle(event, renderer);
+        self.hover.handle(event, ());
         self.gui.handle(event, renderer);
         self.processor.handle(event, renderer);
+        self.depth_buffer.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {

@@ -41,7 +41,7 @@ impl World {
         );
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/block.wgsl"),
+            wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
             &[BlockVertex::desc()],
             &[
                 player_bind_group_layout,
@@ -70,13 +70,34 @@ impl World {
         }
     }
 
-    pub fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        player_bind_group: &'a wgpu::BindGroup,
-        sky_bind_group: &'a wgpu::BindGroup,
+    pub fn draw(
+        &self,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        player_bind_group: &wgpu::BindGroup,
+        sky_bind_group: &wgpu::BindGroup,
+        depth_buffer_view: &wgpu::TextureView,
         frustum: &Frustum,
     ) {
+        let render_pass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_buffer_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        });
         self.program.bind(
             render_pass,
             [

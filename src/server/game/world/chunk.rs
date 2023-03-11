@@ -4,7 +4,7 @@ use super::{
     loader::ChunkLoader,
 };
 use crate::{
-    client::{game::scene::world::BlockVertex, ClientEvent},
+    client::{game::world::BlockVertex, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
         game::player::{
