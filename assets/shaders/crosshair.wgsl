@@ -8,7 +8,7 @@ struct CrosshairUniform {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) screen_coords: vec2<f32>,
+    @location(0) input_coords: vec2<f32>,
     @location(1) tex_coords: vec2<f32>,
 }
 
@@ -30,15 +30,15 @@ var t_crosshair: texture_2d<f32>;
 var s_crosshair: sampler;
 
 @group(2) @binding(0)
-var t_output: texture_2d<f32>;
+var t_input: texture_2d<f32>;
 
 @group(2) @binding(1)
-var s_output: sampler;
+var s_input: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(
-        1.0 - textureSample(t_output, s_output, in.screen_coords).xyz,
+        1.0 - textureSample(t_input, s_input, in.input_coords).xyz,
         textureSample(t_crosshair, s_crosshair, in.tex_coords).w,
     );
 }

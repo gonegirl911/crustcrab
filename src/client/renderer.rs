@@ -963,8 +963,10 @@ impl Blit {
             None,
         ))
     }
+}
 
-    pub fn draw<'a>(
+impl Effect for Blit {
+    fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         input_bind_group: &'a wgpu::BindGroup,

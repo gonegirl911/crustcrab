@@ -4,7 +4,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) tex_coords: vec2<f32>,
+    @location(0) input_coords: vec2<f32>,
 }
 
 @vertex
@@ -15,12 +15,12 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 }
 
 @group(0) @binding(0)
-var t_output: texture_2d<f32>;
+var t_input: texture_2d<f32>;
 
 @group(0) @binding(1)
-var s_output: sampler;
+var s_input: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_output, s_output, in.tex_coords);
+    return textureSample(t_input, s_input, in.input_coords);
 }
