@@ -74,26 +74,43 @@ impl EventHandler for BlockHover {
 }
 
 struct BlockHighlight {
-    mesh: IndexedMesh<BlockHighlightVertex, u16>,
+    mesh: IndexedMesh<Point3<f32>, u16>,
     program: Program,
 }
 
 impl BlockHighlight {
+    const VERTICES: [Point3<f32>; 8] = [
+        point![0.0, 0.0, 0.0],
+        point![1.0, 0.0, 0.0],
+        point![1.0, 1.0, 0.0],
+        point![0.0, 1.0, 0.0],
+        point![0.0, 0.0, 1.0],
+        point![1.0, 0.0, 1.0],
+        point![1.0, 1.0, 1.0],
+        point![0.0, 1.0, 1.0],
+    ];
+
+    #[rustfmt::skip]
+    const INDICES: [u16; 36] = [
+        0, 1, 2, 0, 2, 3,
+        1, 5, 6, 1, 6, 2,
+        5, 4, 7, 5, 7, 6,
+        4, 0, 3, 4, 3, 7,
+        3, 2, 6, 3, 6, 7,
+        4, 5, 1, 4, 1, 0,
+    ];
+
     fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
-            mesh: IndexedMesh::new(
-                renderer,
-                &VERTEX_COORDS.map(BlockHighlightVertex::new),
-                &INDICES,
-            ),
+            mesh: IndexedMesh::new(renderer, &Self::VERTICES, &Self::INDICES),
             program: Program::new(
                 renderer,
                 wgpu::include_wgsl!("../../../assets/shaders/highlight.wgsl"),
-                &[BlockHighlightVertex::desc()],
+                &[Point3::<f32>::desc()],
                 &[player_bind_group_layout, sky_bind_group_layout],
                 &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX,
@@ -133,22 +150,6 @@ impl BlockHighlight {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockHighlightVertex {
-    coords: Point3<f32>,
-}
-
-impl BlockHighlightVertex {
-    fn new(coords: Point3<f32>) -> Self {
-        Self { coords }
-    }
-}
-
-impl Vertex for BlockHighlightVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
 struct BlockHighlightPushConstants {
     coords: Point3<f32>,
 }
@@ -160,24 +161,3 @@ impl BlockHighlightPushConstants {
         }
     }
 }
-
-const VERTEX_COORDS: [Point3<f32>; 8] = [
-    point![0.0, 0.0, 0.0],
-    point![1.0, 0.0, 0.0],
-    point![1.0, 1.0, 0.0],
-    point![0.0, 1.0, 0.0],
-    point![0.0, 0.0, 1.0],
-    point![1.0, 0.0, 1.0],
-    point![1.0, 1.0, 1.0],
-    point![0.0, 1.0, 1.0],
-];
-
-#[rustfmt::skip]
-const INDICES: [u16; 36] = [
-    0, 1, 2, 0, 2, 3,
-    1, 5, 6, 1, 6, 2,
-    5, 4, 7, 5, 7, 6,
-    4, 0, 3, 4, 3, 7,
-    3, 2, 6, 3, 6, 7,
-    4, 5, 1, 4, 1, 0,
-];

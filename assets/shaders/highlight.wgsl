@@ -35,7 +35,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let coords = -0.001 + vertex.coords * 1.002;
     return VertexOutput(
         player.vp * vec4(pc.coords + coords, 1.0),
-        vec4(vec3(1.0), 0.15 * min3(sky.light_intensity)),
+        vec4(vec3(1.0), 0.15 * grayscale(sky.light_intensity)),
     );
 }
 
@@ -44,6 +44,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return in.color;
 }
 
-fn min3(v: vec3<f32>) -> f32 {
-    return min(min(v.x, v.y), v.z);
+fn grayscale(color: vec3<f32>) -> f32 {
+    return dot(color, vec3(0.299, 0.587, 0.114));
 }

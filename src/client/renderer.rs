@@ -4,6 +4,7 @@ use super::{
 };
 use bytemuck::Pod;
 use image::RgbaImage;
+use nalgebra::Point3;
 use std::{
     array,
     marker::PhantomData,
@@ -986,6 +987,10 @@ pub trait Vertex: Pod {
             attributes: Self::ATTRIBS,
         }
     }
+}
+
+impl Vertex for Point3<f32> {
+    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
 }
 
 pub trait Index: Pod {
