@@ -68,7 +68,7 @@ impl Game {
             self.sky.bind_group(),
             self.depth_buffer.view(),
         );
-        self.processor.apply(encoder, &self.gui);
+        self.processor.blit_apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }
 }

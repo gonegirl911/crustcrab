@@ -567,7 +567,7 @@ impl ImageTextureArray {
     }
 }
 
-pub struct ScreenTexture {
+struct ScreenTexture {
     view: wgpu::TextureView,
     format: wgpu::TextureFormat,
     usage: wgpu::TextureUsages,
@@ -575,7 +575,7 @@ pub struct ScreenTexture {
 }
 
 impl ScreenTexture {
-    pub fn new(
+    fn new(
         Renderer { device, config, .. }: &Renderer,
         format: wgpu::TextureFormat,
         usage: wgpu::TextureUsages,
@@ -603,7 +603,7 @@ impl ScreenTexture {
         }
     }
 
-    pub fn view(&self) -> &wgpu::TextureView {
+    fn view(&self) -> &wgpu::TextureView {
         &self.view
     }
 }
@@ -662,7 +662,7 @@ impl EventHandler for DepthBuffer {
     }
 }
 
-pub struct InputOutputTextureArray<const N: usize> {
+struct InputOutputTextureArray<const N: usize> {
     textures: [ScreenTexture; N],
     sampler: wgpu::Sampler,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -672,7 +672,7 @@ pub struct InputOutputTextureArray<const N: usize> {
 
 impl<const N: usize> InputOutputTextureArray<N> {
     #[rustfmt::skip]
-    pub fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
+    fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
         let textures = array::from_fn(|_| {
             ScreenTexture::new(
                 renderer,
@@ -712,15 +712,15 @@ impl<const N: usize> InputOutputTextureArray<N> {
         }
     }
 
-    pub fn view(&self, index: usize) -> &wgpu::TextureView {
+    fn view(&self, index: usize) -> &wgpu::TextureView {
         self.textures[index].view()
     }
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
     }
 
-    pub fn bind_group(&self, index: usize) -> &wgpu::BindGroup {
+    fn bind_group(&self, index: usize) -> &wgpu::BindGroup {
         &self.bind_groups[index]
     }
 
@@ -810,9 +810,9 @@ impl PostProcessor {
         self.textures.bind_group_layout()
     }
 
-    pub fn apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
-        effect.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    pub fn blit_apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
+        {
+            let render_pass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: self.secondary_view(),
@@ -823,9 +823,10 @@ impl PostProcessor {
                     },
                 })],
                 depth_stencil_attachment: None,
-            }),
-            self.main_bind_group(),
-        );
+            });
+            self.blit.draw(render_pass, self.main_bind_group());
+            effect.draw(render_pass, self.main_bind_group());
+        }
         self.swap();
     }
 
@@ -943,10 +944,10 @@ impl Program {
     }
 }
 
-pub struct Blit(Program);
+struct Blit(Program);
 
 impl Blit {
-    pub fn new(
+    fn new(
         renderer: &Renderer,
         input_bind_group_layout: &wgpu::BindGroupLayout,
         format: Option<wgpu::TextureFormat>,

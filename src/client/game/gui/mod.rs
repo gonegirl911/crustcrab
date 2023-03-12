@@ -3,21 +3,19 @@ pub mod crosshair;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{Blit, Effect, Renderer},
+        renderer::{Effect, Renderer},
     },
     server::game::world::block::Block,
 };
 use crosshair::Crosshair;
 
 pub struct Gui {
-    blit: Blit,
     crosshair: Crosshair,
 }
 
 impl Gui {
     pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         Self {
-            blit: Blit::new(renderer, input_bind_group_layout, None),
             crosshair: Crosshair::new(renderer, input_bind_group_layout),
         }
     }
@@ -37,7 +35,6 @@ impl Effect for Gui {
         render_pass: &mut wgpu::RenderPass<'a>,
         input_bind_group: &'a wgpu::BindGroup,
     ) {
-        self.blit.draw(render_pass, input_bind_group);
         self.crosshair.draw(render_pass, input_bind_group);
     }
 }
