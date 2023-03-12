@@ -35,7 +35,7 @@ impl Renderer {
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
+                ..Default::default()
             })
             .await
             .expect("adapter should be available");
@@ -55,12 +55,9 @@ impl Renderer {
             )
             .await
             .expect("device should be available");
-        let config = wgpu::SurfaceConfiguration {
-            present_mode: wgpu::PresentMode::Fifo,
-            ..surface
-                .get_default_config(&adapter, width, height)
-                .expect("surface should be supported by adapter")
-        };
+        let config = surface
+            .get_default_config(&adapter, width, height)
+            .expect("surface should be supported by adapter");
         Self {
             surface,
             device,
@@ -373,7 +370,6 @@ impl ImageTexture {
             } else {
                 wgpu::FilterMode::Linear
             },
-            min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Linear,
             anisotropy_clamp: if mipmap_levels > 1 {
                 NonZeroU8::new(16)
@@ -812,7 +808,7 @@ impl PostProcessor {
 
     pub fn blit_apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
         {
-            let render_pass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: self.secondary_view(),
@@ -824,8 +820,8 @@ impl PostProcessor {
                 })],
                 depth_stencil_attachment: None,
             });
-            self.blit.draw(render_pass, self.main_bind_group());
-            effect.draw(render_pass, self.main_bind_group());
+            self.blit.draw(&mut render_pass, self.main_bind_group());
+            effect.draw(&mut render_pass, self.main_bind_group());
         }
         self.swap();
     }

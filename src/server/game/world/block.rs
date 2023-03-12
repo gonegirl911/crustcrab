@@ -340,13 +340,14 @@ pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
     }
 });
 
-static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> = Lazy::new(|| {
-    SIDE_CORNER_SIDES.map(|s1, corner_sides| {
-        corner_sides.map(|_, [s2, s3]| {
-            (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
+pub static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> =
+    Lazy::new(|| {
+        SIDE_CORNER_SIDES.map(|s1, corner_sides| {
+            corner_sides.map(|_, [s2, s3]| {
+                (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
+            })
         })
-    })
-});
+    });
 
 #[allow(clippy::type_complexity)]
 pub static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
@@ -373,7 +374,7 @@ static CORNER_TEX_COORDS: Lazy<EnumMap<Corner, Point2<u8>>> = Lazy::new(|| {
     }
 });
 
-const CORNERS: [Corner; 6] = [
+pub const CORNERS: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
     Corner::UpperLeft,

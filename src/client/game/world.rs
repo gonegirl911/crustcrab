@@ -76,10 +76,10 @@ impl World {
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        depth_buffer_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
         frustum: &Frustum,
     ) {
-        let render_pass = &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
@@ -90,7 +90,7 @@ impl World {
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_buffer_view,
+                view: depth_view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
                     store: true,
@@ -99,14 +99,14 @@ impl World {
             }),
         });
         self.program.bind(
-            render_pass,
+            &mut render_pass,
             [
                 player_bind_group,
                 sky_bind_group,
                 self.textures.bind_group(),
             ],
         );
-        self.meshes.draw(render_pass, frustum);
+        self.meshes.draw(&mut render_pass, frustum);
     }
 
     fn read_texture(texture: &str) -> Vec<u8> {

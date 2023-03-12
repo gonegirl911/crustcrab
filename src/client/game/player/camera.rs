@@ -176,6 +176,7 @@ impl Controller {
         const ROTATION_SCALE: f32 = 1.0 / 60.0;
 
         let dr = self.sensitivity * ROTATION_SCALE;
+
         camera.yaw = (camera.yaw - self.dx * dr) % TAU;
         camera.pitch = (camera.pitch - self.dy * dr).clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
 

@@ -28,7 +28,7 @@ impl Game {
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
-        let sky = Sky::new(renderer);
+        let sky = Sky::new(renderer, player.bind_group_layout());
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -52,7 +52,12 @@ impl Game {
     }
 
     fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.sky.draw(self.processor.view(), encoder);
+        self.sky.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.depth_buffer.view(),
+        );
         self.world.draw(
             self.processor.view(),
             encoder,
