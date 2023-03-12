@@ -16,7 +16,7 @@ use crate::{
 };
 use bitvec::prelude::*;
 use flume::Sender;
-use nalgebra::{point, Point3};
+use nalgebra::{point, vector, Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -270,7 +270,7 @@ impl ChunkMap {
 
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         ChunkArea::from_fn(|delta| {
-            let delta = delta.cast();
+            let delta = delta.cast().into();
             let chunk_coords = coords + Self::chunk_coords(delta).coords;
             let block_coords = Self::block_coords(delta);
             self.cells
@@ -287,8 +287,7 @@ impl ChunkMap {
         block_updates
             .into_iter()
             .flat_map(|coords| {
-                BlockArea::deltas()
-                    .map(move |delta| Self::chunk_coords(coords + delta.coords.cast()))
+                BlockArea::deltas().map(move |delta| Self::chunk_coords(coords + delta.cast()))
             })
             .collect()
     }
@@ -296,9 +295,7 @@ impl ChunkMap {
     fn outline(points: &FxHashSet<Point3<i32>>) -> FxHashSet<Point3<i32>> {
         points
             .iter()
-            .flat_map(|coords| {
-                ChunkArea::chunk_deltas().map(move |delta| coords + delta.coords.cast())
-            })
+            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
             .filter(|coords| !points.contains(coords))
             .collect()
     }
@@ -542,7 +539,7 @@ impl ChunkArea {
     pub const PADDING: usize = BlockArea::PADDING;
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;
 
-    fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
+    fn from_fn<F: FnMut(Vector3<i8>) -> bool>(mut f: F) -> Self {
         let mut value = Self::default();
         for delta in Self::deltas() {
             value.set(delta, f(delta));
@@ -551,46 +548,46 @@ impl ChunkArea {
     }
 
     fn block_area(&self, coords: Point3<u8>) -> BlockArea {
-        let coords = coords.cast();
-        BlockArea::from_fn(|delta| self.is_opaque(coords + delta.coords))
+        let coords = coords.coords.cast();
+        BlockArea::from_fn(|delta| self.is_opaque(coords + delta))
     }
 
-    fn is_opaque(&self, coords: Point3<i8>) -> bool {
-        unsafe { *self.0.get_unchecked(Self::index(coords)) }
+    fn is_opaque(&self, delta: Vector3<i8>) -> bool {
+        unsafe { *self.0.get_unchecked(Self::index(delta)) }
     }
 
-    fn set(&mut self, coords: Point3<i8>, is_opaque: bool) {
+    fn set(&mut self, delta: Vector3<i8>, is_opaque: bool) {
         unsafe {
-            self.0.set_unchecked(Self::index(coords), is_opaque);
+            self.0.set_unchecked(Self::index(delta), is_opaque);
         }
     }
 
-    fn chunk_deltas() -> impl Iterator<Item = Point3<i32>> {
+    fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
         let padding = ChunkMap::div_ceil(Self::PADDING, Chunk::DIM) as i32;
         (-padding..1 + padding).flat_map(move |dx| {
             (-padding..1 + padding)
-                .flat_map(move |dy| (-padding..1 + padding).map(move |dz| point![dx, dy, dz]))
+                .flat_map(move |dy| (-padding..1 + padding).map(move |dz| vector![dx, dy, dz]))
         })
     }
 
-    fn deltas() -> impl Iterator<Item = Point3<i8>> {
+    fn deltas() -> impl Iterator<Item = Vector3<i8>> {
         Self::AXIS_RANGE.flat_map(|dx| {
-            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| point![dx, dy, dz]))
+            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
         })
     }
 
-    fn index(coords: Point3<i8>) -> usize {
+    fn index(delta: Vector3<i8>) -> usize {
         assert!(
-            Self::AXIS_RANGE.contains(&coords.x)
-                && Self::AXIS_RANGE.contains(&coords.y)
-                && Self::AXIS_RANGE.contains(&coords.z)
+            Self::AXIS_RANGE.contains(&delta.x)
+                && Self::AXIS_RANGE.contains(&delta.y)
+                && Self::AXIS_RANGE.contains(&delta.z)
         );
-        unsafe { Self::index_unchecked(coords) }
+        unsafe { Self::index_unchecked(delta) }
     }
 
-    unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
-        let coords = coords.map(|c| (c + Self::PADDING as i8) as usize);
-        coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
+    unsafe fn index_unchecked(delta: Vector3<i8>) -> usize {
+        let delta = delta.map(|c| (c + Self::PADDING as i8) as usize);
+        delta.x * Self::DIM.pow(2) + delta.y * Self::DIM + delta.z
     }
 }
 

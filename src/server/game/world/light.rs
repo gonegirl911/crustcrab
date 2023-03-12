@@ -4,7 +4,7 @@ use super::{
 };
 use bitfield::bitfield;
 use enum_map::EnumMap;
-use nalgebra::{point, Point3};
+use nalgebra::{vector, Point3, Vector3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
@@ -20,7 +20,7 @@ pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
 impl ChunkMapLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
         ChunkAreaLight::from_fn(|delta| {
-            let delta = delta.cast();
+            let delta = delta.cast().into();
             let chunk_coords = coords + ChunkMap::chunk_coords(delta).coords;
             let block_coords = ChunkMap::block_coords(delta);
             self.0
@@ -277,9 +277,7 @@ impl ChunkMapLight {
     }
 
     fn neighbors(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
-        SIDE_DELTAS
-            .values()
-            .map(move |delta| coords + delta.coords.cast())
+        SIDE_DELTAS.values().map(move |delta| coords + delta.cast())
     }
 }
 
@@ -303,26 +301,26 @@ impl IndexMut<Point3<u8>> for ChunkLight {
 pub struct ChunkAreaLight([[[BlockLight; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl ChunkAreaLight {
-    fn from_fn<F: FnMut(Point3<i8>) -> BlockLight>(mut f: F) -> Self {
+    fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| {
-                array::from_fn(|z| f(point![x, y, z].map(|c| c as i8 - ChunkArea::PADDING as i8)))
+                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - ChunkArea::PADDING as i8)))
             })
         }))
     }
 
     pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
-        let coords = coords.cast();
-        BlockAreaLight::from_fn(|delta| self[coords + delta.coords])
+        let coords = coords.coords.cast();
+        BlockAreaLight::from_fn(|delta| self[coords + delta])
     }
 }
 
-impl Index<Point3<i8>> for ChunkAreaLight {
+impl Index<Vector3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
-    fn index(&self, coords: Point3<i8>) -> &Self::Output {
-        let coords = coords.map(|c| (c + ChunkArea::PADDING as i8) as usize);
-        &self.0[coords.x][coords.y][coords.z]
+    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
+        let delta = delta.map(|c| (c + ChunkArea::PADDING as i8) as usize);
+        &self.0[delta.x][delta.y][delta.z]
     }
 }
 
@@ -346,10 +344,10 @@ impl BlockLight {
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {
-    fn from_fn<F: FnMut(Point3<i8>) -> BlockLight>(mut f: F) -> Self {
+    fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| {
-                array::from_fn(|z| f(point![x, y, z].map(|c| c as i8 - BlockArea::PADDING as i8)))
+                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - BlockArea::PADDING as i8)))
             })
         }))
     }
@@ -368,12 +366,12 @@ impl BlockAreaLight {
     }
 }
 
-impl Index<Point3<i8>> for BlockAreaLight {
+impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
-    fn index(&self, coords: Point3<i8>) -> &Self::Output {
-        let coords = coords.map(|c| (c + BlockArea::PADDING as i8) as usize);
-        &self.0[coords.x][coords.y][coords.z]
+    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
+        let delta = delta.map(|c| (c + BlockArea::PADDING as i8) as usize);
+        &self.0[delta.x][delta.y][delta.z]
     }
 }
 

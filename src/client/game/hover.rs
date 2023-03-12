@@ -79,34 +79,13 @@ struct BlockHighlight {
 }
 
 impl BlockHighlight {
-    const VERTICES: [Point3<f32>; 8] = [
-        point![0.0, 0.0, 0.0],
-        point![1.0, 0.0, 0.0],
-        point![1.0, 1.0, 0.0],
-        point![0.0, 1.0, 0.0],
-        point![0.0, 0.0, 1.0],
-        point![1.0, 0.0, 1.0],
-        point![1.0, 1.0, 1.0],
-        point![0.0, 1.0, 1.0],
-    ];
-
-    #[rustfmt::skip]
-    const INDICES: [u16; 36] = [
-        0, 1, 2, 0, 2, 3,
-        1, 5, 6, 1, 6, 2,
-        5, 4, 7, 5, 7, 6,
-        4, 0, 3, 4, 3, 7,
-        3, 2, 6, 3, 6, 7,
-        4, 5, 1, 4, 1, 0,
-    ];
-
     fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
-            mesh: IndexedMesh::new(renderer, &Self::VERTICES, &Self::INDICES),
+            mesh: IndexedMesh::new(renderer, &DELTAS, &INDICES),
             program: Program::new(
                 renderer,
                 wgpu::include_wgsl!("../../../assets/shaders/highlight.wgsl"),
@@ -161,3 +140,24 @@ impl BlockHighlightPushConstants {
         }
     }
 }
+
+const DELTAS: [Point3<f32>; 8] = [
+    point![0.0, 0.0, 0.0],
+    point![1.0, 0.0, 0.0],
+    point![1.0, 1.0, 0.0],
+    point![0.0, 1.0, 0.0],
+    point![0.0, 0.0, 1.0],
+    point![1.0, 0.0, 1.0],
+    point![1.0, 1.0, 1.0],
+    point![0.0, 1.0, 1.0],
+];
+
+#[rustfmt::skip]
+const INDICES: [u16; 36] = [
+    0, 1, 2, 0, 2, 3,
+    1, 5, 6, 1, 6, 2,
+    5, 4, 7, 5, 7, 6,
+    4, 0, 3, 4, 3, 7,
+    3, 2, 6, 3, 6, 7,
+    4, 5, 1, 4, 1, 0,
+];

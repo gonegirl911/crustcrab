@@ -2,7 +2,7 @@ use super::light::BlockAreaLight;
 use crate::{client::game::world::BlockVertex, color::Rgb};
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
-use nalgebra::{point, Point2, Point3};
+use nalgebra::{point, vector, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
@@ -28,14 +28,14 @@ impl Block {
         let data = self.data();
         data.side_tex_indices.map(move |side_tex_indices| {
             area.visible_sides().flat_map(move |side| {
-                let corner_vertex_coords = SIDE_CORNER_VERTEX_COORDS[side];
+                let corner_deltas = SIDE_CORNER_DELTAS[side];
                 let tex_index = side_tex_indices[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
                 let corner_lights = area_light.corner_lights(side, area);
                 Self::corners(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
-                        coords + corner_vertex_coords[corner].coords,
+                        coords + corner_deltas[corner],
                         tex_index,
                         CORNER_TEX_COORDS[corner],
                         face,
@@ -144,7 +144,7 @@ impl BlockArea {
     pub const PADDING: usize = 1;
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(1 + Self::PADDING) as i8;
 
-    pub fn from_fn<F: FnMut(Point3<i8>) -> bool>(mut f: F) -> Self {
+    pub fn from_fn<F: FnMut(Vector3<i8>) -> bool>(mut f: F) -> Self {
         let mut value = Self::default();
         for delta in Self::deltas() {
             value.set(delta, f(delta));
@@ -163,37 +163,37 @@ impl BlockArea {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self.is_opaque(delta))
     }
 
-    pub fn is_transparent(self, coords: Point3<i8>) -> bool {
-        !self.is_opaque(coords)
+    pub fn is_transparent(self, delta: Vector3<i8>) -> bool {
+        !self.is_opaque(delta)
     }
 
-    fn is_opaque(self, coords: Point3<i8>) -> bool {
-        unsafe { *self.0.get_unchecked(Self::index(coords)) }
+    fn is_opaque(self, delta: Vector3<i8>) -> bool {
+        unsafe { *self.0.get_unchecked(Self::index(delta)) }
     }
 
-    fn set(&mut self, coords: Point3<i8>, is_opaque: bool) {
+    fn set(&mut self, delta: Vector3<i8>, is_opaque: bool) {
         unsafe {
-            self.0.set_unchecked(Self::index(coords), is_opaque);
+            self.0.set_unchecked(Self::index(delta), is_opaque);
         }
     }
 
-    pub fn deltas() -> impl Iterator<Item = Point3<i8>> {
+    pub fn deltas() -> impl Iterator<Item = Vector3<i8>> {
         Self::AXIS_RANGE.flat_map(|dx| {
-            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| point![dx, dy, dz]))
+            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
         })
     }
 
-    fn index(coords: Point3<i8>) -> usize {
+    fn index(delta: Vector3<i8>) -> usize {
         assert!(
-            Self::AXIS_RANGE.contains(&coords.x)
-                && Self::AXIS_RANGE.contains(&coords.y)
-                && Self::AXIS_RANGE.contains(&coords.z)
+            Self::AXIS_RANGE.contains(&delta.x)
+                && Self::AXIS_RANGE.contains(&delta.y)
+                && Self::AXIS_RANGE.contains(&delta.z)
         );
-        unsafe { Self::index_unchecked(coords) }
+        unsafe { Self::index_unchecked(delta) }
     }
 
-    unsafe fn index_unchecked(coords: Point3<i8>) -> usize {
-        let coords = coords.map(|c| (c + Self::PADDING as i8) as usize);
+    unsafe fn index_unchecked(delta: Vector3<i8>) -> usize {
+        let coords = delta.map(|c| (c + Self::PADDING as i8) as usize);
         coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
     }
 }
@@ -329,38 +329,36 @@ static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy
     }
 });
 
-pub static SIDE_DELTAS: Lazy<EnumMap<Side, Point3<i8>>> = Lazy::new(|| {
+pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
     enum_map! {
-        Side::Front => point![0, 0, -1],
-        Side::Right => point![1, 0, 0],
-        Side::Back => point![0, 0, 1],
-        Side::Left => point![-1, 0, 0],
-        Side::Up => point![0, 1, 0],
-        Side::Down => point![0, -1, 0],
+        Side::Front => vector![0, 0, -1],
+        Side::Right => vector![1, 0, 0],
+        Side::Back => vector![0, 0, 1],
+        Side::Left => vector![-1, 0, 0],
+        Side::Up => vector![0, 1, 0],
+        Side::Down => vector![0, -1, 0],
     }
 });
 
-static SIDE_CORNER_VERTEX_COORDS: Lazy<EnumMap<Side, EnumMap<Corner, Point3<u8>>>> =
-    Lazy::new(|| {
-        SIDE_CORNER_SIDES.map(|s1, corner_sides| {
-            corner_sides.map(|_, [s2, s3]| {
-                (SIDE_DELTAS[s1] + SIDE_DELTAS[s2].coords + SIDE_DELTAS[s3].coords)
-                    .map(|c| (c + 1) as u8 / 2)
-            })
+static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> = Lazy::new(|| {
+    SIDE_CORNER_SIDES.map(|s1, corner_sides| {
+        corner_sides.map(|_, [s2, s3]| {
+            (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
         })
-    });
+    })
+});
 
 #[allow(clippy::type_complexity)]
 pub static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
-    EnumMap<Side, EnumMap<Corner, EnumMap<Component, Point3<i8>>>>,
+    EnumMap<Side, EnumMap<Corner, EnumMap<Component, Vector3<i8>>>>,
 > = Lazy::new(|| {
     SIDE_CORNER_SIDES.map(|s1, corner_sides| {
         corner_sides.map(|_, [s2, s3]| {
-            let corner = SIDE_DELTAS[s1] + SIDE_DELTAS[s2].coords + SIDE_DELTAS[s3].coords;
+            let delta = SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3];
             enum_map! {
-                Component::Edge1 => corner - SIDE_DELTAS[s3].coords,
-                Component::Edge2 => corner - SIDE_DELTAS[s2].coords,
-                Component::Corner => corner,
+                Component::Edge1 => delta - SIDE_DELTAS[s3],
+                Component::Edge2 => delta - SIDE_DELTAS[s2],
+                Component::Corner => delta,
             }
         })
     })
