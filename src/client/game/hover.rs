@@ -6,7 +6,7 @@ use crate::{
     server::ServerEvent,
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{point, Point3};
+use nalgebra::{vector, Point3, Vector3};
 use std::mem;
 
 pub struct BlockHover {
@@ -74,7 +74,7 @@ impl EventHandler for BlockHover {
 }
 
 struct BlockHighlight {
-    mesh: IndexedMesh<Point3<f32>, u16>,
+    mesh: IndexedMesh<BlockHighlightVertex, u16>,
     program: Program,
 }
 
@@ -85,11 +85,15 @@ impl BlockHighlight {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
-            mesh: IndexedMesh::new(renderer, &DELTAS, &INDICES),
+            mesh: IndexedMesh::new(
+                renderer,
+                &DELTAS.map(|delta| BlockHighlightVertex::new(delta.into())),
+                &INDICES,
+            ),
             program: Program::new(
                 renderer,
                 wgpu::include_wgsl!("../../../assets/shaders/highlight.wgsl"),
-                &[Point3::<f32>::desc()],
+                &[BlockHighlightVertex::desc()],
                 &[player_bind_group_layout, sky_bind_group_layout],
                 &[wgpu::PushConstantRange {
                     stages: wgpu::ShaderStages::VERTEX,
@@ -129,6 +133,22 @@ impl BlockHighlight {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+struct BlockHighlightVertex {
+    coords: Point3<f32>,
+}
+
+impl BlockHighlightVertex {
+    fn new(coords: Point3<f32>) -> Self {
+        Self { coords }
+    }
+}
+
+impl Vertex for BlockHighlightVertex {
+    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Zeroable, Pod)]
 struct BlockHighlightPushConstants {
     coords: Point3<f32>,
 }
@@ -141,15 +161,15 @@ impl BlockHighlightPushConstants {
     }
 }
 
-const DELTAS: [Point3<f32>; 8] = [
-    point![0.0, 0.0, 0.0],
-    point![1.0, 0.0, 0.0],
-    point![1.0, 1.0, 0.0],
-    point![0.0, 1.0, 0.0],
-    point![0.0, 0.0, 1.0],
-    point![1.0, 0.0, 1.0],
-    point![1.0, 1.0, 1.0],
-    point![0.0, 1.0, 1.0],
+const DELTAS: [Vector3<f32>; 8] = [
+    vector![0.0, 0.0, 0.0],
+    vector![1.0, 0.0, 0.0],
+    vector![1.0, 1.0, 0.0],
+    vector![0.0, 1.0, 0.0],
+    vector![0.0, 0.0, 1.0],
+    vector![1.0, 0.0, 1.0],
+    vector![1.0, 1.0, 1.0],
+    vector![0.0, 1.0, 1.0],
 ];
 
 #[rustfmt::skip]
