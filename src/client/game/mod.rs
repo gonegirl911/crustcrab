@@ -7,7 +7,7 @@ pub mod world;
 use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{Bloom, DepthBuffer, PostProcessor, Renderer, ToneMapper},
+    renderer::{DepthBuffer, PostProcessor, Renderer},
     ClientEvent,
 };
 use flume::Sender;
@@ -16,10 +16,8 @@ use std::time::Duration;
 pub struct Game {
     player: Player,
     sky: Sky,
-    bloom: Bloom,
     world: World,
     hover: BlockHover,
-    mapper: ToneMapper,
     gui: Gui,
     processor: PostProcessor,
     depth_buffer: DepthBuffer,
@@ -30,12 +28,7 @@ impl Game {
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
-        let sky = Sky::new(renderer, player.bind_group_layout());
-        let bloom = Bloom::new(
-            renderer,
-            processor.bind_group_layout(),
-            PostProcessor::FORMAT,
-        );
+        let sky = Sky::new(renderer);
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -46,19 +39,12 @@ impl Game {
             player.bind_group_layout(),
             sky.bind_group_layout(),
         );
-        let mapper = ToneMapper::new(
-            renderer,
-            processor.bind_group_layout(),
-            PostProcessor::FORMAT,
-        );
         let depth_buffer = DepthBuffer::new(renderer);
         Self {
             player,
             sky,
-            bloom,
             world,
             hover,
-            mapper,
             gui,
             processor,
             depth_buffer,
@@ -66,13 +52,7 @@ impl Game {
     }
 
     fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.sky.draw(
-            self.processor.view(),
-            encoder,
-            self.player.bind_group(),
-            self.depth_buffer.view(),
-        );
-        self.processor.apply_raw(encoder, &self.bloom);
+        self.sky.draw(self.processor.view(), encoder);
         self.world.draw(
             self.processor.view(),
             encoder,
@@ -88,7 +68,6 @@ impl Game {
             self.sky.bind_group(),
             self.depth_buffer.view(),
         );
-        self.processor.apply(encoder, &self.mapper);
         self.processor.blit_apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }
@@ -113,7 +92,6 @@ impl EventHandler for Game {
         ): Self::Context<'_>,
     ) {
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-        self.bloom.handle(event, renderer);
         self.world.handle(event, renderer);
         self.hover.handle(event, ());
         self.gui.handle(event, renderer);

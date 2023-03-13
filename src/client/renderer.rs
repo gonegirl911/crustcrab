@@ -5,7 +5,7 @@ use super::{
 use bytemuck::Pod;
 use image::RgbaImage;
 use std::{
-    array, iter,
+    array,
     marker::PhantomData,
     mem,
     num::{NonZeroU32, NonZeroU8},
@@ -784,7 +784,7 @@ pub struct PostProcessor {
 }
 
 impl PostProcessor {
-    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
         let textures = InputOutputTextureArray::new(renderer, Self::FORMAT);
@@ -807,25 +807,6 @@ impl PostProcessor {
         self.textures.bind_group_layout()
     }
 
-    pub fn apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
-        effect.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: self.secondary_view(),
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            }),
-            self.main_bind_group(),
-        );
-        self.swap();
-    }
-
     pub fn blit_apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -843,11 +824,6 @@ impl PostProcessor {
             self.blits[0].draw(&mut render_pass, self.main_bind_group());
             effect.draw(&mut render_pass, self.main_bind_group());
         }
-        self.swap();
-    }
-
-    pub fn apply_raw<E: RawEffect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
-        effect.draw(self.secondary_view(), encoder, self.main_bind_group());
         self.swap();
     }
 
@@ -998,350 +974,6 @@ impl Effect for Blit {
     }
 }
 
-pub struct Bloom {
-    filter: Filter,
-    blur: Blur,
-    blend: Blend,
-}
-
-impl Bloom {
-    pub fn new(
-        renderer: &Renderer,
-        input_bind_group_layout: &wgpu::BindGroupLayout,
-        format: wgpu::TextureFormat,
-    ) -> Self {
-        let filter = Filter::new(renderer, input_bind_group_layout, format);
-        let blur = Blur::new(renderer, format);
-        let blend = Blend::new(
-            renderer,
-            [input_bind_group_layout, blur.bind_group_layout()],
-            format,
-        );
-        Self {
-            filter,
-            blur,
-            blend,
-        }
-    }
-}
-
-impl RawEffect for Bloom {
-    fn draw(
-        &self,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        input_bind_group: &wgpu::BindGroup,
-    ) {
-        self.filter.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: self.blur.view(),
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            }),
-            input_bind_group,
-        );
-        self.blur.apply(encoder);
-        self.blend.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            }),
-            [input_bind_group, self.blur.bind_group()],
-        );
-    }
-}
-
-impl EventHandler for Bloom {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.blur.handle(event, renderer);
-    }
-}
-
-pub struct ToneMapper(Program);
-
-impl ToneMapper {
-    pub fn new(
-        renderer: &Renderer,
-        input_bind_group_layout: &wgpu::BindGroupLayout,
-        format: wgpu::TextureFormat,
-    ) -> Self {
-        Self(Program::new(
-            renderer,
-            wgpu::include_wgsl!("../../assets/shaders/aces.wgsl"),
-            &[],
-            &[input_bind_group_layout],
-            &[],
-            format,
-            None,
-            None,
-            None,
-        ))
-    }
-}
-
-impl Effect for ToneMapper {
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.0.bind(render_pass, [input_bind_group]);
-        render_pass.draw(0..3, 0..1);
-    }
-}
-
-struct Blur {
-    views: [wgpu::TextureView; 4],
-    sampler: wgpu::Sampler,
-    bind_group_layout: wgpu::BindGroupLayout,
-    bind_groups: [wgpu::BindGroup; 4],
-    blit: Blit,
-    is_resized: bool,
-}
-
-impl Blur {
-    fn new(renderer @ Renderer { device, .. }: &Renderer, format: wgpu::TextureFormat) -> Self {
-        let texture = Self::create_texture(renderer);
-        let views = Self::create_views(&texture);
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
-        let bind_groups = Self::create_bind_groups(renderer, &views, &sampler, &bind_group_layout);
-        let blit = Blit::new(renderer, &bind_group_layout, format);
-        Self {
-            views,
-            sampler,
-            bind_group_layout,
-            bind_groups,
-            blit,
-            is_resized: false,
-        }
-    }
-
-    fn view(&self) -> &wgpu::TextureView {
-        &self.views[0]
-    }
-
-    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_groups[0]
-    }
-
-    fn apply(&self, encoder: &mut wgpu::CommandEncoder) {
-        iter::zip(&self.views[1..], &self.bind_groups[..3])
-            .chain(iter::zip(&self.views[..3], &self.bind_groups[1..]).rev())
-            .for_each(|(view, bind_group)| {
-                self.blit.draw(
-                    &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: true,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                    }),
-                    bind_group,
-                );
-            });
-    }
-
-    fn create_texture(Renderer { device, config, .. }: &Renderer) -> wgpu::Texture {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 4,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: PostProcessor::FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        })
-    }
-
-    fn create_views(texture: &wgpu::Texture) -> [wgpu::TextureView; 4] {
-        array::from_fn(|i| {
-            texture.create_view(&wgpu::TextureViewDescriptor {
-                base_mip_level: i as u32,
-                mip_level_count: NonZeroU32::new(1),
-                ..Default::default()
-            })
-        })
-    }
-
-    fn create_bind_groups(
-        Renderer { device, .. }: &Renderer,
-        views: &[wgpu::TextureView; 4],
-        sampler: &wgpu::Sampler,
-        bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> [wgpu::BindGroup; 4] {
-        array::from_fn(|i| {
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: None,
-                layout: bind_group_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&views[i]),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(sampler),
-                    },
-                ],
-            })
-        })
-    }
-}
-
-impl EventHandler for Blur {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        match event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::Resized(PhysicalSize { width, height })
-                    | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: PhysicalSize { width, height },
-                        ..
-                    },
-                ..
-            } if *width != 0 && *height != 0 => {
-                self.is_resized = true;
-            }
-            Event::RedrawRequested(_) if self.is_resized => {
-                let texture = Self::create_texture(renderer);
-                self.views = Self::create_views(&texture);
-                self.bind_groups = Self::create_bind_groups(
-                    renderer,
-                    &self.views,
-                    &self.sampler,
-                    &self.bind_group_layout,
-                );
-            }
-            Event::RedrawEventsCleared => {
-                self.is_resized = false;
-            }
-            _ => {}
-        }
-    }
-}
-
-struct Filter(Program);
-
-impl Filter {
-    fn new(
-        renderer: &Renderer,
-        input_bind_group_layout: &wgpu::BindGroupLayout,
-        format: wgpu::TextureFormat,
-    ) -> Self {
-        Self(Program::new(
-            renderer,
-            wgpu::include_wgsl!("../../assets/shaders/filter.wgsl"),
-            &[],
-            &[input_bind_group_layout],
-            &[],
-            format,
-            None,
-            None,
-            None,
-        ))
-    }
-}
-
-impl Effect for Filter {
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.0.bind(render_pass, [input_bind_group]);
-        render_pass.draw(0..3, 0..1);
-    }
-}
-
-struct Blend(Program);
-
-impl Blend {
-    fn new(
-        renderer: &Renderer,
-        input_bind_group_layouts: [&wgpu::BindGroupLayout; 2],
-        format: wgpu::TextureFormat,
-    ) -> Self {
-        Self(Program::new(
-            renderer,
-            wgpu::include_wgsl!("../../assets/shaders/blend.wgsl"),
-            &[],
-            &input_bind_group_layouts,
-            &[],
-            format,
-            None,
-            None,
-            None,
-        ))
-    }
-
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_groups: [&'a wgpu::BindGroup; 2],
-    ) {
-        self.0.bind(render_pass, input_bind_groups);
-        render_pass.draw(0..3, 0..1);
-    }
-}
-
 pub trait Vertex: Pod {
     const ATTRIBS: &'static [wgpu::VertexAttribute];
 
@@ -1371,14 +1003,5 @@ pub trait Effect {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         input_bind_group: &'a wgpu::BindGroup,
-    );
-}
-
-pub trait RawEffect {
-    fn draw(
-        &self,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        input_bind_group: &wgpu::BindGroup,
     );
 }
