@@ -94,7 +94,7 @@ struct StarDome {
 
 impl StarDome {
     fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let distribution = StarDistribution::new(25000, Vector3::y());
+        let distribution = StarDistribution::new(20000, Vector3::y());
         let mesh = IndexedMesh::new(
             renderer,
             &distribution.vertices().collect::<Vec<_>>(),

@@ -7,7 +7,7 @@ pub mod world;
 use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{Bloom, DepthBuffer, PostProcessor, Renderer},
+    renderer::{Bloom, DepthBuffer, PostProcessor, Renderer, ToneMapper},
     ClientEvent,
 };
 use flume::Sender;
@@ -19,6 +19,7 @@ pub struct Game {
     bloom: Bloom,
     world: World,
     hover: BlockHover,
+    mapper: ToneMapper,
     gui: Gui,
     processor: PostProcessor,
     depth_buffer: DepthBuffer,
@@ -45,6 +46,11 @@ impl Game {
             player.bind_group_layout(),
             sky.bind_group_layout(),
         );
+        let mapper = ToneMapper::new(
+            renderer,
+            processor.bind_group_layout(),
+            PostProcessor::FORMAT,
+        );
         let depth_buffer = DepthBuffer::new(renderer);
         Self {
             player,
@@ -52,6 +58,7 @@ impl Game {
             bloom,
             world,
             hover,
+            mapper,
             gui,
             processor,
             depth_buffer,
@@ -81,6 +88,7 @@ impl Game {
             self.sky.bind_group(),
             self.depth_buffer.view(),
         );
+        self.processor.apply(encoder, &self.mapper);
         self.processor.blit_apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }
@@ -105,6 +113,7 @@ impl EventHandler for Game {
         ): Self::Context<'_>,
     ) {
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
+        self.bloom.handle(event, renderer);
         self.world.handle(event, renderer);
         self.hover.handle(event, ());
         self.gui.handle(event, renderer);
