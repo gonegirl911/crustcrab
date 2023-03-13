@@ -30,7 +30,11 @@ impl Game {
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
         let sky = Sky::new(renderer, player.bind_group_layout());
-        let bloom = Bloom::new(renderer, processor.bind_group_layout());
+        let bloom = Bloom::new(
+            renderer,
+            processor.bind_group_layout(),
+            PostProcessor::FORMAT,
+        );
         let world = World::new(
             renderer,
             player.bind_group_layout(),

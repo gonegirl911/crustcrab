@@ -2,7 +2,9 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         game::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
-        renderer::{DepthBuffer, ImageTextureArray, Mesh, Program, Renderer, Vertex},
+        renderer::{
+            DepthBuffer, ImageTextureArray, Mesh, PostProcessor, Program, Renderer, Vertex,
+        },
     },
     server::{
         game::world::{
@@ -52,7 +54,7 @@ impl World {
                 stages: wgpu::ShaderStages::VERTEX,
                 range: 0..mem::size_of::<BlockPushConstants>() as u32,
             }],
-            None,
+            PostProcessor::FORMAT,
             None,
             Some(wgpu::Face::Back),
             Some(wgpu::DepthStencilState {

@@ -1,7 +1,7 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{DepthBuffer, IndexedMesh, Program, Renderer, Vertex},
+        renderer::{DepthBuffer, IndexedMesh, PostProcessor, Program, Renderer, Vertex},
     },
     server::ServerEvent,
 };
@@ -99,7 +99,7 @@ impl BlockHighlight {
                     stages: wgpu::ShaderStages::VERTEX,
                     range: 0..mem::size_of::<BlockHighlightPushConstants>() as u32,
                 }],
-                None,
+                PostProcessor::FORMAT,
                 Some(wgpu::BlendState::ALPHA_BLENDING),
                 Some(wgpu::Face::Back),
                 Some(wgpu::DepthStencilState {

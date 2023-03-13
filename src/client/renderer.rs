@@ -444,7 +444,7 @@ impl ImageTexture {
                 },
             ],
         });
-        let blit = Blit::new(renderer, &bind_group_layout, Some(texture.format()));
+        let blit = Blit::new(renderer, &bind_group_layout, texture.format());
         let mut encoder = device.create_command_encoder(&Default::default());
 
         (0..levels)
@@ -628,25 +628,21 @@ impl EventHandler for ScreenTexture {
     }
 }
 
-pub struct DepthBuffer {
-    texture: ScreenTexture,
-}
+pub struct DepthBuffer(ScreenTexture);
 
 impl DepthBuffer {
     pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
     pub fn new(renderer: &Renderer) -> Self {
-        Self {
-            texture: ScreenTexture::new(
-                renderer,
-                Self::FORMAT,
-                wgpu::TextureUsages::RENDER_ATTACHMENT,
-            ),
-        }
+        Self(ScreenTexture::new(
+            renderer,
+            Self::FORMAT,
+            wgpu::TextureUsages::RENDER_ATTACHMENT,
+        ))
     }
 
     pub fn view(&self) -> &wgpu::TextureView {
-        self.texture.view()
+        self.0.view()
     }
 }
 
@@ -654,7 +650,7 @@ impl EventHandler for DepthBuffer {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.texture.handle(event, renderer);
+        self.0.handle(event, renderer);
     }
 }
 
@@ -668,11 +664,11 @@ struct InputOutputTextureArray<const N: usize> {
 
 impl<const N: usize> InputOutputTextureArray<N> {
     #[rustfmt::skip]
-    fn new(renderer @ Renderer { device, config, .. }: &Renderer) -> Self {
+    fn new(renderer @ Renderer { device, .. }: &Renderer, format: wgpu::TextureFormat) -> Self {
         let textures = array::from_fn(|_| {
             ScreenTexture::new(
                 renderer,
-                config.format,
+                format,
                 wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             )
         });
@@ -783,17 +779,22 @@ impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
 
 pub struct PostProcessor {
     textures: InputOutputTextureArray<2>,
-    blit: Blit,
+    blits: [Blit; 2],
     index: bool,
 }
 
 impl PostProcessor {
-    pub fn new(renderer: &Renderer) -> Self {
-        let textures = InputOutputTextureArray::new(renderer);
-        let blit = Blit::new(renderer, textures.bind_group_layout(), None);
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+    pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
+        let textures = InputOutputTextureArray::new(renderer, Self::FORMAT);
+        let blits = [
+            Blit::new(renderer, textures.bind_group_layout(), Self::FORMAT),
+            Blit::new(renderer, textures.bind_group_layout(), config.format),
+        ];
         Self {
             textures,
-            blit,
+            blits,
             index: false,
         }
     }
@@ -820,7 +821,7 @@ impl PostProcessor {
                 })],
                 depth_stencil_attachment: None,
             });
-            self.blit.draw(&mut render_pass, self.main_bind_group());
+            self.blits[0].draw(&mut render_pass, self.main_bind_group());
             effect.draw(&mut render_pass, self.main_bind_group());
         }
         self.swap();
@@ -832,7 +833,7 @@ impl PostProcessor {
     }
 
     pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.blit.draw(
+        self.blits[1].draw(
             &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -889,12 +890,12 @@ pub struct Program {
 impl Program {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        Renderer { device, config, .. }: &Renderer,
+        Renderer { device, .. }: &Renderer,
         desc: wgpu::ShaderModuleDescriptor,
         buffers: &[wgpu::VertexBufferLayout],
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         push_constant_ranges: &[wgpu::PushConstantRange],
-        format: Option<wgpu::TextureFormat>,
+        format: wgpu::TextureFormat,
         blend: Option<wgpu::BlendState>,
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
@@ -918,7 +919,7 @@ impl Program {
                 module: &shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: format.unwrap_or(config.format),
+                    format,
                     blend,
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -951,7 +952,7 @@ impl Blit {
     fn new(
         renderer: &Renderer,
         input_bind_group_layout: &wgpu::BindGroupLayout,
-        format: Option<wgpu::TextureFormat>,
+        format: wgpu::TextureFormat,
     ) -> Self {
         Self(Program::new(
             renderer,
@@ -978,36 +979,79 @@ impl Effect for Blit {
     }
 }
 
-struct Filter(Program);
+pub struct Bloom {
+    filter: Filter,
+    blur: Blur,
+    blend: Blend,
+}
 
-impl Filter {
-    fn new(
+impl Bloom {
+    pub fn new(
         renderer: &Renderer,
         input_bind_group_layout: &wgpu::BindGroupLayout,
-        format: Option<wgpu::TextureFormat>,
+        format: wgpu::TextureFormat,
     ) -> Self {
-        Self(Program::new(
+        let filter = Filter::new(renderer, input_bind_group_layout, format);
+        let blur = Blur::new(renderer, format);
+        let blend = Blend::new(
             renderer,
-            wgpu::include_wgsl!("../../assets/shaders/filter.wgsl"),
-            &[],
-            &[input_bind_group_layout],
-            &[],
+            [input_bind_group_layout, blur.bind_group_layout()],
             format,
-            None,
-            None,
-            None,
-        ))
+        );
+        Self {
+            filter,
+            blur,
+            blend,
+        }
     }
 }
 
-impl Effect for Filter {
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_group: &'a wgpu::BindGroup,
+impl RawEffect for Bloom {
+    fn draw(
+        &self,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        input_bind_group: &wgpu::BindGroup,
     ) {
-        self.0.bind(render_pass, [input_bind_group]);
-        render_pass.draw(0..3, 0..1);
+        self.filter.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: self.blur.view(),
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            }),
+            input_bind_group,
+        );
+        self.blur.apply(encoder);
+        self.blend.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            }),
+            [input_bind_group, self.blur.bind_group()],
+        );
+    }
+}
+
+impl EventHandler for Bloom {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        self.blur.handle(event, renderer);
     }
 }
 
@@ -1021,7 +1065,7 @@ struct Blur {
 }
 
 impl Blur {
-    fn new(renderer @ Renderer { device, .. }: &Renderer) -> Self {
+    fn new(renderer @ Renderer { device, .. }: &Renderer, format: wgpu::TextureFormat) -> Self {
         let texture = Self::create_texture(renderer);
         let views = Self::create_views(&texture);
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -1051,7 +1095,7 @@ impl Blur {
             ],
         });
         let bind_groups = Self::create_bind_groups(renderer, &views, &sampler, &bind_group_layout);
-        let blit = Blit::new(renderer, &bind_group_layout, None);
+        let blit = Blit::new(renderer, &bind_group_layout, format);
         Self {
             views,
             sampler,
@@ -1107,7 +1151,7 @@ impl Blur {
             mip_level_count: 4,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: config.format,
+            format: PostProcessor::FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         })
@@ -1182,13 +1226,46 @@ impl EventHandler for Blur {
     }
 }
 
+struct Filter(Program);
+
+impl Filter {
+    fn new(
+        renderer: &Renderer,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
+        format: wgpu::TextureFormat,
+    ) -> Self {
+        Self(Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../assets/shaders/filter.wgsl"),
+            &[],
+            &[input_bind_group_layout],
+            &[],
+            format,
+            None,
+            None,
+            None,
+        ))
+    }
+}
+
+impl Effect for Filter {
+    fn draw<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        input_bind_group: &'a wgpu::BindGroup,
+    ) {
+        self.0.bind(render_pass, [input_bind_group]);
+        render_pass.draw(0..3, 0..1);
+    }
+}
+
 struct Blend(Program);
 
 impl Blend {
     fn new(
         renderer: &Renderer,
         input_bind_group_layouts: [&wgpu::BindGroupLayout; 2],
-        format: Option<wgpu::TextureFormat>,
+        format: wgpu::TextureFormat,
     ) -> Self {
         Self(Program::new(
             renderer,
@@ -1210,78 +1287,6 @@ impl Blend {
     ) {
         self.0.bind(render_pass, input_bind_groups);
         render_pass.draw(0..3, 0..1);
-    }
-}
-
-pub struct Bloom {
-    filter: Filter,
-    blur: Blur,
-    blend: Blend,
-}
-
-impl Bloom {
-    pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let filter = Filter::new(renderer, input_bind_group_layout, None);
-        let blur = Blur::new(renderer);
-        let blend = Blend::new(
-            renderer,
-            [input_bind_group_layout, blur.bind_group_layout()],
-            None,
-        );
-        Self {
-            filter,
-            blur,
-            blend,
-        }
-    }
-}
-
-impl RawEffect for Bloom {
-    fn draw(
-        &self,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        input_bind_group: &wgpu::BindGroup,
-    ) {
-        self.filter.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: self.blur.view(),
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            }),
-            input_bind_group,
-        );
-        self.blur.apply(encoder);
-        self.blend.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            }),
-            [input_bind_group, self.blur.bind_group()],
-        );
-    }
-}
-
-impl EventHandler for Bloom {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.blur.handle(event, renderer);
     }
 }
 

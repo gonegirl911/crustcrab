@@ -1,6 +1,6 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{Effect, ImageTexture, Program, Renderer, Uniform},
+    renderer::{Effect, ImageTexture, PostProcessor, Program, Renderer, Uniform},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4};
@@ -33,7 +33,7 @@ impl Crosshair {
                 input_bind_group_layout,
             ],
             &[],
-            None,
+            PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
             None,
             None,

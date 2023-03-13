@@ -1,5 +1,7 @@
 use crate::{
-    client::renderer::{DepthBuffer, IndexedMesh, Program, Renderer, Uniform, Vertex},
+    client::renderer::{
+        DepthBuffer, IndexedMesh, PostProcessor, Program, Renderer, Uniform, Vertex,
+    },
     color::{Float3, Rgb},
     server::game::world::block::{Corner, Side, CORNERS, SIDE_CORNER_DELTAS, SIDE_DELTAS},
 };
@@ -104,7 +106,7 @@ impl StarDome {
             &[StarVertex::desc()],
             &[player_bind_group_layout],
             &[],
-            None,
+            PostProcessor::FORMAT,
             None,
             Some(wgpu::Face::Back),
             Some(wgpu::DepthStencilState {
