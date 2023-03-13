@@ -6,7 +6,7 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use enum_map::Enum;
 use nalgebra::{point, Point3, Similarity3, UnitQuaternion, Vector3};
-use rand::Rng;
+use rand::prelude::*;
 use std::f32::consts::PI;
 
 pub struct Sky {
@@ -15,7 +15,7 @@ pub struct Sky {
 }
 
 impl Sky {
-    const COLOR: Rgb<f32> = Rgb::splat(0.0);
+    const COLOR: Rgb<f32> = Rgb::new(0.00304, 0.00335, 0.0075);
     const LIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
 
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {

@@ -68,7 +68,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
     let distance = distance(player.origin, coords);
     let fog_distance = f32((player.render_distance - 2u) * 16u);
-    let fog_factor = pow(saturate(distance / fog_distance), 4.0);
+    let fog_factor = exp(-pow(max(distance - fog_distance, 0.0) * 0.2, 2.0));
 
     return VertexOutput(
         player.vp * vec4(coords, 1.0),
@@ -88,8 +88,8 @@ var s_block: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return mix(
-        textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0),
         vec4(sky.color, 1.0),
+        textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0),
         in.fog_factor,
     );
 }

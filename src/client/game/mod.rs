@@ -7,7 +7,7 @@ pub mod world;
 use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{DepthBuffer, PostProcessor, Renderer},
+    renderer::{Bloom, DepthBuffer, PostProcessor, Renderer},
     ClientEvent,
 };
 use flume::Sender;
@@ -16,6 +16,7 @@ use std::time::Duration;
 pub struct Game {
     player: Player,
     sky: Sky,
+    bloom: Bloom,
     world: World,
     hover: BlockHover,
     gui: Gui,
@@ -29,6 +30,7 @@ impl Game {
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
         let sky = Sky::new(renderer, player.bind_group_layout());
+        let bloom = Bloom::new(renderer, processor.bind_group_layout());
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -43,6 +45,7 @@ impl Game {
         Self {
             player,
             sky,
+            bloom,
             world,
             hover,
             gui,
@@ -58,6 +61,7 @@ impl Game {
             self.player.bind_group(),
             self.depth_buffer.view(),
         );
+        self.processor.apply_raw(encoder, &self.bloom);
         self.world.draw(
             self.processor.view(),
             encoder,

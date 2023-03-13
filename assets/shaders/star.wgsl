@@ -21,7 +21,7 @@ var<uniform> player: PlayerUniform;
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     return VertexOutput(
         player.vp * vec4(player.origin + vertex.coords, 1.0),
-        vec3(vertex.light_factor),
+        vec3(vertex.light_factor) + vec3(0.67244, 0.77582, 1.0),
     );
 }
 
