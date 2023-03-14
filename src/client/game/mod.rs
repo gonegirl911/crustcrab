@@ -19,8 +19,8 @@ pub struct Game {
     sky: Sky,
     world: World,
     hover: BlockHover,
-    processor: PostProcessor,
     depth_buffer: DepthBuffer,
+    processor: PostProcessor,
 }
 
 impl Game {
@@ -46,8 +46,8 @@ impl Game {
             sky,
             world,
             hover,
-            processor,
             depth_buffer,
+            processor,
         }
     }
 
@@ -91,12 +91,12 @@ impl EventHandler for Game {
             dt,
         ): Self::Context<'_>,
     ) {
+        self.gui.handle(event, renderer);
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
         self.world.handle(event, renderer);
         self.hover.handle(event, ());
-        self.gui.handle(event, renderer);
-        self.processor.handle(event, renderer);
         self.depth_buffer.handle(event, renderer);
+        self.processor.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {
