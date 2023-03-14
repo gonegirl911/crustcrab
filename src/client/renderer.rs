@@ -663,7 +663,6 @@ struct InputOutputTextureArray<const N: usize> {
 }
 
 impl<const N: usize> InputOutputTextureArray<N> {
-    #[rustfmt::skip]
     fn new(renderer @ Renderer { device, .. }: &Renderer, format: wgpu::TextureFormat) -> Self {
         let textures = array::from_fn(|_| {
             ScreenTexture::new(
@@ -694,7 +693,8 @@ impl<const N: usize> InputOutputTextureArray<N> {
                 },
             ],
         });
-        let bind_groups = Self::create_bind_groups(renderer, &textures, &sampler, &bind_group_layout);
+        let bind_groups =
+            Self::create_bind_groups(renderer, &textures, &sampler, &bind_group_layout);
         Self {
             textures,
             sampler,
