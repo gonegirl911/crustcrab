@@ -14,11 +14,11 @@ use flume::Sender;
 use std::time::Duration;
 
 pub struct Game {
+    gui: Gui,
     player: Player,
     sky: Sky,
     world: World,
     hover: BlockHover,
-    gui: Gui,
     processor: PostProcessor,
     depth_buffer: DepthBuffer,
 }
@@ -41,11 +41,11 @@ impl Game {
         );
         let depth_buffer = DepthBuffer::new(renderer);
         Self {
+            gui,
             player,
             sky,
             world,
             hover,
-            gui,
             processor,
             depth_buffer,
         }

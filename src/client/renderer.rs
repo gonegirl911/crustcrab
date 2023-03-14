@@ -784,7 +784,7 @@ pub struct PostProcessor {
 }
 
 impl PostProcessor {
-    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
         let textures = InputOutputTextureArray::new(renderer, Self::FORMAT);

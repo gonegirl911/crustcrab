@@ -306,10 +306,10 @@ bitflags! {
         const RESIZED = 1 << 2;
         const BLOCK_DESTROYED = 1 << 3;
         const BLOCK_PLACED = 1 << 4;
-        const MATRIX_CHANGES = Self::ROTATED.bits | Self::MOVED.bits | Self::RESIZED.bits;
+        const MATRIX_CHANGES = Self::ROTATED.bits() | Self::MOVED.bits() | Self::RESIZED.bits();
     }
 
-    #[derive(Default)]
+    #[derive(Clone, Copy, Default)]
     struct Keys: u8 {
         const W = 1 << 0;
         const A = 1 << 1;
@@ -319,7 +319,7 @@ bitflags! {
         const SPACE = 1 << 5;
     }
 
-    #[derive(Default)]
+    #[derive(Clone, Copy, Default)]
     struct MouseButtons: u8 {
         const LEFT = 1 << 0;
         const RIGHT = 1 << 1;
