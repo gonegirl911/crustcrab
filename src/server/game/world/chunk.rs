@@ -54,9 +54,7 @@ impl ChunkMap {
             .flat_map(|(coords, _)| self.light.insert(&self.store, *coords))
             .collect();
 
-        let prev = std::time::Instant::now();
         self.store.extend(new);
-        dbg!(prev.elapsed());
 
         let loads = points
             .iter()
