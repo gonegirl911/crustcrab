@@ -16,7 +16,7 @@ use crate::{
 };
 use bitvec::prelude::*;
 use flume::Sender;
-use nalgebra::{point, vector, Point3, Vector3};
+use nalgebra::{point, vector, Point2, Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -29,7 +29,7 @@ use std::{
 
 #[derive(Default)]
 pub struct ChunkMap {
-    cells: FxHashMap<Point3<i32>, ChunkCell>,
+    store: ChunkStore,
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
     hovered_block: Option<BlockIntersection>,
     loader: ChunkLoader,
@@ -41,7 +41,7 @@ impl ChunkMap {
         let missing = points
             .iter()
             .copied()
-            .filter(|coords| self.cells.get_mut(coords).map(ChunkCell::load).is_none())
+            .filter(|coords| self.store.get_mut(*coords).map(ChunkCell::load).is_none())
             .collect::<Vec<_>>();
 
         let new = missing
@@ -51,15 +51,17 @@ impl ChunkMap {
 
         let block_updates = new
             .iter()
-            .flat_map(|(coords, _)| self.light.insert(&self.cells, *coords))
+            .flat_map(|(coords, _)| self.light.insert(&self.store, *coords))
             .collect();
 
-        self.cells.extend(new);
+        let prev = std::time::Instant::now();
+        self.store.extend(new);
+        dbg!(prev.elapsed());
 
         let loads = points
             .iter()
             .copied()
-            .filter(|coords| self.cells.contains_key(coords))
+            .filter(|coords| self.store.contains_coords(*coords))
             .collect();
 
         (loads, block_updates)
@@ -73,12 +75,12 @@ impl ChunkMap {
         let mut block_updates = FxHashSet::default();
 
         for coords in points {
-            if let Some(cell) = self.cells.remove(&coords) {
+            if let Some(cell) = self.store.remove(coords) {
                 unloads.push(coords);
                 if let Some(cell) = cell.unload() {
-                    self.cells.insert(coords, cell);
+                    self.store.insert(coords, cell);
                 } else {
-                    block_updates.extend(self.light.remove(&self.cells, coords));
+                    block_updates.extend(self.light.remove(&self.store, coords));
                 }
             }
         }
@@ -96,7 +98,7 @@ impl ChunkMap {
         let chunk_coords = Self::chunk_coords(coords);
         let block_coords = Self::block_coords(coords);
 
-        let (cell, is_created) = if let Some(cell) = self.cells.remove(&chunk_coords) {
+        let (cell, is_created) = if let Some(cell) = self.store.remove(chunk_coords) {
             (cell.apply(block_coords, &action).map_err(Some), false)
         } else {
             (
@@ -108,7 +110,7 @@ impl ChunkMap {
         match cell {
             Ok(cell) => {
                 let (is_loaded, is_unloaded) = if let Some(cell) = cell {
-                    self.cells.insert(chunk_coords, cell);
+                    self.store.insert(chunk_coords, cell);
                     (is_created, false)
                 } else {
                     (false, !is_created)
@@ -120,7 +122,7 @@ impl ChunkMap {
                 );
 
                 let block_updates = {
-                    let mut updates = self.light.apply(&self.cells, coords, &action);
+                    let mut updates = self.light.apply(&self.store, coords, &action);
                     if !is_loaded && !is_unloaded {
                         updates.insert(coords);
                     } else {
@@ -147,7 +149,7 @@ impl ChunkMap {
                 self.send_updates(updates, server_tx, true);
             }
             Err(Some(cell)) => {
-                self.cells.insert(chunk_coords, cell);
+                self.store.insert(chunk_coords, cell);
             }
             Err(None) => {}
         }
@@ -162,7 +164,7 @@ impl ChunkMap {
             .map(|coords| ServerEvent::ChunkLoaded {
                 coords,
                 data: Arc::new(ChunkData {
-                    chunk: (*self.cells[&coords]).clone(),
+                    chunk: (*self.store[coords]).clone(),
                     area: self.chunk_area(coords),
                     area_light: self.light.chunk_area_light(coords),
                 }),
@@ -182,7 +184,7 @@ impl ChunkMap {
             .map(|coords| ServerEvent::ChunkLoaded {
                 coords,
                 data: Arc::new(ChunkData {
-                    chunk: (*self.cells[&coords]).clone(),
+                    chunk: (*self.store[coords]).clone(),
                     area: self.chunk_area(coords),
                     area_light: self.light.chunk_area_light(coords),
                 }),
@@ -218,7 +220,7 @@ impl ChunkMap {
                 Some(ServerEvent::ChunkUpdated {
                     coords,
                     data: Arc::new(ChunkData {
-                        chunk: (*self.cells.get(&coords)?).clone(),
+                        chunk: (*self.store.get(coords)?).clone(),
                         area: self.chunk_area(coords),
                         area_light: self.light.chunk_area_light(coords),
                     }),
@@ -242,7 +244,7 @@ impl ChunkMap {
                 Some(ServerEvent::ChunkUpdated {
                     coords,
                     data: Arc::new(ChunkData {
-                        chunk: (*self.cells.get(&coords)?).clone(),
+                        chunk: (*self.store.get(coords)?).clone(),
                         area: self.chunk_area(coords),
                         area_light: self.light.chunk_area_light(coords),
                     }),
@@ -273,8 +275,8 @@ impl ChunkMap {
             let delta = delta.cast().into();
             let chunk_coords = coords + Self::chunk_coords(delta).coords;
             let block_coords = Self::block_coords(delta);
-            self.cells
-                .get(&chunk_coords)
+            self.store
+                .get(chunk_coords)
                 .map(|cell| cell[block_coords].data().is_opaque())
                 .unwrap_or_default()
         })
@@ -372,11 +374,10 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
             ChunkMapEvent::BlockSelectionRequested => {
                 self.hovered_block = ray.cast(Player::BUILDING_REACH).find(
                     |BlockIntersection { coords, .. }| {
-                        let coords = coords.cast();
-                        let chunk_coords = Self::chunk_coords(coords);
-                        let block_coords = Self::block_coords(coords);
-                        self.cells
-                            .get(&chunk_coords)
+                        let chunk_coords = Self::chunk_coords(*coords);
+                        let block_coords = Self::block_coords(*coords);
+                        self.store
+                            .get(chunk_coords)
                             .map(|cell| cell[block_coords].is_not_air())
                             .unwrap_or_default()
                     },
@@ -398,6 +399,66 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                     self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
                 }
             }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ChunkStore {
+    cells: FxHashMap<Point3<i32>, ChunkCell>,
+    y_ranges: FxHashMap<Point2<i32>, Range<i32>>,
+}
+
+impl ChunkStore {
+    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) -> Option<ChunkCell> {
+        self.y_ranges
+            .entry(coords.xz())
+            .and_modify(|range| *range = range.start.min(coords.y)..range.end.max(coords.y + 1))
+            .or_insert(coords.y..coords.y + 1);
+        self.cells.insert(coords, cell)
+    }
+
+    fn remove(&mut self, coords: Point3<i32>) -> Option<ChunkCell> {
+        let range = self.y_ranges.get_mut(&coords.xz())?;
+        if range.contains(&coords.y) {
+            if range.len() == 1 {
+                self.y_ranges.remove(&coords.xz());
+            } else if coords.y == range.start {
+                range.start += 1;
+            } else if coords.y == range.end - 1 {
+                range.end -= 1;
+            }
+            self.cells.remove(&coords)
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, coords: Point3<i32>) -> Option<&ChunkCell> {
+        self.cells.get(&coords)
+    }
+
+    fn get_mut(&mut self, coords: Point3<i32>) -> Option<&mut ChunkCell> {
+        self.cells.get_mut(&coords)
+    }
+
+    fn contains_coords(&self, coords: Point3<i32>) -> bool {
+        self.cells.contains_key(&coords)
+    }
+}
+
+impl Index<Point3<i32>> for ChunkStore {
+    type Output = ChunkCell;
+
+    fn index(&self, coords: Point3<i32>) -> &Self::Output {
+        &self.cells[&coords]
+    }
+}
+
+impl Extend<(Point3<i32>, ChunkCell)> for ChunkStore {
+    fn extend<T: IntoIterator<Item = (Point3<i32>, ChunkCell)>>(&mut self, iter: T) {
+        for (coords, cell) in iter {
+            self.insert(coords, cell);
         }
     }
 }
