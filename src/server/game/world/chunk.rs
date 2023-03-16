@@ -51,7 +51,7 @@ impl ChunkMap {
 
         let block_updates = new
             .iter()
-            .flat_map(|(coords, _)| self.light.insert(&self.store, *coords))
+            .flat_map(|(coords, cell)| self.light.insert(&self.store, *coords, cell))
             .collect();
 
         self.store.extend(new);
@@ -308,6 +308,10 @@ impl ChunkMap {
         coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
 
+    pub fn coords(chunk_coords: Point3<i32>, block_coords: Point3<u8>) -> Point3<i64> {
+        chunk_coords.cast() * Chunk::DIM as i64 + block_coords.coords.cast()
+    }
+
     fn div_floor(a: i64, b: i64) -> i64 {
         let d = a / b;
         let r = a % b;
@@ -432,16 +436,20 @@ impl ChunkStore {
         }
     }
 
+    fn contains_coords(&self, coords: Point3<i32>) -> bool {
+        self.cells.contains_key(&coords)
+    }
+
+    pub fn y_range(&self, coords: Point2<i32>) -> Range<i32> {
+        self.y_ranges[&coords].clone()
+    }
+
     pub fn get(&self, coords: Point3<i32>) -> Option<&ChunkCell> {
         self.cells.get(&coords)
     }
 
     fn get_mut(&mut self, coords: Point3<i32>) -> Option<&mut ChunkCell> {
         self.cells.get_mut(&coords)
-    }
-
-    fn contains_coords(&self, coords: Point3<i32>) -> bool {
-        self.cells.contains_key(&coords)
     }
 }
 

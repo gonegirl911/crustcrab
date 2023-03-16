@@ -1,6 +1,6 @@
 use super::{
     block::{Block, BlockArea, BlockData, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS},
-    chunk::{BlockAction, Chunk, ChunkArea, ChunkMap, ChunkStore},
+    chunk::{BlockAction, Chunk, ChunkArea, ChunkCell, ChunkMap, ChunkStore},
 };
 use bitfield::bitfield;
 use enum_map::EnumMap;
@@ -30,7 +30,12 @@ impl ChunkMapLight {
         })
     }
 
-    pub fn insert(&mut self, store: &ChunkStore, coords: Point3<i32>) -> FxHashSet<Point3<i64>> {
+    pub fn insert(
+        &mut self,
+        store: &ChunkStore,
+        coords: Point3<i32>,
+        cell: &ChunkCell,
+    ) -> FxHashSet<Point3<i64>> {
         Default::default()
     }
 

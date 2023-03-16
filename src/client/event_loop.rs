@@ -1,7 +1,7 @@
 use super::{stopwatch::Stopwatch, ClientEvent};
 use crate::server::ServerEvent;
 use flume::{Receiver, Sender};
-use std::time::Duration;
+use std::{ops::Deref, time::Duration};
 use winit::{
     event::{Event as RawEvent, StartCause},
     event_loop::{
@@ -54,8 +54,10 @@ impl EventLoop {
     }
 }
 
-impl AsRef<RawEventLoop<ServerEvent>> for EventLoop {
-    fn as_ref(&self) -> &RawEventLoop<ServerEvent> {
+impl Deref for EventLoop {
+    type Target = RawEventLoop<ServerEvent>;
+
+    fn deref(&self) -> &Self::Target {
         &self.event_loop
     }
 }

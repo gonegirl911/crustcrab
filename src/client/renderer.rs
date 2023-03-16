@@ -1,7 +1,4 @@
-use super::{
-    event_loop::{Event, EventHandler},
-    window::Window,
-};
+use super::event_loop::{Event, EventHandler};
 use bytemuck::Pod;
 use image::RgbaImage;
 use std::{
@@ -12,7 +9,7 @@ use std::{
     slice,
 };
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
-use winit::{dpi::PhysicalSize, event::WindowEvent};
+use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window as RawWindow};
 
 pub struct Renderer {
     pub surface: wgpu::Surface,
@@ -23,12 +20,12 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: &Window) -> Self {
-        let PhysicalSize { width, height } = window.as_ref().inner_size();
+    pub async fn new(window: &RawWindow) -> Self {
+        let PhysicalSize { width, height } = window.inner_size();
         let instance = wgpu::Instance::default();
         let surface = unsafe {
             instance
-                .create_surface(window.as_ref())
+                .create_surface(window)
                 .expect("surface should be creatable")
         };
         let adapter = instance
