@@ -67,8 +67,8 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let light_factor = saturate(global_light + local_light) * ambient_light * face_light;
 
     let distance = distance(player.origin, coords);
-    let fog_distance = f32(player.render_distance * 16u) * 0.8;
-    let fog_factor = exp(-pow(max(distance - fog_distance, 0.0) * 0.1, 2.0));
+    let fog_start = f32((player.render_distance - 2u) * 16u);
+    let fog_factor = exp(-pow(max(distance - fog_start, 0.0) * 0.2, 2.0));
 
     return VertexOutput(
         player.vp * vec4(coords, 1.0),

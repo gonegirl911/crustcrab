@@ -16,7 +16,7 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
-use nalgebra::{point, Matrix4, Point3, Vector3};
+use nalgebra::{point, vector, Matrix4, Point3, Vector3};
 use std::time::Duration;
 use winit::event::StartCause;
 
@@ -29,8 +29,10 @@ pub struct Player {
 }
 
 impl Player {
+    pub const WORLD_UP: Vector3<f32> = vector![0.0, 1.0, 0.0];
+
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
-        let view = View::new(point![0.0, 100.0, 0.0], Vector3::x(), Vector3::y());
+        let view = View::new(point![0.0, 100.0, 0.0], Vector3::x(), Self::WORLD_UP);
         let aspect = config.width as f32 / config.height as f32;
         let zfar = (gui.render_distance() * Chunk::DIM as u32) as f32;
         let projection = Projection::new(90.0, aspect, 0.1, zfar);
