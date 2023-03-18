@@ -1,7 +1,11 @@
 use super::player::Player;
 use crate::{
-    client::renderer::{ImageTexture, PostProcessor, Program, Renderer, Uniform},
+    client::{
+        event_loop::{Event, EventHandler},
+        renderer::{ImageTexture, PostProcessor, Program, Renderer, Uniform},
+    },
     color::{Float3, Rgb},
+    server::ServerEvent,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, Matrix4, Point3};
@@ -11,12 +15,11 @@ pub struct Sky {
     sun: Object,
     moon: Object,
     uniform: Uniform<SkyUniformData>,
+    sun_coords: Point3<f32>,
+    updated_time: Option<f32>,
 }
 
 impl Sky {
-    const COLOR: Rgb<f32> = Rgb::splat(0.0);
-    const LIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
-
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         Self {
             sun: Object::new(
@@ -31,11 +34,9 @@ impl Sky {
                 include_bytes!("../../../assets/textures/moon.png"),
                 true,
             ),
-            uniform: Uniform::with_constant_data(
-                renderer,
-                &SkyUniformData::new(Self::COLOR, Self::LIGHT_INTENSITY),
-                wgpu::ShaderStages::VERTEX_FRAGMENT,
-            ),
+            uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            sun_coords: Default::default(),
+            updated_time: None,
         }
     }
 
@@ -53,7 +54,6 @@ impl Sky {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
-        time: f32,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
@@ -61,23 +61,27 @@ impl Sky {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(Self::COLOR.into()),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: true,
                 },
             })],
             depth_stencil_attachment: None,
         });
-        self.sun.draw(&mut render_pass, player_bind_group, Self::sun_m(time));
-        self.moon.draw(&mut render_pass, player_bind_group, Self::moon_m(time));
+        self.sun.draw(&mut render_pass, player_bind_group, self.sun_m());
+        self.moon.draw(&mut render_pass, player_bind_group, self.moon_m());
     }
 
-    fn sun_m(time: f32) -> Matrix4<f32> {
+    fn sun_m(&self) -> Matrix4<f32> {
+        Self::m(self.sun_coords).prepend_scaling(0.5)
+    }
+
+    fn moon_m(&self) -> Matrix4<f32> {
+        Self::m(-self.sun_coords).prepend_scaling(0.5)
+    }
+
+    fn sun_coords(time: f32) -> Point3<f32> {
         let theta = time * TAU;
-        Self::m(point![theta.cos(), theta.sin(), 0.0]).prepend_scaling(0.5)
-    }
-
-    fn moon_m(time: f32) -> Matrix4<f32> {
-        Self::sun_m(time + 0.5)
+        point![theta.cos(), theta.sin(), 0.0]
     }
 
     fn m(coords: Point3<f32>) -> Matrix4<f32> {
@@ -85,17 +89,48 @@ impl Sky {
     }
 }
 
+impl EventHandler for Sky {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        match event {
+            Event::UserEvent(ServerEvent::TimeUpdated { time }) => {
+                self.updated_time = Some(*time);
+            }
+            Event::RedrawRequested(_) => {
+                if let Some(time) = self.updated_time {
+                    self.sun_coords = Self::sun_coords(time);
+                    self.uniform.write(
+                        renderer,
+                        &SkyUniformData::new(
+                            Rgb::splat(0.0),
+                            self.sun_coords,
+                            Rgb::new(0.15, 0.15, 0.3),
+                        ),
+                    );
+                }
+            }
+            Event::RedrawEventsCleared => {
+                self.updated_time = None;
+            }
+            _ => {}
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct SkyUniformData {
     color: Float3,
+    sun_coords: Float3,
     light_intensity: Float3,
 }
 
 impl SkyUniformData {
-    fn new(color: Rgb<f32>, light_intensity: Rgb<f32>) -> Self {
+    fn new(color: Rgb<f32>, sun_coords: Point3<f32>, light_intensity: Rgb<f32>) -> Self {
         Self {
             color: color.into(),
+            sun_coords: sun_coords.into(),
             light_intensity: light_intensity.into(),
         }
     }
@@ -138,7 +173,10 @@ impl Object {
         player_bind_group: &'a wgpu::BindGroup,
         m: Matrix4<f32>,
     ) {
-        self.program.bind(render_pass, [player_bind_group, self.texture.bind_group()]);
+        self.program.bind(
+            render_pass,
+            [player_bind_group, self.texture.bind_group()],
+        );
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX,
             0,

@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use nalgebra::Point3;
 use serde::Deserialize;
 use std::{array, ops::Index};
 
@@ -6,13 +7,13 @@ use std::{array, ops::Index};
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
-    pub const fn new(r: T, g: T, b: T) -> Self {
+    pub fn new(r: T, g: T, b: T) -> Self {
         Self([r, g, b])
     }
 }
 
 impl<T: Copy> Rgb<T> {
-    pub const fn splat(v: T) -> Self {
+    pub fn splat(v: T) -> Self {
         Self([v; 3])
     }
 }
@@ -34,19 +35,8 @@ impl<T> IntoIterator for Rgb<T> {
     }
 }
 
-impl From<Rgb<f32>> for wgpu::Color {
-    fn from(Rgb([r, g, b]): Rgb<f32>) -> Self {
-        Self {
-            r: r.into(),
-            g: g.into(),
-            b: b.into(),
-            a: 1.0,
-        }
-    }
-}
-
 #[repr(C, align(16))]
-#[derive(Clone, Copy, Zeroable, Pod)]
+#[derive(Clone, Copy, Default, Zeroable, Pod)]
 pub struct Float3 {
     data: [f32; 3],
     padding: f32,
@@ -56,7 +46,16 @@ impl From<Rgb<f32>> for Float3 {
     fn from(rgb: Rgb<f32>) -> Self {
         Self {
             data: rgb.0,
-            padding: 0.0,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<Point3<f32>> for Float3 {
+    fn from(point: Point3<f32>) -> Self {
+        Self {
+            data: point.into(),
+            ..Default::default()
         }
     }
 }

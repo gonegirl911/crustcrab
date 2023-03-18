@@ -10,6 +10,7 @@ struct PlayerUniform {
 
 struct SkyUniform {
     color: vec3<f32>,
+    sun_coords: vec3<f32>,
     light_intensity: vec3<f32>,
 }
 
