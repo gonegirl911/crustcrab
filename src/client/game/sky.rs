@@ -36,7 +36,7 @@ impl Sky {
             ),
             uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT),
             sun_coords: Default::default(),
-            updated_time: None,
+            updated_time: Some(0.0),
         }
     }
 
