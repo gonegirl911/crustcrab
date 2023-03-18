@@ -45,6 +45,9 @@ impl Server {
 }
 
 pub enum ServerEvent {
+    TimeUpdated {
+        time: f32,
+    },
     ChunkLoaded {
         coords: Point3<i32>,
         data: Arc<ChunkData>,

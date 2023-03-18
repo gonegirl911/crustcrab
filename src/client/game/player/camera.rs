@@ -13,7 +13,7 @@ use winit::{
     event::{DeviceEvent, ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
 };
 
-pub struct Camera {
+pub struct View {
     forward: Vector3<f32>,
     right: Vector3<f32>,
     up: Vector3<f32>,
@@ -23,7 +23,7 @@ pub struct Camera {
     pitch: f32,
 }
 
-impl Camera {
+impl View {
     pub fn new(origin: Point3<f32>, dir: Vector3<f32>, up: Vector3<f32>) -> Self {
         let world_up = up.normalize();
         let forward = dir.normalize();
@@ -138,21 +138,21 @@ impl Controller {
 
     pub fn apply_updates(
         &mut self,
-        camera: &mut Camera,
+        view: &mut View,
         projection: &mut Projection,
         dt: Duration,
     ) -> Changes {
         let mut changes = Changes::empty();
 
         if self.dx != 0.0 || self.dy != 0.0 {
-            self.apply_rotation(camera);
+            self.apply_rotation(view);
             self.dx = 0.0;
             self.dy = 0.0;
             changes.insert(Changes::ROTATED);
         }
 
         if !self.relevant_keys.is_empty() {
-            self.apply_movement(camera, dt);
+            self.apply_movement(view, dt);
             changes.insert(Changes::MOVED);
         }
 
@@ -171,27 +171,27 @@ impl Controller {
         changes
     }
 
-    fn apply_rotation(&mut self, camera: &mut Camera) {
+    fn apply_rotation(&mut self, view: &mut View) {
         const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
         const ROTATION_SCALE: f32 = 1.0 / 60.0;
 
         let dr = self.sensitivity * ROTATION_SCALE;
 
-        camera.yaw = (camera.yaw - self.dx * dr) % TAU;
-        camera.pitch = (camera.pitch - self.dy * dr).clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
+        view.yaw = (view.yaw - self.dx * dr) % TAU;
+        view.pitch = (view.pitch - self.dy * dr).clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
 
-        let (sin_yaw, cos_yaw) = camera.yaw.sin_cos();
-        let (sin_pitch, cos_pitch) = camera.pitch.sin_cos();
+        let (sin_yaw, cos_yaw) = view.yaw.sin_cos();
+        let (sin_pitch, cos_pitch) = view.pitch.sin_cos();
 
-        camera.forward = vector![cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch];
-        camera.right = camera.world_up.cross(&camera.forward).normalize();
-        camera.up = camera.forward.cross(&camera.right);
+        view.forward = vector![cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch];
+        view.right = view.world_up.cross(&view.forward).normalize();
+        view.up = view.forward.cross(&view.right);
     }
 
-    fn apply_movement(&mut self, camera: &mut Camera, dt: Duration) {
+    fn apply_movement(&mut self, view: &mut View, dt: Duration) {
         let dp = self.speed * dt.as_secs_f32();
-        let right = camera.right;
-        let up = camera.world_up;
+        let right = view.right;
+        let up = view.world_up;
         let forward = right.cross(&up);
 
         let mut dir = Vector3::zeros();
@@ -214,7 +214,7 @@ impl Controller {
             dir += up;
         }
 
-        camera.origin += dir.normalize() * dp;
+        view.origin += dir.normalize() * dp;
     }
 }
 

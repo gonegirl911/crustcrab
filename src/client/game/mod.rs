@@ -1,10 +1,11 @@
+pub mod clock;
 pub mod gui;
 pub mod hover;
 pub mod player;
 pub mod sky;
 pub mod world;
 
-use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
+use self::{clock::Clock, gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
 use super::{
     event_loop::{Event, EventHandler},
     renderer::{DepthBuffer, PostProcessor, Renderer},
@@ -16,6 +17,7 @@ use std::time::Duration;
 pub struct Game {
     gui: Gui,
     player: Player,
+    clock: Clock,
     sky: Sky,
     world: World,
     hover: BlockHover,
@@ -28,6 +30,7 @@ impl Game {
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
+        let clock = Clock::default();
         let sky = Sky::new(renderer);
         let world = World::new(
             renderer,
@@ -43,6 +46,7 @@ impl Game {
         Self {
             gui,
             player,
+            clock,
             sky,
             world,
             hover,
@@ -93,6 +97,7 @@ impl EventHandler for Game {
     ) {
         self.gui.handle(event, renderer);
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
+        self.clock.handle(event, ());
         self.world.handle(event, renderer);
         self.hover.handle(event, ());
         self.depth_buffer.handle(event, renderer);

@@ -2,7 +2,7 @@ pub mod camera;
 pub mod frustum;
 
 use self::{
-    camera::{Camera, Changes, Controller, Projection},
+    camera::{Changes, Controller, Projection, View},
     frustum::Frustum,
 };
 use super::gui::Gui;
@@ -21,7 +21,7 @@ use std::time::Duration;
 use winit::event::StartCause;
 
 pub struct Player {
-    camera: Camera,
+    view: View,
     projection: Projection,
     controller: Controller,
     uniform: Uniform<PlayerUniformData>,
@@ -30,14 +30,14 @@ pub struct Player {
 
 impl Player {
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
-        let camera = Camera::new(point![0.0, 100.0, 0.0], Vector3::z(), Vector3::y());
+        let view = View::new(point![0.0, 100.0, 0.0], Vector3::x(), Vector3::y());
         let aspect = config.width as f32 / config.height as f32;
         let zfar = (gui.render_distance() * Chunk::DIM as u32) as f32;
         let projection = Projection::new(90.0, aspect, 0.1, zfar);
         let controller = Controller::new(25.0, 0.15);
         let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX);
         Self {
-            camera,
+            view,
             controller,
             projection,
             uniform,
@@ -55,10 +55,10 @@ impl Player {
 
     pub fn frustum(&self) -> Frustum {
         Frustum::new(
-            self.camera.forward(),
-            self.camera.right(),
-            self.camera.up(),
-            self.camera.origin(),
+            self.view.forward(),
+            self.view.right(),
+            self.view.up(),
+            self.view.origin(),
             self.projection.fovy(),
             self.projection.aspect(),
             self.projection.znear(),
@@ -77,8 +77,8 @@ impl EventHandler for Player {
             Event::NewEvents(StartCause::Init) => {
                 client_tx
                     .send(ClientEvent::InitialRenderRequested {
-                        player_dir: self.camera.forward(),
-                        player_coords: self.camera.origin(),
+                        player_dir: self.view.forward(),
+                        player_coords: self.view.origin(),
                         render_distance: gui.render_distance(),
                     })
                     .unwrap_or_else(|_| unreachable!());
@@ -86,12 +86,12 @@ impl EventHandler for Player {
             Event::MainEventsCleared => {
                 let changes =
                     self.controller
-                        .apply_updates(&mut self.camera, &mut self.projection, dt);
+                        .apply_updates(&mut self.view, &mut self.projection, dt);
 
                 if changes.contains(Changes::ROTATED) {
                     client_tx
                         .send(ClientEvent::PlayerOrientationChanged {
-                            dir: self.camera.forward(),
+                            dir: self.view.forward(),
                         })
                         .unwrap_or_else(|_| unreachable!());
                 }
@@ -99,7 +99,7 @@ impl EventHandler for Player {
                 if changes.contains(Changes::MOVED) {
                     client_tx
                         .send(ClientEvent::PlayerPositionChanged {
-                            coords: self.camera.origin(),
+                            coords: self.view.origin(),
                         })
                         .unwrap_or_else(|_| unreachable!());
                 }
@@ -122,8 +122,8 @@ impl EventHandler for Player {
                 self.uniform.write(
                     renderer,
                     &PlayerUniformData::new(
-                        self.projection.mat() * self.camera.mat(),
-                        self.camera.origin(),
+                        self.projection.mat() * self.view.mat(),
+                        self.view.origin(),
                         gui.render_distance(),
                     ),
                 );
