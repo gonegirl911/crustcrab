@@ -145,10 +145,10 @@ impl Object {
     pub fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
-        bytes: &[u8],
+        image: &[u8],
         is_srgb: bool,
     ) -> Self {
-        let texture = ImageTexture::new(renderer, bytes, is_srgb, true, 1);
+        let texture = ImageTexture::new(renderer, image, is_srgb, true, 1);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/object.wgsl"),
