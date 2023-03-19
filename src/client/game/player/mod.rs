@@ -35,7 +35,8 @@ impl Player {
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
         let view = View::new(point![0.0, 100.0, 0.0], Vector3::x(), Self::WORLD_UP);
         let aspect = config.width as f32 / config.height as f32;
-        let projection = Projection::new(90.0, aspect, 0.1, Self::zfar(gui.render_distance()));
+        let zfar = (gui.render_distance() * Chunk::DIM as u32) as f32;
+        let projection = Projection::new(90.0, aspect, 0.1, zfar);
         let controller = Controller::new(25.0, 0.15);
         let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
         Self {
@@ -66,10 +67,6 @@ impl Player {
             self.projection.znear(),
             self.projection.zfar(),
         )
-    }
-
-    fn zfar(render_distance: u32) -> f32 {
-        (render_distance * Chunk::DIM as u32) as f32
     }
 }
 

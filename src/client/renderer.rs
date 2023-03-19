@@ -613,34 +613,6 @@ impl EventHandler for DepthBuffer {
     }
 }
 
-pub struct InputOutputTexture(InputOutputTextureArray<1>);
-
-impl InputOutputTexture {
-    pub fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
-        Self(InputOutputTextureArray::new(renderer, format))
-    }
-
-    pub fn view(&self) -> &wgpu::TextureView {
-        self.0.view(0)
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group(0)
-    }
-}
-
-impl EventHandler for InputOutputTexture {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.0.handle(event, renderer);
-    }
-}
-
 struct InputOutputTextureArray<const N: usize> {
     textures: [ScreenTexture; N],
     sampler: wgpu::Sampler,
