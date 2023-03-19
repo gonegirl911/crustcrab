@@ -12,6 +12,7 @@ use crate::{
         renderer::{Renderer, Uniform},
         ClientEvent,
     },
+    color::Float3,
     server::game::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};
@@ -144,11 +145,14 @@ impl EventHandler for Player {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct PlayerUniformData {
     vp: Matrix4<f32>,
-    origin: Point3<f32>,
+    origin: Float3,
 }
 
 impl PlayerUniformData {
     fn new(vp: Matrix4<f32>, origin: Point3<f32>) -> Self {
-        Self { vp, origin }
+        Self {
+            vp,
+            origin: origin.into(),
+        }
     }
 }
