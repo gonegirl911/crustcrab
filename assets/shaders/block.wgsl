@@ -23,7 +23,6 @@ struct VertexOutput {
     @location(0) tex_index: u32,
     @location(1) tex_coords: vec2<f32>,
     @location(2) light_factor: vec3<f32>,
-    @location(3) fog_factor: f32,
 }
 
 @group(0) @binding(0)
@@ -66,16 +65,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     let light_factor = (global_light + local_light) * ambient_light * face_light;
 
-    let distance = distance(player.origin, coords);
-    let fog_start = f32((player.render_distance - 2u) * 16u);
-    let fog_factor = exp2(-pow(max(distance - fog_start, 0.0) / 3.0, 2.0));
-
     return VertexOutput(
         player.vp * vec4(coords, 1.0),
         tex_index,
         tex_coords,
         light_factor,
-        fog_factor,
     );
 }
 
@@ -87,9 +81,5 @@ var s_block: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return mix(
-        vec4(vec3(0.0), 1.0),
-        textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0),
-        in.fog_factor,
-    );
+    return textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0);
 }

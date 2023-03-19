@@ -613,6 +613,34 @@ impl EventHandler for DepthBuffer {
     }
 }
 
+pub struct InputOutputTexture(InputOutputTextureArray<1>);
+
+impl InputOutputTexture {
+    pub fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
+        Self(InputOutputTextureArray::new(renderer, format))
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.0.view(0)
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.0.bind_group_layout()
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        self.0.bind_group(0)
+    }
+}
+
+impl EventHandler for InputOutputTexture {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        self.0.handle(event, renderer);
+    }
+}
+
 struct InputOutputTextureArray<const N: usize> {
     textures: [ScreenTexture; N],
     sampler: wgpu::Sampler,
@@ -738,7 +766,7 @@ impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
 
 pub struct PostProcessor {
     textures: InputOutputTextureArray<2>,
-    blits: [Blit; 2],
+    blit: Blit,
     index: bool,
 }
 
@@ -747,13 +775,10 @@ impl PostProcessor {
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
         let textures = InputOutputTextureArray::new(renderer, Self::FORMAT);
-        let blits = [
-            Blit::new(renderer, textures.bind_group_layout(), Self::FORMAT),
-            Blit::new(renderer, textures.bind_group_layout(), config.format),
-        ];
+        let blit = Blit::new(renderer, textures.bind_group_layout(), config.format);
         Self {
             textures,
-            blits,
+            blit,
             index: false,
         }
     }
@@ -785,28 +810,8 @@ impl PostProcessor {
         self.swap();
     }
 
-    pub fn blit_apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: self.secondary_view(),
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-            self.blits[0].draw(&mut render_pass, self.main_bind_group());
-            effect.draw(&mut render_pass, self.main_bind_group());
-        }
-        self.swap();
-    }
-
     pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.blits[1].draw(
+        self.blit.draw(
             &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -919,10 +924,10 @@ impl Program {
     }
 }
 
-struct Blit(Program);
+pub struct Blit(Program);
 
 impl Blit {
-    fn new(
+    pub fn new(
         renderer: &Renderer,
         input_bind_group_layout: &wgpu::BindGroupLayout,
         format: wgpu::TextureFormat,

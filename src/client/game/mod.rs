@@ -1,10 +1,15 @@
+pub mod atmosphere;
 pub mod gui;
 pub mod hover;
+pub mod object;
 pub mod player;
 pub mod sky;
 pub mod world;
 
-use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
+use self::{
+    atmosphere::Atmosphere, gui::Gui, hover::BlockHover, object::Objects, player::Player, sky::Sky,
+    world::World,
+};
 use super::{
     event_loop::{Event, EventHandler},
     renderer::{Aces, DepthBuffer, PostProcessor, Renderer},
@@ -17,6 +22,8 @@ pub struct Game {
     gui: Gui,
     player: Player,
     sky: Sky,
+    atmosphere: Atmosphere,
+    objects: Objects,
     world: World,
     hover: BlockHover,
     depth_buffer: DepthBuffer,
@@ -29,7 +36,13 @@ impl Game {
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
-        let sky = Sky::new(renderer, player.bind_group_layout());
+        let sky = Sky::new(renderer);
+        let atmosphere = Atmosphere::new(
+            renderer,
+            player.bind_group_layout(),
+            sky.bind_group_layout(),
+        );
+        let objects = Objects::new(renderer, player.bind_group_layout());
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -50,6 +63,8 @@ impl Game {
             gui,
             player,
             sky,
+            atmosphere,
+            objects,
             world,
             hover,
             depth_buffer,
@@ -58,12 +73,18 @@ impl Game {
         }
     }
 
-    #[rustfmt::skip]
     fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.sky.draw(
+        self.atmosphere.draw(
             self.processor.view(),
             encoder,
             self.player.bind_group(),
+            self.sky.bind_group(),
+        );
+        self.objects.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.sky.sun_coords(),
         );
         self.world.draw(
             self.processor.view(),
@@ -81,7 +102,7 @@ impl Game {
             self.depth_buffer.view(),
         );
         self.processor.apply(encoder, &self.aces);
-        self.processor.blit_apply(encoder, &self.gui);
+        self.processor.apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }
 }
@@ -107,6 +128,7 @@ impl EventHandler for Game {
         self.gui.handle(event, renderer);
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
         self.sky.handle(event, renderer);
+        self.atmosphere.handle(event, renderer);
         self.world.handle(event, renderer);
         self.hover.handle(event, ());
         self.depth_buffer.handle(event, renderer);
