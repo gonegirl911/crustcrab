@@ -13,7 +13,6 @@ use crate::{
         ClientEvent,
     },
     color::Float3,
-    server::game::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
@@ -35,8 +34,7 @@ impl Player {
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
         let view = View::new(point![0.0, 100.0, 0.0], Vector3::x(), Self::WORLD_UP);
         let aspect = config.width as f32 / config.height as f32;
-        let zfar = (gui.render_distance() * Chunk::DIM as u32) as f32;
-        let projection = Projection::new(90.0, aspect, 0.1, zfar);
+        let projection = Projection::new(90.0, aspect, 0.1, gui.zfar());
         let controller = Controller::new(25.0, 0.15);
         let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
         Self {
@@ -74,7 +72,7 @@ impl EventHandler for Player {
     type Context<'a> = (Sender<ClientEvent>, &'a Renderer, &'a Gui, Duration);
 
     fn handle(&mut self, event: &Event, (client_tx, renderer, gui, dt): Self::Context<'_>) {
-        self.controller.handle(event, renderer);
+        self.controller.handle(event, ());
 
         match event {
             Event::NewEvents(StartCause::Init) => {

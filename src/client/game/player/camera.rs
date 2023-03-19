@@ -1,7 +1,4 @@
-use crate::client::{
-    event_loop::{Event, EventHandler},
-    renderer::Renderer,
-};
+use crate::client::event_loop::{Event, EventHandler};
 use bitflags::bitflags;
 use nalgebra::{matrix, vector, Matrix4, Point3, Vector3};
 use std::{
@@ -219,9 +216,9 @@ impl Controller {
 }
 
 impl EventHandler for Controller {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = ();
 
-    fn handle(&mut self, event: &Event, Renderer { config, .. }: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
         match event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta: (dx, dy) },
@@ -269,7 +266,7 @@ impl EventHandler for Controller {
                     new_inner_size: PhysicalSize { width, height },
                     ..
                 } if *width != 0 && !height != 0 => {
-                    self.aspect = config.width as f32 / config.height as f32;
+                    self.aspect = *width as f32 / *height as f32;
                 }
                 WindowEvent::MouseInput { button, state, .. } => {
                     let (button, opp) = match button {

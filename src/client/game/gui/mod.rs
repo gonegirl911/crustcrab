@@ -5,7 +5,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{Blit, Effect, PostProcessor, Renderer},
     },
-    server::game::world::block::Block,
+    server::game::world::{block::Block, chunk::Chunk},
 };
 use crosshair::Crosshair;
 
@@ -28,6 +28,10 @@ impl Gui {
 
     pub fn render_distance(&self) -> u32 {
         36
+    }
+
+    pub fn zfar(&self) -> f32 {
+        (self.render_distance() * Chunk::DIM as u32) as f32
     }
 }
 
