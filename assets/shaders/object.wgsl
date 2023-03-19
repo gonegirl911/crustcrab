@@ -38,5 +38,5 @@ var s_object: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_object, s_object, in.tex_coords);
+    return textureSample(t_object, s_object, in.tex_coords) * 1.5;
 }
