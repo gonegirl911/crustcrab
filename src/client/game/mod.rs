@@ -73,6 +73,7 @@ impl Game {
             self.depth_buffer.view(),
             &self.player.frustum(),
         );
+        self.processor.apply(encoder, &self.aces);
         self.hover.draw(
             self.processor.view(),
             encoder,
@@ -80,7 +81,6 @@ impl Game {
             self.sky.bind_group(),
             self.depth_buffer.view(),
         );
-        self.processor.apply(encoder, &self.aces);
         self.processor.apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }

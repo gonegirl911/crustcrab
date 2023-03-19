@@ -62,7 +62,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let ambient_light = mix(0.2, 1.0, ao / 3.0);
     let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
-    let light_factor = (global_light + local_light) * ambient_light * face_light;
+    let light_factor = saturate(global_light + local_light) * ambient_light * face_light;
 
     return VertexOutput(
         player.vp * vec4(coords, 1.0),

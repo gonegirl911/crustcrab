@@ -34,7 +34,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let coords = -0.001 + vertex.coords * 1.002;
     return VertexOutput(
         player.vp * vec4(pc.coords + coords, 1.0),
-        vec4(vec3(1.0), 0.15 * grayscale(sky.light_intensity)),
+        vec4(vec3(1.0), 0.1 * grayscale(sky.light_intensity)),
     );
 }
 
