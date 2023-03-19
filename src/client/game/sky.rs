@@ -12,7 +12,6 @@ use std::f32::consts::TAU;
 
 pub struct Sky {
     uniform: Uniform<SkyUniformData>,
-    sun_coords: Point3<f32>,
     updated_time: Option<f32>,
 }
 
@@ -20,7 +19,6 @@ impl Sky {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            sun_coords: Default::default(),
             updated_time: Some(0.0),
         }
     }
@@ -33,11 +31,7 @@ impl Sky {
         self.uniform.bind_group()
     }
 
-    pub fn sun_coords(&self) -> Point3<f32> {
-        self.sun_coords
-    }
-
-    fn calc(time: f32) -> Point3<f32> {
+    fn sun_coords(time: f32) -> Point3<f32> {
         let theta = time * TAU;
         point![theta.cos(), theta.sin(), 0.0]
     }
@@ -53,10 +47,9 @@ impl EventHandler for Sky {
             }
             Event::RedrawRequested(_) => {
                 if let Some(time) = self.updated_time {
-                    self.sun_coords = Self::calc(time);
                     self.uniform.write(
                         renderer,
-                        &SkyUniformData::new(self.sun_coords, Rgb::new(0.15, 0.15, 0.3)),
+                        &SkyUniformData::new(Self::sun_coords(time), Rgb::new(0.15, 0.15, 0.3)),
                     );
                 }
             }

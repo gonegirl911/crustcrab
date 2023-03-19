@@ -1,14 +1,12 @@
 pub mod atmosphere;
 pub mod gui;
 pub mod hover;
-pub mod object;
 pub mod player;
 pub mod sky;
 pub mod world;
 
 use self::{
-    atmosphere::Atmosphere, gui::Gui, hover::BlockHover, object::Objects, player::Player, sky::Sky,
-    world::World,
+    atmosphere::Atmosphere, gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World,
 };
 use super::{
     event_loop::{Event, EventHandler},
@@ -23,7 +21,6 @@ pub struct Game {
     player: Player,
     sky: Sky,
     atmosphere: Atmosphere,
-    objects: Objects,
     world: World,
     hover: BlockHover,
     depth_buffer: DepthBuffer,
@@ -42,7 +39,6 @@ impl Game {
             player.bind_group_layout(),
             sky.bind_group_layout(),
         );
-        let objects = Objects::new(renderer, player.bind_group_layout());
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -64,7 +60,6 @@ impl Game {
             player,
             sky,
             atmosphere,
-            objects,
             world,
             hover,
             depth_buffer,
@@ -79,12 +74,6 @@ impl Game {
             encoder,
             self.player.bind_group(),
             self.sky.bind_group(),
-        );
-        self.objects.draw(
-            self.processor.view(),
-            encoder,
-            self.player.bind_group(),
-            self.sky.sun_coords(),
         );
         self.world.draw(
             self.processor.view(),

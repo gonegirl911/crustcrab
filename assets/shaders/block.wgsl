@@ -6,7 +6,6 @@ struct VertexInput {
 struct PlayerUniform {
     vp: mat4x4<f32>,
     origin: vec3<f32>,
-    render_distance: u32,
 }
 
 struct SkyUniform {
