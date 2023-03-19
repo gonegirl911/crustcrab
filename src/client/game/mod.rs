@@ -7,7 +7,7 @@ pub mod world;
 use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{DepthBuffer, PostProcessor, Renderer},
+    renderer::{Aces, DepthBuffer, PostProcessor, Renderer},
     ClientEvent,
 };
 use flume::Sender;
@@ -21,6 +21,7 @@ pub struct Game {
     hover: BlockHover,
     depth_buffer: DepthBuffer,
     processor: PostProcessor,
+    aces: Aces,
 }
 
 impl Game {
@@ -40,6 +41,11 @@ impl Game {
             sky.bind_group_layout(),
         );
         let depth_buffer = DepthBuffer::new(renderer);
+        let aces = Aces::new(
+            renderer,
+            processor.bind_group_layout(),
+            PostProcessor::FORMAT,
+        );
         Self {
             gui,
             player,
@@ -48,6 +54,7 @@ impl Game {
             hover,
             depth_buffer,
             processor,
+            aces,
         }
     }
 
@@ -73,6 +80,7 @@ impl Game {
             self.sky.bind_group(),
             self.depth_buffer.view(),
         );
+        self.processor.apply(encoder, &self.aces);
         self.processor.blit_apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }

@@ -743,7 +743,7 @@ pub struct PostProcessor {
 }
 
 impl PostProcessor {
-    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
         let textures = InputOutputTextureArray::new(renderer, Self::FORMAT);
@@ -764,6 +764,25 @@ impl PostProcessor {
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         self.textures.bind_group_layout()
+    }
+
+    pub fn apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: self.secondary_view(),
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: None,
+            });
+            effect.draw(&mut render_pass, self.main_bind_group());
+        }
+        self.swap();
     }
 
     pub fn blit_apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
@@ -923,6 +942,39 @@ impl Blit {
 }
 
 impl Effect for Blit {
+    fn draw<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        input_bind_group: &'a wgpu::BindGroup,
+    ) {
+        self.0.bind(render_pass, [input_bind_group]);
+        render_pass.draw(0..3, 0..1);
+    }
+}
+
+pub struct Aces(Program);
+
+impl Aces {
+    pub fn new(
+        renderer: &Renderer,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
+        format: wgpu::TextureFormat,
+    ) -> Self {
+        Self(Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../assets/shaders/aces.wgsl"),
+            &[],
+            &[input_bind_group_layout],
+            &[],
+            format,
+            None,
+            None,
+            None,
+        ))
+    }
+}
+
+impl Effect for Aces {
     fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
