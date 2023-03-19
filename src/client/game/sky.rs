@@ -102,11 +102,7 @@ impl EventHandler for Sky {
                     self.sun_coords = Self::sun_coords(time);
                     self.uniform.write(
                         renderer,
-                        &SkyUniformData::new(
-                            Rgb::splat(0.0),
-                            self.sun_coords,
-                            Rgb::new(0.15, 0.15, 0.3),
-                        ),
+                        &SkyUniformData::new(self.sun_coords, Rgb::new(0.15, 0.15, 0.3)),
                     );
                 }
             }
@@ -121,15 +117,13 @@ impl EventHandler for Sky {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct SkyUniformData {
-    color: Float3,
     sun_coords: Float3,
     light_intensity: Float3,
 }
 
 impl SkyUniformData {
-    fn new(color: Rgb<f32>, sun_coords: Point3<f32>, light_intensity: Rgb<f32>) -> Self {
+    fn new(sun_coords: Point3<f32>, light_intensity: Rgb<f32>) -> Self {
         Self {
-            color: color.into(),
             sun_coords: sun_coords.into(),
             light_intensity: light_intensity.into(),
         }

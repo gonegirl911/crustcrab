@@ -10,7 +10,6 @@ struct PlayerUniform {
 }
 
 struct SkyUniform {
-    color: vec3<f32>,
     sun_coords: vec3<f32>,
     light_intensity: vec3<f32>,
 }
@@ -89,7 +88,7 @@ var s_block: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return mix(
-        vec4(sky.color, 1.0),
+        vec4(vec3(0.0), 1.0),
         textureSample(t_blocks[in.tex_index], s_block, in.tex_coords) * vec4(in.light_factor, 1.0),
         in.fog_factor,
     );
