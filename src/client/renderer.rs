@@ -3,7 +3,6 @@ use bytemuck::Pod;
 use image::{io::Reader as ImageReader, RgbaImage};
 use std::{
     array,
-    fmt::Debug,
     marker::PhantomData,
     mem,
     num::{NonZeroU32, NonZeroU8},
@@ -224,7 +223,7 @@ pub struct ImageTexture {
 }
 
 impl ImageTexture {
-    pub fn new<P: AsRef<Path> + Debug>(
+    pub fn new<P: AsRef<Path>>(
         renderer @ Renderer { device, .. }: &Renderer,
         path: P,
         is_srgb: bool,

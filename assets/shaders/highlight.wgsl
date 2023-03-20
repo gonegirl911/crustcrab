@@ -4,7 +4,6 @@ struct VertexInput {
 
 struct PlayerUniform {
     vp: mat4x4<f32>,
-    origin: vec3<f32>,
 }
 
 struct SkyUniform {

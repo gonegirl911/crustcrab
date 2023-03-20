@@ -6,17 +6,14 @@ use self::{
     frustum::Frustum,
 };
 use super::gui::Gui;
-use crate::{
-    client::{
-        event_loop::{Event, EventHandler},
-        renderer::{Renderer, Uniform},
-        ClientEvent,
-    },
-    color::Float3,
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::{Renderer, Uniform},
+    ClientEvent,
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
-use nalgebra::{point, vector, Matrix4, Point3, Vector3};
+use nalgebra::{point, vector, Matrix4, Vector3};
 use std::time::Duration;
 use winit::event::StartCause;
 
@@ -122,10 +119,7 @@ impl EventHandler for Player {
             Event::RedrawRequested(_) if self.is_updated => {
                 self.uniform.write(
                     renderer,
-                    &PlayerUniformData::new(
-                        self.projection.mat() * self.view.mat(),
-                        self.view.origin(),
-                    ),
+                    &PlayerUniformData::new(self.projection.mat() * self.view.mat()),
                 );
             }
             Event::RedrawEventsCleared => {
@@ -140,14 +134,10 @@ impl EventHandler for Player {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct PlayerUniformData {
     vp: Matrix4<f32>,
-    origin: Float3,
 }
 
 impl PlayerUniformData {
-    fn new(vp: Matrix4<f32>, origin: Point3<f32>) -> Self {
-        Self {
-            vp,
-            origin: origin.into(),
-        }
+    fn new(vp: Matrix4<f32>) -> Self {
+        Self { vp }
     }
 }
