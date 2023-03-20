@@ -121,7 +121,7 @@ impl BlockData {
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
     #[serde(default)]
-    side_textures: Option<EnumMap<Side, Arc<String>>>,
+    side_tex_paths: Option<EnumMap<Side, Arc<String>>>,
     #[serde(default)]
     pub luminance: Rgb<u8>,
     #[serde(default)]
@@ -130,8 +130,8 @@ struct RawBlockData {
 
 impl RawBlockData {
     fn side_tex_indices(&self) -> Option<EnumMap<Side, u8>> {
-        self.side_textures.as_ref().map(|side_textures| {
-            enum_map! { side => TEX_INDICES[&side_textures[side]] }
+        self.side_tex_paths.as_ref().map(|side_tex_paths| {
+            enum_map! { side => TEX_INDICES[&side_tex_paths[side]] }
         })
     }
 }
@@ -263,7 +263,7 @@ static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
 pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
     let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
     v.sort_unstable_by_key(|(_, idx)| *idx);
-    v.into_iter().map(|(texture, _)| texture).cloned().collect()
+    v.into_iter().map(|(path, _)| path).cloned().collect()
 });
 
 static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
@@ -271,10 +271,10 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|data| data.side_textures.as_ref())
-        .flat_map(|side_textures| side_textures.values().cloned())
-        .for_each(|texture| {
-            indices.entry(texture).or_insert_with(|| {
+        .filter_map(|data| data.side_tex_paths.as_ref())
+        .flat_map(|side_tex_paths| side_tex_paths.values().cloned())
+        .for_each(|path| {
+            indices.entry(path).or_insert_with(|| {
                 let i = idx;
                 idx += 1;
                 i

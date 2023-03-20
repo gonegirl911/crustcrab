@@ -34,7 +34,7 @@ impl World {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let meshes = ChunkMeshPool::new();
-        let textures = ImageTextureArray::new(renderer, Self::paths(), true, true, 4);
+        let textures = ImageTextureArray::new(renderer, Self::tex_paths(), true, true, 4);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
@@ -105,7 +105,7 @@ impl World {
         self.meshes.draw(&mut render_pass, frustum);
     }
 
-    fn paths() -> impl Iterator<Item = String> {
+    fn tex_paths() -> impl Iterator<Item = String> {
         TEX_PATHS
             .iter()
             .map(|path| format!("assets/textures/blocks/{path}"))
