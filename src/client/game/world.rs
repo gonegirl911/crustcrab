@@ -8,7 +8,7 @@ use crate::{
     },
     server::{
         game::world::{
-            block::{Face, TEXTURES},
+            block::{Face, TEX_PATHS},
             chunk::{Chunk, ChunkData},
             light::BlockLight,
         },
@@ -19,7 +19,7 @@ use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
 use nalgebra::{Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{fs, mem, sync::Arc, thread, time::Instant};
+use std::{mem, sync::Arc, thread, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
@@ -34,13 +34,7 @@ impl World {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let meshes = ChunkMeshPool::new();
-        let textures = ImageTextureArray::new(
-            renderer,
-            TEXTURES.iter().map(|texture| Self::read_texture(texture)),
-            true,
-            true,
-            4,
-        );
+        let textures = ImageTextureArray::new(renderer, Self::paths(), true, true, 4);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
@@ -111,8 +105,10 @@ impl World {
         self.meshes.draw(&mut render_pass, frustum);
     }
 
-    fn read_texture(texture: &str) -> Vec<u8> {
-        fs::read(format!("assets/textures/blocks/{texture}")).expect("texture should exist")
+    fn paths() -> impl Iterator<Item = String> {
+        TEX_PATHS
+            .iter()
+            .map(|path| format!("assets/textures/blocks/{path}"))
     }
 }
 

@@ -6,7 +6,7 @@ use nalgebra::{point, vector, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{ops::Range, sync::Arc};
+use std::{fs, ops::Range, sync::Arc};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
@@ -260,7 +260,7 @@ static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
     }
 });
 
-pub static TEXTURES: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
+pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
     let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
     v.sort_unstable_by_key(|(_, idx)| *idx);
     v.into_iter().map(|(texture, _)| texture).cloned().collect()
@@ -284,8 +284,8 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
 });
 
 static RAW_BLOCK_DATA: Lazy<EnumMap<Block, RawBlockData>> = Lazy::new(|| {
-    toml::from_str(include_str!("../../../../assets/blocks.toml"))
-        .expect("blocks.toml should be valid")
+    toml::from_str(&fs::read_to_string("assets/blocks.toml").expect("file should exist"))
+        .expect("file should be valid")
 });
 
 static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy::new(|| {

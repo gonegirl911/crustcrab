@@ -1,11 +1,13 @@
 use super::event_loop::{Event, EventHandler};
 use bytemuck::Pod;
-use image::RgbaImage;
+use image::{io::Reader as ImageReader, RgbaImage};
 use std::{
     array,
+    fmt::Debug,
     marker::PhantomData,
     mem,
     num::{NonZeroU32, NonZeroU8},
+    path::Path,
     slice,
 };
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -222,14 +224,14 @@ pub struct ImageTexture {
 }
 
 impl ImageTexture {
-    pub fn new(
+    pub fn new<P: AsRef<Path> + Debug>(
         renderer @ Renderer { device, .. }: &Renderer,
-        bytes: &[u8],
+        path: P,
         is_srgb: bool,
         is_pixelated: bool,
         mipmap_levels: u32,
     ) -> Self {
-        let view = Self::create_view(renderer, bytes, is_srgb, mipmap_levels);
+        let view = Self::create_view(renderer, path, is_srgb, mipmap_levels);
         let sampler = Self::create_sampler(renderer, is_pixelated, mipmap_levels);
         let bind_group_layout = Self::create_bind_group_layout(renderer, is_pixelated, None);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -260,18 +262,18 @@ impl ImageTexture {
         &self.bind_group
     }
 
-    fn create_view(
+    fn create_view<P: AsRef<Path>>(
         renderer @ Renderer {
             device,
             queue,
             config,
             ..
         }: &Renderer,
-        bytes: &[u8],
+        path: P,
         is_srgb: bool,
         mipmap_levels: u32,
     ) -> wgpu::TextureView {
-        let image = Self::load_rgba(bytes);
+        let image = Self::load_rgba(path);
         let (width, height) = image.dimensions();
         let size = wgpu::Extent3d {
             width,
@@ -451,10 +453,12 @@ impl ImageTexture {
         queue.submit([encoder.finish()]);
     }
 
-    fn load_rgba(bytes: &[u8]) -> RgbaImage {
-        image::load_from_memory(bytes)
-            .expect("bytes should be a valid image")
-            .to_rgba8()
+    fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
+        ImageReader::open(path)
+            .expect("file should exist")
+            .decode()
+            .expect("format should be valid")
+            .into_rgba8()
     }
 }
 
@@ -466,12 +470,12 @@ pub struct ImageTextureArray {
 impl ImageTextureArray {
     pub fn new(
         renderer @ Renderer { device, .. }: &Renderer,
-        data: impl IntoIterator<Item = impl AsRef<[u8]>>,
+        paths: impl IntoIterator<Item = impl AsRef<Path>>,
         is_srgb: bool,
         is_pixelated: bool,
         mipmap_levels: u32,
     ) -> Self {
-        let views = Self::create_views(renderer, data, is_srgb, mipmap_levels);
+        let views = Self::create_views(renderer, paths, is_srgb, mipmap_levels);
         let sampler = ImageTexture::create_sampler(renderer, is_pixelated, mipmap_levels);
         let bind_group_layout = ImageTexture::create_bind_group_layout(
             renderer,
@@ -510,14 +514,13 @@ impl ImageTextureArray {
 
     fn create_views(
         renderer: &Renderer,
-        data: impl IntoIterator<Item = impl AsRef<[u8]>>,
+        paths: impl IntoIterator<Item = impl AsRef<Path>>,
         is_srgb: bool,
         mipmap_levels: u32,
     ) -> Vec<wgpu::TextureView> {
-        data.into_iter()
-            .map(|bytes| {
-                ImageTexture::create_view(renderer, bytes.as_ref(), is_srgb, mipmap_levels)
-            })
+        paths
+            .into_iter()
+            .map(|path| ImageTexture::create_view(renderer, path, is_srgb, mipmap_levels))
             .collect::<Vec<_>>()
     }
 }
