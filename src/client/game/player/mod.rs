@@ -119,7 +119,7 @@ impl EventHandler for Player {
             Event::RedrawRequested(_) if self.is_updated => {
                 self.uniform.write(
                     renderer,
-                    &PlayerUniformData::new(self.projection.mat() * self.view.mat()),
+                    &PlayerUniformData::new(self.view.mat(), self.projection.mat()),
                 );
             }
             Event::RedrawEventsCleared => {
@@ -134,10 +134,16 @@ impl EventHandler for Player {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct PlayerUniformData {
     vp: Matrix4<f32>,
+    inv_v: Matrix4<f32>,
+    inv_p: Matrix4<f32>,
 }
 
 impl PlayerUniformData {
-    fn new(vp: Matrix4<f32>) -> Self {
-        Self { vp }
+    fn new(v: Matrix4<f32>, p: Matrix4<f32>) -> Self {
+        Self {
+            vp: p * v,
+            inv_v: v.try_inverse().unwrap_or_else(|| unreachable!()),
+            inv_p: p.try_inverse().unwrap_or_else(|| unreachable!()),
+        }
     }
 }

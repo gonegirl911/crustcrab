@@ -4,17 +4,21 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+    @location(0) screen_coords: vec2<f32>,
 }
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32((vertex.index << 1u) & 2u);
     let y = f32(vertex.index & 2u);
-    return VertexOutput(-1.0 + vec4(x, y, 0.5, 1.0) * 2.0);
+    let coords = -1.0 + vec2(x, y) * 2.0;
+    return VertexOutput(vec4(coords, 0.0, 1.0), coords);
 }
 
 struct PlayerUniform {
     vp: mat4x4<f32>,
+    inv_v: mat4x4<f32>,
+    inv_p: mat4x4<f32>,
 }
 
 struct SkyUniform {
@@ -30,5 +34,11 @@ var<uniform> sky: SkyUniform;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4(vec3(0.0), 1.0);
+    return vec4(vec3(acos(dot(dir(in.screen_coords), sky.sun_coords)) / 22.0 * 7.0), 1.0);
+}
+
+fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
+    let eye = player.inv_p * vec4(screen_coords, 1.0, 1.0);
+    let dir = player.inv_v * vec4(eye.xy, 1.0, 0.0);
+    return normalize(dir.xyz);
 }
