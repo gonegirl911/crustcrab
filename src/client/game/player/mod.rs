@@ -13,7 +13,7 @@ use crate::client::{
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
-use nalgebra::{point, vector, Matrix4, Vector3};
+use nalgebra::{vector, Matrix4, Vector3};
 use std::time::Duration;
 use winit::event::StartCause;
 
@@ -29,10 +29,10 @@ impl Player {
     pub const WORLD_UP: Vector3<f32> = vector![0.0, 1.0, 0.0];
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
-        let view = View::new(point![0.0, 100.0, 0.0], Vector3::x(), Self::WORLD_UP);
+        let view = View::new(gui.origin(), Vector3::x(), Self::WORLD_UP);
         let aspect = config.width as f32 / config.height as f32;
-        let projection = Projection::new(90.0, aspect, 0.1, gui.zfar());
-        let controller = Controller::new(25.0, 0.15);
+        let projection = Projection::new(gui.fovy(), aspect, 0.1, gui.zfar());
+        let controller = Controller::new(gui.speed(), gui.sensitivity());
         let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
         Self {
             view,
@@ -107,11 +107,11 @@ impl EventHandler for Player {
                         .send(ClientEvent::BlockDestroyed)
                         .unwrap_or_else(|_| unreachable!());
                 } else if changes.contains(Changes::BLOCK_PLACED) {
-                    client_tx
-                        .send(ClientEvent::BlockPlaced {
-                            block: gui.selected_block(),
-                        })
-                        .unwrap_or_else(|_| unreachable!());
+                    if let Some(block) = gui.selected_block() {
+                        client_tx
+                            .send(ClientEvent::BlockPlaced { block })
+                            .unwrap_or_else(|_| unreachable!());
+                    }
                 }
 
                 self.is_updated = self.is_updated || changes.intersects(Changes::MATRIX_CHANGES);
