@@ -15,7 +15,7 @@ use std::fs;
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
-    settings: Settings,
+    settings: PlayerSettings,
 }
 
 impl Gui {
@@ -23,7 +23,7 @@ impl Gui {
         Self {
             blit: Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT),
             crosshair: Crosshair::new(renderer, input_bind_group_layout),
-            settings: Settings::new(),
+            settings: PlayerSettings::new(),
         }
     }
 
@@ -76,7 +76,7 @@ impl EventHandler for Gui {
 }
 
 #[derive(Deserialize)]
-struct Settings {
+struct PlayerSettings {
     selected_block: Option<Block>,
     render_distance: u32,
     origin: Point3<f32>,
@@ -85,9 +85,9 @@ struct Settings {
     sensitivity: f32,
 }
 
-impl Settings {
+impl PlayerSettings {
     fn new() -> Self {
-        toml::from_str(&fs::read_to_string("assets/settings.toml").expect("file should exist"))
+        toml::from_str(&fs::read_to_string("assets/player.toml").expect("file should exist"))
             .expect("file should be valid")
     }
 }
