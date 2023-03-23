@@ -1,10 +1,13 @@
+pub mod atmosphere;
 pub mod gui;
 pub mod hover;
 pub mod player;
 pub mod sky;
 pub mod world;
 
-use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
+use self::{
+    atmosphere::Atmosphere, gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World,
+};
 use super::{
     event_loop::{Event, EventHandler},
     renderer::{Aces, DepthBuffer, PostProcessor, Renderer},
@@ -16,6 +19,7 @@ use std::time::Duration;
 pub struct Game {
     gui: Gui,
     player: Player,
+    atmosphere: Atmosphere,
     sky: Sky,
     world: World,
     hover: BlockHover,
@@ -29,7 +33,12 @@ impl Game {
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
-        let sky = Sky::new(renderer, player.bind_group_layout());
+        let atmosphere = Atmosphere::new(renderer);
+        let sky = Sky::new(
+            renderer,
+            player.bind_group_layout(),
+            atmosphere.bind_group_layout(),
+        );
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -50,6 +59,7 @@ impl Game {
             gui,
             player,
             sky,
+            atmosphere,
             world,
             hover,
             depth_buffer,
@@ -58,12 +68,12 @@ impl Game {
         }
     }
 
-    #[rustfmt::skip]
     fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         self.sky.draw(
             self.processor.view(),
             encoder,
             self.player.bind_group(),
+            self.atmosphere.bind_group(),
         );
         self.world.draw(
             self.processor.view(),

@@ -21,11 +21,6 @@ struct PlayerUniform {
     inv_p: mat4x4<f32>,
 }
 
-struct SkyUniform {
-    sun_coords: vec3<f32>,
-    light_intensity: vec3<f32>,
-}
-
 struct AtmosphereUniform {
     sun_intensity: vec3<f32>,
     sc_air: vec3<f32>,
@@ -38,14 +33,19 @@ struct AtmosphereUniform {
     g: f32,
 }
 
+struct SkyUniform {
+    sun_coords: vec3<f32>,
+    light_intensity: vec3<f32>,
+}
+
 @group(0) @binding(0)
 var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
-var<uniform> sky: SkyUniform;
+var<uniform> a: AtmosphereUniform;
 
 @group(2) @binding(0)
-var<uniform> a: AtmosphereUniform;
+var<uniform> sky: SkyUniform;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {

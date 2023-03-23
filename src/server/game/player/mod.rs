@@ -6,7 +6,7 @@ use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},
 };
-use nalgebra::{vector, Point3};
+use nalgebra::{vector, Point3, Vector3};
 use std::ops::Range;
 
 #[derive(Default)]
@@ -67,26 +67,28 @@ pub struct WorldArea {
 
 impl WorldArea {
     pub fn points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
-        let radius = self.radius as i32;
-        let radius2 = radius.pow(2);
-        (-radius..=radius).flat_map(move |dx| {
-            (-radius..=radius).flat_map(move |dy| {
-                (-radius..=radius).filter_map(move |dz| {
-                    let dist2 = dx.pow(2) + dy.pow(2) + dz.pow(2);
-                    (dist2 <= radius2).then_some(self.center + vector![dx, dy, dz])
-                })
-            })
-        })
+        self.square_points()
+            .filter(|point| Self::magnitude_squared(point - self.center) <= self.radius.pow(2))
     }
 
     pub fn exclusive_points<'a>(
         &'a self,
         other: &'a WorldArea,
     ) -> impl Iterator<Item = Point3<i32>> + 'a {
-        let radius2 = other.radius.pow(2) as i32;
-        self.points().filter_map(move |point| {
-            let dist2 = (point - other.center).map(|c| c.pow(2)).sum();
-            (dist2 > radius2).then_some(point)
+        self.points()
+            .filter(|point| Self::magnitude_squared(point - other.center) > other.radius.pow(2))
+    }
+
+    fn square_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
+        let radius = self.radius as i32;
+        (-radius..=radius).flat_map(move |dx| {
+            (-radius..=radius).flat_map(move |dy| {
+                (-radius..=radius).map(move |dz| self.center + vector![dx, dy, dz])
+            })
         })
+    }
+
+    fn magnitude_squared(vector: Vector3<i32>) -> u32 {
+        vector.map(|c| c.pow(2)).sum() as u32
     }
 }
