@@ -61,12 +61,12 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
 fn sky_color(cos_theta: f32) -> vec3<f32> {
     let f_air = f_air(cos_theta);
     let f_haze = f_haze(cos_theta);
-    let inner = in_scattering(a.sc_air * f_air + a.sc_haze * f_haze, a.ex, a.s_haze, cos_theta);
-    let outer = in_scattering(a.sc_air * f_air, a.ex_air, a.s_air - a.s_haze, cos_theta);
+    let inner = in_scattering(a.sc_air * f_air + a.sc_haze * f_haze, a.ex, a.s_haze);
+    let outer = in_scattering(a.sc_air * f_air, a.ex_air, a.s_air - a.s_haze);
     return a.sun_intensity * inner * outer * exp(-a.ex * a.s_haze);
 }
 
-fn in_scattering(sc: vec3<f32>, ex: vec3<f32>, s: f32, cos_theta: f32) -> vec3<f32> {
+fn in_scattering(sc: vec3<f32>, ex: vec3<f32>, s: f32) -> vec3<f32> {
     let n = sc * (1.0 - exp(-ex * s));
     let d = ex;
     return n / d;

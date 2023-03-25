@@ -127,7 +127,7 @@ impl SkyColor {
     ) -> Self {
         Self(Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/atmosphere.wgsl"),
+            wgpu::include_wgsl!("../../../assets/shaders/color.wgsl"),
             &[],
             &[
                 player_bind_group_layout,
