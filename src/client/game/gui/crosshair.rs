@@ -1,6 +1,6 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{Effect, ImageTexture, PostProcessor, Program, Renderer, Uniform},
+    renderer::{ImageTexture, PostProcessor, Program, Renderer, Uniform},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4};
@@ -39,10 +39,8 @@ impl Crosshair {
             is_resized: true,
         }
     }
-}
 
-impl Effect for Crosshair {
-    fn draw<'a>(
+    pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         input_bind_group: &'a wgpu::BindGroup,
