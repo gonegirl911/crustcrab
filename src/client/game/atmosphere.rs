@@ -1,28 +1,81 @@
 use crate::{
-    client::renderer::{Renderer, Uniform},
+    client::renderer::{PostProcessor, Program, Renderer, Uniform},
     color::{Float3, Rgb},
 };
 use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
 use std::fs;
 
-pub struct Atmosphere(Uniform<AtmosphereUniformData>);
+pub struct Atmosphere {
+    uniform: Uniform<AtmosphereUniformData>,
+    program: Program,
+}
 
 impl Atmosphere {
-    pub fn new(renderer: &Renderer) -> Self {
-        Self(Uniform::with_constant_data(
+    pub fn new(
+        renderer: &Renderer,
+        player_bind_group_layout: &wgpu::BindGroupLayout,
+        sky_bind_group_layout: &wgpu::BindGroupLayout,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
+        depth_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let uniform = Uniform::with_constant_data(
             renderer,
             &AtmosphereUniformData::new(),
             wgpu::ShaderStages::FRAGMENT,
-        ))
+        );
+        let program = Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../../assets/shaders/atmosphere.wgsl"),
+            &[],
+            &[
+                player_bind_group_layout,
+                sky_bind_group_layout,
+                uniform.bind_group_layout(),
+                input_bind_group_layout,
+                depth_bind_group_layout,
+            ],
+            &[],
+            PostProcessor::FORMAT,
+            None,
+            None,
+            None,
+        );
+        Self { uniform, program }
     }
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group()
+    pub fn draw(
+        &self,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        player_bind_group: &wgpu::BindGroup,
+        sky_bind_group: &wgpu::BindGroup,
+        input_bind_group: &wgpu::BindGroup,
+        depth_bind_group: &wgpu::BindGroup,
+    ) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+        self.program.bind(
+            &mut render_pass,
+            [
+                player_bind_group,
+                sky_bind_group,
+                self.uniform.bind_group(),
+                input_bind_group,
+                depth_bind_group,
+            ],
+        );
+        render_pass.draw(0..6, 0..1);
     }
 }
 

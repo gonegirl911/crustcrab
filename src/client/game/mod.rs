@@ -19,77 +19,83 @@ use std::time::Duration;
 pub struct Game {
     gui: Gui,
     player: Player,
-    atmosphere: Atmosphere,
     sky: Sky,
     world: World,
-    hover: BlockHover,
-    depth_buffer: DepthBuffer,
-    processor: PostProcessor,
+    atmosphere: Atmosphere,
     aces: Aces,
+    hover: BlockHover,
+    processor: PostProcessor,
+    depth: DepthBuffer,
 }
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
         let processor = PostProcessor::new(renderer);
+        let depth = DepthBuffer::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
-        let atmosphere = Atmosphere::new(renderer);
-        let sky = Sky::new(
-            renderer,
-            player.bind_group_layout(),
-            atmosphere.bind_group_layout(),
-        );
+        let sky = Sky::new(renderer);
         let world = World::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
+        );
+        let atmosphere = Atmosphere::new(
+            renderer,
+            player.bind_group_layout(),
+            sky.bind_group_layout(),
+            processor.bind_group_layout(),
+            depth.bind_group_layout(),
+        );
+        let aces = Aces::new(
+            renderer,
+            processor.bind_group_layout(),
+            PostProcessor::FORMAT,
         );
         let hover = BlockHover::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
         );
-        let depth_buffer = DepthBuffer::new(renderer);
-        let aces = Aces::new(
-            renderer,
-            processor.bind_group_layout(),
-            PostProcessor::FORMAT,
-        );
         Self {
             gui,
             player,
             sky,
-            atmosphere,
             world,
-            hover,
-            depth_buffer,
-            processor,
+            atmosphere,
             aces,
+            hover,
+            processor,
+            depth,
         }
     }
 
     fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.sky.draw(
-            self.processor.view(),
-            encoder,
-            self.player.bind_group(),
-            self.atmosphere.bind_group(),
-        );
         self.world.draw(
             self.processor.view(),
             encoder,
             self.player.bind_group(),
             self.sky.bind_group(),
-            self.depth_buffer.view(),
+            self.depth.view(),
             &self.player.frustum(),
         );
+        self.processor.apply_raw(|view, bind_group| {
+            self.atmosphere.draw(
+                view,
+                encoder,
+                self.player.bind_group(),
+                self.sky.bind_group(),
+                bind_group,
+                self.depth.bind_group(),
+            );
+        });
         self.processor.apply(encoder, &self.aces);
         self.hover.draw(
             self.processor.view(),
             encoder,
             self.player.bind_group(),
             self.sky.bind_group(),
-            self.depth_buffer.view(),
+            self.depth.view(),
         );
         self.processor.apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
@@ -119,8 +125,8 @@ impl EventHandler for Game {
         self.sky.handle(event, renderer);
         self.world.handle(event, renderer);
         self.hover.handle(event, ());
-        self.depth_buffer.handle(event, renderer);
         self.processor.handle(event, renderer);
+        self.depth.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {

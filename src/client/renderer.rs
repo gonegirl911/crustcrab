@@ -45,6 +45,7 @@ impl Renderer {
                         | wgpu::Features::TEXTURE_BINDING_ARRAY
                         | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
                     limits: wgpu::Limits {
+                        max_bind_groups: 5,
                         max_push_constant_size: 128,
                         ..Default::default()
                     },
@@ -627,25 +628,27 @@ impl EventHandler for ScreenTexture {
     }
 }
 
-pub struct DepthBuffer(ScreenTexture);
+struct InputOutputTexture(InputOutputTextureArray<1>);
 
-impl DepthBuffer {
-    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
-
-    pub fn new(renderer: &Renderer) -> Self {
-        Self(ScreenTexture::new(
-            renderer,
-            Self::FORMAT,
-            wgpu::TextureUsages::RENDER_ATTACHMENT,
-        ))
+impl InputOutputTexture {
+    fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
+        Self(InputOutputTextureArray::new(renderer, format))
     }
 
-    pub fn view(&self) -> &wgpu::TextureView {
-        self.0.view()
+    fn view(&self) -> &wgpu::TextureView {
+        self.0.view(0)
+    }
+
+    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.0.bind_group_layout()
+    }
+
+    fn bind_group(&self) -> &wgpu::BindGroup {
+        self.0.bind_group(0)
     }
 }
 
-impl EventHandler for DepthBuffer {
+impl EventHandler for InputOutputTexture {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
@@ -776,6 +779,36 @@ impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
     }
 }
 
+pub struct DepthBuffer(InputOutputTexture);
+
+impl DepthBuffer {
+    pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+    pub fn new(renderer: &Renderer) -> Self {
+        Self(InputOutputTexture::new(renderer, Self::FORMAT))
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.0.view()
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.0.bind_group_layout()
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        self.0.bind_group()
+    }
+}
+
+impl EventHandler for DepthBuffer {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        self.0.handle(event, renderer);
+    }
+}
+
 pub struct PostProcessor {
     textures: InputOutputTextureArray<2>,
     blit: Blit,
@@ -819,6 +852,14 @@ impl PostProcessor {
             }),
             self.main_bind_group(),
         );
+        self.swap();
+    }
+
+    pub fn apply_raw<E>(&mut self, effect: E)
+    where
+        E: FnOnce(&wgpu::TextureView, &wgpu::BindGroup),
+    {
+        effect(self.secondary_view(), self.main_bind_group());
         self.swap();
     }
 

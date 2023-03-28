@@ -1,7 +1,7 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{PostProcessor, Program, Renderer, Uniform},
+        renderer::{Renderer, Uniform},
     },
     color::{Float3, Rgb},
     server::ServerEvent,
@@ -11,27 +11,14 @@ use nalgebra::{point, Point3};
 use std::f32::consts::TAU;
 
 pub struct Sky {
-    color: SkyColor,
     uniform: Uniform<SkyUniformData>,
     updated_time: Option<f32>,
 }
 
 impl Sky {
-    pub fn new(
-        renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        atmosphere_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
-        let color = SkyColor::new(
-            renderer,
-            player_bind_group_layout,
-            atmosphere_bind_group_layout,
-            uniform.bind_group_layout(),
-        );
+    pub fn new(renderer: &Renderer) -> Self {
         Self {
-            color,
-            uniform,
+            uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT),
             updated_time: Some(0.0),
         }
     }
@@ -42,32 +29,6 @@ impl Sky {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.uniform.bind_group()
-    }
-
-    pub fn draw(
-        &self,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        player_bind_group: &wgpu::BindGroup,
-        atmosphere_bind_group: &wgpu::BindGroup,
-    ) {
-        self.color.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            }),
-            player_bind_group,
-            atmosphere_bind_group,
-            self.uniform.bind_group(),
-        );
     }
 
     fn sun_coords(time: f32) -> Point3<f32> {
@@ -113,46 +74,5 @@ impl SkyUniformData {
             sun_coords: sun_coords.into(),
             light_intensity: light_intensity.into(),
         }
-    }
-}
-
-struct SkyColor(Program);
-
-impl SkyColor {
-    fn new(
-        renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        atmosphere_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        Self(Program::new(
-            renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/color.wgsl"),
-            &[],
-            &[
-                player_bind_group_layout,
-                atmosphere_bind_group_layout,
-                sky_bind_group_layout,
-            ],
-            &[],
-            PostProcessor::FORMAT,
-            None,
-            None,
-            None,
-        ))
-    }
-
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        player_bind_group: &'a wgpu::BindGroup,
-        atmosphere_bind_group: &'a wgpu::BindGroup,
-        sky_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.0.bind(
-            render_pass,
-            [player_bind_group, atmosphere_bind_group, sky_bind_group],
-        );
-        render_pass.draw(0..6, 0..1);
     }
 }

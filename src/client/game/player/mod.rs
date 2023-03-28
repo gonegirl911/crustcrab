@@ -119,7 +119,12 @@ impl EventHandler for Player {
             Event::RedrawRequested(_) if self.is_updated => {
                 self.uniform.write(
                     renderer,
-                    &PlayerUniformData::new(self.view.mat(), self.projection.mat()),
+                    &PlayerUniformData::new(
+                        self.view.mat(),
+                        self.projection.mat(),
+                        self.projection.znear(),
+                        self.projection.zfar(),
+                    ),
                 );
             }
             Event::RedrawEventsCleared => {
@@ -136,14 +141,20 @@ struct PlayerUniformData {
     vp: Matrix4<f32>,
     inv_v: Matrix4<f32>,
     inv_p: Matrix4<f32>,
+    znear: f32,
+    zfar: f32,
+    padding: [f32; 2],
 }
 
 impl PlayerUniformData {
-    fn new(v: Matrix4<f32>, p: Matrix4<f32>) -> Self {
+    fn new(v: Matrix4<f32>, p: Matrix4<f32>, znear: f32, zfar: f32) -> Self {
         Self {
             vp: p * v,
             inv_v: v.try_inverse().unwrap_or_else(|| unreachable!()),
             inv_p: p.try_inverse().unwrap_or_else(|| unreachable!()),
+            znear,
+            zfar,
+            padding: [0.0; 2],
         }
     }
 }
