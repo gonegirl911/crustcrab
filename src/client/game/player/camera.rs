@@ -170,9 +170,8 @@ impl Controller {
 
     fn apply_rotation(&mut self, view: &mut View) {
         const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
-        const ROTATION_SCALE: f32 = 1.0 / 60.0;
 
-        let dr = self.sensitivity * ROTATION_SCALE;
+        let dr = self.sensitivity;
 
         view.yaw = (view.yaw - self.dx * dr) % TAU;
         view.pitch = (view.pitch - self.dy * dr).clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);

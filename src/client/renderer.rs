@@ -804,8 +804,8 @@ impl PostProcessor {
     }
 
     pub fn apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        effect.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: self.secondary_view(),
@@ -816,9 +816,9 @@ impl PostProcessor {
                     },
                 })],
                 depth_stencil_attachment: None,
-            });
-            effect.draw(&mut render_pass, self.main_bind_group());
-        }
+            }),
+            self.main_bind_group(),
+        );
         self.swap();
     }
 

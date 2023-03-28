@@ -3,4 +3,4 @@ render_distance = 36
 origin = [0.0, 100.0, 0.0]
 fovy = 90.0
 speed = 25.0
-sensitivity = 0.15
+sensitivity = 0.0025
