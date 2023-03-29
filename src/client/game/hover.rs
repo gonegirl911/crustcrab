@@ -10,7 +10,7 @@ use nalgebra::{vector, Point3, Vector3};
 use std::mem;
 
 pub struct BlockHover {
-    outline: BlockHighlight,
+    highlight: BlockHighlight,
     coords: Option<Point3<i64>>,
 }
 
@@ -21,7 +21,11 @@ impl BlockHover {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
-            outline: BlockHighlight::new(renderer, player_bind_group_layout, sky_bind_group_layout),
+            highlight: BlockHighlight::new(
+                renderer,
+                player_bind_group_layout,
+                sky_bind_group_layout,
+            ),
             coords: None,
         }
     }
@@ -35,7 +39,7 @@ impl BlockHover {
         depth_buffer_view: &wgpu::TextureView,
     ) {
         if let Some(coords) = self.coords {
-            self.outline.draw(
+            self.highlight.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: None,
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
