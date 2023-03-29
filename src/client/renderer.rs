@@ -45,7 +45,6 @@ impl Renderer {
                         | wgpu::Features::TEXTURE_BINDING_ARRAY
                         | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
                     limits: wgpu::Limits {
-                        max_bind_groups: 5,
                         max_push_constant_size: 128,
                         ..Default::default()
                     },
@@ -191,8 +190,8 @@ impl<T: Pod> Uniform<T> {
 
     pub fn with_constant_data(
         renderer @ Renderer { device, .. }: &Renderer,
-        data: &T,
         visibility: wgpu::ShaderStages,
+        data: &T,
     ) -> Self {
         let buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,

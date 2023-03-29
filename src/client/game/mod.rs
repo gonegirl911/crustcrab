@@ -43,7 +43,6 @@ impl Game {
         let atmosphere = Atmosphere::new(
             renderer,
             player.bind_group_layout(),
-            sky.bind_group_layout(),
             processor.bind_group_layout(),
             depth.bind_group_layout(),
         );
@@ -84,7 +83,6 @@ impl Game {
                 view,
                 encoder,
                 self.player.bind_group(),
-                self.sky.bind_group(),
                 bind_group,
                 self.depth.bind_group(),
             );
@@ -122,8 +120,8 @@ impl EventHandler for Game {
     ) {
         self.gui.handle(event, renderer);
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-        self.sky.handle(event, renderer);
         self.world.handle(event, renderer);
+        self.atmosphere.handle(event, renderer);
         self.hover.handle(event, ());
         self.processor.handle(event, renderer);
         self.depth.handle(event, renderer);

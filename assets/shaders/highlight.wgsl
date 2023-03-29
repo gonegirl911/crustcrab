@@ -11,7 +11,6 @@ struct PlayerUniform {
 }
 
 struct SkyUniform {
-    sun_coords: vec3<f32>,
     light_intensity: vec3<f32>,
 }
 

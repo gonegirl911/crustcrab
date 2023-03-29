@@ -24,12 +24,8 @@ struct PlayerUniform {
     zfar: f32,
 }
 
-struct SkyUniform {
-    sun_coords: vec3<f32>,
-    light_intensity: vec3<f32>,
-}
-
 struct AtmosphereUniform {
+    sun_dir: vec3<f32>,
     sun_intensity: vec3<f32>,
     sc_air: vec3<f32>,
     sc_haze: vec3<f32>,
@@ -45,28 +41,25 @@ struct AtmosphereUniform {
 var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
-var<uniform> sky: SkyUniform;
-
-@group(2) @binding(0)
 var<uniform> a: AtmosphereUniform;
 
-@group(3) @binding(0)
+@group(2) @binding(0)
 var t_input: texture_2d<f32>;
 
-@group(3) @binding(1)
+@group(2) @binding(1)
 var s_input: sampler;
 
-@group(4) @binding(0)
+@group(3) @binding(0)
 var t_depth: texture_2d<f32>;
 
-@group(4) @binding(1)
+@group(3) @binding(1)
 var s_depth: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_input, s_input, in.input_coords).xyz;
     let depth = linearize(textureSample(t_depth, s_depth, in.input_coords).x);
-    let cos_theta = dot(dir(in.screen_coords), -sky.sun_coords);
+    let cos_theta = dot(dir(in.screen_coords), a.sun_dir);
     let sky_color = sky_color(cos_theta);
     let perspective = aerial_perspective(color, player.zfar * depth, cos_theta);
     return vec4(mix(sky_color, perspective, f32(depth < 1.0)), 1.0);

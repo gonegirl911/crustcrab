@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
 use serde::Deserialize;
 use std::{
     array,
@@ -96,6 +96,15 @@ impl From<Rgb<f32>> for Float3 {
     fn from(rgb: Rgb<f32>) -> Self {
         Self {
             data: rgb.0,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<Vector3<f32>> for Float3 {
+    fn from(vector: Vector3<f32>) -> Self {
+        Self {
+            data: vector.into(),
             ..Default::default()
         }
     }

@@ -6,18 +6,16 @@ use winit::{
     window::{CursorGrabMode, Window as RawWindow, WindowBuilder as RawWindowBuilder},
 };
 
-pub struct Window {
-    window: RawWindow,
-}
+pub struct Window(RawWindow);
 
 impl Window {
     pub fn new<T>(event_loop: &RawEventLoop<T>) -> Self {
-        Self {
-            window: RawWindowBuilder::new()
+        Self(
+            RawWindowBuilder::new()
                 .with_title("Crustcrab")
                 .build(event_loop)
                 .expect("window should be creatable"),
-        }
+        )
     }
 }
 
@@ -25,7 +23,7 @@ impl Deref for Window {
     type Target = RawWindow;
 
     fn deref(&self) -> &Self::Target {
-        &self.window
+        &self.0
     }
 }
 
@@ -40,11 +38,11 @@ impl EventHandler for Window {
                     state: ElementState::Pressed,
                     ..
                 } => {
-                    self.window
+                    self.0
                         .set_cursor_grab(CursorGrabMode::Locked)
-                        .or_else(|_| self.window.set_cursor_grab(CursorGrabMode::Confined))
+                        .or_else(|_| self.0.set_cursor_grab(CursorGrabMode::Confined))
                         .expect("cursor should be lockable");
-                    self.window.set_cursor_visible(false);
+                    self.0.set_cursor_visible(false);
                 }
                 WindowEvent::KeyboardInput {
                     input:
@@ -55,15 +53,15 @@ impl EventHandler for Window {
                         },
                     ..
                 } => {
-                    self.window
+                    self.0
                         .set_cursor_grab(CursorGrabMode::None)
                         .expect("cursor should be unlockable");
-                    self.window.set_cursor_visible(true);
+                    self.0.set_cursor_visible(true);
                 }
                 WindowEvent::CloseRequested => control_flow.set_exit(),
                 _ => {}
             },
-            Event::MainEventsCleared => self.window.request_redraw(),
+            Event::MainEventsCleared => self.0.request_redraw(),
             _ => {}
         }
     }
