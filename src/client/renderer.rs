@@ -190,8 +190,8 @@ impl<T: Pod> Uniform<T> {
 
     pub fn with_constant_data(
         renderer @ Renderer { device, .. }: &Renderer,
-        visibility: wgpu::ShaderStages,
         data: &T,
+        visibility: wgpu::ShaderStages,
     ) -> Self {
         let buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: None,

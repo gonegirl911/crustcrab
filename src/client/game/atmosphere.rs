@@ -160,9 +160,9 @@ impl AtmosphereSettings {
     fn sun_intensity(&self, sun_dir: Vector3<f32>) -> Rgb<f32> {
         let cos_theta = sun_dir.dot(&Player::WORLD_UP);
         let theta = cos_theta.acos().to_degrees();
-        let l = 1.0 / (cos_theta + 0.15 * (93.885 - theta).powf(-1.253));
-        let s_air = self.s_air * l;
-        let s_haze = self.s_haze * l;
+        let m = 1.0 / (cos_theta + 0.15 * (93.885 - theta).powf(-1.253));
+        let s_air = self.s_air * m;
+        let s_haze = self.s_haze * m;
         self.sun_intensity * (-self.ex_air() * s_air - self.ex_haze() * s_haze).exp()
     }
 
