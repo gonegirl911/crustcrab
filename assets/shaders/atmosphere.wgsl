@@ -33,9 +33,9 @@ struct AtmosphereUniform {
     sun_intensity: vec3<f32>,
     sc_air: vec3<f32>,
     sc_haze: vec3<f32>,
+    ex: vec3<f32>,
     ex_air: vec3<f32>,
     ex_haze: vec3<f32>,
-    ex: vec3<f32>,
     s_air: f32,
     s_haze: f32,
     g: f32,
@@ -66,10 +66,10 @@ var s_depth: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_input, s_input, in.input_coords).xyz;
     let depth = linearize(textureSample(t_depth, s_depth, in.input_coords).x);
-    let cos_theta = dot(dir(in.screen_coords), sky.sun_coords);
+    let cos_theta = dot(dir(in.screen_coords), -sky.sun_coords);
     let sky_color = sky_color(cos_theta);
-    let aerial_perspective = aerial_perspective(color, depth * player.zfar, cos_theta);
-    return vec4(mix(sky_color, aerial_perspective, f32(depth < 1.0)), 1.0);
+    let perspective = aerial_perspective(color, player.zfar * depth, cos_theta);
+    return vec4(mix(sky_color, perspective, f32(depth < 1.0)), 1.0);
 }
 
 fn linearize(depth: f32) -> f32 {
@@ -91,8 +91,8 @@ fn sky_color(cos_theta: f32) -> vec3<f32> {
 fn aerial_perspective(color: vec3<f32>, s: f32, cos_theta: f32) -> vec3<f32> {
     let ex = extinction(s);
     let in = a.sun_intensity * in_scattering(sc(cos_theta), a.ex, s);
-    return ex * color + in;
-} 
+    return color * ex + in;
+}
 
 fn extinction(s: f32) -> vec3<f32> {
     return exp(-a.ex * s);

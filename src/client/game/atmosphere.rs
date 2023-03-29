@@ -85,9 +85,9 @@ struct AtmosphereUniformData {
     sun_intensity: Float3,
     sc_air: Float3,
     sc_haze: Float3,
+    ex: Float3,
     ex_air: Float3,
-    ex_haze: Float3,
-    ex: Rgb<f32>,
+    ex_haze: Rgb<f32>,
     s_air: f32,
     s_haze: f32,
     g: f32,
@@ -101,9 +101,9 @@ impl AtmosphereUniformData {
             sun_intensity: settings.sun_intensity().into(),
             sc_air: settings.sc_air.into(),
             sc_haze: settings.sc_haze.into(),
+            ex: settings.ex().into(),
             ex_air: settings.ex_air().into(),
-            ex_haze: settings.ex_haze().into(),
-            ex: settings.ex(),
+            ex_haze: settings.ex_haze(),
             s_air: settings.s_air,
             s_haze: settings.s_haze,
             g: settings.g,
@@ -134,15 +134,15 @@ impl AtmosphereSettings {
         self.sun_intensity * (-self.ex_air() * self.s_air - self.ex_haze() * self.s_haze).exp()
     }
 
+    fn ex(&self) -> Rgb<f32> {
+        self.ex_air() + self.ex_haze()
+    }
+
     fn ex_air(&self) -> Rgb<f32> {
         self.ab_air + self.sc_air
     }
 
     fn ex_haze(&self) -> Rgb<f32> {
         self.ab_haze + self.sc_haze
-    }
-
-    fn ex(&self) -> Rgb<f32> {
-        self.ex_air() + self.ex_haze()
     }
 }

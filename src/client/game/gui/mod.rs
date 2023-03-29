@@ -44,7 +44,7 @@ impl Gui {
     }
 
     pub fn zfar(&self) -> f32 {
-        (self.render_distance() * Chunk::DIM as u32) as f32
+        ((self.render_distance() + 1) * Chunk::DIM as u32) as f32
     }
 
     pub fn speed(&self) -> f32 {
