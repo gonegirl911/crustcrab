@@ -87,7 +87,7 @@ struct ClientSettings {
 
 impl ClientSettings {
     fn new() -> Self {
-        toml::from_str(&fs::read_to_string("assets/player.toml").expect("file should exist"))
+        toml::from_str(&fs::read_to_string("assets/client.toml").expect("file should exist"))
             .expect("file should be valid")
     }
 }
