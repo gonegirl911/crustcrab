@@ -7,7 +7,7 @@ use self::chunk::{ChunkMap, ChunkMapEvent};
 use crate::server::{
     event_loop::{Event, EventHandler},
     game::player::{ray::Ray, Player},
-    ServerEvent,
+    ServerEvent, ServerSettings,
 };
 use flume::Sender;
 use std::thread;
@@ -16,12 +16,12 @@ pub struct World {
     chunks_tx: Sender<(ChunkMapEvent, Sender<ServerEvent>, Ray)>,
 }
 
-impl Default for World {
-    fn default() -> Self {
+impl World {
+    pub fn new(settings: &ServerSettings) -> Self {
         let (chunks_tx, chunks_rx) = flume::unbounded();
+        let mut chunks = ChunkMap::new(settings);
 
         thread::spawn(move || {
-            let mut chunks = ChunkMap::default();
             for (event, server_tx, ray) in chunks_rx {
                 chunks.handle(&event, (server_tx, ray));
             }

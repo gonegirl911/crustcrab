@@ -11,7 +11,7 @@ use crate::{
             ray::{BlockIntersection, Ray},
             Player, WorldArea,
         },
-        ServerEvent,
+        ServerEvent, ServerSettings,
     },
 };
 use bitvec::prelude::*;
@@ -34,9 +34,17 @@ pub struct ChunkMap {
     hovered_block: Option<BlockIntersection>,
     loader: ChunkLoader,
     light: ChunkMapLight,
+    reach: Range<f32>,
 }
 
 impl ChunkMap {
+    pub fn new(settings: &ServerSettings) -> Self {
+        Self {
+            reach: settings.reach.clone(),
+            ..Default::default()
+        }
+    }
+
     fn load_many(&mut self, points: &[Point3<i32>]) -> (Vec<Point3<i32>>, FxHashSet<Point3<i64>>) {
         let missing = points
             .iter()
@@ -374,16 +382,16 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 );
             }
             ChunkMapEvent::BlockSelectionRequested => {
-                self.hovered_block = ray.cast(Player::BUILDING_REACH).find(
-                    |BlockIntersection { coords, .. }| {
-                        let chunk_coords = Self::chunk_coords(*coords);
-                        let block_coords = Self::block_coords(*coords);
-                        self.store
-                            .get(chunk_coords)
-                            .map(|cell| cell[block_coords].is_not_air())
-                            .unwrap_or_default()
-                    },
-                );
+                self.hovered_block =
+                    ray.cast(self.reach.clone())
+                        .find(|BlockIntersection { coords, .. }| {
+                            let chunk_coords = Self::chunk_coords(*coords);
+                            let block_coords = Self::block_coords(*coords);
+                            self.store
+                                .get(chunk_coords)
+                                .map(|cell| cell[block_coords].is_not_air())
+                                .unwrap_or_default()
+                        });
 
                 server_tx
                     .send(ServerEvent::BlockHovered {

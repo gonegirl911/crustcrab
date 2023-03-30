@@ -12,7 +12,8 @@ use crate::{
 };
 use flume::{Receiver, Sender};
 use nalgebra::Point3;
-use std::sync::Arc;
+use serde::Deserialize;
+use std::{fs, ops::Range, sync::Arc};
 
 pub struct Server {
     event_loop: EventLoop,
@@ -21,10 +22,10 @@ pub struct Server {
 
 impl Server {
     pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
-        Self {
-            event_loop: EventLoop::new(server_tx, client_rx),
-            game: Default::default(),
-        }
+        let settings = Self::settings();
+        let event_loop = EventLoop::new(server_tx, client_rx, &settings);
+        let game = Game::new(&settings);
+        Self { event_loop, game }
     }
 
     pub fn run(self) -> ! {
@@ -42,6 +43,17 @@ impl Server {
 
         self.event_loop.run(MiniServer { game: self.game })
     }
+
+    fn settings() -> ServerSettings {
+        toml::from_str(&fs::read_to_string("assets/server.toml").expect("file should exist"))
+            .expect("file should be valid")
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ServerSettings {
+    ticks_per_second: u32,
+    reach: Range<f32>,
 }
 
 pub enum ServerEvent {

@@ -9,13 +9,13 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Vector3};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::{f32::consts::TAU, fs};
 
 pub struct Atmosphere {
     uniform: Uniform<AtmosphereUniformData>,
     program: Program,
+    settings: AtmosphereSettings,
     updated_time: Option<f32>,
 }
 
@@ -43,9 +43,11 @@ impl Atmosphere {
             None,
             None,
         );
+        let settings = Self::settings();
         Self {
             uniform,
             program,
+            settings,
             updated_time: Some(0.0),
         }
     }
@@ -86,6 +88,11 @@ impl Atmosphere {
         let theta = time * TAU;
         vector![theta.cos(), theta.sin(), 0.0]
     }
+
+    fn settings() -> AtmosphereSettings {
+        toml::from_str(&fs::read_to_string("assets/atmosphere.toml").expect("file should exist"))
+            .expect("file should be valid")
+    }
 }
 
 impl EventHandler for Atmosphere {
@@ -98,8 +105,10 @@ impl EventHandler for Atmosphere {
             }
             Event::RedrawRequested(_) => {
                 if let Some(time) = self.updated_time {
-                    self.uniform
-                        .write(renderer, &AtmosphereUniformData::new(Self::sun_dir(time)));
+                    self.uniform.write(
+                        renderer,
+                        &AtmosphereUniformData::new(Self::sun_dir(time), &self.settings),
+                    );
                 }
             }
             Event::RedrawEventsCleared => {
@@ -127,18 +136,18 @@ struct AtmosphereUniformData {
 }
 
 impl AtmosphereUniformData {
-    fn new(sun_dir: Vector3<f32>) -> Self {
+    fn new(sun_dir: Vector3<f32>, settings: &AtmosphereSettings) -> Self {
         Self {
             sun_dir: sun_dir.into(),
-            sun_intensity: SETTINGS.sun_intensity(sun_dir).into(),
-            sc_air: SETTINGS.sc_air.into(),
-            sc_haze: SETTINGS.sc_haze.into(),
-            ex: SETTINGS.ex().into(),
-            ex_air: SETTINGS.ex_air().into(),
-            ex_haze: SETTINGS.ex_haze(),
-            s_air: SETTINGS.s_air,
-            s_haze: SETTINGS.s_haze,
-            g: SETTINGS.g,
+            sun_intensity: settings.sun_intensity(sun_dir).into(),
+            sc_air: settings.sc_air.into(),
+            sc_haze: settings.sc_haze.into(),
+            ex: settings.ex().into(),
+            ex_air: settings.ex_air().into(),
+            ex_haze: settings.ex_haze(),
+            s_air: settings.s_air,
+            s_haze: settings.s_haze,
+            g: settings.g,
             padding: [0.0; 2],
         }
     }
@@ -158,17 +167,12 @@ struct AtmosphereSettings {
 
 impl AtmosphereSettings {
     fn sun_intensity(&self, sun_dir: Vector3<f32>) -> Rgb<f32> {
-        let cos_theta = sun_dir.dot(&Player::WORLD_UP);
+        let cos_theta = sun_dir.dot(&Player::WORLD_UP).clamp(0.0, 1.0);
         let theta = cos_theta.acos();
-        let diff = 93.885 - theta.to_degrees();
-        if diff >= 1.0 {
-            let m = 1.0 / (cos_theta + 0.15 * diff.powf(-1.253));
-            let s_air = self.s_air * m;
-            let s_haze = self.s_haze * m;
-            self.sun_intensity * (-self.ex_air() * s_air - self.ex_haze() * s_haze).exp()
-        } else {
-            Rgb::splat(0.0)
-        }
+        let m = 1.0 / (cos_theta + 0.15 * (93.885 - theta.to_degrees()).powf(-1.253));
+        let s_air = self.s_air * m;
+        let s_haze = self.s_haze * m;
+        self.sun_intensity * (-self.ex_air() * s_air - self.ex_haze() * s_haze).exp()
     }
 
     fn ex(&self) -> Rgb<f32> {
@@ -183,8 +187,3 @@ impl AtmosphereSettings {
         self.ab_haze + self.sc_haze
     }
 }
-
-static SETTINGS: Lazy<AtmosphereSettings> = Lazy::new(|| {
-    toml::from_str(&fs::read_to_string("assets/atmosphere.toml").expect("file should exist"))
-        .expect("file should be valid")
-});

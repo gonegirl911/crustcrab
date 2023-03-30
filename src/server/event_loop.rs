@@ -1,17 +1,23 @@
-use super::{ticker::Ticker, ServerEvent};
+use super::{ticker::Ticker, ServerEvent, ServerSettings};
 use crate::client::ClientEvent;
 use flume::{Receiver, Sender};
 
 pub struct EventLoop {
     server_tx: Sender<ServerEvent>,
     client_rx: Receiver<ClientEvent>,
+    ticks_per_second: u32,
 }
 
 impl EventLoop {
-    pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
+    pub fn new(
+        server_tx: Sender<ServerEvent>,
+        client_rx: Receiver<ClientEvent>,
+        settings: &ServerSettings,
+    ) -> Self {
         Self {
             server_tx,
             client_rx,
+            ticks_per_second: settings.ticks_per_second,
         }
     }
 
@@ -19,7 +25,7 @@ impl EventLoop {
     where
         H: for<'a> EventHandler<Event, Context<'a> = Sender<ServerEvent>> + Send,
     {
-        let mut ticker = Ticker::start(20);
+        let mut ticker = Ticker::start(self.ticks_per_second);
 
         handler.handle(&Event::Init, self.server_tx.clone());
         loop {

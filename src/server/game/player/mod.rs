@@ -7,7 +7,6 @@ use crate::{
     server::event_loop::{Event, EventHandler},
 };
 use nalgebra::{vector, Point3, Vector3};
-use std::ops::Range;
 
 #[derive(Default)]
 pub struct Player {
@@ -17,8 +16,6 @@ pub struct Player {
 }
 
 impl Player {
-    pub const BUILDING_REACH: Range<f32> = 0.0..4.5;
-
     fn chunk_coords(coords: Point3<f32>) -> Point3<i32> {
         coords.map(|c| (c / Chunk::DIM as f32).floor() as i32)
     }
