@@ -344,7 +344,7 @@ impl ImageTexture {
             &image,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: NonZeroU32::new(4 * width),
+                bytes_per_row: NonZeroU32::new(width * 4),
                 rows_per_image: NonZeroU32::new(height),
             },
             size,
