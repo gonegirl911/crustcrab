@@ -22,7 +22,7 @@ pub struct Server {
 
 impl Server {
     pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
-        let settings = Self::settings();
+        let settings = ServerSettings::new();
         let event_loop = EventLoop::new(server_tx, client_rx, &settings);
         let game = Game::new(&settings);
         Self { event_loop, game }
@@ -43,17 +43,19 @@ impl Server {
 
         self.event_loop.run(MiniServer { game: self.game })
     }
-
-    fn settings() -> ServerSettings {
-        toml::from_str(&fs::read_to_string("assets/server.toml").expect("file should exist"))
-            .expect("file should be valid")
-    }
 }
 
 #[derive(Deserialize)]
 pub struct ServerSettings {
     ticks_per_second: u32,
     reach: Range<f32>,
+}
+
+impl ServerSettings {
+    fn new() -> Self {
+        toml::from_str(&fs::read_to_string("assets/server.toml").expect("file should exist"))
+            .expect("file should be valid")
+    }
 }
 
 pub enum ServerEvent {

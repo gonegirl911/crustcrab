@@ -43,7 +43,7 @@ impl Atmosphere {
             None,
             None,
         );
-        let settings = Self::settings();
+        let settings = AtmosphereSettings::new();
         Self {
             uniform,
             program,
@@ -87,11 +87,6 @@ impl Atmosphere {
     fn sun_dir(time: f32) -> Vector3<f32> {
         let theta = time * TAU;
         vector![theta.cos(), theta.sin(), 0.0]
-    }
-
-    fn settings() -> AtmosphereSettings {
-        toml::from_str(&fs::read_to_string("assets/atmosphere.toml").expect("file should exist"))
-            .expect("file should be valid")
     }
 }
 
@@ -166,6 +161,11 @@ struct AtmosphereSettings {
 }
 
 impl AtmosphereSettings {
+    fn new() -> Self {
+        toml::from_str(&fs::read_to_string("assets/atmosphere.toml").expect("file should exist"))
+            .expect("file should be valid")
+    }
+
     fn sun_intensity(&self, sun_dir: Vector3<f32>) -> Rgb<f32> {
         let cos_theta = sun_dir.dot(&Player::WORLD_UP).clamp(0.0, 1.0);
         let theta = cos_theta.acos();
