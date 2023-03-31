@@ -59,7 +59,7 @@ var s_depth: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_input, s_input, in.input_coords).xyz;
     let depth = linearize(textureSample(t_depth, s_depth, in.input_coords).x);
-    let cos_theta = dot(dir(in.screen_coords), a.sun_dir);
+    let cos_theta = dot(dir(in.screen_coords), -a.sun_dir);
     let sky_color = sky_color(cos_theta);
     let perspective = aerial_perspective(color, depth * player.zfar, cos_theta);
     return vec4(mix(sky_color, perspective, f32(depth < 1.0)), 1.0);
