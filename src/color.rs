@@ -1,10 +1,6 @@
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Point3, Vector3};
 use serde::Deserialize;
-use std::{
-    array,
-    ops::{Add, Index, Mul, Neg, Sub},
-};
+use std::{array, ops::Index};
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Zeroable, Pod, Deserialize)]
@@ -22,57 +18,11 @@ impl<T: Copy> Rgb<T> {
     }
 }
 
-impl Rgb<f32> {
-    pub fn exp(self) -> Self {
-        Self(self.0.map(f32::exp))
-    }
-}
-
 impl<T> Index<usize> for Rgb<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
-    }
-}
-
-impl<T: Add + Copy> Add for Rgb<T> {
-    type Output = Rgb<T::Output>;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Rgb(array::from_fn(|i| self[i] + rhs[i]))
-    }
-}
-
-impl<T: Sub + Copy> Sub for Rgb<T> {
-    type Output = Rgb<T::Output>;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Rgb(array::from_fn(|i| self[i] - rhs[i]))
-    }
-}
-
-impl<T: Mul + Copy> Mul for Rgb<T> {
-    type Output = Rgb<T::Output>;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Rgb(array::from_fn(|i| self[i] * rhs[i]))
-    }
-}
-
-impl<T: Mul + Copy> Mul<T> for Rgb<T> {
-    type Output = Rgb<T::Output>;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        Rgb(self.0.map(|c| c * rhs))
-    }
-}
-
-impl<T: Neg> Neg for Rgb<T> {
-    type Output = Rgb<T::Output>;
-
-    fn neg(self) -> Self::Output {
-        Rgb(self.0.map(Neg::neg))
     }
 }
 
@@ -96,24 +46,6 @@ impl From<Rgb<f32>> for Float3 {
     fn from(rgb: Rgb<f32>) -> Self {
         Self {
             data: rgb.0,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<Vector3<f32>> for Float3 {
-    fn from(vector: Vector3<f32>) -> Self {
-        Self {
-            data: vector.into(),
-            ..Default::default()
-        }
-    }
-}
-
-impl From<Point3<f32>> for Float3 {
-    fn from(point: Point3<f32>) -> Self {
-        Self {
-            data: point.into(),
             ..Default::default()
         }
     }

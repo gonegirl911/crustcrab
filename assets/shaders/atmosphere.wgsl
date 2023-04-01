@@ -20,6 +20,7 @@ struct PlayerUniform {
     vp: mat4x4<f32>,
     inv_v: mat4x4<f32>,
     inv_p: mat4x4<f32>,
+    origin: vec3<f32>,
     znear: f32,
     zfar: f32,
 }
@@ -63,8 +64,9 @@ var s_depth: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_input, s_input, in.input_coords).xyz;
     let depth = linearize(textureSample(t_depth, s_depth, in.input_coords).x);
-    let cos_theta = dot(dir(in.screen_coords), a.light_dir);
-    return vec4(color, 1.0);
+    let origin = vec3(0.0, a.r_planet + player.origin.y, 0.0);
+    let dir = dir(in.screen_coords);
+    return vec4(scatter(color, origin, dir, depth), 1.0);
 }
 
 fn linearize(depth: f32) -> f32 {
@@ -75,6 +77,10 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
     let eye = player.inv_p * vec4(screen_coords, 1.0, 1.0);
     let dir = player.inv_v * vec4(eye.xy, 1.0, 0.0);
     return normalize(dir.xyz);
+}
+
+fn scatter(color: vec3<f32>, origin: vec3<f32>, dir: vec3<f32>, depth: f32) -> vec3<f32> {
+    return color;
 }
 
 const PI = 3.14159265358979323846264338327950288;
