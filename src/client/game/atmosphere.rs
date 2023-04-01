@@ -1,10 +1,9 @@
-use super::player::Player;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{PostProcessor, Program, Renderer, Uniform},
     },
-    color::{Float3, Rgb},
+    color::Rgb,
     server::ServerEvent,
 };
 use bytemuck::{Pod, Zeroable};
@@ -117,73 +116,63 @@ impl EventHandler for Atmosphere {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct AtmosphereUniformData {
-    sun_dir: Float3,
-    sun_intensity: Float3,
-    sc_air: Float3,
-    sc_haze: Float3,
-    ex: Float3,
-    ex_air: Float3,
-    ex_haze: Rgb<f32>,
-    s_air: f32,
-    s_haze: f32,
+    light_dir: Vector3<f32>,
     g: f32,
-    padding: [f32; 2],
+    light_intensity: Rgb<f32>,
+    h_ray: f32,
+    b_ray: Rgb<f32>,
+    h_mie: f32,
+    b_mie: Rgb<f32>,
+    h_ab: f32,
+    b_ab: Rgb<f32>,
+    ab_falloff: f32,
+    r_planet: f32,
+    r_atmosphere: f32,
+    primary_steps: u32,
+    light_steps: u32,
 }
 
 impl AtmosphereUniformData {
     fn new(sun_dir: Vector3<f32>, settings: &AtmosphereSettings) -> Self {
         Self {
-            sun_dir: sun_dir.into(),
-            sun_intensity: settings.sun_intensity(sun_dir).into(),
-            sc_air: settings.sc_air.into(),
-            sc_haze: settings.sc_haze.into(),
-            ex: settings.ex().into(),
-            ex_air: settings.ex_air().into(),
-            ex_haze: settings.ex_haze(),
-            s_air: settings.s_air,
-            s_haze: settings.s_haze,
+            light_dir: -sun_dir,
             g: settings.g,
-            padding: [0.0; 2],
+            light_intensity: settings.light_intensity,
+            h_ray: settings.h_ray,
+            b_ray: settings.b_ray,
+            h_mie: settings.h_mie,
+            b_mie: settings.b_mie,
+            h_ab: settings.h_ab,
+            b_ab: settings.b_ab,
+            ab_falloff: settings.ab_falloff,
+            r_planet: settings.r_planet,
+            r_atmosphere: settings.r_atmosphere,
+            primary_steps: settings.primary_steps,
+            light_steps: settings.light_steps,
         }
     }
 }
 
 #[derive(Deserialize)]
 struct AtmosphereSettings {
-    sun_intensity: Rgb<f32>,
-    ab_air: Rgb<f32>,
-    ab_haze: Rgb<f32>,
-    sc_air: Rgb<f32>,
-    sc_haze: Rgb<f32>,
-    s_air: f32,
-    s_haze: f32,
     g: f32,
+    light_intensity: Rgb<f32>,
+    h_ray: f32,
+    b_ray: Rgb<f32>,
+    h_mie: f32,
+    b_mie: Rgb<f32>,
+    h_ab: f32,
+    b_ab: Rgb<f32>,
+    ab_falloff: f32,
+    r_planet: f32,
+    r_atmosphere: f32,
+    primary_steps: u32,
+    light_steps: u32,
 }
 
 impl AtmosphereSettings {
     fn new() -> Self {
         toml::from_str(&fs::read_to_string("assets/atmosphere.toml").expect("file should exist"))
             .expect("file should be valid")
-    }
-
-    fn sun_intensity(&self, sun_dir: Vector3<f32>) -> Rgb<f32> {
-        let cos_theta = sun_dir.dot(&Player::WORLD_UP).clamp(0.0, 1.0);
-        let theta = cos_theta.acos();
-        let m = 1.0 / (cos_theta + 0.15 * (93.885 - theta.to_degrees()).powf(-1.253));
-        let s_air = self.s_air * m;
-        let s_haze = self.s_haze * m;
-        self.sun_intensity * (-self.ex_air() * s_air - self.ex_haze() * s_haze).exp()
-    }
-
-    fn ex(&self) -> Rgb<f32> {
-        self.ex_air() + self.ex_haze()
-    }
-
-    fn ex_air(&self) -> Rgb<f32> {
-        self.ab_air + self.sc_air
-    }
-
-    fn ex_haze(&self) -> Rgb<f32> {
-        self.ab_haze + self.sc_haze
     }
 }

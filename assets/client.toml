@@ -1,6 +1,6 @@
 selected_block = "glowstone"
 render_distance = 36
-origin = [0.0, 25.0, 0.0]
+origin = [0.0, 9.0, 0.0]
 fovy = 90.0
 speed = 25.0
 sensitivity = 0.0025
