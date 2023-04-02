@@ -123,13 +123,11 @@ struct AtmosphereUniformData {
     b_ray: Rgb<f32>,
     h_mie: f32,
     b_mie: Rgb<f32>,
-    h_ab: f32,
-    b_ab: Rgb<f32>,
-    ab_falloff: f32,
     r_planet: f32,
     r_atmosphere: f32,
     n_samples: u32,
     n_light_samples: u32,
+    padding: f32,
 }
 
 impl AtmosphereUniformData {
@@ -142,13 +140,11 @@ impl AtmosphereUniformData {
             b_ray: settings.b_ray,
             h_mie: settings.h_mie,
             b_mie: settings.b_mie,
-            h_ab: settings.h_ab,
-            b_ab: settings.b_ab,
-            ab_falloff: settings.ab_falloff,
             r_planet: settings.r_planet,
             r_atmosphere: settings.r_atmosphere,
             n_samples: settings.n_samples,
             n_light_samples: settings.n_light_samples,
+            padding: 0.0,
         }
     }
 }
@@ -161,9 +157,6 @@ struct AtmosphereSettings {
     b_ray: Rgb<f32>,
     h_mie: f32,
     b_mie: Rgb<f32>,
-    h_ab: f32,
-    b_ab: Rgb<f32>,
-    ab_falloff: f32,
     r_planet: f32,
     r_atmosphere: f32,
     n_samples: u32,
