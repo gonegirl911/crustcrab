@@ -116,9 +116,9 @@ impl EventHandler for Atmosphere {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct AtmosphereUniformData {
-    light_dir: Vector3<f32>,
+    sun_dir: Vector3<f32>,
     g: f32,
-    light_intensity: Rgb<f32>,
+    sun_intensity: Rgb<f32>,
     h_ray: f32,
     b_ray: Rgb<f32>,
     h_mie: f32,
@@ -128,16 +128,16 @@ struct AtmosphereUniformData {
     ab_falloff: f32,
     r_planet: f32,
     r_atmosphere: f32,
-    primary_steps: u32,
-    light_steps: u32,
+    n_samples: u32,
+    n_light_samples: u32,
 }
 
 impl AtmosphereUniformData {
     fn new(sun_dir: Vector3<f32>, settings: &AtmosphereSettings) -> Self {
         Self {
-            light_dir: -sun_dir,
+            sun_dir,
             g: settings.g,
-            light_intensity: settings.light_intensity,
+            sun_intensity: settings.sun_intensity,
             h_ray: settings.h_ray,
             b_ray: settings.b_ray,
             h_mie: settings.h_mie,
@@ -147,8 +147,8 @@ impl AtmosphereUniformData {
             ab_falloff: settings.ab_falloff,
             r_planet: settings.r_planet,
             r_atmosphere: settings.r_atmosphere,
-            primary_steps: settings.primary_steps,
-            light_steps: settings.light_steps,
+            n_samples: settings.n_samples,
+            n_light_samples: settings.n_light_samples,
         }
     }
 }
@@ -156,7 +156,7 @@ impl AtmosphereUniformData {
 #[derive(Deserialize)]
 struct AtmosphereSettings {
     g: f32,
-    light_intensity: Rgb<f32>,
+    sun_intensity: Rgb<f32>,
     h_ray: f32,
     b_ray: Rgb<f32>,
     h_mie: f32,
@@ -166,8 +166,8 @@ struct AtmosphereSettings {
     ab_falloff: f32,
     r_planet: f32,
     r_atmosphere: f32,
-    primary_steps: u32,
-    light_steps: u32,
+    n_samples: u32,
+    n_light_samples: u32,
 }
 
 impl AtmosphereSettings {

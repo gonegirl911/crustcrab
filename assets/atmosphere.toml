@@ -1,5 +1,5 @@
-g = 0.7
-light_intensity = [40.0, 40.0, 40.0]
+g = 0.76
+sun_intensity = [40.0, 40.0, 40.0]
 h_ray = 8e3
 b_ray = [5.5e-6, 13.0e-6, 22.4e-6]
 h_mie = 1.2e3
@@ -9,5 +9,5 @@ b_ab = [2.04e-5, 4.97e-5, 1.95e-6]
 ab_falloff = 4e3
 r_planet = 6371e3
 r_atmosphere = 6471e3
-primary_steps = 32
-light_steps = 8
+n_samples = 8
+n_light_samples = 4
