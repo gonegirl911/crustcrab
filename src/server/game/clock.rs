@@ -87,15 +87,16 @@ impl TimeData {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub enum Stage {
-    Dawn {
-        progress: f32,
-    },
+    Dawn { progress: f32 },
     Day,
-    Dusk {
-        progress: f32,
-    },
-    #[default]
+    Dusk { progress: f32 },
     Night,
+}
+
+impl Default for Stage {
+    fn default() -> Self {
+        Self::Dawn { progress: 0.0 }
+    }
 }

@@ -11,22 +11,28 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 
-pub struct Sky(Uniform<SkyUniformData>);
+pub struct Sky {
+    uniform: Uniform<SkyUniformData>,
+    updated_stage: Option<Stage>,
+}
 
 impl Sky {
     const DAY_INTENSITY: Rgb<f32> = Rgb::splat(1.0);
     const NIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
 
     pub fn new(renderer: &Renderer) -> Self {
-        Self(Uniform::new(renderer, wgpu::ShaderStages::VERTEX))
+        Self {
+            uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX),
+            updated_stage: Some(Default::default()),
+        }
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
+        self.uniform.bind_group_layout()
     }
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group()
+        self.uniform.bind_group()
     }
 
     fn light_intensity(stage: Stage) -> Rgb<f32> {
@@ -43,11 +49,20 @@ impl EventHandler for Sky {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        if let Event::UserEvent(ServerEvent::TimeUpdated(TimeData { stage, .. })) = event {
-            self.0.write(
-                renderer,
-                &SkyUniformData::new(Self::light_intensity(*stage)),
-            );
+        match event {
+            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { stage, .. })) => {
+                self.updated_stage = Some(*stage);
+            }
+            Event::RedrawRequested(_) => {
+                if let Some(stage) = self.updated_stage {
+                    self.uniform
+                        .write(renderer, &SkyUniformData::new(Self::light_intensity(stage)));
+                }
+            }
+            Event::RedrawEventsCleared => {
+                self.updated_stage = None;
+            }
+            _ => {}
         }
     }
 }
