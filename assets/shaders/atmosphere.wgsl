@@ -33,10 +33,13 @@ struct AtmosphereUniform {
     b_ray: vec3<f32>,
     h_mie: f32,
     b_mie: vec3<f32>,
+    h_ab: f32,
+    b_ab: vec3<f32>,
+    ab_falloff: f32,
     r_planet: f32,
     r_atmosphere: f32,
-    n_samples: u32,
-    n_light_samples: u32,
+    num_samples: u32,
+    num_light_samples: u32,
 }
 
 @group(0) @binding(0)
@@ -77,43 +80,50 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
 }
 
 fn scatter(color: vec3<f32>, origin: vec3<f32>, dir: vec3<f32>, depth: f32) -> vec3<f32> {
-    let t = intersect(origin, dir, a.r_atmosphere);
-    let length = mix(min(player.zfar * depth, t), t, f32(depth == 1.0));
     let cos_theta = dot(dir, a.sun_dir);
     let phase_ray = phase_ray(cos_theta);
     let phase_mie = phase_mie(cos_theta);
-    let l_segment = length / f32(a.n_samples);
-    var t_curr = l_segment * 0.5;
     var sum_ray = vec3(0.0);
     var sum_mie = vec3(0.0);
-    var opt = vec2(0.0);
 
-    for (var i = 0u; i < a.n_samples; i++) {
+    let t = intersect(origin, dir, a.r_atmosphere);
+    let length = mix(min(player.zfar * depth, t), t, f32(depth == 1.0));
+    let step_size = length / f32(a.num_samples);
+    var t_curr = step_size * 0.5;
+    var opt = vec3(0.0);
+
+    for (var i = 0u; i < a.num_samples; i++) {
         let coords = origin + dir * t_curr;
-        let density = density(coords) * l_segment;
-        
+        let height = height(coords);
+        var density = vec3(density(height), 0.0);
+        let denom = (a.h_ab - height) / a.ab_falloff;
+        density.z = density.x / (1.0 + denom * denom);
+        density *= step_size;
+        t_curr += step_size;
         opt += density;
-        t_curr += l_segment;
 
-        let t = intersect(coords, a.sun_dir, a.r_atmosphere);
-        let l_light_segment = t / f32(a.n_light_samples);
-        var t_curr_light = l_light_segment * 0.5;
-        var opt_light = vec2(0.0);
+        let length = intersect(coords, a.sun_dir, a.r_atmosphere);
+        let step_size = length / f32(a.num_light_samples);
+        var t_curr = step_size * 0.5;
+        var opt_light = vec3(0.0);
 
-        for (var j = 0u; j < a.n_light_samples; j++) {
-            let coords = coords + a.sun_dir * t_curr_light;
-            let density = density(coords) * l_light_segment;
-            
+        for (var i = 0u; i < a.num_light_samples; i++) {
+            let coords = coords + a.sun_dir * t_curr;
+            let height = height(coords);
+            var density = vec3(density(height), 0.0);
+            let denom = (a.h_ab - height) / a.ab_falloff;
+            density.z = density.x / (1.0 + denom * denom);
+            density *= step_size;
+            t_curr += step_size;
             opt_light += density;
-            t_curr_light += l_light_segment;
         }
-
-        let attn = exp(-a.b_ray * (opt.x + opt_light.x) - a.b_mie * (opt.y + opt_light.y));
+        
+        let attn = exp(-a.b_ray * (opt.x + opt_light.x) - a.b_mie * (opt.y + opt_light.y) - a.b_ab * (opt.z + opt_light.z));
         sum_ray += density.x * attn;
         sum_mie += density.y * attn;
     }
 
-    let ex = exp(-a.b_ray * opt.x - a.b_mie * opt.y);
+    let ex = exp(-a.b_ray * opt.x - a.b_mie * opt.y - a.b_ab * opt.z);
     let in = a.sun_intensity * (sum_ray * a.b_ray * phase_ray + sum_mie * a.b_mie * phase_mie);
     return color * ex + in;
 }
@@ -138,12 +148,8 @@ fn phase_mie(cos_theta: f32) -> f32 {
     return n / d;
 }
 
-fn density(coords: vec3<f32>) -> vec2<f32> {
-    return exp(-relative_height(coords));
-}
-
-fn relative_height(coords: vec3<f32>) -> vec2<f32> {
-    return height(coords) / vec2(a.h_ray, a.h_mie);
+fn density(height: f32) -> vec2<f32> {
+    return exp(-height / vec2(a.h_ray, a.h_mie));
 }
 
 fn height(coords: vec3<f32>) -> f32 {
