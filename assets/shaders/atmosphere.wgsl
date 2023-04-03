@@ -148,12 +148,12 @@ fn phase_mie(cos_theta: f32) -> f32 {
     return n / d;
 }
 
-fn density(height: f32) -> vec2<f32> {
-    return exp(-height / vec2(a.h_ray, a.h_mie));
-}
-
 fn height(coords: vec3<f32>) -> f32 {
     return length(coords) - a.r_planet;
+}
+
+fn density(height: f32) -> vec2<f32> {
+    return exp(-height / vec2(a.h_ray, a.h_mie));
 }
 
 const PI = 3.14159265358979323846264338327950288;
