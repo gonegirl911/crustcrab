@@ -6,7 +6,8 @@ use crate::{
     },
 };
 use flume::Sender;
-use std::ops::Range;
+use nalgebra::{vector, Vector3};
+use std::{f32::consts::TAU, ops::Range};
 
 #[derive(Default)]
 pub struct Clock {
@@ -30,11 +31,15 @@ impl Clock {
     }
 
     fn data(&self) -> TimeData {
-        TimeData::new(self.time(), self.stage())
+        TimeData {
+            sun_dir: self.sun_dir(),
+            stage: self.stage(),
+        }
     }
 
-    fn time(&self) -> f32 {
-        self.ticks as f32 / Self::TICKS_PER_DAY as f32
+    fn sun_dir(&self) -> Vector3<f32> {
+        let theta = self.time() * TAU;
+        vector![theta.cos(), theta.sin(), 0.0]
     }
 
     fn stage(&self) -> Stage {
@@ -51,6 +56,10 @@ impl Clock {
         } else {
             Stage::Night
         }
+    }
+
+    fn time(&self) -> f32 {
+        self.ticks as f32 / Self::TICKS_PER_DAY as f32
     }
 
     fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
@@ -75,15 +84,15 @@ impl EventHandler<Event> for Clock {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct TimeData {
-    pub time: f32,
+    pub sun_dir: Vector3<f32>,
     pub stage: Stage,
 }
 
-impl TimeData {
-    fn new(time: f32, stage: Stage) -> Self {
-        Self { time, stage }
+impl Default for TimeData {
+    fn default() -> Self {
+        Clock::default().data()
     }
 }
 
@@ -93,10 +102,4 @@ pub enum Stage {
     Day,
     Dusk { progress: f32 },
     Night,
-}
-
-impl Default for Stage {
-    fn default() -> Self {
-        Self::Dawn { progress: 0.0 }
-    }
 }

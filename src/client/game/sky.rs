@@ -23,7 +23,7 @@ impl Sky {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX),
-            updated_stage: Some(Default::default()),
+            updated_stage: Some(TimeData::default().stage),
         }
     }
 

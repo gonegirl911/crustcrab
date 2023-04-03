@@ -7,15 +7,15 @@ use crate::{
     server::{game::clock::TimeData, ServerEvent},
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Vector3};
+use nalgebra::Vector3;
 use serde::Deserialize;
-use std::{f32::consts::TAU, fs};
+use std::fs;
 
 pub struct Atmosphere {
     uniform: Uniform<AtmosphereUniformData>,
     program: Program,
     settings: AtmosphereSettings,
-    updated_time: Option<f32>,
+    updated_sun_dir: Option<Vector3<f32>>,
 }
 
 impl Atmosphere {
@@ -47,7 +47,7 @@ impl Atmosphere {
             uniform,
             program,
             settings,
-            updated_time: Some(0.0),
+            updated_sun_dir: Some(TimeData::default().sun_dir),
         }
     }
 
@@ -82,11 +82,6 @@ impl Atmosphere {
         );
         render_pass.draw(0..6, 0..1);
     }
-
-    fn sun_dir(time: f32) -> Vector3<f32> {
-        let theta = time * TAU;
-        vector![theta.cos(), theta.sin(), 0.0]
-    }
 }
 
 impl EventHandler for Atmosphere {
@@ -94,19 +89,19 @@ impl EventHandler for Atmosphere {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { time, .. })) => {
-                self.updated_time = Some(*time);
+            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { sun_dir, .. })) => {
+                self.updated_sun_dir = Some(*sun_dir);
             }
             Event::RedrawRequested(_) => {
-                if let Some(time) = self.updated_time {
+                if let Some(sun_dir) = self.updated_sun_dir {
                     self.uniform.write(
                         renderer,
-                        &AtmosphereUniformData::new(Self::sun_dir(time), &self.settings),
+                        &AtmosphereUniformData::new(sun_dir, &self.settings),
                     );
                 }
             }
             Event::RedrawEventsCleared => {
-                self.updated_time = None;
+                self.updated_sun_dir = None;
             }
             _ => {}
         }
