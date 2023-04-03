@@ -7,14 +7,29 @@ use std::{array, ops::Index};
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
-    pub fn new(r: T, g: T, b: T) -> Self {
+    pub const fn new(r: T, g: T, b: T) -> Self {
         Self([r, g, b])
+    }
+
+    fn zip<F, U, V>(self, rhs: Rgb<U>, mut f: F) -> Rgb<V>
+    where
+        T: Copy,
+        F: FnMut(T, U) -> V,
+        U: Copy,
+    {
+        Rgb(array::from_fn(|i| f(self[i], rhs[i])))
     }
 }
 
 impl<T: Copy> Rgb<T> {
-    pub fn splat(v: T) -> Self {
+    pub const fn splat(v: T) -> Self {
         Self([v; 3])
+    }
+}
+
+impl Rgb<f32> {
+    pub fn lerp(self, rhs: Self, t: f32) -> Self {
+        self.zip(rhs, |a, b| a * (1.0 - t) + b * t)
     }
 }
 

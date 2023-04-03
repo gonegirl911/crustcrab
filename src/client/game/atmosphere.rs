@@ -4,7 +4,7 @@ use crate::{
         renderer::{PostProcessor, Program, Renderer, Uniform},
     },
     color::Rgb,
-    server::ServerEvent,
+    server::{game::clock::TimeData, ServerEvent},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Vector3};
@@ -94,7 +94,7 @@ impl EventHandler for Atmosphere {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated { time }) => {
+            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { time, .. })) => {
                 self.updated_time = Some(*time);
             }
             Event::RedrawRequested(_) => {

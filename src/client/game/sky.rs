@@ -1,18 +1,24 @@
 use crate::{
-    client::renderer::{Renderer, Uniform},
+    client::{
+        event_loop::{Event, EventHandler},
+        renderer::{Renderer, Uniform},
+    },
     color::{Float3, Rgb},
+    server::{
+        game::clock::{Stage, TimeData},
+        ServerEvent,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 
 pub struct Sky(Uniform<SkyUniformData>);
 
 impl Sky {
+    const DAY_INTENSITY: Rgb<f32> = Rgb::splat(1.0);
+    const NIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
+
     pub fn new(renderer: &Renderer) -> Self {
-        Self(Uniform::with_constant_data(
-            renderer,
-            &SkyUniformData::new(Rgb::new(0.15, 0.15, 0.3)),
-            wgpu::ShaderStages::VERTEX_FRAGMENT,
-        ))
+        Self(Uniform::new(renderer, wgpu::ShaderStages::VERTEX))
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
@@ -21,6 +27,28 @@ impl Sky {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.0.bind_group()
+    }
+
+    fn light_intensity(stage: Stage) -> Rgb<f32> {
+        match stage {
+            Stage::Dawn { progress } => Self::NIGHT_INTENSITY.lerp(Self::DAY_INTENSITY, progress),
+            Stage::Day => Self::DAY_INTENSITY,
+            Stage::Dusk { progress } => Self::DAY_INTENSITY.lerp(Self::NIGHT_INTENSITY, progress),
+            Stage::Night => Self::NIGHT_INTENSITY,
+        }
+    }
+}
+
+impl EventHandler for Sky {
+    type Context<'a> = &'a Renderer;
+
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        if let Event::UserEvent(ServerEvent::TimeUpdated(TimeData { stage, .. })) = event {
+            self.0.write(
+                renderer,
+                &SkyUniformData::new(Self::light_intensity(*stage)),
+            );
+        }
     }
 }
 

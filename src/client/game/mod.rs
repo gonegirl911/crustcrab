@@ -87,7 +87,6 @@ impl Game {
                 self.depth.bind_group(),
             );
         });
-        self.processor.apply(encoder, &self.aces);
         self.hover.draw(
             self.processor.view(),
             encoder,
@@ -95,6 +94,7 @@ impl Game {
             self.sky.bind_group(),
             self.depth.view(),
         );
+        self.processor.apply(encoder, &self.aces);
         self.processor.apply(encoder, &self.gui);
         self.processor.draw(view, encoder);
     }
@@ -120,6 +120,7 @@ impl EventHandler for Game {
     ) {
         self.gui.handle(event, renderer);
         self.player.handle(event, (client_tx, renderer, &self.gui, dt));
+        self.sky.handle(event, renderer);
         self.world.handle(event, renderer);
         self.atmosphere.handle(event, renderer);
         self.hover.handle(event, ());
