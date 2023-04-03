@@ -94,11 +94,7 @@ fn scatter(color: vec3<f32>, origin: vec3<f32>, dir: vec3<f32>, depth: f32) -> v
 
     for (var i = 0u; i < a.num_samples; i++) {
         let coords = origin + dir * t_curr;
-        let height = height(coords);
-        var density = vec3(density(height), 0.0);
-        let denom = (a.h_ab - height) / a.ab_falloff;
-        density.z = density.x / (1.0 + denom * denom);
-        density *= step_size;
+        let density = density(coords) * step_size;
         t_curr += step_size;
         opt += density;
 
@@ -109,11 +105,7 @@ fn scatter(color: vec3<f32>, origin: vec3<f32>, dir: vec3<f32>, depth: f32) -> v
 
         for (var i = 0u; i < a.num_light_samples; i++) {
             let coords = coords + a.sun_dir * t_curr;
-            let height = height(coords);
-            var density = vec3(density(height), 0.0);
-            let denom = (a.h_ab - height) / a.ab_falloff;
-            density.z = density.x / (1.0 + denom * denom);
-            density *= step_size;
+            let density = density(coords) * step_size;
             t_curr += step_size;
             opt_light += density;
         }
@@ -148,12 +140,17 @@ fn phase_mie(cos_theta: f32) -> f32 {
     return n / d;
 }
 
-fn height(coords: vec3<f32>) -> f32 {
-    return length(coords) - a.r_planet;
+fn density(coords: vec3<f32>) -> vec3<f32> {
+    let height = height(coords);
+    let ray = exp(-height / a.h_ray);
+    let mie = exp(-height / a.h_mie);
+    let denom = (a.h_ab - height) / a.ab_falloff;
+    let ab = ray / (1.0 + denom * denom);
+    return vec3(ray, mie, ab);
 }
 
-fn density(height: f32) -> vec2<f32> {
-    return exp(-height / vec2(a.h_ray, a.h_mie));
+fn height(coords: vec3<f32>) -> f32 {
+    return length(coords) - a.r_planet;
 }
 
 const PI = 3.14159265358979323846264338327950288;
