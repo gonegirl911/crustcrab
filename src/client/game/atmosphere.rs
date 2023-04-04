@@ -15,7 +15,7 @@ pub struct Atmosphere {
     uniform: Uniform<AtmosphereUniformData>,
     program: Program,
     settings: AtmosphereSettings,
-    updated_sun_dir: Option<Vector3<f32>>,
+    updated_data: Option<TimeData>,
 }
 
 impl Atmosphere {
@@ -47,7 +47,7 @@ impl Atmosphere {
             uniform,
             program,
             settings,
-            updated_sun_dir: Some(TimeData::default().sun_dir),
+            updated_data: Some(Default::default()),
         }
     }
 
@@ -89,19 +89,19 @@ impl EventHandler for Atmosphere {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { sun_dir, .. })) => {
-                self.updated_sun_dir = Some(*sun_dir);
+            Event::UserEvent(ServerEvent::TimeUpdated(data)) => {
+                self.updated_data = Some(*data);
             }
             Event::RedrawRequested(_) => {
-                if let Some(sun_dir) = self.updated_sun_dir {
+                if let Some(data) = self.updated_data {
                     self.uniform.write(
                         renderer,
-                        &AtmosphereUniformData::new(sun_dir, &self.settings),
+                        &AtmosphereUniformData::new(data.sun_dir(), &self.settings),
                     );
                 }
             }
             Event::RedrawEventsCleared => {
-                self.updated_sun_dir = None;
+                self.updated_data = None;
             }
             _ => {}
         }

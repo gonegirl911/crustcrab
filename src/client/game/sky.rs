@@ -13,7 +13,7 @@ use bytemuck::{Pod, Zeroable};
 
 pub struct Sky {
     uniform: Uniform<SkyUniformData>,
-    updated_stage: Option<Stage>,
+    updated_data: Option<TimeData>,
 }
 
 impl Sky {
@@ -23,7 +23,7 @@ impl Sky {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX),
-            updated_stage: Some(TimeData::default().stage),
+            updated_data: Some(Default::default()),
         }
     }
 
@@ -50,17 +50,19 @@ impl EventHandler for Sky {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(TimeData { stage, .. })) => {
-                self.updated_stage = Some(*stage);
+            Event::UserEvent(ServerEvent::TimeUpdated(data)) => {
+                self.updated_data = Some(*data);
             }
             Event::RedrawRequested(_) => {
-                if let Some(stage) = self.updated_stage {
-                    self.uniform
-                        .write(renderer, &SkyUniformData::new(Self::light_intensity(stage)));
+                if let Some(data) = self.updated_data {
+                    self.uniform.write(
+                        renderer,
+                        &SkyUniformData::new(Self::light_intensity(data.stage())),
+                    );
                 }
             }
             Event::RedrawEventsCleared => {
-                self.updated_stage = None;
+                self.updated_data = None;
             }
             _ => {}
         }

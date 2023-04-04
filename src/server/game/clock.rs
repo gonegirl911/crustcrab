@@ -20,9 +20,6 @@ impl Clock {
     const DAY_START: u16 = 500;
     const DUSK_START: u16 = 11500;
     const NIGHT_START: u16 = 12000;
-    const DAWN_RANGE: Range<u16> = Self::DAWN_START..Self::DAY_START;
-    const DAY_RANGE: Range<u16> = Self::DAY_START..Self::DUSK_START;
-    const DUSK_RANGE: Range<u16> = Self::DUSK_START..Self::NIGHT_START;
 
     fn send(&self, server_tx: Sender<ServerEvent>) {
         server_tx
@@ -31,36 +28,7 @@ impl Clock {
     }
 
     fn data(&self) -> TimeData {
-        TimeData {
-            sun_dir: self.sun_dir(),
-            stage: self.stage(),
-        }
-    }
-
-    fn sun_dir(&self) -> Vector3<f32> {
-        let time = self.ticks as f32 / Self::TICKS_PER_DAY as f32;
-        let theta = TAU * time;
-        vector![theta.cos(), theta.sin(), 0.0]
-    }
-
-    fn stage(&self) -> Stage {
-        if Self::DAWN_RANGE.contains(&self.ticks) {
-            Stage::Dawn {
-                progress: Self::inv_lerp(Self::DAWN_RANGE, self.ticks),
-            }
-        } else if Self::DAY_RANGE.contains(&self.ticks) {
-            Stage::Day
-        } else if Self::DUSK_RANGE.contains(&self.ticks) {
-            Stage::Dusk {
-                progress: Self::inv_lerp(Self::DUSK_RANGE, self.ticks),
-            }
-        } else {
-            Stage::Night
-        }
-    }
-
-    fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
-        (value - start) as f32 / (end - 1 - start) as f32
+        TimeData { ticks: self.ticks }
     }
 }
 
@@ -83,8 +51,39 @@ impl EventHandler<Event> for Clock {
 
 #[derive(Clone, Copy)]
 pub struct TimeData {
-    pub sun_dir: Vector3<f32>,
-    pub stage: Stage,
+    ticks: u16,
+}
+
+impl TimeData {
+    const DAWN_RANGE: Range<u16> = Clock::DAWN_START..Clock::DAY_START;
+    const DAY_RANGE: Range<u16> = Clock::DAY_START..Clock::DUSK_START;
+    const DUSK_RANGE: Range<u16> = Clock::DUSK_START..Clock::NIGHT_START;
+
+    pub fn sun_dir(&self) -> Vector3<f32> {
+        let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;
+        let theta = TAU * time;
+        vector![theta.cos(), theta.sin(), 0.0]
+    }
+
+    pub fn stage(&self) -> Stage {
+        if Self::DAWN_RANGE.contains(&self.ticks) {
+            Stage::Dawn {
+                progress: Self::inv_lerp(Self::DAWN_RANGE, self.ticks),
+            }
+        } else if Self::DAY_RANGE.contains(&self.ticks) {
+            Stage::Day
+        } else if Self::DUSK_RANGE.contains(&self.ticks) {
+            Stage::Dusk {
+                progress: Self::inv_lerp(Self::DUSK_RANGE, self.ticks),
+            }
+        } else {
+            Stage::Night
+        }
+    }
+
+    fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
+        (value - start) as f32 / (end - 1 - start) as f32
+    }
 }
 
 impl Default for TimeData {
