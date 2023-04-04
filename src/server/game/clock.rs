@@ -38,7 +38,8 @@ impl Clock {
     }
 
     fn sun_dir(&self) -> Vector3<f32> {
-        let theta = self.time() * TAU;
+        let time = self.ticks as f32 / Self::TICKS_PER_DAY as f32;
+        let theta = TAU * time;
         vector![theta.cos(), theta.sin(), 0.0]
     }
 
@@ -56,10 +57,6 @@ impl Clock {
         } else {
             Stage::Night
         }
-    }
-
-    fn time(&self) -> f32 {
-        self.ticks as f32 / Self::TICKS_PER_DAY as f32
     }
 
     fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
