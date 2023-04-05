@@ -31,7 +31,7 @@ use std::{
 pub struct ChunkMap {
     store: ChunkStore,
     actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
-    hovered_block: Option<BlockIntersection>,
+    hover: Option<BlockIntersection>,
     loader: ChunkLoader,
     light: ChunkMapLight,
     reach: Range<f32>,
@@ -382,7 +382,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 );
             }
             ChunkMapEvent::BlockSelectionRequested => {
-                let hovered_block =
+                let hover =
                     ray.cast(self.reach.clone())
                         .find(|BlockIntersection { coords, .. }| {
                             let chunk_coords = Self::chunk_coords(*coords);
@@ -393,22 +393,22 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                                 .unwrap_or_default()
                         });
 
-                if self.hovered_block != hovered_block {
-                    self.hovered_block = hovered_block;
+                if self.hover != hover {
+                    self.hover = hover;
                     server_tx
                         .send(ServerEvent::BlockHovered {
-                            coords: self.hovered_block.map(|data| data.coords),
+                            coords: self.hover.map(|data| data.coords),
                         })
                         .unwrap_or_else(|_| unreachable!());
                 }
             }
             ChunkMapEvent::BlockPlaced { block } => {
-                if let Some(BlockIntersection { coords, normal }) = self.hovered_block {
+                if let Some(BlockIntersection { coords, normal }) = self.hover {
                     self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
                 }
             }
             ChunkMapEvent::BlockDestroyed => {
-                if let Some(BlockIntersection { coords, .. }) = self.hovered_block {
+                if let Some(BlockIntersection { coords, .. }) = self.hover {
                     self.apply(coords, BlockAction::Destroy, server_tx, ray);
                 }
             }
