@@ -28,7 +28,7 @@ impl Clock {
     }
 
     fn time(&self) -> Time {
-        Time::new(self.ticks)
+        Time { ticks: self.ticks }
     }
 }
 
@@ -58,10 +58,6 @@ impl Time {
     const DAWN_RANGE: Range<u16> = Clock::DAWN_START..Clock::DAY_START;
     const DAY_RANGE: Range<u16> = Clock::DAY_START..Clock::DUSK_START;
     const DUSK_RANGE: Range<u16> = Clock::DUSK_START..Clock::NIGHT_START;
-
-    fn new(ticks: u16) -> Self {
-        Self { ticks }
-    }
 
     pub fn sun_dir(&self) -> Vector3<f32> {
         let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;

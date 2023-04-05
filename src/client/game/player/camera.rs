@@ -1,3 +1,4 @@
+use super::Player;
 use crate::client::event_loop::{Event, EventHandler};
 use bitflags::bitflags;
 use nalgebra::{matrix, vector, Matrix4, Point3, Vector3};
@@ -11,32 +12,33 @@ use winit::{
 };
 
 pub struct View {
+    origin: Point3<f32>,
     forward: Vector3<f32>,
     right: Vector3<f32>,
     up: Vector3<f32>,
-    origin: Point3<f32>,
-    world_up: Vector3<f32>,
     yaw: f32,
     pitch: f32,
 }
 
 impl View {
-    pub fn new(origin: Point3<f32>, dir: Vector3<f32>, up: Vector3<f32>) -> Self {
-        let world_up = up.normalize();
+    pub fn new(origin: Point3<f32>, dir: Vector3<f32>) -> Self {
         let forward = dir.normalize();
-        let right = world_up.cross(&forward).normalize();
+        let right = Player::WORLD_UP.cross(&forward).normalize();
         let up = forward.cross(&right);
         let yaw = forward.z.atan2(forward.x);
         let pitch = forward.y.asin();
         Self {
+            origin,
             forward,
             right,
             up,
-            origin,
-            world_up,
             yaw,
             pitch,
         }
+    }
+
+    pub fn origin(&self) -> Point3<f32> {
+        self.origin
     }
 
     pub fn forward(&self) -> Vector3<f32> {
@@ -49,10 +51,6 @@ impl View {
 
     pub fn up(&self) -> Vector3<f32> {
         self.up
-    }
-
-    pub fn origin(&self) -> Point3<f32> {
-        self.origin
     }
 
     pub fn mat(&self) -> Matrix4<f32> {
@@ -180,14 +178,14 @@ impl Controller {
         let (sin_pitch, cos_pitch) = view.pitch.sin_cos();
 
         view.forward = vector![cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch];
-        view.right = view.world_up.cross(&view.forward).normalize();
+        view.right = Player::WORLD_UP.cross(&view.forward).normalize();
         view.up = view.forward.cross(&view.right);
     }
 
     fn apply_movement(&mut self, view: &mut View, dt: Duration) {
         let dp = self.speed * dt.as_secs_f32();
         let right = view.right;
-        let up = view.world_up;
+        let up = Player::WORLD_UP;
         let forward = right.cross(&up);
 
         let mut dir = Vector3::zeros();
@@ -204,10 +202,10 @@ impl Controller {
             dir += right;
         }
 
-        if self.relevant_keys.contains(Keys::LSHIFT) {
-            dir -= up;
-        } else if self.relevant_keys.contains(Keys::SPACE) {
+        if self.relevant_keys.contains(Keys::SPACE) {
             dir += up;
+        } else if self.relevant_keys.contains(Keys::LSHIFT) {
+            dir -= up;
         }
 
         view.origin += dir.normalize() * dp;
@@ -241,8 +239,8 @@ impl EventHandler for Controller {
                         VirtualKeyCode::A => (Keys::A, Keys::D),
                         VirtualKeyCode::S => (Keys::S, Keys::W),
                         VirtualKeyCode::D => (Keys::D, Keys::A),
-                        VirtualKeyCode::LShift => (Keys::LSHIFT, Keys::SPACE),
                         VirtualKeyCode::Space => (Keys::SPACE, Keys::LSHIFT),
+                        VirtualKeyCode::LShift => (Keys::LSHIFT, Keys::SPACE),
                         _ => return,
                     };
                     match state {
@@ -297,12 +295,12 @@ impl EventHandler for Controller {
 
 bitflags! {
     pub struct Changes: u8 {
-        const ROTATED = 1 << 0;
-        const MOVED = 1 << 1;
+        const MOVED = 1 << 0;
+        const ROTATED = 1 << 1;
         const RESIZED = 1 << 2;
-        const BLOCK_DESTROYED = 1 << 3;
-        const BLOCK_PLACED = 1 << 4;
-        const MATRIX_CHANGES = Self::ROTATED.bits() | Self::MOVED.bits() | Self::RESIZED.bits();
+        const BLOCK_PLACED = 1 << 3;
+        const BLOCK_DESTROYED = 1 << 4;
+        const MATRIX_CHANGES = Self::MOVED.bits() | Self::ROTATED.bits() | Self::RESIZED.bits();
     }
 
     #[derive(Clone, Copy, Default)]
@@ -311,8 +309,8 @@ bitflags! {
         const A = 1 << 1;
         const S = 1 << 2;
         const D = 1 << 3;
-        const LSHIFT = 1 << 4;
-        const SPACE = 1 << 5;
+        const SPACE = 1 << 4;
+        const LSHIFT = 1 << 5;
     }
 
     #[derive(Clone, Copy, Default)]

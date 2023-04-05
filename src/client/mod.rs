@@ -67,18 +67,18 @@ impl Client {
 
 pub enum ClientEvent {
     InitialRenderRequested {
-        player_dir: Vector3<f32>,
-        player_coords: Point3<f32>,
+        origin: Point3<f32>,
+        dir: Vector3<f32>,
         render_distance: u32,
+    },
+    PlayerPositionChanged {
+        origin: Point3<f32>,
     },
     PlayerOrientationChanged {
         dir: Vector3<f32>,
     },
-    PlayerPositionChanged {
-        coords: Point3<f32>,
-    },
-    BlockDestroyed,
     BlockPlaced {
         block: Block,
     },
+    BlockDestroyed,
 }

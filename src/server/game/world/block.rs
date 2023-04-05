@@ -118,6 +118,16 @@ impl BlockData {
     }
 }
 
+impl From<RawBlockData> for BlockData {
+    fn from(data: RawBlockData) -> Self {
+        Self {
+            side_tex_indices: data.side_tex_indices(),
+            luminance: data.luminance,
+            light_filter: data.light_filter,
+        }
+    }
+}
+
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
     #[serde(default)]
@@ -130,9 +140,9 @@ struct RawBlockData {
 
 impl RawBlockData {
     fn side_tex_indices(&self) -> Option<EnumMap<Side, u8>> {
-        self.side_tex_paths.as_ref().map(|side_tex_paths| {
-            enum_map! { side => TEX_INDICES[&side_tex_paths[side]] }
-        })
+        self.side_tex_paths
+            .clone()
+            .map(|paths| paths.map(|_, path| TEX_INDICES[&path]))
     }
 }
 
@@ -247,18 +257,8 @@ pub enum Component {
     Corner,
 }
 
-static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> = Lazy::new(|| {
-    enum_map! {
-        block => {
-            let data = &RAW_BLOCK_DATA[block];
-            BlockData {
-                side_tex_indices: data.side_tex_indices(),
-                luminance: data.luminance,
-                light_filter: data.light_filter,
-            }
-        }
-    }
-});
+static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
+    Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
 
 pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
     let mut v = TEX_INDICES.iter().collect::<Vec<_>>();

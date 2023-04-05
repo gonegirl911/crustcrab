@@ -29,7 +29,7 @@ impl Player {
     pub const WORLD_UP: Vector3<f32> = vector![0.0, 1.0, 0.0];
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
-        let view = View::new(gui.origin(), Vector3::x(), Self::WORLD_UP);
+        let view = View::new(gui.origin(), Vector3::x());
         let aspect = config.width as f32 / config.height as f32;
         let projection = Projection::new(gui.fovy(), aspect, 0.1, gui.zfar());
         let controller = Controller::new(gui.speed(), gui.sensitivity());
@@ -53,10 +53,10 @@ impl Player {
 
     pub fn frustum(&self) -> Frustum {
         Frustum::new(
+            self.view.origin(),
             self.view.forward(),
             self.view.right(),
             self.view.up(),
-            self.view.origin(),
             self.projection.fovy(),
             self.projection.aspect(),
             self.projection.znear(),
@@ -75,8 +75,8 @@ impl EventHandler for Player {
             Event::NewEvents(StartCause::Init) => {
                 client_tx
                     .send(ClientEvent::InitialRenderRequested {
-                        player_dir: self.view.forward(),
-                        player_coords: self.view.origin(),
+                        origin: self.view.origin(),
+                        dir: self.view.forward(),
                         render_distance: gui.render_distance(),
                     })
                     .unwrap_or_else(|_| unreachable!());
@@ -86,6 +86,14 @@ impl EventHandler for Player {
                     self.controller
                         .apply_updates(&mut self.view, &mut self.projection, dt);
 
+                if changes.contains(Changes::MOVED) {
+                    client_tx
+                        .send(ClientEvent::PlayerPositionChanged {
+                            origin: self.view.origin(),
+                        })
+                        .unwrap_or_else(|_| unreachable!());
+                }
+
                 if changes.contains(Changes::ROTATED) {
                     client_tx
                         .send(ClientEvent::PlayerOrientationChanged {
@@ -94,24 +102,16 @@ impl EventHandler for Player {
                         .unwrap_or_else(|_| unreachable!());
                 }
 
-                if changes.contains(Changes::MOVED) {
-                    client_tx
-                        .send(ClientEvent::PlayerPositionChanged {
-                            coords: self.view.origin(),
-                        })
-                        .unwrap_or_else(|_| unreachable!());
-                }
-
-                if changes.contains(Changes::BLOCK_DESTROYED) {
-                    client_tx
-                        .send(ClientEvent::BlockDestroyed)
-                        .unwrap_or_else(|_| unreachable!());
-                } else if changes.contains(Changes::BLOCK_PLACED) {
+                if changes.contains(Changes::BLOCK_PLACED) {
                     if let Some(block) = gui.selected_block() {
                         client_tx
                             .send(ClientEvent::BlockPlaced { block })
                             .unwrap_or_else(|_| unreachable!());
                     }
+                } else if changes.contains(Changes::BLOCK_DESTROYED) {
+                    client_tx
+                        .send(ClientEvent::BlockDestroyed)
+                        .unwrap_or_else(|_| unreachable!());
                 }
 
                 self.is_updated = self.is_updated || changes.intersects(Changes::MATRIX_CHANGES);

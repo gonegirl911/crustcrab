@@ -24,25 +24,25 @@ impl Ray {
         let tmax = values.map(|c| c.1 * c.2);
         let tdelta = values.map(|c| c.2);
         iter::successors(
-            Some((coords, tmax, Vector3::zeros())),
-            move |(coords, tmax, _)| {
+            Some((coords, Vector3::zeros(), tmax)),
+            move |(coords, _, tmax)| {
                 let i = tmax.imin();
                 reach.contains(&tmax[i]).then(|| {
                     let mut coords = *coords;
-                    let mut tmax = *tmax;
                     let mut normal = Vector3::zeros();
+                    let mut tmax = *tmax;
                     coords[i] += step[i];
-                    tmax[i] += tdelta[i];
                     normal[i] -= step[i];
-                    (coords, tmax, normal)
+                    tmax[i] += tdelta[i];
+                    (coords, normal, tmax)
                 })
             },
         )
-        .map(|(coords, _, normal)| BlockIntersection { coords, normal })
+        .map(|(coords, normal, _)| BlockIntersection { coords, normal })
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct BlockIntersection {
     pub coords: Point3<i64>,
     pub normal: Vector3<i64>,

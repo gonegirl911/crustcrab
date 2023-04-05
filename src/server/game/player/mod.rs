@@ -30,25 +30,25 @@ impl EventHandler<Event> for Player {
         if let Event::ClientEvent(event) = event {
             match event {
                 ClientEvent::InitialRenderRequested {
-                    player_dir,
-                    player_coords,
+                    origin,
+                    dir,
                     render_distance,
                 } => {
                     self.curr = WorldArea {
-                        center: Self::chunk_coords(*player_coords),
+                        center: Self::chunk_coords(*origin),
                         radius: *render_distance,
                     };
                     self.ray = Ray {
-                        origin: *player_coords,
-                        dir: *player_dir,
+                        origin: *origin,
+                        dir: *dir,
                     };
                 }
                 ClientEvent::PlayerOrientationChanged { dir } => {
                     self.ray.dir = *dir;
                 }
-                ClientEvent::PlayerPositionChanged { coords } => {
-                    self.curr.center = Self::chunk_coords(*coords);
-                    self.ray.origin = *coords;
+                ClientEvent::PlayerPositionChanged { origin } => {
+                    self.curr.center = Self::chunk_coords(*origin);
+                    self.ray.origin = *origin;
                 }
                 _ => {}
             }

@@ -50,16 +50,9 @@ impl ChunkMapLight {
         action: &BlockAction,
     ) -> FxHashSet<Point3<i64>> {
         match action {
-            BlockAction::Destroy => self.destroy(store, coords),
             BlockAction::Place(block) => self.place(store, coords, *block),
+            BlockAction::Destroy => self.destroy(store, coords),
         }
-    }
-
-    fn destroy(&mut self, store: &ChunkStore, coords: Point3<i64>) -> FxHashSet<Point3<i64>> {
-        self.unblock_skylight(store, coords)
-            .into_iter()
-            .chain(self.destroy_torchlight(store, coords))
-            .collect()
     }
 
     fn place(
@@ -71,6 +64,13 @@ impl ChunkMapLight {
         self.block_skylight(store, coords, block)
             .into_iter()
             .chain(self.place_torchlight(store, coords, block))
+            .collect()
+    }
+
+    fn destroy(&mut self, store: &ChunkStore, coords: Point3<i64>) -> FxHashSet<Point3<i64>> {
+        self.unblock_skylight(store, coords)
+            .into_iter()
+            .chain(self.destroy_torchlight(store, coords))
             .collect()
     }
 

@@ -105,10 +105,10 @@ impl ChunkMap {
         let block_coords = Self::block_coords(coords);
 
         let (cell, is_created) = if let Some(cell) = self.store.remove(chunk_coords) {
-            (cell.apply(block_coords, &action).map_err(Some), false)
+            (cell.apply(block_coords, action).map_err(Some), false)
         } else {
             (
-                ChunkCell::default_with_action(block_coords, &action).map_err(|_| None),
+                ChunkCell::default_with_action(block_coords, action).map_err(|_| None),
                 true,
             )
         };
@@ -127,6 +127,11 @@ impl ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
+                self.actions
+                    .entry(chunk_coords)
+                    .or_default()
+                    .insert(block_coords, action);
+
                 let block_updates = {
                     let mut updates = self.light.apply(&self.store, coords, &action);
                     if !is_loaded && !is_unloaded {
@@ -136,11 +141,6 @@ impl ChunkMap {
                     }
                     updates
                 };
-
-                self.actions
-                    .entry(chunk_coords)
-                    .or_default()
-                    .insert(block_coords, action);
 
                 let updates = {
                     let mut updates = Self::chunk_updates(block_updates);
@@ -271,7 +271,7 @@ impl ChunkMap {
             .into_iter()
             .flatten()
             .for_each(|(coords, action)| {
-                chunk.apply(*coords, action);
+                chunk.apply(*coords, *action);
             });
         ChunkCell::load_new(chunk)
     }
@@ -382,7 +382,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 );
             }
             ChunkMapEvent::BlockSelectionRequested => {
-                self.hovered_block =
+                let hovered_block =
                     ray.cast(self.reach.clone())
                         .find(|BlockIntersection { coords, .. }| {
                             let chunk_coords = Self::chunk_coords(*coords);
@@ -393,20 +393,23 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                                 .unwrap_or_default()
                         });
 
-                server_tx
-                    .send(ServerEvent::BlockHovered {
-                        coords: self.hovered_block.map(|data| data.coords),
-                    })
-                    .unwrap_or_else(|_| unreachable!());
-            }
-            ChunkMapEvent::BlockDestroyed => {
-                if let Some(BlockIntersection { coords, .. }) = self.hovered_block {
-                    self.apply(coords, BlockAction::Destroy, server_tx, ray);
+                if self.hovered_block != hovered_block {
+                    self.hovered_block = hovered_block;
+                    server_tx
+                        .send(ServerEvent::BlockHovered {
+                            coords: self.hovered_block.map(|data| data.coords),
+                        })
+                        .unwrap_or_else(|_| unreachable!());
                 }
             }
             ChunkMapEvent::BlockPlaced { block } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hovered_block {
                     self.apply(coords + normal, BlockAction::Place(*block), server_tx, ray);
+                }
+            }
+            ChunkMapEvent::BlockDestroyed => {
+                if let Some(BlockIntersection { coords, .. }) = self.hovered_block {
+                    self.apply(coords, BlockAction::Destroy, server_tx, ray);
                 }
             }
         }
@@ -488,7 +491,7 @@ impl ChunkCell {
         })
     }
 
-    fn default_with_action(coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, ()> {
+    fn default_with_action(coords: Point3<u8>, action: BlockAction) -> Result<Option<Self>, ()> {
         let mut chunk = Chunk::default();
         chunk
             .apply(coords, action)
@@ -502,7 +505,7 @@ impl ChunkCell {
         None
     }
 
-    fn apply(mut self, coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, Self> {
+    fn apply(mut self, coords: Point3<u8>, action: BlockAction) -> Result<Option<Self>, Self> {
         if self.chunk.apply(coords, action) {
             Ok(self.chunk.is_not_empty().then_some(self))
         } else {
@@ -561,11 +564,11 @@ impl Chunk {
         })
     }
 
-    fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
+    fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
         let prev = &mut self[coords];
         match action {
+            BlockAction::Place(block) => prev.is_air().then(|| *prev = block).is_some(),
             BlockAction::Destroy => prev.is_not_air().then(|| *prev = Block::Air).is_some(),
-            BlockAction::Place(block) => prev.is_air().then(|| *prev = *block).is_some(),
         }
     }
 
@@ -666,17 +669,18 @@ impl ChunkArea {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum BlockAction {
-    Destroy,
     Place(Block),
+    Destroy,
 }
 
 pub enum ChunkMapEvent {
     InitialRenderRequested { area: WorldArea },
     WorldAreaChanged { prev: WorldArea, curr: WorldArea },
     BlockSelectionRequested,
-    BlockDestroyed,
     BlockPlaced { block: Block },
+    BlockDestroyed,
 }
 
 impl ChunkMapEvent {
@@ -686,7 +690,6 @@ impl ChunkMapEvent {
                 ClientEvent::InitialRenderRequested { .. } => {
                     Some(Self::InitialRenderRequested { area: *curr })
                 }
-                ClientEvent::PlayerOrientationChanged { .. } => Some(Self::BlockSelectionRequested),
                 ClientEvent::PlayerPositionChanged { .. } if curr != prev => {
                     Some(Self::WorldAreaChanged {
                         prev: *prev,
@@ -694,8 +697,9 @@ impl ChunkMapEvent {
                     })
                 }
                 ClientEvent::PlayerPositionChanged { .. } => Some(Self::BlockSelectionRequested),
-                ClientEvent::BlockDestroyed => Some(Self::BlockDestroyed),
+                ClientEvent::PlayerOrientationChanged { .. } => Some(Self::BlockSelectionRequested),
                 ClientEvent::BlockPlaced { block } => Some(Self::BlockPlaced { block: *block }),
+                ClientEvent::BlockDestroyed => Some(Self::BlockDestroyed),
             }
         } else {
             None
