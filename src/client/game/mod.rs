@@ -22,8 +22,8 @@ pub struct Game {
     sky: Sky,
     world: World,
     atmosphere: Atmosphere,
-    aces: Aces,
     hover: BlockHover,
+    aces: Aces,
     processor: PostProcessor,
     depth: DepthBuffer,
 }
@@ -46,15 +46,15 @@ impl Game {
             processor.bind_group_layout(),
             depth.bind_group_layout(),
         );
-        let aces = Aces::new(
-            renderer,
-            processor.bind_group_layout(),
-            PostProcessor::FORMAT,
-        );
         let hover = BlockHover::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
+        );
+        let aces = Aces::new(
+            renderer,
+            processor.bind_group_layout(),
+            PostProcessor::FORMAT,
         );
         Self {
             gui,
