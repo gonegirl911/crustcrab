@@ -272,7 +272,8 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     RAW_BLOCK_DATA
         .values()
         .filter_map(|data| data.side_tex_paths.as_ref())
-        .flat_map(|side_tex_paths| side_tex_paths.values().cloned())
+        .flat_map(|side_tex_paths| side_tex_paths.values())
+        .cloned()
         .for_each(|path| {
             indices.entry(path).or_insert_with(|| {
                 let i = idx;
