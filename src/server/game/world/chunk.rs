@@ -569,17 +569,6 @@ impl Chunk {
         }
     }
 
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> + '_ {
-        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
-            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
-                blocks
-                    .iter()
-                    .zip(0..)
-                    .map(move |(block, z)| (point![x, y, z], block))
-            })
-        })
-    }
-
     fn is_empty(&self) -> bool {
         self.0
             .iter()
@@ -589,6 +578,17 @@ impl Chunk {
 
     fn is_not_empty(&self) -> bool {
         !self.is_empty()
+    }
+
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> + '_ {
+        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
+            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
+                blocks
+                    .iter()
+                    .zip(0..)
+                    .map(move |(block, z)| (point![x, y, z], block))
+            })
+        })
     }
 }
 
