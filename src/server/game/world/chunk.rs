@@ -105,10 +105,10 @@ impl ChunkMap {
         let block_coords = Self::block_coords(coords);
 
         let (cell, is_created) = if let Some(cell) = self.store.remove(chunk_coords) {
-            (cell.apply(block_coords, action).map_err(Some), false)
+            (cell.apply(block_coords, &action).map_err(Some), false)
         } else {
             (
-                ChunkCell::default_with_action(block_coords, action).map_err(|_| None),
+                ChunkCell::default_with_action(block_coords, &action).map_err(|_| None),
                 true,
             )
         };
@@ -127,11 +127,6 @@ impl ChunkMap {
                     (server_tx.clone(), ray),
                 );
 
-                self.actions
-                    .entry(chunk_coords)
-                    .or_default()
-                    .insert(block_coords, action);
-
                 let block_updates = {
                     let mut updates = self.light.apply(&self.store, coords, &action);
                     if !is_loaded && !is_unloaded {
@@ -141,6 +136,11 @@ impl ChunkMap {
                     }
                     updates
                 };
+
+                self.actions
+                    .entry(chunk_coords)
+                    .or_default()
+                    .insert(block_coords, action);
 
                 let updates = {
                     let mut updates = Self::chunk_updates(block_updates);
@@ -271,7 +271,7 @@ impl ChunkMap {
             .into_iter()
             .flatten()
             .for_each(|(coords, action)| {
-                chunk.apply(*coords, *action);
+                chunk.apply(*coords, action);
             });
         ChunkCell::load_new(chunk)
     }
@@ -491,7 +491,7 @@ impl ChunkCell {
         })
     }
 
-    fn default_with_action(coords: Point3<u8>, action: BlockAction) -> Result<Option<Self>, ()> {
+    fn default_with_action(coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, ()> {
         let mut chunk = Chunk::default();
         chunk
             .apply(coords, action)
@@ -505,7 +505,7 @@ impl ChunkCell {
         None
     }
 
-    fn apply(mut self, coords: Point3<u8>, action: BlockAction) -> Result<Option<Self>, Self> {
+    fn apply(mut self, coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, Self> {
         if self.chunk.apply(coords, action) {
             Ok(self.chunk.is_not_empty().then_some(self))
         } else {
@@ -564,10 +564,10 @@ impl Chunk {
         })
     }
 
-    fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
+    fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
         let prev = &mut self[coords];
         match action {
-            BlockAction::Place(block) => prev.is_air().then(|| *prev = block).is_some(),
+            BlockAction::Place(block) => prev.is_air().then(|| *prev = *block).is_some(),
             BlockAction::Destroy => prev.is_not_air().then(|| *prev = Block::Air).is_some(),
         }
     }
@@ -669,7 +669,6 @@ impl ChunkArea {
     }
 }
 
-#[derive(Clone, Copy)]
 pub enum BlockAction {
     Place(Block),
     Destroy,
