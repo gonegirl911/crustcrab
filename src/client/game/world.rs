@@ -185,10 +185,10 @@ impl ChunkMeshPool {
 
     fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
         let dim = Chunk::DIM as f32;
-        BoundingSphere {
-            center: coords.map(|c| c as f32 + 0.5) * dim,
-            radius: dim * 3.0f32.sqrt() * 0.5,
-        }
+        BoundingSphere::new(
+            coords.map(|c| c as f32 + 0.5) * dim,
+            dim * 3.0f32.sqrt() * 0.5,
+        )
     }
 
     fn data_tx(&self, is_important: bool) -> &Sender<(Point3<i32>, Arc<ChunkData>, Instant)> {

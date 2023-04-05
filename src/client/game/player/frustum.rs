@@ -53,6 +53,12 @@ pub struct BoundingSphere {
     pub radius: f32,
 }
 
+impl BoundingSphere {
+    pub fn new(center: Point3<f32>, radius: f32) -> Self {
+        Self { center, radius }
+    }
+}
+
 impl FrustumCheck for BoundingSphere {
     fn is_visible(&self, frustum: &Frustum) -> bool {
         let v = self.center - frustum.origin;

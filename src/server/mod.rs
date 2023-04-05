@@ -4,7 +4,7 @@ pub mod ticker;
 
 use self::{
     event_loop::EventLoop,
-    game::{clock::TimeData, world::chunk::ChunkData, Game},
+    game::{clock::Time, world::chunk::ChunkData, Game},
 };
 use crate::{
     client::ClientEvent,
@@ -59,7 +59,7 @@ impl ServerSettings {
 }
 
 pub enum ServerEvent {
-    TimeUpdated(TimeData),
+    TimeUpdated(Time),
     ChunkLoaded {
         coords: Point3<i32>,
         data: Arc<ChunkData>,

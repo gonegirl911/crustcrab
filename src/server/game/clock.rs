@@ -23,12 +23,12 @@ impl Clock {
 
     fn send(&self, server_tx: Sender<ServerEvent>) {
         server_tx
-            .send(ServerEvent::TimeUpdated(self.data()))
+            .send(ServerEvent::TimeUpdated(self.time()))
             .unwrap_or_else(|_| unreachable!());
     }
 
-    fn data(&self) -> TimeData {
-        TimeData { ticks: self.ticks }
+    fn time(&self) -> Time {
+        Time::new(self.ticks)
     }
 }
 
@@ -50,14 +50,18 @@ impl EventHandler<Event> for Clock {
 }
 
 #[derive(Clone, Copy)]
-pub struct TimeData {
+pub struct Time {
     ticks: u16,
 }
 
-impl TimeData {
+impl Time {
     const DAWN_RANGE: Range<u16> = Clock::DAWN_START..Clock::DAY_START;
     const DAY_RANGE: Range<u16> = Clock::DAY_START..Clock::DUSK_START;
     const DUSK_RANGE: Range<u16> = Clock::DUSK_START..Clock::NIGHT_START;
+
+    fn new(ticks: u16) -> Self {
+        Self { ticks }
+    }
 
     pub fn sun_dir(&self) -> Vector3<f32> {
         let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;
@@ -86,9 +90,9 @@ impl TimeData {
     }
 }
 
-impl Default for TimeData {
+impl Default for Time {
     fn default() -> Self {
-        Clock::default().data()
+        Clock::default().time()
     }
 }
 

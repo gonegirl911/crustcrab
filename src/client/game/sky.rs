@@ -5,7 +5,7 @@ use crate::{
     },
     color::{Float3, Rgb},
     server::{
-        game::clock::{Stage, TimeData},
+        game::clock::{Stage, Time},
         ServerEvent,
     },
 };
@@ -13,7 +13,7 @@ use bytemuck::{Pod, Zeroable};
 
 pub struct Sky {
     uniform: Uniform<SkyUniformData>,
-    updated_data: Option<TimeData>,
+    updated_time: Option<Time>,
 }
 
 impl Sky {
@@ -23,7 +23,7 @@ impl Sky {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             uniform: Uniform::new(renderer, wgpu::ShaderStages::VERTEX),
-            updated_data: Some(Default::default()),
+            updated_time: Some(Default::default()),
         }
     }
 
@@ -50,19 +50,19 @@ impl EventHandler for Sky {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(data)) => {
-                self.updated_data = Some(*data);
+            Event::UserEvent(ServerEvent::TimeUpdated(timestamp)) => {
+                self.updated_time = Some(*timestamp);
             }
             Event::RedrawRequested(_) => {
-                if let Some(data) = self.updated_data {
+                if let Some(time) = self.updated_time {
                     self.uniform.write(
                         renderer,
-                        &SkyUniformData::new(Self::light_intensity(data.stage())),
+                        &SkyUniformData::new(Self::light_intensity(time.stage())),
                     );
                 }
             }
             Event::RedrawEventsCleared => {
-                self.updated_data = None;
+                self.updated_time = None;
             }
             _ => {}
         }

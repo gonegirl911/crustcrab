@@ -4,7 +4,7 @@ use crate::{
         renderer::{PostProcessor, Program, Renderer, Uniform},
     },
     color::Rgb,
-    server::{game::clock::TimeData, ServerEvent},
+    server::{game::clock::Time, ServerEvent},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;
@@ -15,7 +15,7 @@ pub struct Atmosphere {
     uniform: Uniform<AtmosphereUniformData>,
     program: Program,
     settings: AtmosphereSettings,
-    updated_data: Option<TimeData>,
+    updated_time: Option<Time>,
 }
 
 impl Atmosphere {
@@ -47,7 +47,7 @@ impl Atmosphere {
             uniform,
             program,
             settings,
-            updated_data: Some(Default::default()),
+            updated_time: Some(Default::default()),
         }
     }
 
@@ -89,19 +89,19 @@ impl EventHandler for Atmosphere {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(data)) => {
-                self.updated_data = Some(*data);
+            Event::UserEvent(ServerEvent::TimeUpdated(timestamp)) => {
+                self.updated_time = Some(*timestamp);
             }
             Event::RedrawRequested(_) => {
-                if let Some(data) = self.updated_data {
+                if let Some(time) = self.updated_time {
                     self.uniform.write(
                         renderer,
-                        &AtmosphereUniformData::new(data.sun_dir(), &self.settings),
+                        &AtmosphereUniformData::new(time.sun_dir(), &self.settings),
                     );
                 }
             }
             Event::RedrawEventsCleared => {
-                self.updated_data = None;
+                self.updated_time = None;
             }
             _ => {}
         }
