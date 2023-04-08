@@ -22,7 +22,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
-    collections::LinkedList,
+    collections::{hash_map::Entry, LinkedList},
     mem,
     ops::{Deref, Index, IndexMut, Range},
     sync::Arc,
@@ -31,10 +31,10 @@ use std::{
 #[derive(Default)]
 pub struct ChunkMap {
     cells: CellStore,
-    actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
-    hovered_block: Option<BlockIntersection>,
+    actions: ActionStore,
     loader: ChunkLoader,
     light: ChunkMapLight,
+    hovered_block: Option<BlockIntersection>,
     reach: Range<f32>,
 }
 
@@ -169,7 +169,7 @@ impl ChunkMap {
                 coords,
                 data: Arc::new(ChunkData {
                     chunk: (*self.cells[coords]).clone(),
-                    area: self.chunk_area(coords),
+                    area: self.cells.chunk_area(coords),
                     area_light: self.light.chunk_area_light(coords),
                 }),
                 is_important,
@@ -189,7 +189,7 @@ impl ChunkMap {
                 coords,
                 data: Arc::new(ChunkData {
                     chunk: (*self.cells[coords]).clone(),
-                    area: self.chunk_area(coords),
+                    area: self.cells.chunk_area(coords),
                     area_light: self.light.chunk_area_light(coords),
                 }),
                 is_important,
@@ -225,7 +225,7 @@ impl ChunkMap {
                     coords,
                     data: Arc::new(ChunkData {
                         chunk: (*self.cells.get(coords)?).clone(),
-                        area: self.chunk_area(coords),
+                        area: self.cells.chunk_area(coords),
                         area_light: self.light.chunk_area_light(coords),
                     }),
                     is_important,
@@ -249,7 +249,7 @@ impl ChunkMap {
                     coords,
                     data: Arc::new(ChunkData {
                         chunk: (*self.cells.get(coords)?).clone(),
-                        area: self.chunk_area(coords),
+                        area: self.cells.chunk_area(coords),
                         area_light: self.light.chunk_area_light(coords),
                     }),
                     is_important,
@@ -265,25 +265,13 @@ impl ChunkMap {
     fn load_new(&self, coords: Point3<i32>) -> Option<ChunkCell> {
         let mut chunk = self.loader.get(coords);
         self.actions
-            .get(&coords)
+            .get(coords)
             .into_iter()
             .flatten()
             .for_each(|(coords, action)| {
                 chunk.apply(*coords, action);
             });
         ChunkCell::new(chunk)
-    }
-
-    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
-        ChunkArea::from_fn(|delta| {
-            let delta = delta.cast().into();
-            let chunk_coords = coords + Self::chunk_coords(delta).coords;
-            let block_coords = Self::block_coords(delta);
-            self.cells
-                .get(chunk_coords)
-                .map(|cell| cell[block_coords].data().is_opaque())
-                .unwrap_or_default()
-        })
     }
 
     fn chunk_updates<I>(block_updates: I) -> FxHashSet<Point3<i32>>
@@ -390,6 +378,17 @@ pub struct CellStore {
 }
 
 impl CellStore {
+    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
+        ChunkArea::from_fn(|delta| {
+            let delta = delta.cast().into();
+            let chunk_coords = coords + ChunkMap::chunk_coords(delta).coords;
+            let block_coords = ChunkMap::block_coords(delta);
+            self.get(chunk_coords)
+                .map(|cell| cell[block_coords].data().is_opaque())
+                .unwrap_or_default()
+        })
+    }
+
     fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) -> Option<ChunkCell> {
         self.y_ranges
             .entry(coords.xz())
@@ -428,6 +427,22 @@ impl Index<Point3<i32>> for CellStore {
 
     fn index(&self, coords: Point3<i32>) -> &Self::Output {
         &self.cells[&coords]
+    }
+}
+
+#[derive(Default)]
+struct ActionStore(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
+
+impl ActionStore {
+    fn entry(
+        &mut self,
+        coords: Point3<i32>,
+    ) -> Entry<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>> {
+        self.0.entry(coords)
+    }
+
+    fn get(&self, coords: Point3<i32>) -> Option<&FxHashMap<Point3<u8>, BlockAction>> {
+        self.0.get(&coords)
     }
 }
 

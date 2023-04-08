@@ -78,15 +78,15 @@ impl Game {
             self.depth.view(),
             &self.player.frustum(),
         );
-        // self.processor.apply_raw(|view, bind_group| {
-        //     self.atmosphere.draw(
-        //         view,
-        //         encoder,
-        //         self.player.bind_group(),
-        //         bind_group,
-        //         self.depth.bind_group(),
-        //     );
-        // });
+        self.processor.apply_raw(|view, bind_group| {
+            self.atmosphere.draw(
+                view,
+                encoder,
+                self.player.bind_group(),
+                bind_group,
+                self.depth.bind_group(),
+            );
+        });
         self.hover.draw(
             self.processor.view(),
             encoder,
