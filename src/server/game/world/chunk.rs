@@ -31,8 +31,8 @@ use std::{
 #[derive(Default)]
 pub struct ChunkMap {
     cells: CellStore,
-    actions: ActionStore,
     loader: ChunkLoader,
+    actions: ActionStore,
     light: ChunkMapLight,
     hovered_block: Option<BlockIntersection>,
     reach: Range<f32>,
@@ -607,10 +607,11 @@ impl ChunkArea {
     }
 
     fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        let padding = utils::div_ceil(Self::PADDING, Chunk::DIM) as i32;
-        (-padding..1 + padding).flat_map(move |dx| {
-            (-padding..1 + padding)
-                .flat_map(move |dy| (-padding..1 + padding).map(move |dz| vector![dx, dy, dz]))
+        let chunk_padding = utils::div_ceil(Self::PADDING, Chunk::DIM) as i32;
+        (-chunk_padding..1 + chunk_padding).flat_map(move |dx| {
+            (-chunk_padding..1 + chunk_padding).flat_map(move |dy| {
+                (-chunk_padding..1 + chunk_padding).map(move |dz| vector![dx, dy, dz])
+            })
         })
     }
 
