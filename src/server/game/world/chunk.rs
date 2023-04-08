@@ -274,6 +274,14 @@ impl ChunkMap {
         ChunkCell::new(chunk)
     }
 
+    fn outline(points: &FxHashSet<Point3<i32>>) -> FxHashSet<Point3<i32>> {
+        points
+            .iter()
+            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
+            .filter(|coords| !points.contains(coords))
+            .collect()
+    }
+
     fn chunk_updates<I>(block_updates: I) -> FxHashSet<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i64>>,
@@ -283,14 +291,6 @@ impl ChunkMap {
             .flat_map(|coords| {
                 BlockArea::deltas().map(move |delta| Self::chunk_coords(coords + delta.cast()))
             })
-            .collect()
-    }
-
-    fn outline(points: &FxHashSet<Point3<i32>>) -> FxHashSet<Point3<i32>> {
-        points
-            .iter()
-            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
-            .filter(|coords| !points.contains(coords))
             .collect()
     }
 

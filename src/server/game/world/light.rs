@@ -1,6 +1,6 @@
 use super::{
     block::{Block, BlockArea, BlockData, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS},
-    chunk::{BlockAction, CellStore, Chunk, ChunkArea, ChunkCell, ChunkMap},
+    chunk::{BlockAction, CellStore, Chunk, ChunkArea, ChunkMap},
 };
 use bitfield::bitfield;
 use enum_map::EnumMap;
@@ -28,19 +28,6 @@ impl ChunkMapLight {
                 .map(|cell| cell[block_coords])
                 .unwrap_or_default()
         })
-    }
-
-    pub fn insert(
-        &mut self,
-        cells: &CellStore,
-        coords: Point3<i32>,
-        cell: &ChunkCell,
-    ) -> FxHashSet<Point3<i64>> {
-        Default::default()
-    }
-
-    pub fn remove(&mut self, cells: &CellStore, coords: Point3<i32>) -> FxHashSet<Point3<i64>> {
-        Default::default()
     }
 
     pub fn apply(
