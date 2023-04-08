@@ -288,9 +288,8 @@ impl ChunkMap {
     {
         block_updates
             .into_iter()
-            .flat_map(|coords| {
-                BlockArea::deltas().map(move |delta| Self::chunk_coords(coords + delta.cast()))
-            })
+            .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
+            .map(Self::chunk_coords)
             .collect()
     }
 
