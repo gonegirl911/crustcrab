@@ -29,7 +29,7 @@ impl EventLoop {
 
         handler.handle(&Event::Init, self.server_tx.clone());
         loop {
-            for event in self.client_rx.try_iter() {
+            for event in self.client_rx.drain() {
                 handler.handle(&Event::ClientEvent(event), self.server_tx.clone());
             }
             ticker.wait(|| handler.handle(&Event::Tick, self.server_tx.clone()));

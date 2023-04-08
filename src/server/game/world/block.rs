@@ -164,8 +164,8 @@ impl BlockArea {
 
     fn visible_sides(self) -> impl Iterator<Item = Side> {
         SIDE_DELTAS
-            .iter()
-            .filter(move |(_, delta)| self.is_transparent(**delta))
+            .into_iter()
+            .filter(move |(_, delta)| self.is_transparent(*delta))
             .map(|(side, _)| side)
     }
 
