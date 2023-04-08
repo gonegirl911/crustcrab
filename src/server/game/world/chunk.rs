@@ -53,12 +53,12 @@ impl ChunkMap {
         points
             .into_iter()
             .map(|coords| {
-                self.cells
-                    .get_mut(coords)
-                    .map(ChunkCell::load)
-                    .is_some()
-                    .then_some(coords)
-                    .ok_or(coords)
+                if let Some(cell) = self.cells.get_mut(coords) {
+                    cell.load();
+                    Ok(coords)
+                } else {
+                    Err(coords)
+                }
             })
             .collect::<Vec<_>>()
             .into_par_iter()
