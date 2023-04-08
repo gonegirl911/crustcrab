@@ -34,10 +34,14 @@ impl World {
 impl EventHandler<Event> for World {
     type Context<'a> = (Sender<ServerEvent>, &'a Player);
 
-    fn handle(&mut self, event: &Event, (server_tx, player): Self::Context<'_>) {
+    fn handle(
+        &mut self,
+        event: &Event,
+        (server_tx, player @ Player { ray, .. }): Self::Context<'_>,
+    ) {
         if let Some(event) = ChunkMapEvent::new(event, player) {
             self.chunks_tx
-                .send((event, server_tx, player.ray))
+                .send((event, server_tx, *ray))
                 .unwrap_or_else(|_| unreachable!());
         }
     }

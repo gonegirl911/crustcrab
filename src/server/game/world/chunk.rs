@@ -13,6 +13,7 @@ use crate::{
         },
         ServerEvent, ServerSettings,
     },
+    utils,
 };
 use bitvec::prelude::*;
 use flume::Sender;
@@ -45,53 +46,50 @@ impl ChunkMap {
         }
     }
 
-    fn load_many(&mut self, points: &[Point3<i32>]) -> (Vec<Point3<i32>>, FxHashSet<Point3<i64>>) {
-        let missing = points
-            .iter()
-            .copied()
-            .filter(|coords| self.cells.get_mut(*coords).map(ChunkCell::load).is_none())
-            .collect::<Vec<_>>();
-
-        let new = missing
+    fn load_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        points
+            .into_iter()
+            .map(|coords| {
+                self.cells
+                    .get_mut(coords)
+                    .map(ChunkCell::load)
+                    .is_some()
+                    .then_some(coords)
+                    .ok_or(coords)
+            })
+            .collect::<Vec<_>>()
             .into_par_iter()
-            .filter_map(|coords| self.get_new(coords).map(|cell| (coords, cell)))
-            .collect::<LinkedList<_>>();
-
-        let block_updates = new
-            .iter()
-            .flat_map(|(coords, cell)| self.light.insert(&self.cells, *coords, cell))
-            .collect();
-
-        self.cells.extend(new);
-
-        let loads = points
-            .iter()
-            .copied()
-            .filter(|coords| self.cells.contains_coords(*coords))
-            .collect();
-
-        (loads, block_updates)
+            .map(|coords| coords.map_err(|coords| self.load_new(coords).map(|cell| (coords, cell))))
+            .collect::<LinkedList<_>>()
+            .into_iter()
+            .filter_map(|entry| match entry {
+                Ok(coords) => Some(coords),
+                Err(Some((coords, cell))) => {
+                    self.cells.insert(coords, cell);
+                    Some(coords)
+                }
+                Err(None) => None,
+            })
+            .collect()
     }
 
-    fn unload_many<'a, I>(&'a mut self, points: I) -> (Vec<Point3<i32>>, FxHashSet<Point3<i64>>)
+    fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
     where
-        I: IntoIterator<Item = Point3<i32>> + 'a,
+        I: IntoIterator<Item = Point3<i32>>,
     {
-        let mut unloads = vec![];
-        let mut block_updates = FxHashSet::default();
-
-        for coords in points {
-            if let Some(cell) = self.cells.remove(coords) {
-                unloads.push(coords);
-                if let Some(cell) = cell.unload() {
-                    self.cells.insert(coords, cell);
-                } else {
-                    block_updates.extend(self.light.remove(&self.cells, coords));
-                }
-            }
-        }
-
-        (unloads, block_updates)
+        points
+            .into_iter()
+            .filter(|coords| {
+                self.cells
+                    .remove(*coords)
+                    .and_then(ChunkCell::unload)
+                    .map(|cell| self.cells.insert(*coords, cell))
+                    .is_none()
+            })
+            .collect()
     }
 
     fn apply(
@@ -264,7 +262,7 @@ impl ChunkMap {
             });
     }
 
-    fn get_new(&self, coords: Point3<i32>) -> Option<ChunkCell> {
+    fn load_new(&self, coords: Point3<i32>) -> Option<ChunkCell> {
         let mut chunk = self.loader.get(coords);
         self.actions
             .get(&coords)
@@ -273,7 +271,7 @@ impl ChunkMap {
             .for_each(|(coords, action)| {
                 chunk.apply(*coords, action);
             });
-        ChunkCell::load_new(chunk)
+        ChunkCell::new(chunk)
     }
 
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
@@ -309,35 +307,11 @@ impl ChunkMap {
     }
 
     pub fn chunk_coords(coords: Point3<i64>) -> Point3<i32> {
-        coords.map(|c| Self::div_floor(c, Chunk::DIM as i64) as i32)
+        coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
     }
 
     pub fn block_coords(coords: Point3<i64>) -> Point3<u8> {
         coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
-    }
-
-    pub fn coords(chunk_coords: Point3<i32>, block_coords: Point3<u8>) -> Point3<i64> {
-        chunk_coords.cast() * Chunk::DIM as i64 + block_coords.coords.cast()
-    }
-
-    fn div_floor(a: i64, b: i64) -> i64 {
-        let d = a / b;
-        let r = a % b;
-        if (r > 0 && b < 0) || (r < 0 && b > 0) {
-            d - 1
-        } else {
-            d
-        }
-    }
-
-    fn div_ceil(a: usize, b: usize) -> usize {
-        let d = a / b;
-        let r = a % b;
-        if r > 0 && b > 0 {
-            d + 1
-        } else {
-            d
-        }
     }
 }
 
@@ -347,7 +321,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
     fn handle(&mut self, event: &ChunkMapEvent, (server_tx, ray): Self::Context<'_>) {
         match event {
             ChunkMapEvent::InitialRenderRequested { area } => {
-                let (mut loads, _) = self.load_many(&area.points().collect::<Vec<_>>());
+                let mut loads = self.load_many(area.points());
 
                 self.handle(
                     &ChunkMapEvent::BlockHoverRequested,
@@ -355,16 +329,15 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
                 );
 
                 loads.par_sort_unstable_by_key(|coords| {
-                    (coords - area.center).map(|c| c.pow(2)).sum()
+                    utils::magnitude_squared(coords - area.center)
                 });
 
                 self.par_send_loads(loads, server_tx, false);
             }
             ChunkMapEvent::WorldAreaChanged { prev, curr } => {
-                let (unloads, b1) = self.unload_many(prev.exclusive_points(curr));
-                let (loads, b2) = self.load_many(&curr.exclusive_points(prev).collect::<Vec<_>>());
+                let unloads = self.unload_many(prev.exclusive_points(curr));
+                let loads = self.load_many(curr.exclusive_points(prev));
                 let outline = Self::outline(&loads.iter().chain(&unloads).copied().collect());
-                let light_updates = Self::chunk_updates(b1.union(&b2).copied());
 
                 self.handle(
                     &ChunkMapEvent::BlockHoverRequested,
@@ -373,11 +346,7 @@ impl EventHandler<ChunkMapEvent> for ChunkMap {
 
                 self.send_unloads(unloads, server_tx.clone());
                 self.par_send_loads(loads, server_tx.clone(), false);
-                self.par_send_updates(
-                    outline.into_iter().chain(light_updates).collect::<Vec<_>>(),
-                    server_tx,
-                    false,
-                );
+                self.par_send_updates(outline, server_tx, false);
             }
             ChunkMapEvent::BlockHoverRequested => {
                 let hovered_block =
@@ -445,14 +414,6 @@ impl CellStore {
         }
     }
 
-    fn contains_coords(&self, coords: Point3<i32>) -> bool {
-        self.cells.contains_key(&coords)
-    }
-
-    pub fn y_range(&self, coords: Point2<i32>) -> Range<i32> {
-        self.y_ranges[&coords].clone()
-    }
-
     pub fn get(&self, coords: Point3<i32>) -> Option<&ChunkCell> {
         self.cells.get(&coords)
     }
@@ -470,20 +431,12 @@ impl Index<Point3<i32>> for CellStore {
     }
 }
 
-impl Extend<(Point3<i32>, ChunkCell)> for CellStore {
-    fn extend<T: IntoIterator<Item = (Point3<i32>, ChunkCell)>>(&mut self, iter: T) {
-        for (coords, cell) in iter {
-            self.insert(coords, cell);
-        }
-    }
-}
-
 pub struct ChunkCell {
     chunk: Box<Chunk>,
 }
 
 impl ChunkCell {
-    fn load_new(chunk: Chunk) -> Option<Self> {
+    fn new(chunk: Chunk) -> Option<Self> {
         chunk.is_not_empty().then(|| Self {
             chunk: Box::new(chunk),
         })
@@ -493,7 +446,7 @@ impl ChunkCell {
         let mut chunk = Chunk::default();
         chunk
             .apply(coords, action)
-            .then(|| Self::load_new(chunk))
+            .then(|| Self::new(chunk))
             .ok_or(())
     }
 
@@ -639,7 +592,7 @@ impl ChunkArea {
     }
 
     fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        let padding = ChunkMap::div_ceil(Self::PADDING, Chunk::DIM) as i32;
+        let padding = utils::div_ceil(Self::PADDING, Chunk::DIM) as i32;
         (-padding..1 + padding).flat_map(move |dx| {
             (-padding..1 + padding)
                 .flat_map(move |dy| (-padding..1 + padding).map(move |dz| vector![dx, dy, dz]))

@@ -5,8 +5,9 @@ use super::world::chunk::Chunk;
 use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},
+    utils,
 };
-use nalgebra::{vector, Point3, Vector3};
+use nalgebra::{vector, Point3};
 
 #[derive(Default)]
 pub struct Player {
@@ -65,7 +66,7 @@ pub struct WorldArea {
 impl WorldArea {
     pub fn points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
         self.square_points()
-            .filter(|point| Self::magnitude_squared(point - self.center) <= self.radius.pow(2))
+            .filter(|point| utils::magnitude_squared(point - self.center) <= self.radius.pow(2))
     }
 
     pub fn exclusive_points<'a>(
@@ -73,7 +74,7 @@ impl WorldArea {
         other: &'a WorldArea,
     ) -> impl Iterator<Item = Point3<i32>> + 'a {
         self.points()
-            .filter(|point| Self::magnitude_squared(point - other.center) > other.radius.pow(2))
+            .filter(|point| utils::magnitude_squared(point - other.center) > other.radius.pow(2))
     }
 
     fn square_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
@@ -83,9 +84,5 @@ impl WorldArea {
                 (-radius..=radius).map(move |dz| self.center + vector![dx, dy, dz])
             })
         })
-    }
-
-    fn magnitude_squared(vector: Vector3<i32>) -> u32 {
-        vector.map(|c| c.pow(2)).sum() as u32
     }
 }
