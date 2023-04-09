@@ -205,11 +205,12 @@ impl ChunkMap {
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        for coords in points {
-            server_tx
-                .send(ServerEvent::ChunkUnloaded { coords })
-                .unwrap_or_else(|_| unreachable!());
-        }
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkUnloaded { coords })
+            .for_each(|event| {
+                server_tx.send(event).unwrap_or_else(|_| unreachable!());
+            });
     }
 
     fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
