@@ -82,13 +82,7 @@ impl ChunkMap {
     {
         points
             .into_iter()
-            .filter(|coords| {
-                self.cells
-                    .remove(*coords)
-                    .and_then(ChunkCell::unload)
-                    .map(|cell| self.cells.insert(*coords, cell))
-                    .is_none()
-            })
+            .filter(|coords| self.unload(*coords))
             .collect()
     }
 
@@ -233,6 +227,19 @@ impl ChunkMap {
                 chunk.apply(*coords, action);
             });
         ChunkCell::new(chunk)
+    }
+
+    fn unload(&mut self, coords: Point3<i32>) -> bool {
+        if let Some(cell) = self.cells.remove(coords) {
+            if let Some(cell) = cell.unload() {
+                self.cells.insert(coords, cell);
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        }
     }
 
     fn load_event(&self, coords: Point3<i32>, is_important: bool) -> ServerEvent {
