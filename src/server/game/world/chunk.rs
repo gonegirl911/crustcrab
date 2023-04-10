@@ -163,54 +163,35 @@ impl ChunkMap {
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        points
-            .into_iter()
-            .map(|coords| ServerEvent::ChunkLoaded {
-                coords,
-                data: Arc::new(ChunkData {
-                    chunk: (*self.cells[coords]).clone(),
-                    area: self.cells.chunk_area(coords),
-                    area_light: self.light.chunk_area_light(coords),
-                }),
-                is_important,
-            })
-            .for_each(|event| {
-                server_tx.send(event).unwrap_or_else(|_| unreachable!());
-            });
+        self.send_events(
+            points
+                .into_iter()
+                .map(|coords| self.load_event(coords, is_important)),
+            server_tx,
+        );
     }
 
     fn par_send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
-        points
-            .into_par_iter()
-            .map(|coords| ServerEvent::ChunkLoaded {
-                coords,
-                data: Arc::new(ChunkData {
-                    chunk: (*self.cells[coords]).clone(),
-                    area: self.cells.chunk_area(coords),
-                    area_light: self.light.chunk_area_light(coords),
-                }),
-                is_important,
-            })
-            .collect::<LinkedList<_>>()
-            .into_iter()
-            .for_each(|event| {
-                server_tx.send(event).unwrap_or_else(|_| unreachable!());
-            });
+        self.send_events(
+            points
+                .into_par_iter()
+                .map(|coords| self.load_event(coords, is_important))
+                .collect::<LinkedList<_>>(),
+            server_tx,
+        );
     }
 
     fn send_unloads<I>(&self, points: I, server_tx: Sender<ServerEvent>)
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        points
-            .into_iter()
-            .map(|coords| ServerEvent::ChunkUnloaded { coords })
-            .for_each(|event| {
-                server_tx.send(event).unwrap_or_else(|_| unreachable!());
-            });
+        self.send_events(
+            points.into_iter().map(|coords| self.unload_event(coords)),
+            server_tx,
+        );
     }
 
     fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
@@ -219,22 +200,12 @@ impl ChunkMap {
         server_tx: Sender<ServerEvent>,
         is_important: bool,
     ) {
-        points
-            .into_iter()
-            .filter_map(|coords| {
-                Some(ServerEvent::ChunkUpdated {
-                    coords,
-                    data: Arc::new(ChunkData {
-                        chunk: (*self.cells.get(coords)?).clone(),
-                        area: self.cells.chunk_area(coords),
-                        area_light: self.light.chunk_area_light(coords),
-                    }),
-                    is_important,
-                })
-            })
-            .for_each(|event| {
-                server_tx.send(event).unwrap_or_else(|_| unreachable!());
-            });
+        self.send_events(
+            points
+                .into_iter()
+                .filter_map(|coords| self.update_event(coords, is_important)),
+            server_tx,
+        );
     }
 
     fn par_send_updates<I: IntoParallelIterator<Item = Point3<i32>>>(
@@ -243,24 +214,13 @@ impl ChunkMap {
         server_tx: Sender<ServerEvent>,
         is_important: bool,
     ) {
-        points
-            .into_par_iter()
-            .filter_map(|coords| {
-                Some(ServerEvent::ChunkUpdated {
-                    coords,
-                    data: Arc::new(ChunkData {
-                        chunk: (*self.cells.get(coords)?).clone(),
-                        area: self.cells.chunk_area(coords),
-                        area_light: self.light.chunk_area_light(coords),
-                    }),
-                    is_important,
-                })
-            })
-            .collect::<LinkedList<_>>()
-            .into_iter()
-            .for_each(|event| {
-                server_tx.send(event).unwrap_or_else(|_| unreachable!());
-            });
+        self.send_events(
+            points
+                .into_par_iter()
+                .filter_map(|coords| self.update_event(coords, is_important))
+                .collect::<LinkedList<_>>(),
+            server_tx,
+        );
     }
 
     fn load_new(&self, coords: Point3<i32>) -> Option<ChunkCell> {
@@ -273,6 +233,43 @@ impl ChunkMap {
                 chunk.apply(*coords, action);
             });
         ChunkCell::new(chunk)
+    }
+
+    fn load_event(&self, coords: Point3<i32>, is_important: bool) -> ServerEvent {
+        ServerEvent::ChunkLoaded {
+            coords,
+            data: Arc::new(ChunkData {
+                chunk: (*self.cells[coords]).clone(),
+                area: self.cells.chunk_area(coords),
+                area_light: self.light.chunk_area_light(coords),
+            }),
+            is_important,
+        }
+    }
+
+    fn unload_event(&self, coords: Point3<i32>) -> ServerEvent {
+        ServerEvent::ChunkUnloaded { coords }
+    }
+
+    fn update_event(&self, coords: Point3<i32>, is_important: bool) -> Option<ServerEvent> {
+        Some(ServerEvent::ChunkUpdated {
+            coords,
+            data: Arc::new(ChunkData {
+                chunk: (*self.cells.get(coords)?).clone(),
+                area: self.cells.chunk_area(coords),
+                area_light: self.light.chunk_area_light(coords),
+            }),
+            is_important,
+        })
+    }
+
+    fn send_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
+    where
+        I: IntoIterator<Item = ServerEvent>,
+    {
+        for event in events {
+            server_tx.send(event).unwrap_or_else(|_| unreachable!());
+        }
     }
 
     fn outline(points: &FxHashSet<Point3<i32>>) -> FxHashSet<Point3<i32>> {
