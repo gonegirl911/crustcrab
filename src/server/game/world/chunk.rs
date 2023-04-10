@@ -1,7 +1,7 @@
 use super::{
     block::{Block, BlockArea},
+    generator::ChunkGenerator,
     light::{ChunkAreaLight, ChunkMapLight},
-    loader::ChunkLoader,
 };
 use crate::{
     client::{game::world::BlockVertex, ClientEvent},
@@ -31,7 +31,7 @@ use std::{
 #[derive(Default)]
 pub struct ChunkMap {
     cells: CellStore,
-    loader: ChunkLoader,
+    generator: ChunkGenerator,
     actions: ActionStore,
     light: ChunkMapLight,
     hovered_block: Option<BlockIntersection>,
@@ -62,7 +62,7 @@ impl ChunkMap {
             })
             .collect::<Vec<_>>()
             .into_par_iter()
-            .map(|coords| coords.map_err(|coords| self.load_new(coords).map(|cell| (coords, cell))))
+            .map(|coords| coords.map_err(|coords| self.gen(coords).map(|cell| (coords, cell))))
             .collect::<LinkedList<_>>()
             .into_iter()
             .filter_map(|entry| match entry {
@@ -217,8 +217,8 @@ impl ChunkMap {
         );
     }
 
-    fn load_new(&self, coords: Point3<i32>) -> Option<ChunkCell> {
-        let mut chunk = self.loader.get(coords);
+    fn gen(&self, coords: Point3<i32>) -> Option<ChunkCell> {
+        let mut chunk = self.generator.gen(coords);
         self.actions
             .get(coords)
             .into_iter()

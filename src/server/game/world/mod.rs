@@ -1,7 +1,7 @@
 pub mod block;
 pub mod chunk;
+pub mod generator;
 pub mod light;
-pub mod loader;
 
 use self::chunk::{ChunkMap, ChunkMapEvent};
 use crate::server::{
