@@ -3,7 +3,10 @@ pub mod crosshair;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{Blit, Effect, PostProcessor, Renderer},
+        renderer::{
+            effect::{Blit, Effect, PostProcessor},
+            Renderer,
+        },
     },
     server::game::world::{block::Block, chunk::Chunk},
 };

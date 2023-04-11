@@ -1,7 +1,13 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{DepthBuffer, IndexedMesh, PostProcessor, Program, Renderer, Vertex},
+        renderer::{
+            effect::PostProcessor,
+            mesh::{IndexedMesh, Vertex},
+            program::Program,
+            texture::screen::DepthBuffer,
+            Renderer,
+        },
     },
     server::ServerEvent,
 };

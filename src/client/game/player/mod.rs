@@ -8,7 +8,7 @@ use self::{
 use super::gui::Gui;
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{Renderer, Uniform},
+    renderer::{uniform::Uniform, Renderer},
     ClientEvent,
 };
 use bytemuck::{Pod, Zeroable};

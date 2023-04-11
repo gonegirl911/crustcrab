@@ -10,7 +10,11 @@ use self::{
 };
 use super::{
     event_loop::{Event, EventHandler},
-    renderer::{Aces, DepthBuffer, PostProcessor, Renderer},
+    renderer::{
+        effect::{Aces, PostProcessor},
+        texture::screen::DepthBuffer,
+        Renderer,
+    },
     ClientEvent,
 };
 use flume::Sender;
@@ -24,14 +28,14 @@ pub struct Game {
     atmosphere: Atmosphere,
     hover: BlockHover,
     aces: Aces,
-    processor: PostProcessor,
     depth: DepthBuffer,
+    processor: PostProcessor,
 }
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
-        let processor = PostProcessor::new(renderer);
         let depth = DepthBuffer::new(renderer);
+        let processor = PostProcessor::new(renderer);
         let gui = Gui::new(renderer, processor.bind_group_layout());
         let player = Player::new(renderer, &gui);
         let sky = Sky::new(renderer);
@@ -64,8 +68,8 @@ impl Game {
             atmosphere,
             aces,
             hover,
-            processor,
             depth,
+            processor,
         }
     }
 
@@ -124,8 +128,8 @@ impl EventHandler for Game {
         self.world.handle(event, renderer);
         self.atmosphere.handle(event, renderer);
         self.hover.handle(event, ());
-        self.processor.handle(event, renderer);
         self.depth.handle(event, renderer);
+        self.processor.handle(event, renderer);
 
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {

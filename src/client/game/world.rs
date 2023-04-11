@@ -3,7 +3,11 @@ use crate::{
         event_loop::{Event, EventHandler},
         game::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
         renderer::{
-            DepthBuffer, ImageTextureArray, Mesh, PostProcessor, Program, Renderer, Vertex,
+            effect::PostProcessor,
+            mesh::{Mesh, Vertex},
+            program::Program,
+            texture::{image::ImageTextureArray, screen::DepthBuffer},
+            Renderer,
         },
     },
     server::{

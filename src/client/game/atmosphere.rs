@@ -1,7 +1,7 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{PostProcessor, Program, Renderer, Uniform},
+        renderer::{effect::PostProcessor, program::Program, uniform::Uniform, Renderer},
     },
     color::Rgb,
     server::{game::clock::Time, ServerEvent},

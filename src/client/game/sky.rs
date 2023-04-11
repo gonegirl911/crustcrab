@@ -1,7 +1,7 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{Renderer, Uniform},
+        renderer::{uniform::Uniform, Renderer},
     },
     color::{Float3, Rgb},
     server::{

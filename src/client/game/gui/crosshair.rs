@@ -1,6 +1,9 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{ImageTexture, PostProcessor, Program, Renderer, Uniform},
+    renderer::{
+        effect::PostProcessor, program::Program, texture::image::ImageTexture, uniform::Uniform,
+        Renderer,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4};
