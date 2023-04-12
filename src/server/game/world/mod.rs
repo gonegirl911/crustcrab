@@ -226,11 +226,15 @@ impl World {
     }
 
     pub fn chunk_coords(coords: Point3<i64>) -> Point3<i32> {
-        coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
+        coords.map(|c| utils::div_floor(c, Chunk::DIM as _) as _)
     }
 
     pub fn block_coords(coords: Point3<i64>) -> Point3<u8> {
-        coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
+        coords.map(|c| c.rem_euclid(Chunk::DIM as _) as _)
+    }
+
+    pub fn coords(chunk_coords: Point3<i32>, block_coords: Point3<u8>) -> Point3<i64> {
+        chunk_coords.cast() * Chunk::DIM as _ + block_coords.coords.cast()
     }
 }
 
@@ -309,13 +313,12 @@ pub struct ChunkStore {
 
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
+        let coords = World::coords(coords, Default::default());
         ChunkArea::from_fn(|delta| {
-            let delta = delta.cast().into();
-            let chunk_coords = coords + World::chunk_coords(delta).coords;
-            let block_coords = World::block_coords(delta);
-            self.get(chunk_coords)
-                .map(|cell| cell[block_coords].data().is_opaque())
-                .unwrap_or_default()
+            let coords = coords + delta.cast();
+            self.get(World::chunk_coords(coords)).map_or(false, |cell| {
+                cell[World::block_coords(coords)].data().is_opaque()
+            })
         })
     }
 

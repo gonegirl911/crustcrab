@@ -1,6 +1,6 @@
-use nalgebra::Vector3;
+use nalgebra::SVector;
 
-pub fn magnitude_squared(vector: Vector3<i32>) -> u32 {
+pub fn magnitude_squared<const D: usize>(vector: SVector<i32, D>) -> u32 {
     vector.map(|c| c.pow(2)).sum() as u32
 }
 

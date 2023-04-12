@@ -23,7 +23,7 @@ impl Chunk {
 
     pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
-            array::from_fn(|y| array::from_fn(|z| f(point![x as u8, y as u8, z as u8])))
+            array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
     }
 

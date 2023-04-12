@@ -1,9 +1,6 @@
 use super::{
     block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
-    chunk::{
-        light::{ChunkAreaLight, ChunkLight},
-        Chunk,
-    },
+    chunk::light::{ChunkAreaLight, ChunkLight},
     {BlockAction, ChunkStore, World},
 };
 use nalgebra::Point3;
@@ -15,11 +12,8 @@ pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
 
 impl ChunkMapLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
-        let coords = coords.cast() * Chunk::DIM as i64;
-        ChunkAreaLight::from_fn(|delta| {
-            let coords = coords + delta.cast();
-            self.block_light(&LightNode::new(coords))
-        })
+        let coords = World::coords(coords, Point3::origin());
+        ChunkAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
     pub fn apply(
@@ -189,8 +183,7 @@ impl ChunkMapLight {
     }
 
     fn replace_component(&mut self, coords: Point3<i64>, index: usize, value: u8) -> u8 {
-        self.block_light_mut(&LightNode::new(coords))
-            .replace_component(index, value)
+        self.block_light_mut(coords).replace_component(index, value)
     }
 
     fn take_component(&mut self, coords: Point3<i64>, index: usize) -> u8 {
@@ -198,7 +191,7 @@ impl ChunkMapLight {
     }
 
     fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
-        self.block_light(&LightNode::new(coords)).component(index)
+        self.block_light(coords).component(index)
     }
 
     fn set_component(
@@ -208,8 +201,7 @@ impl ChunkMapLight {
         index: usize,
         value: u8,
     ) -> Option<u8> {
-        let node = LightNode::new(coords);
-        let block_light = self.block_light_mut(&node);
+        let block_light = self.block_light_mut(coords);
         let component = block_light.component(index);
         let value = node.apply_filter(chunks, index, value);
         (component < value).then(|| {
@@ -225,8 +217,7 @@ impl ChunkMapLight {
         index: usize,
         value: u8,
     ) -> Result<u8, u8> {
-        let node = LightNode::new(coords);
-        let block_light = self.block_light_mut(&node);
+        let block_light = self.block_light_mut(coords);
         let component = block_light.component(index);
         if component != 0 && component == node.apply_filter(chunks, index, value) {
             block_light.set_component(index, 0);
@@ -236,14 +227,14 @@ impl ChunkMapLight {
         }
     }
 
-    fn block_light(&self, node: &LightNode) -> BlockLight {
+    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
         self.0
-            .get(&node.chunk_coords)
-            .map_or_else(Default::default, |light| light[node.block_coords])
+            .get(&World::chunk_coords(coords))
+            .map_or_else(Default::default, |light| light[World::block_coords(coords)])
     }
 
-    fn block_light_mut(&mut self, node: &LightNode) -> &mut BlockLight {
-        &mut self.0.entry(node.chunk_coords).or_default()[node.block_coords]
+    fn block_light_mut(&mut self, coords: Point3<i64>) -> &mut BlockLight {
+        &mut self.0.entry(World::chunk_coords(coords)).or_default()[World::block_coords(coords)]
     }
 
     fn unvisited_neighbors(
