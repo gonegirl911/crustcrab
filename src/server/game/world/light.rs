@@ -1,69 +1,61 @@
 use super::{
-    block::{Block, BlockArea, BlockData, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS},
-    chunk::{BlockAction, CellStore, Chunk, ChunkArea, ChunkMap},
+    block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
+    chunk::{
+        light::{ChunkAreaLight, ChunkLight},
+        Chunk,
+    },
+    {BlockAction, ChunkStore, World},
 };
-use bitfield::bitfield;
-use enum_map::EnumMap;
-use nalgebra::{vector, Point3, Vector3};
+use nalgebra::Point3;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{
-    array,
-    cmp::Ordering,
-    collections::VecDeque,
-    iter::Sum,
-    ops::{Index, IndexMut, Range},
-};
+use std::{cmp::Ordering, collections::VecDeque};
 
 #[derive(Default)]
 pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
 
 impl ChunkMapLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
+        let coords = coords.cast() * Chunk::DIM as i64;
         ChunkAreaLight::from_fn(|delta| {
-            let delta = delta.cast().into();
-            let chunk_coords = coords + ChunkMap::chunk_coords(delta).coords;
-            let block_coords = ChunkMap::block_coords(delta);
-            self.0
-                .get(&chunk_coords)
-                .map(|cell| cell[block_coords])
-                .unwrap_or_default()
+            let coords = coords + delta.cast();
+            self.block_light(&LightNode::new(coords))
         })
     }
 
     pub fn apply(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         action: &BlockAction,
     ) -> FxHashSet<Point3<i64>> {
         match action {
-            BlockAction::Place(block) => self.place(cells, coords, *block),
-            BlockAction::Destroy => self.destroy(cells, coords),
+            BlockAction::Place(block) => self.place(chunks, coords, *block),
+            BlockAction::Destroy => self.destroy(chunks, coords),
         }
     }
 
     fn place(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         block: Block,
     ) -> FxHashSet<Point3<i64>> {
-        self.block_skylight(cells, coords, block)
+        self.block_skylight(chunks, coords, block)
             .into_iter()
-            .chain(self.place_torchlight(cells, coords, block))
+            .chain(self.place_torchlight(chunks, coords, block))
             .collect()
     }
 
-    fn destroy(&mut self, cells: &CellStore, coords: Point3<i64>) -> FxHashSet<Point3<i64>> {
-        self.unblock_skylight(cells, coords)
+    fn destroy(&mut self, chunks: &ChunkStore, coords: Point3<i64>) -> FxHashSet<Point3<i64>> {
+        self.unblock_skylight(chunks, coords)
             .into_iter()
-            .chain(self.destroy_torchlight(cells, coords))
+            .chain(self.destroy_torchlight(chunks, coords))
             .collect()
     }
 
     fn block_skylight(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         block: Block,
     ) -> FxHashSet<Point3<i64>> {
@@ -72,7 +64,7 @@ impl ChunkMapLight {
 
     fn place_torchlight(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         block: Block,
     ) -> FxHashSet<Point3<i64>> {
@@ -81,13 +73,13 @@ impl ChunkMapLight {
             .luminance
             .into_iter()
             .zip(BlockLight::TORCHLIGHT_RANGE)
-            .flat_map(|(v, i)| self.set_torchlight(cells, coords, i, v))
+            .flat_map(|(v, i)| self.set_torchlight(chunks, coords, i, v))
             .collect()
     }
 
     fn unblock_skylight(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
     ) -> FxHashSet<Point3<i64>> {
         Default::default()
@@ -95,46 +87,46 @@ impl ChunkMapLight {
 
     fn destroy_torchlight(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
     ) -> FxHashSet<Point3<i64>> {
         BlockLight::TORCHLIGHT_RANGE
-            .flat_map(|i| self.unset_torchlight(cells, coords, i))
+            .flat_map(|i| self.unset_torchlight(chunks, coords, i))
             .collect()
     }
 
     fn set_torchlight(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
         value: u8,
     ) -> FxHashSet<Point3<i64>> {
         let component = self.replace_component(coords, index, value);
         match component.cmp(&value) {
-            Ordering::Less => self.spread_component(cells, coords, index, value),
+            Ordering::Less => self.spread_component(chunks, coords, index, value),
             Ordering::Equal => Default::default(),
-            Ordering::Greater => self.unspread_component(cells, coords, index, component),
+            Ordering::Greater => self.unspread_component(chunks, coords, index, component),
         }
     }
 
     fn unset_torchlight(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
     ) -> FxHashSet<Point3<i64>> {
         let component = self.take_component(coords, index);
         if component != 0 {
-            self.unspread_component(cells, coords, index, component)
+            self.unspread_component(chunks, coords, index, component)
         } else {
-            self.spread_neighbors(cells, coords, index)
+            self.spread_neighbors(chunks, coords, index)
         }
     }
 
     fn spread_component(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
         value: u8,
@@ -144,7 +136,7 @@ impl ChunkMapLight {
 
         while let Some((coords, value)) = deq.pop_front() {
             for coords in Self::unvisited_neighbors(coords, &mut visits) {
-                if let Some(value) = self.set_component(cells, coords, index, value - 1) {
+                if let Some(value) = self.set_component(chunks, coords, index, value - 1) {
                     deq.push_back((coords, value));
                 }
             }
@@ -155,7 +147,7 @@ impl ChunkMapLight {
 
     fn unspread_component(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
         value: u8,
@@ -166,7 +158,7 @@ impl ChunkMapLight {
 
         while let Some((coords, value)) = deq.pop_front() {
             for coords in Self::unvisited_neighbors(coords, &mut visits) {
-                match self.unset_component(cells, coords, index, value - 1) {
+                match self.unset_component(chunks, coords, index, value - 1) {
                     Ok(value) => deq.push_back((coords, value)),
                     Err(0) => {}
                     Err(component) => sources.push((coords, component)),
@@ -176,21 +168,21 @@ impl ChunkMapLight {
 
         sources
             .into_iter()
-            .flat_map(|(coords, component)| self.spread_component(cells, coords, index, component))
+            .flat_map(|(coords, component)| self.spread_component(chunks, coords, index, component))
             .chain(visits)
             .collect()
     }
 
     fn spread_neighbors(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
     ) -> FxHashSet<Point3<i64>> {
         Self::neighbors(coords)
             .filter_map(|coords| {
                 let component = self.component(coords, index);
-                (component != 0).then(|| self.spread_component(cells, coords, index, component))
+                (component != 0).then(|| self.spread_component(chunks, coords, index, component))
             })
             .flatten()
             .collect()
@@ -205,14 +197,13 @@ impl ChunkMapLight {
         self.replace_component(coords, index, 0)
     }
 
-    fn component(&mut self, coords: Point3<i64>, index: usize) -> u8 {
-        self.block_light_mut(&LightNode::new(coords))
-            .component(index)
+    fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
+        self.block_light(&LightNode::new(coords)).component(index)
     }
 
     fn set_component(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
         value: u8,
@@ -220,7 +211,7 @@ impl ChunkMapLight {
         let node = LightNode::new(coords);
         let block_light = self.block_light_mut(&node);
         let component = block_light.component(index);
-        let value = node.apply_filter(cells, index, value);
+        let value = node.apply_filter(chunks, index, value);
         (component < value).then(|| {
             block_light.set_component(index, value);
             value
@@ -229,7 +220,7 @@ impl ChunkMapLight {
 
     fn unset_component(
         &mut self,
-        cells: &CellStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
         value: u8,
@@ -237,12 +228,18 @@ impl ChunkMapLight {
         let node = LightNode::new(coords);
         let block_light = self.block_light_mut(&node);
         let component = block_light.component(index);
-        if component != 0 && component == node.apply_filter(cells, index, value) {
+        if component != 0 && component == node.apply_filter(chunks, index, value) {
             block_light.set_component(index, 0);
             Ok(value)
         } else {
             Err(component)
         }
+    }
+
+    fn block_light(&self, node: &LightNode) -> BlockLight {
+        self.0
+            .get(&node.chunk_coords)
+            .map_or_else(Default::default, |light| light[node.block_coords])
     }
 
     fn block_light_mut(&mut self, node: &LightNode) -> &mut BlockLight {
@@ -263,124 +260,6 @@ impl ChunkMapLight {
     }
 }
 
-#[derive(Default)]
-struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
-
-impl Index<Point3<u8>> for ChunkLight {
-    type Output = BlockLight;
-
-    fn index(&self, coords: Point3<u8>) -> &Self::Output {
-        &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
-    }
-}
-
-impl IndexMut<Point3<u8>> for ChunkLight {
-    fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
-        &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
-    }
-}
-
-pub struct ChunkAreaLight([[[BlockLight; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
-
-impl ChunkAreaLight {
-    fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
-        Self(array::from_fn(|x| {
-            array::from_fn(|y| {
-                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - ChunkArea::PADDING as i8)))
-            })
-        }))
-    }
-
-    pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
-        let coords = coords.coords.cast();
-        BlockAreaLight::from_fn(|delta| self[coords + delta])
-    }
-}
-
-impl Index<Vector3<i8>> for ChunkAreaLight {
-    type Output = BlockLight;
-
-    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let delta = delta.map(|c| (c + ChunkArea::PADDING as i8) as usize);
-        &self.0[delta.x][delta.y][delta.z]
-    }
-}
-
-bitfield! {
-    #[derive(Clone, Copy, Default)]
-    pub struct BlockLight(u32);
-    u8, component, set_component: 3, 0, 6;
-}
-
-impl BlockLight {
-    const SKYLIGHT_RANGE: Range<usize> = 0..3;
-    const TORCHLIGHT_RANGE: Range<usize> = 3..6;
-
-    fn replace_component(&mut self, index: usize, value: u8) -> u8 {
-        let component = self.component(index);
-        self.set_component(index, value);
-        component
-    }
-}
-
-pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
-
-impl BlockAreaLight {
-    fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
-        Self(array::from_fn(|x| {
-            array::from_fn(|y| {
-                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - BlockArea::PADDING as i8)))
-            })
-        }))
-    }
-
-    pub fn corner_lights(&self, side: Side, area: BlockArea) -> EnumMap<Corner, BlockLight> {
-        let side_delta = SIDE_DELTAS[side];
-        SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
-            component_deltas
-                .into_values()
-                .chain([side_delta])
-                .filter(|delta| area.is_transparent(*delta))
-                .map(|delta| self[delta])
-                .sum::<BlockLightSum>()
-                .avg()
-        })
-    }
-}
-
-impl Index<Vector3<i8>> for BlockAreaLight {
-    type Output = BlockLight;
-
-    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let delta = delta.map(|c| (c + BlockArea::PADDING as i8) as usize);
-        &self.0[delta.x][delta.y][delta.z]
-    }
-}
-
-struct BlockLightSum {
-    sums: [u8; 6],
-    count: u8,
-}
-
-impl BlockLightSum {
-    fn avg(self) -> BlockLight {
-        let mut value = BlockLight::default();
-        for (i, sum) in self.sums.into_iter().enumerate() {
-            value.set_component(i, sum / self.count.max(1))
-        }
-        value
-    }
-}
-
-impl Sum<BlockLight> for BlockLightSum {
-    fn sum<I: Iterator<Item = BlockLight>>(iter: I) -> Self {
-        let (sums, count) = iter.fold(([0; 6], 0), |(sums, count), light| {
-            (array::from_fn(|i| sums[i] + light.component(i)), count + 1)
-        });
-        Self { sums, count }
-    }
-}
-
 struct LightNode {
     chunk_coords: Point3<i32>,
     block_coords: Point3<u8>,
@@ -389,24 +268,23 @@ struct LightNode {
 impl LightNode {
     fn new(coords: Point3<i64>) -> Self {
         Self {
-            chunk_coords: ChunkMap::chunk_coords(coords),
-            block_coords: ChunkMap::block_coords(coords),
+            chunk_coords: World::chunk_coords(coords),
+            block_coords: World::block_coords(coords),
         }
     }
 
-    fn apply_filter(&self, cells: &CellStore, index: usize, value: u8) -> u8 {
-        (value as f32 * self.filter(cells, index)).round() as u8
+    fn apply_filter(&self, chunks: &ChunkStore, index: usize, value: u8) -> u8 {
+        (value as f32 * self.filter(chunks, index)).round() as u8
     }
 
-    fn filter(&self, cells: &CellStore, index: usize) -> f32 {
-        self.block_data(cells).light_filter[index % 3]
+    fn filter(&self, chunks: &ChunkStore, index: usize) -> f32 {
+        self.block_data(chunks).light_filter[index % 3]
     }
 
-    fn block_data(&self, cells: &CellStore) -> &'static BlockData {
-        cells
+    fn block_data(&self, chunks: &ChunkStore) -> &'static BlockData {
+        chunks
             .get(self.chunk_coords)
-            .map(|cell| cell[self.block_coords])
-            .unwrap_or_default()
+            .map_or(Block::Air, |chunk| chunk[self.block_coords])
             .data()
     }
 }

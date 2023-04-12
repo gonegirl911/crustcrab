@@ -12,9 +12,9 @@ use crate::{
     },
     server::{
         game::world::{
-            block::{Face, TEX_PATHS},
-            chunk::{Chunk, ChunkData},
-            light::BlockLight,
+            block::{data::TEX_PATHS, light::BlockLight, Face},
+            chunk::Chunk,
+            ChunkData,
         },
         ServerEvent,
     },

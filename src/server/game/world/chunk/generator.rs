@@ -1,4 +1,5 @@
-use super::{block::Block, chunk::Chunk};
+use super::Chunk;
+use crate::server::game::world::block::Block;
 use nalgebra::Point3;
 
 #[derive(Default)]
