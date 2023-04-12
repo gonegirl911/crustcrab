@@ -1,7 +1,7 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        game::player::frustum::{BoundingSphere, Frustum, FrustumCheck},
+        game::player::frustum::{Frustum, FrustumCheck},
         renderer::{
             effect::PostProcessor,
             mesh::{Mesh, Vertex},
@@ -176,7 +176,7 @@ impl ChunkMeshPool {
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
         for (coords, (mesh, _)) in &self.meshes {
-            if Self::bounding_sphere(*coords).is_visible(frustum) {
+            if Chunk::bounding_sphere(*coords).is_visible(frustum) {
                 render_pass.set_push_constants(
                     wgpu::ShaderStages::VERTEX,
                     0,

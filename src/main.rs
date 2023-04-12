@@ -1,8 +1,7 @@
 mod app;
 mod client;
-mod color;
 mod server;
-mod utils;
+mod shared;
 
 fn main() -> ! {
     pollster::block_on(app::App::new()).run()

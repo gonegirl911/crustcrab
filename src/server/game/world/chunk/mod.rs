@@ -5,8 +5,15 @@ use self::light::ChunkAreaLight;
 use super::{
     action::BlockAction,
     block::{Block, BlockArea},
+    World,
 };
-use crate::{client::game::world::BlockVertex, utils};
+use crate::{
+    client::game::world::BlockVertex,
+    shared::{
+        bound::{Aabb, BoundingSphere},
+        div_ceil,
+    },
+};
 use bitvec::BitArr;
 use nalgebra::{point, vector, Point3, Vector3};
 use std::{
@@ -58,6 +65,17 @@ impl Chunk {
 
     pub fn is_not_empty(&self) -> bool {
         !self.is_empty()
+    }
+
+    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
+        Aabb::new(
+            World::coords(coords, Default::default()).cast(),
+            Vector3::from_element(Self::DIM).cast(),
+        )
+    }
+
+    pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
+        Self::bounding_box(coords).into()
     }
 
     fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> + '_ {
@@ -118,7 +136,7 @@ impl ChunkArea {
     }
 
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        let chunk_padding = utils::div_ceil(Self::PADDING, Chunk::DIM) as i32;
+        let chunk_padding = div_ceil(Self::PADDING, Chunk::DIM) as i32;
         (-chunk_padding..1 + chunk_padding).flat_map(move |dx| {
             (-chunk_padding..1 + chunk_padding).flat_map(move |dy| {
                 (-chunk_padding..1 + chunk_padding).map(move |dz| vector![dx, dy, dz])

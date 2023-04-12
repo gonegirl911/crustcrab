@@ -19,7 +19,7 @@ use crate::{
         },
         ServerEvent, ServerSettings,
     },
-    utils,
+    shared::{div_floor, magnitude_squared},
 };
 use flume::Sender;
 use nalgebra::{Point2, Point3};
@@ -226,7 +226,7 @@ impl World {
     }
 
     pub fn chunk_coords(coords: Point3<i64>) -> Point3<i32> {
-        coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
+        coords.map(|c| div_floor(c, Chunk::DIM as i64) as i32)
     }
 
     pub fn block_coords(coords: Point3<i64>) -> Point3<u8> {
@@ -246,9 +246,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.load_many(area.points());
 
-                loads.par_sort_unstable_by_key(|coords| {
-                    utils::magnitude_squared(coords - area.center)
-                });
+                loads.par_sort_unstable_by_key(|coords| magnitude_squared(coords - area.center));
 
                 self.handle(
                     &WorldEvent::BlockHoverRequested { ray: *ray },

@@ -1,3 +1,4 @@
+use crate::shared::bound::BoundingSphere;
 use nalgebra::{Point3, Vector3};
 
 pub struct Frustum {
@@ -46,11 +47,6 @@ impl Frustum {
 
 pub trait FrustumCheck {
     fn is_visible(&self, frustum: &Frustum) -> bool;
-}
-
-pub struct BoundingSphere {
-    pub center: Point3<f32>,
-    pub radius: f32,
 }
 
 impl FrustumCheck for BoundingSphere {
