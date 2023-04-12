@@ -1,5 +1,5 @@
 use super::{
-    block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
+    block::{light::BlockLight, Block, SIDE_DELTAS},
     chunk::light::{ChunkAreaLight, ChunkLight},
     {BlockAction, ChunkStore, World},
 };
@@ -12,7 +12,7 @@ pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
 
 impl ChunkMapLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
-        let coords = World::coords(coords, Point3::origin());
+        let coords = World::coords(coords, Default::default());
         ChunkAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
@@ -203,7 +203,7 @@ impl ChunkMapLight {
     ) -> Option<u8> {
         let block_light = self.block_light_mut(coords);
         let component = block_light.component(index);
-        let value = node.apply_filter(chunks, index, value);
+        let value = Self::apply_filter(chunks, coords, index, value);
         (component < value).then(|| {
             block_light.set_component(index, value);
             value
@@ -219,7 +219,7 @@ impl ChunkMapLight {
     ) -> Result<u8, u8> {
         let block_light = self.block_light_mut(coords);
         let component = block_light.component(index);
-        if component != 0 && component == node.apply_filter(chunks, index, value) {
+        if component != 0 && component == Self::apply_filter(chunks, coords, index, value) {
             block_light.set_component(index, 0);
             Ok(value)
         } else {
@@ -249,33 +249,12 @@ impl ChunkMapLight {
             .into_values()
             .map(move |delta| coords + delta.cast())
     }
-}
 
-struct LightNode {
-    chunk_coords: Point3<i32>,
-    block_coords: Point3<u8>,
-}
-
-impl LightNode {
-    fn new(coords: Point3<i64>) -> Self {
-        Self {
-            chunk_coords: World::chunk_coords(coords),
-            block_coords: World::block_coords(coords),
-        }
+    fn apply_filter(chunks: &ChunkStore, coords: Point3<i64>, index: usize, value: u8) -> u8 {
+        (value as f32 * Self::filter(chunks, coords, index)).round() as u8
     }
 
-    fn apply_filter(&self, chunks: &ChunkStore, index: usize, value: u8) -> u8 {
-        (value as f32 * self.filter(chunks, index)).round() as u8
-    }
-
-    fn filter(&self, chunks: &ChunkStore, index: usize) -> f32 {
-        self.block_data(chunks).light_filter[index % 3]
-    }
-
-    fn block_data(&self, chunks: &ChunkStore) -> &'static BlockData {
-        chunks
-            .get(self.chunk_coords)
-            .map_or(Block::Air, |chunk| chunk[self.block_coords])
-            .data()
+    fn filter(chunks: &ChunkStore, coords: Point3<i64>, index: usize) -> f32 {
+        chunks.block(coords).data().light_filter[index % 3]
     }
 }

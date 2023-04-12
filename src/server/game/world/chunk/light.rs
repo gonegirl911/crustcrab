@@ -44,7 +44,7 @@ impl Index<Vector3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let delta = delta.map(|c| (c + ChunkArea::PADDING as i8) as usize);
-        &self.0[delta.x][delta.y][delta.z]
+        let idx = delta.map(|c| (c + ChunkArea::PADDING as i8) as usize);
+        &self.0[idx.x][idx.y][idx.z]
     }
 }

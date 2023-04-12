@@ -142,7 +142,7 @@ impl ChunkArea {
     }
 
     unsafe fn index_unchecked(delta: Vector3<i8>) -> usize {
-        let delta = delta.map(|c| (c + Self::PADDING as i8) as usize);
-        delta.x * Self::DIM.pow(2) + delta.y * Self::DIM + delta.z
+        let idx = delta.map(|c| (c + Self::PADDING as i8) as usize);
+        idx.x * Self::DIM.pow(2) + idx.y * Self::DIM + idx.z
     }
 }

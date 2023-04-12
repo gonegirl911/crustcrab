@@ -226,15 +226,15 @@ impl World {
     }
 
     pub fn chunk_coords(coords: Point3<i64>) -> Point3<i32> {
-        coords.map(|c| utils::div_floor(c, Chunk::DIM as _) as _)
+        coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
     }
 
     pub fn block_coords(coords: Point3<i64>) -> Point3<u8> {
-        coords.map(|c| c.rem_euclid(Chunk::DIM as _) as _)
+        coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
 
     pub fn coords(chunk_coords: Point3<i32>, block_coords: Point3<u8>) -> Point3<i64> {
-        chunk_coords.cast() * Chunk::DIM as _ + block_coords.coords.cast()
+        chunk_coords.cast() * Chunk::DIM as i64 + block_coords.coords.cast()
     }
 }
 
@@ -275,11 +275,7 @@ impl EventHandler<WorldEvent> for World {
                 let hovered_block =
                     ray.cast(self.reach.clone())
                         .find(|BlockIntersection { coords, .. }| {
-                            let chunk_coords = Self::chunk_coords(*coords);
-                            let block_coords = Self::block_coords(*coords);
-                            self.chunks
-                                .get(chunk_coords)
-                                .map_or(false, |cell| cell[block_coords] != Block::Air)
+                            self.chunks.block(*coords) != Block::Air
                         });
 
                 if self.hovered_block != hovered_block {
@@ -314,15 +310,15 @@ pub struct ChunkStore {
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let coords = World::coords(coords, Default::default());
-        ChunkArea::from_fn(|delta| {
-            let coords = coords + delta.cast();
-            self.get(World::chunk_coords(coords)).map_or(false, |cell| {
-                cell[World::block_coords(coords)].data().is_opaque()
-            })
-        })
+        ChunkArea::from_fn(|delta| self.block(coords + delta.cast()).data().is_opaque())
     }
 
-    pub fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
+    pub fn block(&self, coords: Point3<i64>) -> Block {
+        self.get(World::chunk_coords(coords))
+            .map_or(Block::Air, |chunk| chunk[World::block_coords(coords)])
+    }
+
+    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         self.cells.get(&coords).map(Deref::deref)
     }
 

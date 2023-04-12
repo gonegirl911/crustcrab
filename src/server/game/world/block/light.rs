@@ -31,11 +31,7 @@ impl BlockAreaLight {
     pub fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| {
-                array::from_fn(|z| {
-                    let delta = vector![x, y, z];
-                    let padding = Vector3::from_element(BlockArea::PADDING);
-                    f(delta.cast() - padding.cast())
-                })
+                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - BlockArea::PADDING as i8)))
             })
         }))
     }
@@ -58,9 +54,8 @@ impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let padding = Vector3::from_element(BlockArea::PADDING);
-        let delta = delta + Vector3::from_element(BlockArea::PADDING).cast();
-        &self.0[delta.x as usize][delta.y as usize][delta.z as usize]
+        let idx = delta.map(|c| (c + BlockArea::PADDING as i8) as usize);
+        &self.0[idx.x][idx.y][idx.z]
     }
 }
 

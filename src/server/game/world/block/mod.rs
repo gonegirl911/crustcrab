@@ -174,8 +174,8 @@ impl BlockArea {
     }
 
     unsafe fn index_unchecked(delta: Vector3<i8>) -> usize {
-        let coords = delta.map(|c| (c + Self::PADDING as i8) as usize);
-        coords.x * Self::DIM.pow(2) + coords.y * Self::DIM + coords.z
+        let idx = delta.map(|c| (c + Self::PADDING as i8) as usize);
+        idx.x * Self::DIM.pow(2) + idx.y * Self::DIM + idx.z
     }
 }
 
