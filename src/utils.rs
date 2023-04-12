@@ -1,6 +1,3 @@
-pub mod bound;
-pub mod color;
-
 use nalgebra::SVector;
 
 pub fn magnitude_squared<const D: usize>(vector: SVector<i32, D>) -> u32 {

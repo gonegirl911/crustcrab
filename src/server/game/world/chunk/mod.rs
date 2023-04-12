@@ -9,10 +9,8 @@ use super::{
 };
 use crate::{
     client::game::world::BlockVertex,
-    shared::{
-        bound::{Aabb, BoundingSphere},
-        div_ceil,
-    },
+    primitives::bound::{Aabb, BoundingSphere},
+    utils,
 };
 use bitvec::BitArr;
 use nalgebra::{point, vector, Point3, Vector3};
@@ -136,7 +134,7 @@ impl ChunkArea {
     }
 
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        let chunk_padding = div_ceil(Self::PADDING, Chunk::DIM) as i32;
+        let chunk_padding = utils::div_ceil(Self::PADDING, Chunk::DIM) as i32;
         (-chunk_padding..1 + chunk_padding).flat_map(move |dx| {
             (-chunk_padding..1 + chunk_padding).flat_map(move |dy| {
                 (-chunk_padding..1 + chunk_padding).map(move |dz| vector![dx, dy, dz])

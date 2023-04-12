@@ -3,11 +3,11 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{uniform::Uniform, Renderer},
     },
+    primitives::color::{Float3, Rgb},
     server::{
         game::clock::{Stage, Time},
         ServerEvent,
     },
-    shared::color::{Float3, Rgb},
 };
 use bytemuck::{Pod, Zeroable};
 
