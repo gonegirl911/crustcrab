@@ -9,8 +9,10 @@ use super::{
 };
 use crate::{
     client::game::world::BlockVertex,
-    primitives::bound::{Aabb, BoundingSphere},
-    utils,
+    shared::{
+        bound::{Aabb, BoundingSphere},
+        utils,
+    },
 };
 use bitvec::BitArr;
 use nalgebra::{point, vector, Point3, Vector3};

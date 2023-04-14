@@ -1,4 +1,4 @@
-use crate::primitives::bound::BoundingSphere;
+use crate::shared::bound::BoundingSphere;
 use nalgebra::{Point3, Vector3};
 
 pub struct Frustum {

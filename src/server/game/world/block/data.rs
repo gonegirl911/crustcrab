@@ -1,5 +1,5 @@
 use super::{Block, Side};
-use crate::primitives::color::Rgb;
+use crate::shared::color::Rgb;
 use enum_map::EnumMap;
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;

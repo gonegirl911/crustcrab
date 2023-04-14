@@ -3,8 +3,8 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{effect::PostProcessor, program::Program, uniform::Uniform, Renderer},
     },
-    primitives::color::Rgb,
     server::{game::clock::Time, ServerEvent},
+    shared::color::Rgb,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;

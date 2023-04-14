@@ -19,7 +19,7 @@ use crate::{
         },
         ServerEvent, ServerSettings,
     },
-    utils,
+    shared::utils,
 };
 use flume::Sender;
 use nalgebra::{Point2, Point3};
@@ -95,6 +95,7 @@ impl World {
         server_tx: Sender<ServerEvent>,
         ray: Ray,
     ) {
+        todo!()
     }
 
     fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
@@ -344,14 +345,12 @@ impl ChunkStore {
         }
     }
 
-    fn apply(&mut self, coords: Point3<i64>, action: &BlockAction) {}
-
-    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) -> Option<ChunkCell> {
+    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) {
+        self.cells.insert(coords, cell);
         self.y_ranges
             .entry(coords.xz())
             .and_modify(|range| *range = range.start.min(coords.y)..range.end.max(coords.y + 1))
             .or_insert(coords.y..coords.y + 1);
-        self.cells.insert(coords, cell)
     }
 
     fn remove_from_ranges(&mut self, coords: Point3<i32>) {

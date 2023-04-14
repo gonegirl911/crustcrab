@@ -5,7 +5,7 @@ use super::world::chunk::Chunk;
 use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},
-    utils,
+    shared::utils,
 };
 use nalgebra::{vector, Point3};
 

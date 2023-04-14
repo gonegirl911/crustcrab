@@ -14,11 +14,11 @@ impl ActionStore {
             .map(|(coords, action)| (*coords, action))
     }
 
-    pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) -> Option<BlockAction> {
+    pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
         self.0
             .entry(World::chunk_coords(coords))
             .or_default()
-            .insert(World::block_coords(coords), action)
+            .insert(World::block_coords(coords), action);
     }
 }
 
