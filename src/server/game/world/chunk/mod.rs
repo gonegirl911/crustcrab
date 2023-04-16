@@ -55,12 +55,16 @@ impl Chunk {
         self[coords].apply(action)
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         let expected = unsafe { mem::transmute([Block::Air; Self::DIM]) };
         self.0
             .iter()
             .flatten()
             .all(|blocks| *unsafe { mem::transmute::<_, &u128>(blocks) } == expected)
+    }
+
+    pub fn is_not_empty(&self) -> bool {
+        !self.is_empty()
     }
 
     pub fn bounding_box(coords: Point3<i32>) -> Aabb {

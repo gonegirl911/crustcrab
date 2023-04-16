@@ -13,8 +13,12 @@ pub struct BlockData {
 }
 
 impl BlockData {
-    pub fn is_glowing(&self) -> bool {
+    fn is_glowing(&self) -> bool {
         self.luminance != Rgb::splat(0)
+    }
+
+    pub fn is_not_glowing(&self) -> bool {
+        !self.is_glowing()
     }
 
     fn is_transparent(&self) -> bool {

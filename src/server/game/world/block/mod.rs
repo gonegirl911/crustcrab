@@ -83,7 +83,7 @@ impl Block {
     }
 
     fn corner_aos(data: &BlockData, side: Side, area: BlockArea) -> EnumMap<Corner, u8> {
-        if !data.is_glowing() {
+        if data.is_not_glowing() {
             enum_map! { corner => Self::ao(side, corner, area) }
         } else {
             enum_map! { _ => 3 }
