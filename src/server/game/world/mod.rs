@@ -223,19 +223,33 @@ impl World {
         block_updates: B,
         include_outline: bool,
     ) -> FxHashSet<Point3<i32>> {
-        let block_area = block_updates
-            .into_iter()
-            .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()));
-
-        let chunk_area = points
-            .iter()
-            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()));
-
-        block_area
+        Self::block_area_points(block_updates)
             .map(Self::chunk_coords)
-            .chain(include_outline.then_some(chunk_area).into_iter().flatten())
+            .chain(
+                include_outline
+                    .then_some(Self::chunk_area_points(points))
+                    .into_iter()
+                    .flatten(),
+            )
             .filter(|coords| !points.contains(coords))
             .collect()
+    }
+
+    fn chunk_area_points(
+        points: &FxHashSet<Point3<i32>>,
+    ) -> impl Iterator<Item = Point3<i32>> + '_ {
+        points
+            .iter()
+            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
+    }
+
+    fn block_area_points<I>(block_updates: I) -> impl Iterator<Item = Point3<i64>>
+    where
+        I: IntoIterator<Item = Point3<i64>>,
+    {
+        block_updates
+            .into_iter()
+            .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
     }
 
     pub fn chunk_coords(coords: Point3<i64>) -> Point3<i32> {
