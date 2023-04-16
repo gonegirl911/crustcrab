@@ -58,6 +58,10 @@ impl Crosshair {
         );
         render_pass.draw(0..6, 0..1);
     }
+
+    fn size(screen_height: u32) -> f32 {
+        (screen_height as f32 * 0.065).max(27.0)
+    }
 }
 
 impl EventHandler for Crosshair {
@@ -77,7 +81,7 @@ impl EventHandler for Crosshair {
                 self.is_resized = true;
             }
             Event::RedrawRequested(_) if self.is_resized => {
-                let size = (config.height as f32 * 0.065).max(27.0);
+                let size = Self::size(config.height);
                 self.uniform.write(
                     renderer,
                     &CrosshairUniformData::new(Matrix4::new_nonuniform_scaling(&vector![

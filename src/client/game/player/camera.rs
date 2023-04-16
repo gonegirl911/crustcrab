@@ -167,28 +167,20 @@ impl Controller {
     }
 
     fn apply_rotation(&mut self, view: &mut View) {
-        const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
+        const BOUND_Y: f32 = FRAC_PI_2 - 0.0001;
 
-        let dr = self.sensitivity;
-
-        view.yaw = (view.yaw - self.dx * dr) % TAU;
-        view.pitch = (view.pitch - self.dy * dr).clamp(-SAFE_FRAC_PI_2, SAFE_FRAC_PI_2);
-
-        let (sin_yaw, cos_yaw) = view.yaw.sin_cos();
-        let (sin_pitch, cos_pitch) = view.pitch.sin_cos();
-
-        view.forward = vector![cos_yaw * cos_pitch, sin_pitch, sin_yaw * cos_pitch];
+        view.yaw = (view.yaw - self.dx * self.sensitivity) % TAU;
+        view.pitch = (view.pitch - self.dy * self.sensitivity).clamp(-BOUND_Y, BOUND_Y);
+        view.forward = Self::forward(view.yaw, view.pitch);
         view.right = Player::WORLD_UP.cross(&view.forward).normalize();
         view.up = view.forward.cross(&view.right);
     }
 
     fn apply_movement(&mut self, view: &mut View, dt: Duration) {
-        let dp = self.speed * dt.as_secs_f32();
+        let mut dir = Vector3::zeros();
         let right = view.right;
         let up = Player::WORLD_UP;
         let forward = right.cross(&up);
-
-        let mut dir = Vector3::zeros();
 
         if self.relevant_keys.contains(Keys::W) {
             dir += forward;
@@ -208,7 +200,15 @@ impl Controller {
             dir -= up;
         }
 
-        view.origin += dir.normalize() * dp;
+        view.origin += dir.normalize() * self.speed * dt.as_secs_f32();
+    }
+
+    fn forward(yaw: f32, pitch: f32) -> Vector3<f32> {
+        vector![
+            yaw.cos() * pitch.cos(),
+            pitch.sin(),
+            yaw.sin() * pitch.cos()
+        ]
     }
 }
 
