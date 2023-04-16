@@ -366,6 +366,7 @@ impl ChunkStore {
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
         let chunk_coords = World::chunk_coords(coords);
         let block_coords = World::block_coords(coords);
+
         if let Some(cell) = self.cells.remove(&chunk_coords) {
             match cell.apply(block_coords, action) {
                 Ok(Some(cell)) => {
@@ -391,6 +392,10 @@ impl ChunkStore {
 
     fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) {
         self.cells.insert(coords, cell);
+        self.insert_into_ranges(coords);
+    }
+
+    fn insert_into_ranges(&mut self, coords: Point3<i32>) {
         self.y_ranges
             .entry(coords.xz())
             .and_modify(|range| *range = range.start.min(coords.y)..range.end.max(coords.y + 1))
