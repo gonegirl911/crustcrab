@@ -380,7 +380,6 @@ impl ChunkStore {
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
         let chunk_coords = World::chunk_coords(coords);
         let block_coords = World::block_coords(coords);
-
         if let Some(cell) = self.cells.remove(&chunk_coords) {
             match cell.apply(block_coords, action) {
                 Ok(Some(cell)) => {
