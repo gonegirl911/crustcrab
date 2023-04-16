@@ -17,11 +17,7 @@ impl BlockData {
         self.luminance != Rgb::splat(0)
     }
 
-    pub fn is_not_glowing(&self) -> bool {
-        !self.is_glowing()
-    }
-
-    pub fn is_transparent(&self) -> bool {
+    fn is_transparent(&self) -> bool {
         self.light_filter != Rgb::splat(0.0)
     }
 
