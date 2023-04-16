@@ -95,7 +95,18 @@ impl World {
         server_tx: Sender<ServerEvent>,
         ray: Ray,
     ) {
-        todo!()
+        let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
+        let points = [load, unload].into_iter().flatten().collect();
+        let light_updates = self.light.apply(&self.chunks, coords, &action);
+        let updates = Self::updates(&points, light_updates.into_iter().chain([coords]), false);
+
+        self.actions.insert(coords, action);
+
+        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
+
+        self.send_unloads(unload, server_tx.clone());
+        self.send_loads(load, server_tx.clone(), true);
+        self.send_updates(updates, server_tx, true);
     }
 
     fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
@@ -207,22 +218,23 @@ impl World {
         }
     }
 
-    fn outline(points: &FxHashSet<Point3<i32>>) -> FxHashSet<Point3<i32>> {
-        points
-            .iter()
-            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
-            .filter(|coords| !points.contains(coords))
-            .collect()
-    }
-
-    fn chunk_updates<I>(block_updates: I) -> FxHashSet<Point3<i32>>
-    where
-        I: IntoIterator<Item = Point3<i64>>,
-    {
-        block_updates
+    fn updates<B: IntoIterator<Item = Point3<i64>>>(
+        points: &FxHashSet<Point3<i32>>,
+        block_updates: B,
+        include_outline: bool,
+    ) -> FxHashSet<Point3<i32>> {
+        let block_area = block_updates
             .into_iter()
-            .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
+            .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()));
+
+        let chunk_area = points
+            .iter()
+            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()));
+
+        block_area
             .map(Self::chunk_coords)
+            .chain(include_outline.then_some(chunk_area).into_iter().flatten())
+            .filter(|coords| !points.contains(coords))
             .collect()
     }
 
@@ -261,7 +273,8 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.load_many(curr.exclusive_points(prev));
-                let outline = Self::outline(&loads.iter().chain(&unloads).copied().collect());
+                let points = loads.iter().chain(&unloads).copied().collect();
+                let updates = Self::updates(&points, [], true);
 
                 self.handle(
                     &WorldEvent::BlockHoverRequested { ray: *ray },
@@ -270,7 +283,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.send_unloads(unloads, server_tx.clone());
                 self.par_send_loads(loads, server_tx.clone(), false);
-                self.par_send_updates(outline, server_tx, false);
+                self.par_send_updates(updates, server_tx, false);
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hovered_block =
@@ -342,6 +355,38 @@ impl ChunkStore {
             true
         } else {
             false
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn apply(
+        &mut self,
+        coords: Point3<i64>,
+        action: &BlockAction,
+    ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
+        let chunk_coords = World::chunk_coords(coords);
+        let block_coords = World::block_coords(coords);
+
+        if let Some(cell) = self.cells.remove(&chunk_coords) {
+            match cell.apply(block_coords, action) {
+                Ok(Some(cell)) => {
+                    self.cells.insert(chunk_coords, cell);
+                    Ok((None, None))
+                }
+                Ok(None) => {
+                    self.remove_from_ranges(chunk_coords);
+                    Ok((None, Some(chunk_coords)))
+                }
+                Err(cell) => {
+                    self.cells.insert(chunk_coords, cell);
+                    Err(())
+                }
+            }
+        } else if let Ok(Some(cell)) = ChunkCell::default_with_action(block_coords, action) {
+            self.insert(chunk_coords, cell);
+            Ok((Some(chunk_coords), None))
+        } else {
+            Err(())
         }
     }
 

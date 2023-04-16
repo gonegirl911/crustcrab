@@ -5,7 +5,13 @@ use super::{
 };
 use nalgebra::Point3;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cmp::Ordering, collections::VecDeque};
+use std::{
+    cmp::Ordering,
+    collections::{
+        hash_map::{Entry, VacantEntry},
+        VecDeque,
+    },
+};
 
 #[derive(Default)]
 pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
@@ -118,6 +124,20 @@ impl ChunkMapLight {
         }
     }
 
+    fn replace_component(&mut self, coords: Point3<i64>, index: usize, value: u8) -> u8 {
+        let block_light = self.block_light_mut(coords);
+        let component = block_light.get().component(index);
+        if component != value {
+            block_light.into_mut().replace_component(index, value)
+        } else {
+            component
+        }
+    }
+
+    fn take_component(&mut self, coords: Point3<i64>, index: usize) -> u8 {
+        self.replace_component(coords, index, 0)
+    }
+
     fn spread_component(
         &mut self,
         chunks: &ChunkStore,
@@ -182,18 +202,6 @@ impl ChunkMapLight {
             .collect()
     }
 
-    fn replace_component(&mut self, coords: Point3<i64>, index: usize, value: u8) -> u8 {
-        self.block_light_mut(coords).replace_component(index, value)
-    }
-
-    fn take_component(&mut self, coords: Point3<i64>, index: usize) -> u8 {
-        self.replace_component(coords, index, 0)
-    }
-
-    fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
-        self.block_light(coords).component(index)
-    }
-
     fn set_component(
         &mut self,
         chunks: &ChunkStore,
@@ -202,10 +210,10 @@ impl ChunkMapLight {
         value: u8,
     ) -> Option<u8> {
         let block_light = self.block_light_mut(coords);
-        let component = block_light.component(index);
+        let component = block_light.get().component(index);
         let value = Self::apply_filter(chunks, coords, index, value);
         (component < value).then(|| {
-            block_light.set_component(index, value);
+            block_light.into_mut().set_component(index, value);
             value
         })
     }
@@ -218,13 +226,17 @@ impl ChunkMapLight {
         value: u8,
     ) -> Result<u8, u8> {
         let block_light = self.block_light_mut(coords);
-        let component = block_light.component(index);
+        let component = block_light.get().component(index);
         if component != 0 && component == Self::apply_filter(chunks, coords, index, value) {
-            block_light.set_component(index, 0);
+            block_light.into_mut().set_component(index, 0);
             Ok(value)
         } else {
             Err(component)
         }
+    }
+
+    fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
+        self.block_light(coords).component(index)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
@@ -233,8 +245,11 @@ impl ChunkMapLight {
             .map_or_else(Default::default, |light| light[World::block_coords(coords)])
     }
 
-    fn block_light_mut(&mut self, coords: Point3<i64>) -> &mut BlockLight {
-        &mut self.0.entry(World::chunk_coords(coords)).or_default()[World::block_coords(coords)]
+    fn block_light_mut(&mut self, coords: Point3<i64>) -> BlockLightRefMut<'_> {
+        BlockLightRefMut::new(
+            self.0.entry(World::chunk_coords(coords)),
+            World::block_coords(coords),
+        )
     }
 
     fn unvisited_neighbors(
@@ -256,5 +271,37 @@ impl ChunkMapLight {
 
     fn filter(chunks: &ChunkStore, coords: Point3<i64>, index: usize) -> f32 {
         chunks.block(coords).data().light_filter[index % 3]
+    }
+}
+
+enum BlockLightRefMut<'a> {
+    Occupied(&'a mut BlockLight),
+    Vacant {
+        entry: VacantEntry<'a, Point3<i32>, ChunkLight>,
+        coords: Point3<u8>,
+    },
+}
+
+impl<'a> BlockLightRefMut<'a> {
+    fn new(entry: Entry<'a, Point3<i32>, ChunkLight>, coords: Point3<u8>) -> Self {
+        match entry {
+            Entry::Occupied(entry) => Self::Occupied(&mut entry.into_mut()[coords]),
+            Entry::Vacant(entry) => Self::Vacant { entry, coords },
+        }
+    }
+
+    fn get(&self) -> BlockLight {
+        if let Self::Occupied(block_light) = self {
+            **block_light
+        } else {
+            Default::default()
+        }
+    }
+
+    fn into_mut(self) -> &'a mut BlockLight {
+        match self {
+            Self::Occupied(block_light) => block_light,
+            Self::Vacant { entry, coords } => &mut entry.insert(Default::default())[coords],
+        }
     }
 }
