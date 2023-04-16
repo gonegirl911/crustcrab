@@ -227,7 +227,7 @@ impl World {
             .map(Self::chunk_coords)
             .chain(
                 include_outline
-                    .then_some(Self::chunk_area_points(points))
+                    .then_some(Self::chunk_area_points(points.iter().copied()))
                     .into_iter()
                     .flatten(),
             )
@@ -235,11 +235,12 @@ impl World {
             .collect()
     }
 
-    fn chunk_area_points(
-        points: &FxHashSet<Point3<i32>>,
-    ) -> impl Iterator<Item = Point3<i32>> + '_ {
+    fn chunk_area_points<I>(points: I) -> impl Iterator<Item = Point3<i32>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
         points
-            .iter()
+            .into_iter()
             .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
     }
 
