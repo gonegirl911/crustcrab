@@ -96,7 +96,7 @@ impl World {
         ray: Ray,
     ) {
         let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
-        let points = [load, unload].into_iter().flatten().collect();
+        let points = load.into_iter().chain(unload).collect();
         let light_updates = self.light.apply(&self.chunks, coords, &action);
         let updates = Self::updates(&points, light_updates.into_iter().chain([coords]), false);
 
