@@ -39,6 +39,17 @@ impl Game {
             world_tx,
         }
     }
+
+    fn send_world_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
+    where
+        I: IntoIterator<Item = WorldEvent>,
+    {
+        for event in events {
+            self.world_tx
+                .send((event, server_tx.clone()))
+                .unwrap_or_else(|_| unreachable!());
+        }
+    }
 }
 
 impl EventHandler<Event> for Game {
@@ -47,10 +58,6 @@ impl EventHandler<Event> for Game {
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, ());
         self.clock.handle(event, server_tx.clone());
-        if let Some(event) = WorldEvent::new(event, &self.player) {
-            self.world_tx
-                .send((event, server_tx))
-                .unwrap_or_else(|_| unreachable!());
-        }
+        self.send_world_events(WorldEvent::new(event, &self.player), server_tx);
     }
 }

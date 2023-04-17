@@ -49,7 +49,6 @@ impl EventLoop {
                 Event::MainEventsCleared => dt = stopwatch.lap(),
                 _ => {}
             }
-
             handler.handle(&event, (control_flow, self.client_tx.clone(), dt));
         })
     }
