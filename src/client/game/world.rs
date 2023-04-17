@@ -234,7 +234,7 @@ impl EventHandler for ChunkMeshPool {
                             self.meshes
                                 .entry(coords)
                                 .and_modify(|(mesh, last_updated_at)| {
-                                    if updated_at > *last_updated_at {
+                                    if *last_updated_at < updated_at {
                                         *mesh = Mesh::new(renderer, &vertices);
                                         *last_updated_at = updated_at;
                                     }
