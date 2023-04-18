@@ -448,7 +448,7 @@ pub struct ChunkCell(Box<Chunk>);
 
 impl ChunkCell {
     fn new(chunk: Chunk) -> Option<Self> {
-        chunk.is_not_empty().then(|| Self(Box::new(chunk)))
+        (!chunk.is_empty()).then(|| Self(Box::new(chunk)))
     }
 
     fn default_with_action(coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, ()> {
@@ -468,7 +468,7 @@ impl ChunkCell {
 
     fn apply(mut self, coords: Point3<u8>, action: &BlockAction) -> Result<Option<Self>, Self> {
         if self.0.apply(coords, action) {
-            Ok(self.0.is_not_empty().then_some(self))
+            Ok((!self.0.is_empty()).then_some(self))
         } else {
             Err(self)
         }
