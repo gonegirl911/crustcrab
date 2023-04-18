@@ -45,9 +45,9 @@ struct RawBlockData {
     #[serde(default)]
     side_tex_paths: Option<EnumMap<Side, Arc<String>>>,
     #[serde(default)]
-    pub luminance: Rgb<u8>,
+    luminance: Rgb<u8>,
     #[serde(default)]
-    pub light_filter: Rgb<f32>,
+    light_filter: Rgb<f32>,
 }
 
 impl RawBlockData {
