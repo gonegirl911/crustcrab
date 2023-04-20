@@ -3,10 +3,7 @@ use crate::client::renderer::{
     Renderer,
 };
 use image::{io::Reader as ImageReader, RgbaImage};
-use std::{
-    num::{NonZeroU32, NonZeroU8},
-    path::Path,
-};
+use std::{num::NonZeroU32, path::Path};
 
 pub struct ImageTexture {
     bind_group_layout: wgpu::BindGroupLayout,
@@ -19,10 +16,10 @@ impl ImageTexture {
         path: P,
         is_srgb: bool,
         is_pixelated: bool,
-        mipmap_levels: u32,
+        mip_level_count: u32,
     ) -> Self {
-        let view = Self::create_view(renderer, path, is_srgb, mipmap_levels);
-        let sampler = Self::create_sampler(renderer, is_pixelated, mipmap_levels);
+        let view = Self::create_view(renderer, path, is_srgb, mip_level_count);
+        let sampler = Self::create_sampler(renderer, is_pixelated, mip_level_count);
         let bind_group_layout = Self::create_bind_group_layout(renderer, is_pixelated, None);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -61,7 +58,7 @@ impl ImageTexture {
         }: &Renderer,
         path: P,
         is_srgb: bool,
-        mipmap_levels: u32,
+        mip_level_count: u32,
     ) -> wgpu::TextureView {
         let image = Self::load_rgba(path);
         let (width, height) = image.dimensions();
@@ -73,10 +70,10 @@ impl ImageTexture {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size,
-            mip_level_count: mipmap_levels,
+            mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: if is_srgb && config.format.describe().srgb {
+            format: if is_srgb && config.format.is_srgb() {
                 wgpu::TextureFormat::Rgba8UnormSrgb
             } else {
                 wgpu::TextureFormat::Rgba8Unorm
@@ -97,14 +94,14 @@ impl ImageTexture {
             &image,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: NonZeroU32::new(width * 4),
-                rows_per_image: NonZeroU32::new(height),
+                bytes_per_row: Some(width * 4),
+                rows_per_image: Some(height),
             },
             size,
         );
 
-        if mipmap_levels > 1 {
-            Self::gen_mipmaps(renderer, &texture, mipmap_levels);
+        if mip_level_count > 1 {
+            Self::gen_mipmaps(renderer, &texture, mip_level_count);
         }
 
         texture.create_view(&Default::default())
@@ -113,7 +110,7 @@ impl ImageTexture {
     fn create_sampler(
         Renderer { device, .. }: &Renderer,
         is_pixelated: bool,
-        mipmap_levels: u32,
+        mip_level_count: u32,
     ) -> wgpu::Sampler {
         device.create_sampler(&wgpu::SamplerDescriptor {
             mag_filter: if is_pixelated {
@@ -121,12 +118,12 @@ impl ImageTexture {
             } else {
                 wgpu::FilterMode::Linear
             },
-            mipmap_filter: wgpu::FilterMode::Linear,
-            anisotropy_clamp: if mipmap_levels > 1 {
-                NonZeroU8::new(16)
+            mipmap_filter: if mip_level_count > 1 {
+                wgpu::FilterMode::Linear
             } else {
-                None
+                wgpu::FilterMode::Nearest
             },
+            anisotropy_clamp: if mip_level_count > 1 { 16 } else { 1 },
             ..Default::default()
         })
     }
@@ -202,7 +199,7 @@ impl ImageTexture {
             .map(|level| {
                 texture.create_view(&wgpu::TextureViewDescriptor {
                     base_mip_level: level,
-                    mip_level_count: NonZeroU32::new(1),
+                    mip_level_count: Some(1),
                     ..Default::default()
                 })
             })
@@ -263,10 +260,10 @@ impl ImageTextureArray {
         paths: impl IntoIterator<Item = impl AsRef<Path>>,
         is_srgb: bool,
         is_pixelated: bool,
-        mipmap_levels: u32,
+        mip_level_count: u32,
     ) -> Self {
-        let views = Self::create_views(renderer, paths, is_srgb, mipmap_levels);
-        let sampler = ImageTexture::create_sampler(renderer, is_pixelated, mipmap_levels);
+        let views = Self::create_views(renderer, paths, is_srgb, mip_level_count);
+        let sampler = ImageTexture::create_sampler(renderer, is_pixelated, mip_level_count);
         let bind_group_layout = ImageTexture::create_bind_group_layout(
             renderer,
             is_pixelated,
@@ -306,11 +303,11 @@ impl ImageTextureArray {
         renderer: &Renderer,
         paths: impl IntoIterator<Item = impl AsRef<Path>>,
         is_srgb: bool,
-        mipmap_levels: u32,
+        mip_level_count: u32,
     ) -> Vec<wgpu::TextureView> {
         paths
             .into_iter()
-            .map(|path| ImageTexture::create_view(renderer, path, is_srgb, mipmap_levels))
+            .map(|path| ImageTexture::create_view(renderer, path, is_srgb, mip_level_count))
             .collect::<Vec<_>>()
     }
 }
