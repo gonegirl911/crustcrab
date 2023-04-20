@@ -82,7 +82,7 @@ impl ChunkMapLight {
         chunks: &ChunkStore,
         coords: Point3<i64>,
     ) -> FxHashSet<Point3<i64>> {
-        Default::default()
+        todo!()
     }
 
     fn destroy_torchlight(
@@ -120,7 +120,7 @@ impl ChunkMapLight {
         if component != 0 {
             self.unspread_component(chunks, coords, index, component)
         } else {
-            self.spread_neighbors(chunks, coords, index)
+            self.fill_component(chunks, coords, index)
         }
     }
 
@@ -187,19 +187,20 @@ impl ChunkMapLight {
             .collect()
     }
 
-    fn spread_neighbors(
+    fn fill_component(
         &mut self,
         chunks: &ChunkStore,
         coords: Point3<i64>,
         index: usize,
     ) -> FxHashSet<Point3<i64>> {
-        Self::neighbors(coords)
-            .filter_map(|coords| {
-                let component = self.component(coords, index);
-                (component != 0).then(|| self.spread_component(chunks, coords, index, component))
-            })
-            .flatten()
-            .collect()
+        let component = self.brightest_neighbor(coords, index);
+        if component > 1 {
+            let value = component - 1;
+            self.overwrite_component(coords, index, value);
+            self.spread_component(chunks, coords, index, value)
+        } else {
+            Default::default()
+        }
     }
 
     fn set_component(
@@ -233,6 +234,19 @@ impl ChunkMapLight {
         } else {
             Err(component)
         }
+    }
+
+    fn brightest_neighbor(&self, coords: Point3<i64>, index: usize) -> u8 {
+        Self::neighbors(coords)
+            .map(|coords| self.component(coords, index))
+            .max()
+            .unwrap_or_else(|| unreachable!())
+    }
+
+    fn overwrite_component(&mut self, coords: Point3<i64>, index: usize, value: u8) {
+        self.block_light_mut(coords)
+            .into_mut()
+            .set_component(index, value)
     }
 
     fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
