@@ -101,7 +101,7 @@ impl ImageTexture {
         );
 
         if mip_level_count > 1 {
-            Self::gen_mipmaps(renderer, &texture, mip_level_count);
+            Self::gen_mip_levels(renderer, &texture, mip_level_count);
         }
 
         texture.create_view(&Default::default())
@@ -162,10 +162,10 @@ impl ImageTexture {
         })
     }
 
-    fn gen_mipmaps(
+    fn gen_mip_levels(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
-        levels: u32,
+        count: u32,
     ) {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             min_filter: wgpu::FilterMode::Linear,
@@ -195,7 +195,7 @@ impl ImageTexture {
         let blit = Blit::new(renderer, &bind_group_layout, texture.format());
         let mut encoder = device.create_command_encoder(&Default::default());
 
-        (0..levels)
+        (0..count)
             .map(|level| {
                 texture.create_view(&wgpu::TextureViewDescriptor {
                     base_mip_level: level,
