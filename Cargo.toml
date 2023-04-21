@@ -29,5 +29,5 @@ rustc-hash = "1.1.0"
 serde = { version = "1.0.160", features = ["derive", "rc"] }
 spin_sleep = "1.1.1"
 toml = "0.7.3"
-wgpu = "0.16.0"
+wgpu = "0.15.1"
 winit = "0.28.3"

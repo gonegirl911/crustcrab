@@ -3,7 +3,10 @@ use crate::client::renderer::{
     Renderer,
 };
 use image::{io::Reader as ImageReader, RgbaImage};
-use std::{num::NonZeroU32, path::Path};
+use std::{
+    num::{NonZeroU32, NonZeroU8},
+    path::Path,
+};
 
 pub struct ImageTexture {
     bind_group_layout: wgpu::BindGroupLayout,
@@ -73,7 +76,7 @@ impl ImageTexture {
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: if is_srgb && config.format.is_srgb() {
+            format: if is_srgb && config.format.describe().srgb {
                 wgpu::TextureFormat::Rgba8UnormSrgb
             } else {
                 wgpu::TextureFormat::Rgba8Unorm
@@ -94,8 +97,8 @@ impl ImageTexture {
             &image,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(width * 4),
-                rows_per_image: Some(height),
+                bytes_per_row: NonZeroU32::new(width * 4),
+                rows_per_image: NonZeroU32::new(height),
             },
             size,
         );
@@ -123,7 +126,11 @@ impl ImageTexture {
             } else {
                 wgpu::FilterMode::Nearest
             },
-            anisotropy_clamp: if mip_level_count > 1 { 16 } else { 1 },
+            anisotropy_clamp: if mip_level_count > 1 {
+                NonZeroU8::new(16)
+            } else {
+                None
+            },
             ..Default::default()
         })
     }
@@ -199,7 +206,7 @@ impl ImageTexture {
             .map(|level| {
                 texture.create_view(&wgpu::TextureViewDescriptor {
                     base_mip_level: level,
-                    mip_level_count: Some(1),
+                    mip_level_count: NonZeroU32::new(1),
                     ..Default::default()
                 })
             })
