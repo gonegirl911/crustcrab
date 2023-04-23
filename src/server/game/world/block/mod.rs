@@ -271,12 +271,12 @@ static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy
 
 pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
     enum_map! {
-        Side::Front => vector![0, 0, -1],
-        Side::Right => vector![1, 0, 0],
-        Side::Back => vector![0, 0, 1],
-        Side::Left => vector![-1, 0, 0],
-        Side::Up => vector![0, 1, 0],
-        Side::Down => vector![0, -1, 0],
+        Side::Front => -Vector3::z(),
+        Side::Right => Vector3::x(),
+        Side::Back => Vector3::z(),
+        Side::Left => -Vector3::x(),
+        Side::Up => Vector3::y(),
+        Side::Down => -Vector3::y(),
     }
 });
 
