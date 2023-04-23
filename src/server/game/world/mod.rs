@@ -351,6 +351,10 @@ impl ChunkStore {
         self.cells.get(&coords).map(Deref::deref)
     }
 
+    pub fn y_range(&self, coords: Point2<i32>) -> Range<i32> {
+        self.y_ranges.get(&coords).cloned().unwrap_or_default()
+    }
+
     fn load(&mut self, coords: Point3<i32>) -> bool {
         if let Some(cell) = self.cells.get_mut(&coords) {
             cell.load();

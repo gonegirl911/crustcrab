@@ -49,12 +49,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     );
     let face = extractBits(vertex.data, 25u, 2u);
     let ao = f32(extractBits(vertex.data, 27u, 2u));
-    // let skylight = vec3(
-    //     f32(extractBits(vertex.light, 0u, 4u)),
-    //     f32(extractBits(vertex.light, 4u, 4u)),
-    //     f32(extractBits(vertex.light, 8u, 4u)),
-    // );
-    let skylight = vec3(15.0);
+    let skylight = vec3(
+        f32(extractBits(vertex.light, 0u, 4u)),
+        f32(extractBits(vertex.light, 4u, 4u)),
+        f32(extractBits(vertex.light, 8u, 4u)),
+    );
     let torchlight = vec3(
         f32(extractBits(vertex.light, 12u, 4u)),
         f32(extractBits(vertex.light, 16u, 4u)),
