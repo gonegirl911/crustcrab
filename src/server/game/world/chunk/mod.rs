@@ -107,14 +107,10 @@ impl ChunkArea {
     pub const DIM: usize = Chunk::DIM + Self::PADDING * 2;
     pub const PADDING: usize = BlockArea::PADDING;
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;
-
-    pub fn from_fn<F: FnMut(Vector3<i8>) -> bool>(mut f: F) -> Self {
-        let mut value = Self::default();
-        for delta in Self::deltas() {
-            value.set(delta, f(delta));
-        }
-        value
-    }
+    const CHUNK_PADDING: usize = utils::div_ceil(Self::PADDING, Chunk::DIM);
+    const CHUNK_AXIS_RANGE: Range<i32> =
+        -(Self::CHUNK_PADDING as i32)..(1 + Self::CHUNK_PADDING as i32);
+    const REM: usize = Self::PADDING % Chunk::DIM;
 
     fn block_area(&self, coords: Point3<u8>) -> BlockArea {
         let coords = coords.coords.cast();
@@ -125,24 +121,45 @@ impl ChunkArea {
         unsafe { *self.0.get_unchecked(Self::index(delta)) }
     }
 
-    fn set(&mut self, delta: Vector3<i8>, is_opaque: bool) {
+    pub fn set(&mut self, delta: Vector3<i8>, is_opaque: bool) {
         unsafe {
             self.0.set_unchecked(Self::index(delta), is_opaque);
         }
     }
 
-    pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        let chunk_padding = utils::div_ceil(Self::PADDING, Chunk::DIM) as i32;
-        (-chunk_padding..1 + chunk_padding).flat_map(move |dx| {
-            (-chunk_padding..1 + chunk_padding).flat_map(move |dy| {
-                (-chunk_padding..1 + chunk_padding).map(move |dz| vector![dx, dy, dz])
+    pub fn deltas() -> impl Iterator<
+        Item = (
+            Vector3<i32>,
+            impl Iterator<Item = (Point3<u8>, Vector3<i8>)>,
+        ),
+    > {
+        Self::CHUNK_AXIS_RANGE.flat_map(|dx| {
+            Self::CHUNK_AXIS_RANGE.flat_map(move |dy| {
+                Self::CHUNK_AXIS_RANGE.map(move |dz| {
+                    (
+                        vector![dx, dy, dz],
+                        Self::block_axis_range(dx).flat_map(move |x| {
+                            Self::block_axis_range(dy).flat_map(move |y| {
+                                Self::block_axis_range(dz).map(move |z| {
+                                    (
+                                        point![x, y, z],
+                                        World::coords(point![dx, dy, dz], point![x, y, z])
+                                            .coords
+                                            .cast(),
+                                    )
+                                })
+                            })
+                        }),
+                    )
+                })
             })
         })
     }
 
-    fn deltas() -> impl Iterator<Item = Vector3<i8>> {
-        Self::AXIS_RANGE.flat_map(|dx| {
-            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
+    pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
+        Self::CHUNK_AXIS_RANGE.flat_map(|dx| {
+            Self::CHUNK_AXIS_RANGE
+                .flat_map(move |dy| Self::CHUNK_AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
         })
     }
 
@@ -158,5 +175,15 @@ impl ChunkArea {
     unsafe fn index_unchecked(delta: Vector3<i8>) -> usize {
         let idx = delta.map(|c| (c + Self::PADDING as i8) as usize);
         idx.x * Self::DIM.pow(2) + idx.y * Self::DIM + idx.z
+    }
+
+    fn block_axis_range(dc: i32) -> Range<u8> {
+        if dc == Self::CHUNK_AXIS_RANGE.start {
+            (Chunk::DIM - Self::REM) as u8..Chunk::DIM as u8
+        } else if dc == Self::CHUNK_AXIS_RANGE.end - 1 {
+            0..Self::REM as u8
+        } else {
+            0..Chunk::DIM as u8
+        }
     }
 }

@@ -1,10 +1,7 @@
 use super::{Chunk, ChunkArea};
 use crate::server::game::world::block::light::{BlockAreaLight, BlockLight};
-use nalgebra::{vector, Point3, Vector3};
-use std::{
-    array,
-    ops::{Index, IndexMut},
-};
+use nalgebra::{Point3, Vector3};
+use std::ops::{Index, IndexMut};
 
 #[derive(Default)]
 pub struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
@@ -23,20 +20,19 @@ impl IndexMut<Point3<u8>> for ChunkLight {
     }
 }
 
+#[derive(Default)]
 pub struct ChunkAreaLight([[[BlockLight; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl ChunkAreaLight {
-    pub fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
-        Self(array::from_fn(|x| {
-            array::from_fn(|y| {
-                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - ChunkArea::PADDING as i8)))
-            })
-        }))
-    }
-
     pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
         let coords = coords.coords.cast();
         BlockAreaLight::from_fn(|delta| self[coords + delta])
+    }
+
+    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
+        delta
+            .map(|c| (c + ChunkArea::PADDING as i8) as usize)
+            .into()
     }
 }
 
@@ -44,7 +40,14 @@ impl Index<Vector3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = delta.map(|c| (c + ChunkArea::PADDING as i8) as usize);
+        let idx = unsafe { Self::index_unchecked(delta) };
         &self.0[idx.x][idx.y][idx.z]
+    }
+}
+
+impl IndexMut<Vector3<i8>> for ChunkAreaLight {
+    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
+        let idx = unsafe { Self::index_unchecked(delta) };
+        &mut self.0[idx.x][idx.y][idx.z]
     }
 }

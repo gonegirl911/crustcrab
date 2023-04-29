@@ -1,6 +1,9 @@
 use super::{
     block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
-    chunk::light::{ChunkAreaLight, ChunkLight},
+    chunk::{
+        light::{ChunkAreaLight, ChunkLight},
+        ChunkArea,
+    },
     {BlockAction, ChunkStore, World},
 };
 use nalgebra::{vector, Point3};
@@ -18,8 +21,14 @@ pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
 
 impl ChunkMapLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
-        let coords = World::coords(coords, Default::default());
-        ChunkAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
+        let mut value = ChunkAreaLight::default();
+        for (chunk_delta, deltas) in ChunkArea::deltas() {
+            let light = self.0.get(&(coords + chunk_delta));
+            for (block_coords, delta) in deltas {
+                value[delta] = light.map_or_else(Default::default, |light| light[block_coords]);
+            }
+        }
+        value
     }
 
     pub fn apply(

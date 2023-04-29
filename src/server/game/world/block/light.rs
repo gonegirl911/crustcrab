@@ -1,7 +1,7 @@
 use super::{BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
 use bitfield::bitfield;
 use enum_map::EnumMap;
-use nalgebra::{vector, Vector3};
+use nalgebra::{point, Point3, Vector3};
 use std::{
     array,
     iter::Sum,
@@ -25,7 +25,7 @@ impl BlockAreaLight {
     pub fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| {
-                array::from_fn(|z| f(vector![x, y, z].map(|c| c as i8 - BlockArea::PADDING as i8)))
+                array::from_fn(|z| f(unsafe { Self::delta_unchecked(point![x, y, z]) }))
             })
         }))
     }
@@ -42,13 +42,23 @@ impl BlockAreaLight {
                 .avg()
         })
     }
+
+    unsafe fn delta_unchecked(index: Point3<usize>) -> Vector3<i8> {
+        index.coords.map(|c| c as i8 - BlockArea::PADDING as i8)
+    }
+
+    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
+        delta
+            .map(|c| (c + BlockArea::PADDING as i8) as usize)
+            .into()
+    }
 }
 
 impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = delta.map(|c| (c + BlockArea::PADDING as i8) as usize);
+        let idx = unsafe { Self::index_unchecked(delta) };
         &self.0[idx.x][idx.y][idx.z]
     }
 }

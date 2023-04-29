@@ -14,7 +14,7 @@ pub fn div_floor(a: i64, b: i64) -> i64 {
     }
 }
 
-pub fn div_ceil(a: usize, b: usize) -> usize {
+pub const fn div_ceil(a: usize, b: usize) -> usize {
     let d = a / b;
     let r = a % b;
     if r > 0 && b > 0 {
