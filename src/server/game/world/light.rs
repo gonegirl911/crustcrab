@@ -40,40 +40,37 @@ impl ChunkMapLight {
         coords: Point3<i64>,
         block: Block,
     ) -> FxHashSet<Point3<i64>> {
-        let mut visits = FxHashSet::default();
-        // visits.extend(self.block_skylight(chunks, coords, block));
-        visits.extend(self.place_torchlight(chunks, coords, block));
-        visits
+        let mut updates = FxHashSet::default();
+        updates.extend(self.block_skylight(chunks, coords));
+        updates.extend(self.place_torchlight(chunks, coords, block));
+        updates
     }
 
     fn destroy(&mut self, chunks: &ChunkStore, coords: Point3<i64>) -> FxHashSet<Point3<i64>> {
-        let mut visits = FxHashSet::default();
-        visits.extend(self.unblock_skylight(chunks, coords));
-        visits.extend(self.destroy_torchlight(chunks, coords));
-        visits
+        let mut updates = FxHashSet::default();
+        updates.extend(self.unblock_skylight(chunks, coords));
+        updates.extend(self.destroy_torchlight(chunks, coords));
+        updates
     }
 
-    // fn block_skylight<'a>(
-    //     &'a mut self,
-    //     chunks: &'a ChunkStore,
-    //     coords: Point3<i64>,
-    //     block: Block,
-    // ) -> impl Iterator<Item = Point3<i64>> + 'a {
-    //     BlockLight::SKYLIGHT_RANGE
-    //         .zip(block.data().light_filter)
-    //         .flat_map(move |(i, f)| {
-    //             if Self::is_covered(chunks, coords) {
-    //                 let component = self.take_component(coords, i);
-    //                 if component != 0 {
-    //                     self.unspread_component(chunks, coords, i, component)
-    //                 } else {
-    //                     Default::default()
-    //                 }
-    //             } else {
-    //                 todo!()
-    //             }
-    //         })
-    // }
+    fn block_skylight<'a>(
+        &'a mut self,
+        chunks: &'a ChunkStore,
+        coords: Point3<i64>,
+    ) -> impl Iterator<Item = Point3<i64>> + 'a {
+        BlockLight::SKYLIGHT_RANGE.flat_map(move |i| {
+            if Self::is_covered(chunks, coords) {
+                let component = self.take_component(coords, i);
+                if component != 0 {
+                    self.unspread_component(chunks, coords, i, component)
+                } else {
+                    Default::default()
+                }
+            } else {
+                todo!()
+            }
+        })
+    }
 
     fn place_torchlight<'a>(
         &'a mut self,
@@ -102,8 +99,7 @@ impl ChunkMapLight {
             if Self::is_covered(chunks, coords) {
                 self.fill_component(chunks, coords, i)
             } else {
-                let value = self.component(coords + vector![0, 1, 0], i);
-                self.spread_light_beam(chunks, coords, i, value).collect()
+                self.spread_light_beam(chunks, coords, i).collect()
             }
         })
     }
@@ -128,8 +124,8 @@ impl ChunkMapLight {
         chunks: &'a ChunkStore,
         coords: Point3<i64>,
         index: usize,
-        mut value: u8,
     ) -> impl Iterator<Item = Point3<i64>> + 'a {
+        let mut value = self.component(coords + vector![0, 1, 0], index);
         Self::floor(chunks, coords)
             .map_while(
                 move |coords| match self.set_component(chunks, coords, index, value) {
@@ -256,11 +252,10 @@ impl ChunkMapLight {
         let block_light = self.block_light_mut(coords);
         let component = block_light.get().component(index);
         let data = chunks.block(coords).data();
-        let value = Self::apply_filter(value, Self::filter(data, index));
-        if component != 0 && component == value {
+        if component != 0 && component == Self::apply_filter(value, Self::filter(data, index)) {
             let luminance = Self::luminance(data, index);
             block_light.into_mut().set_component(index, luminance);
-            Ok((value, luminance))
+            Ok((component, luminance))
         } else {
             Err(component)
         }

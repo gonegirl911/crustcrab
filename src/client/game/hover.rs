@@ -119,7 +119,7 @@ impl BlockHighlight {
                     stencil: Default::default(),
                     bias: wgpu::DepthBiasState {
                         constant: -2,
-                        slope_scale: -0.005,
+                        slope_scale: -0.01,
                         ..Default::default()
                     },
                 }),
