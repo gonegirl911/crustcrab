@@ -17,6 +17,7 @@ bitfield! {
 impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
+    pub const COMPONENT_MAX: u8 = 15;
 }
 
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);

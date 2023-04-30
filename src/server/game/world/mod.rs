@@ -22,7 +22,7 @@ use crate::{
     shared::utils,
 };
 use flume::Sender;
-use nalgebra::{Point2, Point3};
+use nalgebra::{point, Point, Point2, Point3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -253,15 +253,18 @@ impl World {
             .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
     }
 
-    pub fn chunk_coords(coords: Point3<i64>) -> Point3<i32> {
+    pub fn chunk_coords<const D: usize>(coords: Point<i64, D>) -> Point<i32, D> {
         coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
     }
 
-    pub fn block_coords(coords: Point3<i64>) -> Point3<u8> {
+    pub fn block_coords<const D: usize>(coords: Point<i64, D>) -> Point<u8, D> {
         coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
 
-    pub fn coords(chunk_coords: Point3<i32>, block_coords: Point3<u8>) -> Point3<i64> {
+    pub fn coords<const D: usize>(
+        chunk_coords: Point<i32, D>,
+        block_coords: Point<u8, D>,
+    ) -> Point<i64, D> {
         chunk_coords.cast() * Chunk::DIM as i64 + block_coords.coords.cast()
     }
 }
@@ -359,12 +362,33 @@ impl ChunkStore {
             .map_or(Block::Air, |chunk| chunk[World::block_coords(coords)])
     }
 
+    pub fn bottom(&self, coords: Point2<i64>) -> Option<i64> {
+        let y_range = self.y_range(World::chunk_coords(coords))?;
+        Some(World::coords(point![y_range.start], Default::default()).x)
+    }
+
+    pub fn top(&self, coords: Point2<i64>) -> Option<i64> {
+        let y_range = self.y_range(World::chunk_coords(coords))?;
+        let lower_bound = World::coords(point![y_range.start], Default::default()).x;
+        let upper_bound = World::coords(point![y_range.end - 1], point![Chunk::DIM as u8 - 1]).x;
+        Some(
+            (lower_bound..=upper_bound)
+                .rev()
+                .find(|y| {
+                    self.block(point![coords.x, *y, coords.y])
+                        .data()
+                        .is_opaque()
+                })
+                .unwrap_or(upper_bound),
+        )
+    }
+
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         self.cells.get(&coords).map(Deref::deref)
     }
 
-    pub fn y_range(&self, coords: Point2<i32>) -> Range<i32> {
-        self.y_ranges.get(&coords).cloned().unwrap_or_default()
+    fn y_range(&self, coords: Point2<i32>) -> Option<Range<i32>> {
+        self.y_ranges.get(&coords).cloned()
     }
 
     fn load(&mut self, coords: Point3<i32>) -> bool {
