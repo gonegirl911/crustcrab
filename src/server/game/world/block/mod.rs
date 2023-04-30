@@ -38,7 +38,7 @@ impl Block {
                 let tex_index = side_tex_indices[side];
                 let face = side.into();
                 let corner_aos = Self::corner_aos(data, side, area);
-                let corner_lights = area_light.corner_lights(side, area);
+                let corner_lights = area_light.corner_lights(data, side, area);
                 Self::corners(corner_aos).into_iter().map(move |corner| {
                     BlockVertex::new(
                         coords + corner_deltas[corner],
@@ -83,7 +83,7 @@ impl Block {
     }
 
     fn corner_aos(data: &BlockData, side: Side, area: BlockArea) -> EnumMap<Corner, u8> {
-        if !data.is_glowing() {
+        if data.smooth_lighting() {
             enum_map! { corner => Self::ao(side, corner, area) }
         } else {
             enum_map! { _ => 3 }

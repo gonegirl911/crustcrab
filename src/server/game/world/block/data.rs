@@ -24,6 +24,10 @@ impl BlockData {
     pub fn is_opaque(&self) -> bool {
         !self.is_transparent()
     }
+
+    pub fn smooth_lighting(&self) -> bool {
+        !self.is_glowing() && self.is_opaque()
+    }
 }
 
 impl From<RawBlockData> for BlockData {

@@ -1,6 +1,6 @@
-use super::{BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
+use super::{data::BlockData, BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
 use bitfield::bitfield;
-use enum_map::EnumMap;
+use enum_map::{enum_map, EnumMap};
 use nalgebra::{point, Point3, Vector3};
 use std::{
     array,
@@ -31,17 +31,26 @@ impl BlockAreaLight {
         }))
     }
 
-    pub fn corner_lights(&self, side: Side, area: BlockArea) -> EnumMap<Corner, BlockLight> {
-        let side_delta = SIDE_DELTAS[side];
-        SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
-            component_deltas
-                .into_values()
-                .chain([side_delta])
-                .filter(|delta| area.is_transparent(*delta))
-                .map(|delta| self[delta])
-                .sum::<BlockLightSum>()
-                .avg()
-        })
+    pub fn corner_lights(
+        &self,
+        data: &BlockData,
+        side: Side,
+        area: BlockArea,
+    ) -> EnumMap<Corner, BlockLight> {
+        if data.smooth_lighting() {
+            let side_delta = SIDE_DELTAS[side];
+            SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
+                component_deltas
+                    .into_values()
+                    .chain([side_delta])
+                    .filter(|delta| area.is_transparent(*delta))
+                    .map(|delta| self[delta])
+                    .sum::<BlockLightSum>()
+                    .avg()
+            })
+        } else {
+            enum_map! { _ => self[SIDE_DELTAS[side]] }
+        }
     }
 
     unsafe fn delta_unchecked(index: Point3<usize>) -> Vector3<i8> {

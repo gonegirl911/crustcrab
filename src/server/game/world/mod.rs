@@ -22,7 +22,7 @@ use crate::{
     shared::utils,
 };
 use flume::Sender;
-use nalgebra::{point, Point, Point2, Point3};
+use nalgebra::{Point, Point2, Point3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -347,10 +347,7 @@ impl ChunkStore {
             for (block_coords, delta) in deltas {
                 value.set(
                     delta,
-                    chunk
-                        .map_or(Block::Air, |chunk| chunk[block_coords])
-                        .data()
-                        .is_opaque(),
+                    chunk.map_or(false, |chunk| chunk[block_coords].data().is_opaque()),
                 );
             }
         }
@@ -362,32 +359,11 @@ impl ChunkStore {
             .map_or(Block::Air, |chunk| chunk[World::block_coords(coords)])
     }
 
-    pub fn bottom(&self, coords: Point2<i64>) -> Option<i64> {
-        let y_range = self.y_range(World::chunk_coords(coords))?;
-        Some(World::coords(point![y_range.start], Default::default()).x)
-    }
-
-    pub fn top(&self, coords: Point2<i64>) -> Option<i64> {
-        let y_range = self.y_range(World::chunk_coords(coords))?;
-        let lower_bound = World::coords(point![y_range.start], Default::default()).x;
-        let upper_bound = World::coords(point![y_range.end - 1], point![Chunk::DIM as u8 - 1]).x;
-        Some(
-            (lower_bound..=upper_bound)
-                .rev()
-                .find(|y| {
-                    self.block(point![coords.x, *y, coords.y])
-                        .data()
-                        .is_opaque()
-                })
-                .unwrap_or(upper_bound),
-        )
-    }
-
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         self.cells.get(&coords).map(Deref::deref)
     }
 
-    fn y_range(&self, coords: Point2<i32>) -> Option<Range<i32>> {
+    pub fn y_range(&self, coords: Point2<i32>) -> Option<Range<i32>> {
         self.y_ranges.get(&coords).cloned()
     }
 
