@@ -22,11 +22,11 @@ use crate::{
     shared::utils,
 };
 use flume::Sender;
-use nalgebra::{Point, Point2, Point3};
+use nalgebra::{Point, Point3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
-    collections::{hash_map::Entry, LinkedList},
+    collections::LinkedList,
     ops::{Deref, Index, Range},
     sync::Arc,
 };
@@ -361,10 +361,7 @@ impl EventHandler<WorldEvent> for World {
 }
 
 #[derive(Default)]
-pub struct ChunkStore {
-    cells: FxHashMap<Point3<i32>, ChunkCell>,
-    y_ranges: FxHashMap<Point2<i32>, Range<i32>>,
-}
+pub struct ChunkStore(FxHashMap<Point3<i32>, ChunkCell>);
 
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
@@ -387,15 +384,11 @@ impl ChunkStore {
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.cells.get(&coords).map(Deref::deref)
-    }
-
-    pub fn y_range(&self, coords: Point2<i32>) -> Option<Range<i32>> {
-        self.y_ranges.get(&coords).cloned()
+        self.0.get(&coords).map(Deref::deref)
     }
 
     fn load(&mut self, coords: Point3<i32>) -> bool {
-        if let Some(cell) = self.cells.get_mut(&coords) {
+        if let Some(cell) = self.0.get_mut(&coords) {
             cell.load();
             true
         } else {
@@ -404,11 +397,9 @@ impl ChunkStore {
     }
 
     fn unload(&mut self, coords: Point3<i32>) -> bool {
-        if let Some(cell) = self.cells.remove(&coords) {
+        if let Some(cell) = self.0.remove(&coords) {
             if let Some(cell) = cell.unload() {
-                self.cells.insert(coords, cell);
-            } else {
-                self.remove_from_ranges(coords);
+                self.0.insert(coords, cell);
             }
             true
         } else {
@@ -424,58 +415,28 @@ impl ChunkStore {
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
         let chunk_coords = World::chunk_coords(coords);
         let block_coords = World::block_coords(coords);
-        if let Some(cell) = self.cells.remove(&chunk_coords) {
+        if let Some(cell) = self.0.remove(&chunk_coords) {
             match cell.apply(block_coords, action) {
                 Ok(Some(cell)) => {
-                    self.cells.insert(chunk_coords, cell);
+                    self.0.insert(chunk_coords, cell);
                     Ok((None, None))
                 }
-                Ok(None) => {
-                    self.remove_from_ranges(chunk_coords);
-                    Ok((None, Some(chunk_coords)))
-                }
+                Ok(None) => Ok((None, Some(chunk_coords))),
                 Err(cell) => {
-                    self.cells.insert(chunk_coords, cell);
+                    self.0.insert(chunk_coords, cell);
                     Err(())
                 }
             }
         } else if let Ok(Some(cell)) = ChunkCell::default_with_action(block_coords, action) {
-            self.insert(chunk_coords, cell);
+            self.0.insert(chunk_coords, cell);
             Ok((Some(chunk_coords), None))
         } else {
             Err(())
         }
     }
 
-    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) {
-        self.cells.insert(coords, cell);
-        self.insert_into_ranges(coords);
-    }
-
-    fn insert_into_ranges(&mut self, coords: Point3<i32>) {
-        self.y_ranges
-            .entry(coords.xz())
-            .and_modify(|range| *range = range.start.min(coords.y)..range.end.max(coords.y + 1))
-            .or_insert(coords.y..coords.y + 1);
-    }
-
-    fn remove_from_ranges(&mut self, coords: Point3<i32>) {
-        if let Entry::Occupied(mut entry) = self.y_ranges.entry(coords.xz()) {
-            let range = entry.get_mut();
-            if range.contains(&coords.y) {
-                if range.len() == 1 {
-                    entry.remove();
-                } else if coords.y == range.start {
-                    range.start += 1;
-                } else if coords.y == range.end - 1 {
-                    range.end -= 1;
-                }
-            } else {
-                unreachable!();
-            }
-        } else {
-            unreachable!();
-        }
+    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) -> Option<ChunkCell> {
+        self.0.insert(coords, cell)
     }
 }
 
@@ -483,7 +444,7 @@ impl Index<Point3<i32>> for ChunkStore {
     type Output = Chunk;
 
     fn index(&self, coords: Point3<i32>) -> &Self::Output {
-        &self.cells[&coords]
+        &self.0[&coords]
     }
 }
 
