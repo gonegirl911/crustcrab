@@ -102,9 +102,14 @@ impl World {
         ray: Ray,
     ) {
         let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
-        let points = load.into_iter().chain(unload).collect();
-        let light_updates = self.light.apply(&self.chunks, coords, &action);
-        let updates = Self::updates(&points, light_updates.into_iter().chain([coords]), false);
+        let updates = Self::updates(
+            &load.into_iter().chain(unload).collect(),
+            self.light
+                .apply(&self.chunks, coords, &action)
+                .into_iter()
+                .chain([coords]),
+            false,
+        );
 
         self.actions.insert(coords, action);
 
@@ -301,8 +306,7 @@ impl EventHandler<WorldEvent> for World {
         match event {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let (mut loads, inserts) = Self::unzip(self.load_many(area.points()));
-
-                self.light.insert_many(&self.chunks, inserts);
+                let _ = self.light.insert_many(&self.chunks, inserts);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - area.center)
@@ -316,10 +320,16 @@ impl EventHandler<WorldEvent> for World {
                 self.par_send_loads(loads, server_tx, false);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
-                let (unloads, _) = Self::unzip(self.unload_many(prev.exclusive_points(curr)));
-                let (loads, _) = Self::unzip(self.load_many(curr.exclusive_points(prev)));
-                let points = loads.iter().chain(&unloads).copied().collect();
-                let updates = Self::updates(&points, [], true);
+                let (unloads, removes) = Self::unzip(self.unload_many(prev.exclusive_points(curr)));
+                let (loads, inserts) = Self::unzip(self.load_many(curr.exclusive_points(prev)));
+                let updates = Self::updates(
+                    &loads.iter().chain(&unloads).copied().collect(),
+                    self.light
+                        .remove_many(&self.chunks, removes)
+                        .into_iter()
+                        .chain(self.light.insert_many(&self.chunks, inserts)),
+                    true,
+                );
 
                 self.handle(
                     &WorldEvent::BlockHoverRequested { ray: *ray },

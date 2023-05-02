@@ -40,6 +40,13 @@ impl ChunkMapLight {
         Default::default()
     }
 
+    pub fn remove_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        Default::default()
+    }
+
     pub fn apply(
         &mut self,
         chunks: &ChunkStore,
@@ -81,7 +88,7 @@ impl ChunkMapLight {
             if component != 0 {
                 let mut updates = self.unspread_component(chunks, coords, i, component);
                 let value = Self::light_beam_value(chunks, coords + Vector3::y(), i);
-                self.light_up_shell(chunks, coords, i);
+                self.light_up_shell(coords, i);
                 updates.extend(self.unspread_light_beam(chunks, coords, i, value));
                 updates.extend(self.spread_light_beam(chunks, coords + Vector3::y(), i, value));
                 updates
@@ -137,13 +144,11 @@ impl ChunkMapLight {
         })
     }
 
-    fn light_up_shell(&mut self, chunks: &ChunkStore, coords: Point3<i64>, index: usize) {
+    fn light_up_shell(&mut self, coords: Point3<i64>, index: usize) {
         for delta in BlockArea::shell() {
             let coords = coords + delta.cast();
             let block_light = self.block_light_mut(coords);
-            if block_light.is_vacant()
-                && Self::light_beam_value(chunks, coords, index) == BlockLight::COMPONENT_MAX
-            {
+            if block_light.is_vacant() {
                 block_light
                     .into_mut()
                     .set_component(index, BlockLight::COMPONENT_MAX);
