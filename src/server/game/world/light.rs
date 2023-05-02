@@ -1,12 +1,12 @@
 use super::{
-    block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
+    block::{data::BlockData, light::BlockLight, Block, BlockArea, SIDE_DELTAS},
     chunk::{
         light::{ChunkAreaLight, ChunkLight},
         Chunk, ChunkArea,
     },
     {BlockAction, ChunkStore, World},
 };
-use nalgebra::{point, Point3};
+use nalgebra::{point, Point3, Vector3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp::Ordering,
@@ -31,6 +31,13 @@ impl ChunkMapLight {
             }
         }
         value
+    }
+
+    pub fn insert_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        Default::default()
     }
 
     pub fn apply(
@@ -70,20 +77,17 @@ impl ChunkMapLight {
         coords: Point3<i64>,
     ) -> impl Iterator<Item = Point3<i64>> + 'a {
         BlockLight::SKYLIGHT_RANGE.flat_map(move |i| {
-            if let Some(value) = Self::light_beam_value(chunks, coords, i) {
-                let mut updates = FxHashSet::default();
-                updates.extend(self.unset_skylight(chunks, coords, i));
-                updates.extend(self.unspread_light_beam(chunks, coords, i, value));
-                updates.extend(self.spread_light_beam(chunks, coords, i, value));
-                updates
-            } else {
-                let component = self.take_component(coords, i);
-                if component != 0 {
-                    self.unspread_component(chunks, coords, i, component)
-                } else {
-                    Default::default()
+            let mut updates = FxHashSet::default();
+            let component = self.take_component(coords, i);
+            if component != 0 {
+                updates.extend(self.unspread_component(chunks, coords, i, component));
+                if let Some(value) = Self::light_beam_value(chunks, coords + Vector3::y(), i) {
+                    self.light_up_shell(chunks, coords, i);
+                    updates.extend(self.unspread_light_beam(chunks, coords, i, value));
+                    updates.extend(self.spread_light_beam(chunks, coords, i, value));
                 }
             }
+            updates
         })
     }
 
@@ -112,7 +116,7 @@ impl ChunkMapLight {
     ) -> impl Iterator<Item = Point3<i64>> + 'a {
         BlockLight::SKYLIGHT_RANGE.flat_map(move |i| {
             let mut updates = self.fill_component(chunks, coords, i);
-            if let Some(value) = Self::light_beam_value(chunks, coords, i) {
+            if let Some(value) = Self::light_beam_value(chunks, coords + Vector3::y(), i) {
                 updates.extend(self.spread_light_beam(chunks, coords, i, value));
             }
             updates
@@ -134,14 +138,16 @@ impl ChunkMapLight {
         })
     }
 
-    fn unset_skylight(
-        &mut self,
-        chunks: &ChunkStore,
-        coords: Point3<i64>,
-        index: usize,
-    ) -> FxHashSet<Point3<i64>> {
-        let component = self.take_component(coords, index);
-        self.unspread_component(chunks, coords, index, component)
+    fn light_up_shell(&mut self, chunks: &ChunkStore, coords: Point3<i64>, index: usize) {
+        for delta in BlockArea::shell() {
+            let coords = coords + delta.cast();
+            let block_light = self.block_light_mut(coords);
+            if block_light.is_vacant() {
+                if let Some(value) = Self::light_beam_value(chunks, coords, index) {
+                    block_light.into_mut().set_component(index, value);
+                }
+            }
+        }
     }
 
     fn spread_light_beam<'a>(
@@ -412,6 +418,10 @@ impl<'a> BlockLightRefMut<'a> {
             Entry::Occupied(entry) => Self::Occupied(&mut entry.into_mut()[coords]),
             Entry::Vacant(entry) => Self::Vacant { entry, coords },
         }
+    }
+
+    fn is_vacant(&self) -> bool {
+        matches!(self, Self::Vacant { .. })
     }
 
     fn get(&self) -> BlockLight {

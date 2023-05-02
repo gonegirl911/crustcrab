@@ -49,7 +49,7 @@ impl World {
         }
     }
 
-    fn load_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    fn load_many<I>(&mut self, points: I) -> Vec<Result<Point3<i32>, Point3<i32>>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -68,23 +68,29 @@ impl World {
             .collect::<LinkedList<_>>()
             .into_iter()
             .filter_map(|entry| match entry {
-                Ok(coords) => Some(coords),
+                Ok(coords) => Some(Ok(coords)),
                 Err(Some((coords, cell))) => {
                     self.chunks.insert(coords, cell);
-                    Some(coords)
+                    Some(Err(coords))
                 }
                 Err(None) => None,
             })
             .collect()
     }
 
-    fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    fn unload_many<I>(&mut self, points: I) -> Vec<Result<Point3<i32>, Point3<i32>>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
         points
             .into_iter()
-            .filter(|coords| self.chunks.unload(*coords))
+            .map(|coords| {
+                if self.chunks.unload(coords) {
+                    Err(coords)
+                } else {
+                    Ok(coords)
+                }
+            })
             .collect()
     }
 
@@ -218,9 +224,9 @@ impl World {
         }
     }
 
-    fn updates<B: IntoIterator<Item = Point3<i64>>>(
+    fn updates<I: IntoIterator<Item = Point3<i64>>>(
         points: &FxHashSet<Point3<i32>>,
-        block_updates: B,
+        block_updates: I,
         include_outline: bool,
     ) -> FxHashSet<Point3<i32>> {
         Self::block_area_points(block_updates)
@@ -253,6 +259,25 @@ impl World {
             .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
     }
 
+    fn unzip<T, I>(iter: I) -> (Vec<T>, Vec<T>)
+    where
+        T: Copy,
+        I: IntoIterator<Item = Result<T, T>>,
+    {
+        let mut all = vec![];
+        let mut err = vec![];
+        for value in iter {
+            match value {
+                Ok(value) => all.push(value),
+                Err(value) => {
+                    all.push(value);
+                    err.push(value);
+                }
+            }
+        }
+        (all, err)
+    }
+
     pub fn chunk_coords<const D: usize>(coords: Point<i64, D>) -> Point<i32, D> {
         coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
     }
@@ -275,7 +300,9 @@ impl EventHandler<WorldEvent> for World {
     fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
         match event {
             WorldEvent::InitialRenderRequested { area, ray } => {
-                let mut loads = self.load_many(area.points());
+                let (mut loads, inserts) = Self::unzip(self.load_many(area.points()));
+
+                self.light.insert_many(&self.chunks, inserts);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - area.center)
@@ -289,8 +316,8 @@ impl EventHandler<WorldEvent> for World {
                 self.par_send_loads(loads, server_tx, false);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
-                let unloads = self.unload_many(prev.exclusive_points(curr));
-                let loads = self.load_many(curr.exclusive_points(prev));
+                let (unloads, _) = Self::unzip(self.unload_many(prev.exclusive_points(curr)));
+                let (loads, _) = Self::unzip(self.load_many(curr.exclusive_points(prev)));
                 let points = loads.iter().chain(&unloads).copied().collect();
                 let updates = Self::updates(&points, [], true);
 
