@@ -270,10 +270,10 @@ impl ChunkMapLight {
         coords: Point3<i64>,
         index: usize,
     ) -> FxHashSet<Point3<i64>> {
-        let value = self.brightest_neighbor(coords, index);
-        if value > 1 {
-            self.overwrite_component(coords, index, value - 1);
-            self.spread_component(chunks, coords, index, value - 1)
+        let neighbor = self.brightest_neighbor(coords, index);
+        if neighbor > 1 {
+            self.overwrite_component(coords, index, neighbor - 1);
+            self.spread_component(chunks, coords, index, neighbor - 1)
         } else {
             Default::default()
         }

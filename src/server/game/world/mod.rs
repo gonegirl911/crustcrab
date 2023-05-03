@@ -445,8 +445,8 @@ impl ChunkStore {
         }
     }
 
-    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) -> Option<ChunkCell> {
-        self.0.insert(coords, cell)
+    fn insert(&mut self, coords: Point3<i32>, cell: ChunkCell) {
+        self.0.insert(coords, cell);
     }
 }
 
