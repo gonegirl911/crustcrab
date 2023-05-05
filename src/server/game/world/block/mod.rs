@@ -164,10 +164,6 @@ impl BlockArea {
         })
     }
 
-    pub fn shell() -> impl Iterator<Item = Vector3<i8>> {
-        Self::deltas().filter(|delta| *delta != Vector3::zeros())
-    }
-
     fn index(delta: Vector3<i8>) -> usize {
         assert!(
             Self::AXIS_RANGE.contains(&delta.x)

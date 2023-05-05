@@ -409,7 +409,7 @@ impl ChunkStore {
     fn unload(&mut self, coords: Point3<i32>) -> bool {
         if let Some(cell) = self.0.remove(&coords) {
             if let Some(cell) = cell.unload() {
-                self.0.insert(coords, cell);
+                self.insert(coords, cell);
             }
             true
         } else {
@@ -428,17 +428,17 @@ impl ChunkStore {
         if let Some(cell) = self.0.remove(&chunk_coords) {
             match cell.apply(block_coords, action) {
                 Ok(Some(cell)) => {
-                    self.0.insert(chunk_coords, cell);
+                    self.insert(chunk_coords, cell);
                     Ok((None, None))
                 }
                 Ok(None) => Ok((None, Some(chunk_coords))),
                 Err(cell) => {
-                    self.0.insert(chunk_coords, cell);
+                    self.insert(chunk_coords, cell);
                     Err(())
                 }
             }
         } else if let Ok(Some(cell)) = ChunkCell::default_with_action(block_coords, action) {
-            self.0.insert(chunk_coords, cell);
+            self.insert(chunk_coords, cell);
             Ok((Some(chunk_coords), None))
         } else {
             Err(())
