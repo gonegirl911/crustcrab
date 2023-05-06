@@ -130,14 +130,15 @@ impl ChunkMapLight {
             let neighbor = self.brightest_neighbor(coords, i);
             let value = light_beam.max(neighbor.saturating_sub(1));
             let block_light = self.block_light_mut(coords);
-            let mut updates = FxHashSet::default();
             if block_light.component(i) < value {
                 block_light.set_component(i, value);
-                updates.insert(coords);
+                let mut updates = FxHashSet::from_iter([coords]);
                 updates.extend(self.spread_component(chunks, coords, i, value));
+                updates.extend(self.spread_light_beam(chunks, coords, i, value));
+                updates
+            } else {
+                Default::default()
             }
-            updates.extend(self.spread_light_beam(chunks, coords, i, value));
-            updates
         })
     }
 
