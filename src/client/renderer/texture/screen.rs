@@ -62,8 +62,10 @@ impl EventHandler for ScreenTexture {
             } if *width != 0 && *height != 0 => {
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) if self.is_resized => {
-                *self = Self::new(renderer, self.format, self.usage);
+            Event::RedrawRequested(_) => {
+                if self.is_resized {
+                    *self = Self::new(renderer, self.format, self.usage);
+                }
             }
             _ => {}
         }

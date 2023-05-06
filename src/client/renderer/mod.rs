@@ -83,8 +83,10 @@ impl EventHandler for Renderer {
                 self.config.height = *height;
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) if self.is_resized => {
-                self.recreate_surface();
+            Event::RedrawRequested(_) => {
+                if self.is_resized {
+                    self.recreate_surface();
+                }
             }
             Event::RedrawEventsCleared => {
                 self.is_resized = false;

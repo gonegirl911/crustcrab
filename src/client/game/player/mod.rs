@@ -116,17 +116,19 @@ impl EventHandler for Player {
 
                 self.is_updated = self.is_updated || changes.intersects(Changes::MATRIX_CHANGES);
             }
-            Event::RedrawRequested(_) if self.is_updated => {
-                self.uniform.write(
-                    renderer,
-                    &PlayerUniformData::new(
-                        self.view.mat(),
-                        self.projection.mat(),
-                        self.view.origin(),
-                        self.projection.znear(),
-                        self.projection.zfar(),
-                    ),
-                );
+            Event::RedrawRequested(_) => {
+                if self.is_updated {
+                    self.uniform.write(
+                        renderer,
+                        &PlayerUniformData::new(
+                            self.view.mat(),
+                            self.projection.mat(),
+                            self.view.origin(),
+                            self.projection.znear(),
+                            self.projection.zfar(),
+                        ),
+                    );
+                }
             }
             Event::RedrawEventsCleared => {
                 self.is_updated = false;

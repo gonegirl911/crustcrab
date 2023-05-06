@@ -80,16 +80,18 @@ impl EventHandler for Crosshair {
             } if *width != 0 && *height != 0 => {
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) if self.is_resized => {
-                let size = Self::size(config.height);
-                self.uniform.write(
-                    renderer,
-                    &CrosshairUniformData::new(Matrix4::new_nonuniform_scaling(&vector![
-                        size / config.width as f32,
-                        size / config.height as f32,
-                        1.0
-                    ])),
-                );
+            Event::RedrawRequested(_) => {
+                if self.is_resized {
+                    let size = Self::size(config.height);
+                    self.uniform.write(
+                        renderer,
+                        &CrosshairUniformData::new(Matrix4::new_nonuniform_scaling(&vector![
+                            size / config.width as f32,
+                            size / config.height as f32,
+                            1.0
+                        ])),
+                    );
+                }
             }
             Event::RedrawEventsCleared => {
                 self.is_resized = false;
