@@ -91,8 +91,8 @@ impl ChunkMapLight {
                 let value = Self::apply_filter(component, f);
                 if block_light.set_component(i, value) {
                     let mut updates = FxHashSet::from_iter([coords]);
-                    let light_beam = Self::light_beam_value(chunks, coords + Vector3::y(), i);
                     updates.extend(self.unspread_component(chunks, coords, i, component, f));
+                    let light_beam = Self::light_beam_value(chunks, coords + Vector3::y(), i);
                     updates.extend(self.unspread_light_beam(chunks, coords, i, light_beam, f));
                     updates
                 } else {
