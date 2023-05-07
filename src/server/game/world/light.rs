@@ -2,7 +2,7 @@ use super::{
     block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
     chunk::{
         light::{ChunkAreaLight, ChunkLight},
-        ChunkArea,
+        Chunk, ChunkArea,
     },
     {BlockAction, ChunkStore, World},
 };
@@ -92,7 +92,9 @@ impl ChunkMapLight {
                 if block_light.set_component(i, value) {
                     let mut updates = FxHashSet::from_iter([coords]);
                     updates.extend(self.unspread_component(chunks, coords, i, component, f));
+                    let prev = std::time::Instant::now();
                     let light_beam = Self::light_beam_value(chunks, coords + Vector3::y(), i);
+                    dbg!(prev.elapsed());
                     updates.extend(self.unspread_light_beam(chunks, coords, i, light_beam, f));
                     updates
                 } else {
@@ -385,12 +387,21 @@ impl ChunkMapLight {
     }
 
     fn light_beam_value(chunks: &ChunkStore, coords: Point3<i64>, index: usize) -> u8 {
-        let top = World::coords(point![World::Y_RANGE.end], Default::default()).x;
-        (coords.y..top)
+        let [chunk_x, chunk_z] = <[_; 2]>::from(World::chunk_coords(coords.xz()));
+        let [block_x, block_z] = <[_; 2]>::from(World::block_coords(coords.xz()));
+        World::Y_RANGE
             .rev()
-            .map(|y| chunks.block(point![coords.x, y, coords.z]))
-            .skip_while(|block| *block == Block::Air)
-            .map(|block| Self::filter(block.data(), index))
+            .filter_map(|y| Some((y, chunks.get(point![chunk_x, y, chunk_z])?)))
+            .flat_map(|(chunk_y, chunk)| {
+                (0..Chunk::DIM as u8)
+                    .rev()
+                    .map(move |y| (chunk_y, y, chunk[point![block_x, y, block_z]]))
+            })
+            .filter(|(_, _, block)| *block != Block::Air)
+            .take_while(|(chunk_y, block_y, _)| {
+                World::coords(point![*chunk_y], point![*block_y]).x > coords.y
+            })
+            .map(|(_, _, block)| Self::filter(block.data(), index))
             .try_fold(BlockLight::COMPONENT_MAX, |accum, f| {
                 Some(NonZeroU8::new(Self::apply_filter(accum, f))?.get())
             })
