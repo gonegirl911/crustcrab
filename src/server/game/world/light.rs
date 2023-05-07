@@ -92,9 +92,7 @@ impl ChunkMapLight {
                 if block_light.set_component(i, value) {
                     let mut updates = FxHashSet::from_iter([coords]);
                     updates.extend(self.unspread_component(chunks, coords, i, component, f));
-                    let prev = std::time::Instant::now();
                     let light_beam = Self::light_beam_value(chunks, coords + Vector3::y(), i);
-                    dbg!(prev.elapsed());
                     updates.extend(self.unspread_light_beam(chunks, coords, i, light_beam, f));
                     updates
                 } else {
