@@ -42,6 +42,8 @@ pub struct World {
 }
 
 impl World {
+    pub const Y_RANGE: Range<i32> = -4..20;
+
     pub fn new(settings: &ServerSettings) -> Self {
         Self {
             reach: settings.reach.clone(),
@@ -425,21 +427,25 @@ impl ChunkStore {
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
         let chunk_coords = World::chunk_coords(coords);
         let block_coords = World::block_coords(coords);
-        if let Some(cell) = self.0.remove(&chunk_coords) {
-            match cell.apply(block_coords, action) {
-                Ok(Some(cell)) => {
-                    self.insert(chunk_coords, cell);
-                    Ok((None, None))
+        if World::Y_RANGE.contains(&chunk_coords.y) {
+            if let Some(cell) = self.0.remove(&chunk_coords) {
+                match cell.apply(block_coords, action) {
+                    Ok(Some(cell)) => {
+                        self.insert(chunk_coords, cell);
+                        Ok((None, None))
+                    }
+                    Ok(None) => Ok((None, Some(chunk_coords))),
+                    Err(cell) => {
+                        self.insert(chunk_coords, cell);
+                        Err(())
+                    }
                 }
-                Ok(None) => Ok((None, Some(chunk_coords))),
-                Err(cell) => {
-                    self.insert(chunk_coords, cell);
-                    Err(())
-                }
+            } else if let Ok(Some(cell)) = ChunkCell::default_with_action(block_coords, action) {
+                self.insert(chunk_coords, cell);
+                Ok((Some(chunk_coords), None))
+            } else {
+                Err(())
             }
-        } else if let Ok(Some(cell)) = ChunkCell::default_with_action(block_coords, action) {
-            self.insert(chunk_coords, cell);
-            Ok((Some(chunk_coords), None))
         } else {
             Err(())
         }
