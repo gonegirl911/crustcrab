@@ -397,7 +397,7 @@ impl ChunkMapLight {
             })
             .filter(|(_, _, block)| *block != Block::Air)
             .take_while(|(chunk_y, block_y, _)| {
-                World::coords(point![*chunk_y], point![*block_y]).x > coords.y
+                World::coords(point![*chunk_y], point![*block_y]).x >= coords.y
             })
             .map(|(_, _, block)| Self::filter(block.data(), index))
             .try_fold(BlockLight::COMPONENT_MAX, |accum, f| {
