@@ -379,12 +379,10 @@ impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
         for (chunk_delta, deltas) in ChunkArea::deltas() {
-            let chunk = self.get(coords + chunk_delta);
-            for (block_coords, delta) in deltas {
-                value.set(
-                    delta,
-                    chunk.map_or(false, |chunk| chunk[block_coords].data().is_opaque()),
-                );
+            if let Some(chunk) = self.get(coords + chunk_delta) {
+                for (block_coords, delta) in deltas {
+                    value.set(delta, chunk[block_coords].data().is_opaque());
+                }
             }
         }
         value

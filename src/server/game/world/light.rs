@@ -24,9 +24,10 @@ impl ChunkMapLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
         let mut value = ChunkAreaLight::default();
         for (chunk_delta, deltas) in ChunkArea::deltas() {
-            let light = self.0.get(&(coords + chunk_delta));
-            for (block_coords, delta) in deltas {
-                value[delta] = light.map_or_else(Default::default, |light| light[block_coords]);
+            if let Some(light) = self.0.get(&(coords + chunk_delta)) {
+                for (block_coords, delta) in deltas {
+                    value[delta] = light[block_coords];
+                }
             }
         }
         value
