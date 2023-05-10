@@ -42,7 +42,7 @@ pub struct World {
 }
 
 impl World {
-    pub const Y_RANGE: Range<i32> = -4..20;
+    const Y_RANGE: Range<i32> = -4..20;
 
     pub fn new(settings: &ServerSettings) -> Self {
         Self {
@@ -285,15 +285,15 @@ impl World {
         (all, err)
     }
 
-    pub fn chunk_coords<const D: usize>(coords: Point<i64, D>) -> Point<i32, D> {
+    fn chunk_coords<const D: usize>(coords: Point<i64, D>) -> Point<i32, D> {
         coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
     }
 
-    pub fn block_coords<const D: usize>(coords: Point<i64, D>) -> Point<u8, D> {
+    fn block_coords<const D: usize>(coords: Point<i64, D>) -> Point<u8, D> {
         coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
 
-    pub fn coords<const D: usize>(
+    fn coords<const D: usize>(
         chunk_coords: Point<i32, D>,
         block_coords: Point<u8, D>,
     ) -> Point<i64, D> {
@@ -388,7 +388,7 @@ impl ChunkStore {
         value
     }
 
-    pub fn block(&self, coords: Point3<i64>) -> Block {
+    fn block(&self, coords: Point3<i64>) -> Block {
         self.get(World::chunk_coords(coords))
             .map_or(Block::Air, |chunk| chunk[World::block_coords(coords)])
     }
@@ -462,7 +462,7 @@ impl Index<Point3<i32>> for ChunkStore {
     }
 }
 
-pub struct ChunkCell(Box<Chunk>);
+struct ChunkCell(Box<Chunk>);
 
 impl ChunkCell {
     fn new(chunk: Chunk) -> Option<Self> {

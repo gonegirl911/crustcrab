@@ -144,7 +144,7 @@ impl BlockArea {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self.is_opaque(delta))
     }
 
-    pub fn is_transparent(self, delta: Vector3<i8>) -> bool {
+    fn is_transparent(self, delta: Vector3<i8>) -> bool {
         !self.is_opaque(delta)
     }
 
@@ -222,7 +222,7 @@ pub enum Corner {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Enum)]
-pub enum Component {
+enum Component {
     Edge1,
     Edge2,
     Corner,
@@ -280,17 +280,16 @@ pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
     }
 });
 
-pub static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> =
-    Lazy::new(|| {
-        SIDE_CORNER_SIDES.map(|s1, corner_sides| {
-            corner_sides.map(|_, [s2, s3]| {
-                (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
-            })
+static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> = Lazy::new(|| {
+    SIDE_CORNER_SIDES.map(|s1, corner_sides| {
+        corner_sides.map(|_, [s2, s3]| {
+            (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
         })
-    });
+    })
+});
 
 #[allow(clippy::type_complexity)]
-pub static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
+static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
     EnumMap<Side, EnumMap<Corner, EnumMap<Component, Vector3<i8>>>>,
 > = Lazy::new(|| {
     SIDE_CORNER_SIDES.map(|s1, corner_sides| {
@@ -314,7 +313,7 @@ static CORNER_TEX_COORDS: Lazy<EnumMap<Corner, Point2<u8>>> = Lazy::new(|| {
     }
 });
 
-pub const CORNERS: [Corner; 6] = [
+const CORNERS: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
     Corner::UpperLeft,

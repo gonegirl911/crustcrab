@@ -28,7 +28,7 @@ pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 impl Chunk {
     pub const DIM: usize = 16;
 
-    pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
+    fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
