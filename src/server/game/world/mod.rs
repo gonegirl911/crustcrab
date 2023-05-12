@@ -7,7 +7,7 @@ use self::{
     action::{ActionStore, BlockAction},
     block::{Block, BlockArea},
     chunk::{generator::ChunkGenerator, light::ChunkAreaLight, Chunk, ChunkArea},
-    light::ChunkMapLight,
+    light::WorldLight,
 };
 use crate::{
     client::{game::world::BlockVertex, ClientEvent},
@@ -36,7 +36,7 @@ pub struct World {
     chunks: ChunkStore,
     generator: ChunkGenerator,
     actions: ActionStore,
-    light: ChunkMapLight,
+    light: WorldLight,
     hovered_block: Option<BlockIntersection>,
     reach: Range<f32>,
 }

@@ -6,6 +6,7 @@ use super::{
     },
     {BlockAction, ChunkStore, World},
 };
+use crate::shared::color::Rgb;
 use nalgebra::{point, Point3, Vector3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -14,13 +15,12 @@ use std::{
         hash_map::{Entry, VacantEntry},
         VecDeque,
     },
-    num::NonZeroU8,
 };
 
 #[derive(Default)]
-pub struct ChunkMapLight(FxHashMap<Point3<i32>, ChunkLight>);
+pub struct WorldLight(FxHashMap<Point3<i32>, ChunkLight>);
 
-impl ChunkMapLight {
+impl WorldLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
         let mut value = ChunkAreaLight::default();
         for (chunk_delta, deltas) in ChunkArea::deltas() {
@@ -85,16 +85,16 @@ impl ChunkMapLight {
         data: &BlockData,
     ) -> impl Iterator<Item = Point3<i64>> + 'a {
         BlockLight::SKYLIGHT_RANGE
+            .zip(Self::light_beam_value(chunks, coords + Vector3::y()))
             .zip(data.light_filter)
-            .flat_map(move |(i, f)| {
+            .flat_map(move |((i, l), f)| {
                 let block_light = self.block_light_mut(coords);
                 let component = block_light.component(i);
                 let value = Self::apply_filter(component, f);
                 if block_light.set_component(i, value) {
                     let mut updates = FxHashSet::from_iter([coords]);
-                    let light_beam = Self::light_beam_value(chunks, coords + Vector3::y(), i);
                     updates.extend(self.unspread_component(chunks, coords, i, component, f));
-                    updates.extend(self.unspread_light_beam(chunks, coords, i, light_beam, f));
+                    updates.extend(self.unspread_light_beam(chunks, coords, i, l, f));
                     updates
                 } else {
                     Default::default()
@@ -115,22 +115,20 @@ impl ChunkMapLight {
                 let block_light = self.block_light_mut(coords);
                 let component = block_light.component(i);
                 let value = Self::apply_filter(component, f);
-                if value >= l {
-                    if block_light.set_component(i, value) {
-                        Some(coords)
-                            .into_iter()
-                            .chain(vec![])
-                            .chain(self.unspread_component(chunks, coords, i, component, f))
-                    } else {
-                        None.into_iter().chain(vec![]).chain(FxHashSet::default())
-                    }
-                } else {
+                if value < l {
                     block_light
                         .set_component(i, l)
                         .then_some(coords)
                         .into_iter()
                         .chain(self.spread_component(chunks, coords, i, l))
                         .chain(FxHashSet::default())
+                } else if block_light.set_component(i, value) {
+                    Some(coords)
+                        .into_iter()
+                        .chain(vec![])
+                        .chain(self.unspread_component(chunks, coords, i, component, f))
+                } else {
+                    None.into_iter().chain(vec![]).chain(FxHashSet::default())
                 }
             })
     }
@@ -140,23 +138,19 @@ impl ChunkMapLight {
         chunks: &'a ChunkStore,
         coords: Point3<i64>,
     ) -> impl Iterator<Item = Point3<i64>> + 'a {
-        BlockLight::SKYLIGHT_RANGE.flat_map(move |i| {
-            let neighbor = self.brightest_neighbor(coords, i);
-            let block_light = self.block_light_mut(coords);
-            let light_beam = Self::light_beam_value(chunks, coords + Vector3::y(), i);
-            let value = neighbor.saturating_sub(1).max(light_beam);
-            match block_light.component(i).cmp(&value) {
-                Ordering::Less => {
-                    block_light.set_component(i, value);
+        BlockLight::SKYLIGHT_RANGE
+            .zip(Self::light_beam_value(chunks, coords + Vector3::y()))
+            .flat_map(move |(i, l)| {
+                let value = self.brightest_neighbor(coords, i).saturating_sub(1).max(l);
+                if self.block_light_mut(coords).set_component(i, value) {
                     let mut updates = FxHashSet::from_iter([coords]);
                     updates.extend(self.spread_component(chunks, coords, i, value));
-                    updates.extend(self.spread_light_beam(chunks, coords, i, light_beam));
+                    updates.extend(self.spread_light_beam(chunks, coords, i, l));
                     updates
+                } else {
+                    Default::default()
                 }
-                Ordering::Equal => Default::default(),
-                Ordering::Greater => unreachable!(),
-            }
-        })
+            })
     }
 
     fn destroy_torchlight<'a>(
@@ -227,8 +221,6 @@ impl ChunkMapLight {
         Self::floor(coords)
             .map_while(move |coords| {
                 match self.unset_component(chunks, coords, index, expected, filter) {
-                    Ok(None) | Err((_, 0)) => None,
-                    Ok(Some(0)) => unreachable!(),
                     Ok(Some(e)) => {
                         expected = e;
                         Some(
@@ -237,6 +229,7 @@ impl ChunkMapLight {
                                 .chain(self.unspread_component(chunks, coords, index, e, filter)),
                         )
                     }
+                    Ok(None) | Err((_, 0)) => None,
                     Err((_, e)) => {
                         expected = e;
                         Some(None.into_iter().chain(FxHashSet::default()))
@@ -285,12 +278,11 @@ impl ChunkMapLight {
         while let Some((coords, expected)) = deq.pop_front() {
             for coords in Self::unvisited_neighbors(coords, &mut visits) {
                 match self.unset_component(chunks, coords, index, expected - 1, filter) {
-                    Ok(None) | Err((Ok(0) | Err(Ok(0) | Err(0)), _)) => {}
-                    Ok(Some(0)) => unreachable!(),
                     Ok(Some(expected)) => {
                         deq.push_back((coords, expected));
                         updates.push(coords);
                     }
+                    Ok(None) | Err((Ok(0) | Err(Ok(0) | Err(0)), _)) => {}
                     Err((Ok(component), _)) => {
                         sources.push((coords, component));
                     }
@@ -348,20 +340,18 @@ impl ChunkMapLight {
         let component = block_light.component(index);
         let data = chunks.block(coords).data();
         let expected = Self::apply_filter(expected, Self::filter(data, index));
-        match component.cmp(&expected) {
-            Ordering::Less => unreachable!(),
-            Ordering::Equal => {
-                let value = Self::apply_filter(component, filter);
-                let luminance = Self::luminance(data, index);
-                if value >= luminance {
-                    Ok(block_light.set_component(index, value).then_some(expected))
-                } else if block_light.set_component(index, luminance) {
-                    Err((Err(Ok(luminance)), expected))
-                } else {
-                    Err((Err(Err(luminance)), expected))
-                }
+        if component == expected {
+            let value = Self::apply_filter(component, filter);
+            let luminance = Self::luminance(data, index);
+            if value >= luminance {
+                Ok(block_light.set_component(index, value).then_some(expected))
+            } else if block_light.set_component(index, luminance) {
+                Err((Err(Ok(luminance)), expected))
+            } else {
+                Err((Err(Err(luminance)), expected))
             }
-            Ordering::Greater => Err((Ok(component), expected)),
+        } else {
+            Err((Ok(component), expected))
         }
     }
 
@@ -385,7 +375,7 @@ impl ChunkMapLight {
         )
     }
 
-    fn light_beam_value(chunks: &ChunkStore, coords: Point3<i64>, index: usize) -> u8 {
+    fn light_beam_value(chunks: &ChunkStore, coords: Point3<i64>) -> Rgb<u8> {
         let [chunk_x, chunk_z] = <[_; 2]>::from(World::chunk_coords(coords.xz()));
         let [block_x, block_z] = <[_; 2]>::from(World::block_coords(coords.xz()));
         World::Y_RANGE
@@ -400,11 +390,12 @@ impl ChunkMapLight {
             .take_while(|(chunk_y, block_y, _)| {
                 World::coords(point![*chunk_y], point![*block_y]).x >= coords.y
             })
-            .map(|(_, _, block)| Self::filter(block.data(), index))
-            .try_fold(BlockLight::COMPONENT_MAX, |accum, f| {
-                Some(NonZeroU8::new(Self::apply_filter(accum, f))?.get())
+            .map(|(_, _, block)| block.data().light_filter)
+            .try_fold(Rgb::splat(BlockLight::COMPONENT_MAX), |accum, f| {
+                let value = accum.zip_map(f, Self::apply_filter);
+                (value != Rgb::splat(0)).then_some(value)
             })
-            .unwrap_or(0)
+            .unwrap_or(Rgb::splat(0))
     }
 
     fn floor(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {

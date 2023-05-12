@@ -11,11 +11,11 @@ impl<T> Rgb<T> {
         Self([r, g, b])
     }
 
-    fn zip<F, U, V>(self, rhs: Rgb<U>, mut f: F) -> Rgb<V>
+    pub fn zip_map<F, U, V>(self, rhs: Rgb<U>, mut f: F) -> Rgb<V>
     where
         T: Copy,
-        F: FnMut(T, U) -> V,
         U: Copy,
+        F: FnMut(T, U) -> V,
     {
         Rgb(array::from_fn(|i| f(self[i], rhs[i])))
     }
@@ -29,7 +29,7 @@ impl<T: Copy> Rgb<T> {
 
 impl Rgb<f32> {
     pub fn lerp(self, rhs: Self, t: f32) -> Self {
-        self.zip(rhs, |a, b| a * (1.0 - t) + b * t)
+        self.zip_map(rhs, |a, b| a * (1.0 - t) + b * t)
     }
 }
 
