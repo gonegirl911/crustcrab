@@ -51,6 +51,10 @@ impl Chunk {
         })
     }
 
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
+        Self::points().zip(self.0.iter().flatten().flatten().copied())
+    }
+
     pub fn is_empty(&self) -> bool {
         let expected = unsafe { mem::transmute([Block::Air; Self::DIM]) };
         self.0
@@ -61,10 +65,6 @@ impl Chunk {
 
     pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
         self[coords].apply(action)
-    }
-
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
-        Self::points().zip(self.0.iter().flatten().flatten().copied())
     }
 
     fn points() -> impl Iterator<Item = Point3<u8>> {
