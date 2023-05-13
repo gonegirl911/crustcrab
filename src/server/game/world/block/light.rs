@@ -1,7 +1,8 @@
 use super::{data::BlockData, BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
+use crate::{server::game::world::chunk::Chunk, shared::utils};
 use bitfield::bitfield;
 use enum_map::{enum_map, EnumMap};
-use nalgebra::{point, Point3, Vector3};
+use nalgebra::{point, vector, Point3, Vector3};
 use std::{
     array,
     iter::Sum,
@@ -18,6 +19,15 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
     pub const COMPONENT_MAX: u8 = 15;
+
+    pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
+        let chunk_reach = utils::div_ceil(Self::COMPONENT_MAX as usize - 1, Chunk::DIM) as i32;
+        (-chunk_reach..1 + chunk_reach).flat_map(move |dx| {
+            (-chunk_reach..1 + chunk_reach).flat_map(move |dy| {
+                (-chunk_reach..1 + chunk_reach).map(move |dz| vector![dx, dy, dz])
+            })
+        })
+    }
 }
 
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);

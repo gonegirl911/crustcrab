@@ -123,7 +123,7 @@ pub struct BlockArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in u32));
 impl BlockArea {
     pub const DIM: usize = 1 + Self::PADDING * 2;
     pub const PADDING: usize = 1;
-    const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(1 + Self::PADDING) as i8;
+    const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..1 + Self::PADDING as i8;
 
     pub fn from_fn<F: FnMut(Vector3<i8>) -> bool>(mut f: F) -> Self {
         let mut value = Self::default();

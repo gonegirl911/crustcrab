@@ -33,18 +33,38 @@ impl WorldLight {
         value
     }
 
-    pub fn insert_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        Default::default()
+    pub fn insert_many(
+        &mut self,
+        chunks: &ChunkStore,
+        points: &FxHashSet<Point3<i32>>,
+    ) -> FxHashSet<Point3<i64>> {
+        let mut updates = FxHashSet::default();
+
+        let prev = std::time::Instant::now();
+
+        dbg!(prev.elapsed());
+
+        updates
     }
 
-    pub fn remove_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        Default::default()
+    pub fn remove_many(
+        &mut self,
+        chunks: &ChunkStore,
+        points: &FxHashSet<Point3<i32>>,
+    ) -> FxHashSet<Point3<i64>> {
+        for coords in points {
+            self.0.remove(coords);
+        }
+
+        self.insert_many(
+            chunks,
+            &points
+                .iter()
+                .copied()
+                .flat_map(|coords| BlockLight::chunk_deltas().map(move |delta| coords + delta))
+                .filter(|coords| !points.contains(coords))
+                .collect::<FxHashSet<_>>(),
+        )
     }
 
     pub fn apply(

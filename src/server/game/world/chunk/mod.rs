@@ -51,8 +51,8 @@ impl Chunk {
         })
     }
 
-    pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
-        self[coords].apply(action)
+    pub fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
+        Self::points().zip(self.0.iter().flatten().flatten().copied())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -63,7 +63,17 @@ impl Chunk {
             .all(|blocks| *unsafe { mem::transmute::<_, &u128>(blocks) } == expected)
     }
 
-    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
+    pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
+        self[coords].apply(action)
+    }
+
+    fn points() -> impl Iterator<Item = Point3<u8>> {
+        (0..Self::DIM).flat_map(|x| {
+            (0..Self::DIM).flat_map(move |y| (0..Self::DIM).map(move |z| point![x, y, z].cast()))
+        })
+    }
+
+    fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
             World::coords(coords, Default::default()).cast(),
             Vector3::from_element(Self::DIM).cast(),
@@ -72,17 +82,6 @@ impl Chunk {
 
     pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
         Self::bounding_box(coords).into()
-    }
-
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> + '_ {
-        self.0.iter().zip(0..).flat_map(move |(blocks, x)| {
-            blocks.iter().zip(0..).flat_map(move |(blocks, y)| {
-                blocks
-                    .iter()
-                    .zip(0..)
-                    .map(move |(block, z)| (point![x, y, z], block))
-            })
-        })
     }
 }
 
@@ -109,7 +108,7 @@ impl ChunkArea {
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;
     const CHUNK_PADDING: usize = utils::div_ceil(Self::PADDING, Chunk::DIM);
     const CHUNK_AXIS_RANGE: Range<i32> =
-        -(Self::CHUNK_PADDING as i32)..(1 + Self::CHUNK_PADDING as i32);
+        -(Self::CHUNK_PADDING as i32)..1 + Self::CHUNK_PADDING as i32;
     const REM: usize = Self::PADDING % Chunk::DIM;
 
     fn block_area(&self, coords: Point3<u8>) -> BlockArea {

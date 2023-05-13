@@ -11,7 +11,7 @@ impl ActionStore {
             .get(&coords)
             .into_iter()
             .flatten()
-            .map(|(coords, action)| (*coords, action))
+            .map(|(&coords, action)| (coords, action))
     }
 
     pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {

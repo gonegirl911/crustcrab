@@ -27,6 +27,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::LinkedList,
+    hash::Hash,
     ops::{Deref, Index, Range},
     sync::Arc,
 };
@@ -266,19 +267,19 @@ impl World {
             .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
     }
 
-    fn unzip<T, I>(iter: I) -> (Vec<T>, Vec<T>)
+    fn unzip<T, I>(iter: I) -> (Vec<T>, FxHashSet<T>)
     where
-        T: Copy,
+        T: Copy + Eq + Hash,
         I: IntoIterator<Item = Result<T, T>>,
     {
         let mut all = vec![];
-        let mut err = vec![];
+        let mut err = FxHashSet::default();
         for value in iter {
             match value {
                 Ok(value) => all.push(value),
                 Err(value) => {
                     all.push(value);
-                    err.push(value);
+                    err.insert(value);
                 }
             }
         }
@@ -308,7 +309,7 @@ impl EventHandler<WorldEvent> for World {
         match event {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let (mut loads, inserts) = Self::unzip(self.load_many(area.points()));
-                let _ = self.light.insert_many(&self.chunks, inserts);
+                let _ = self.light.insert_many(&self.chunks, &inserts);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - area.center)
@@ -327,9 +328,9 @@ impl EventHandler<WorldEvent> for World {
                 let updates = Self::updates(
                     &loads.iter().chain(&unloads).copied().collect(),
                     self.light
-                        .remove_many(&self.chunks, removes)
+                        .remove_many(&self.chunks, &removes)
                         .into_iter()
-                        .chain(self.light.insert_many(&self.chunks, inserts)),
+                        .chain(self.light.insert_many(&self.chunks, &inserts)),
                     true,
                 );
 
