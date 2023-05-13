@@ -33,36 +33,35 @@ impl WorldLight {
         value
     }
 
-    pub fn insert_many(
-        &mut self,
-        chunks: &ChunkStore,
-        points: &FxHashSet<Point3<i32>>,
-    ) -> FxHashSet<Point3<i64>> {
-        let mut updates = FxHashSet::default();
+    pub fn insert_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        let points = points
+            .into_iter()
+            .filter_map(|coords| Some((coords, chunks.get(coords)?)))
+            .collect::<Vec<_>>();
 
-        let prev = std::time::Instant::now();
-
-        dbg!(prev.elapsed());
-
-        updates
+        Default::default()
     }
 
-    pub fn remove_many(
-        &mut self,
-        chunks: &ChunkStore,
-        points: &FxHashSet<Point3<i32>>,
-    ) -> FxHashSet<Point3<i64>> {
-        for coords in points {
+    pub fn remove_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        let area = points
+            .into_iter()
+            .flat_map(Self::chunk_light_area)
+            .collect::<FxHashSet<_>>();
+
+        for coords in &area {
             self.0.remove(coords);
         }
 
         self.insert_many(
             chunks,
-            &points
-                .iter()
-                .copied()
-                .flat_map(|coords| BlockLight::chunk_deltas().map(move |delta| coords + delta))
-                .filter(|coords| !points.contains(coords))
+            area.into_iter()
+                .flat_map(Self::chunk_light_area)
                 .collect::<FxHashSet<_>>(),
         )
     }
@@ -108,10 +107,10 @@ impl WorldLight {
             .zip(Self::light_beam_value(chunks, coords + Vector3::y()))
             .zip(data.light_filter)
             .flat_map(move |((i, l), f)| {
-                let block_light = self.block_light_mut(coords);
-                let component = block_light.component(i);
+                let light = self.block_light_mut(coords);
+                let component = light.component(i);
                 let value = Self::apply_filter(component, f);
-                if block_light.set_component(i, value) {
+                if light.set_component(i, value) {
                     let mut updates = FxHashSet::from_iter([coords]);
                     updates.extend(self.unspread_component(chunks, coords, i, component, f));
                     updates.extend(self.unspread_light_beam(chunks, coords, i, l, f));
@@ -132,17 +131,17 @@ impl WorldLight {
             .zip(data.luminance)
             .zip(data.light_filter)
             .flat_map(move |((i, l), f)| {
-                let block_light = self.block_light_mut(coords);
-                let component = block_light.component(i);
+                let light = self.block_light_mut(coords);
+                let component = light.component(i);
                 let value = Self::apply_filter(component, f);
                 if value < l {
-                    block_light
+                    light
                         .set_component(i, l)
                         .then_some(coords)
                         .into_iter()
                         .chain(self.spread_component(chunks, coords, i, l))
                         .chain(FxHashSet::default())
-                } else if block_light.set_component(i, value) {
+                } else if light.set_component(i, value) {
                     Some(coords)
                         .into_iter()
                         .chain(vec![])
@@ -180,11 +179,11 @@ impl WorldLight {
     ) -> impl Iterator<Item = Point3<i64>> + 'a {
         BlockLight::TORCHLIGHT_RANGE.flat_map(move |i| {
             let value = self.brightest_neighbor(coords, i).saturating_sub(1);
-            let block_light = self.block_light_mut(coords);
-            let component = block_light.component(i);
+            let light = self.block_light_mut(coords);
+            let component = light.component(i);
             match component.cmp(&value) {
                 Ordering::Less => {
-                    block_light.set_component(i, value);
+                    light.set_component(i, value);
                     Some(coords)
                         .into_iter()
                         .chain(self.spread_component(chunks, coords, i, value))
@@ -192,7 +191,7 @@ impl WorldLight {
                 }
                 Ordering::Equal => None.into_iter().chain(vec![]).chain(FxHashSet::default()),
                 Ordering::Greater => {
-                    block_light.set_component(i, 0);
+                    light.set_component(i, 0);
                     Some(coords)
                         .into_iter()
                         .chain(vec![])
@@ -325,7 +324,7 @@ impl WorldLight {
     }
 
     fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
-        self.block_light(coords).component(index)
+        self.light(coords).component(index)
     }
 
     fn set_component(
@@ -335,12 +334,12 @@ impl WorldLight {
         index: usize,
         value: u8,
     ) -> Result<u8, u8> {
-        let block_light = self.block_light_mut(coords);
-        let component = block_light.component(index);
         let data = chunks.block(coords).data();
+        let light = self.block_light_mut(coords);
+        let component = light.component(index);
         let value = Self::apply_filter(value, Self::filter(data, index));
         if component < value {
-            block_light.set_component(index, value);
+            light.set_component(index, value);
             Ok(value)
         } else {
             Err(value)
@@ -356,16 +355,16 @@ impl WorldLight {
         expected: u8,
         filter: f32,
     ) -> Result<Option<u8>, (Result<u8, Result<u8, u8>>, u8)> {
-        let block_light = self.block_light_mut(coords);
-        let component = block_light.component(index);
         let data = chunks.block(coords).data();
+        let light = self.block_light_mut(coords);
+        let component = light.component(index);
         let expected = Self::apply_filter(expected, Self::filter(data, index));
         if component == expected {
             let value = Self::apply_filter(component, filter);
             let luminance = Self::luminance(data, index);
             if value >= luminance {
-                Ok(block_light.set_component(index, value).then_some(expected))
-            } else if block_light.set_component(index, luminance) {
+                Ok(light.set_component(index, value).then_some(expected))
+            } else if light.set_component(index, luminance) {
                 Err((Err(Ok(luminance)), expected))
             } else {
                 Err((Err(Err(luminance)), expected))
@@ -382,7 +381,7 @@ impl WorldLight {
             .unwrap_or_else(|| unreachable!())
     }
 
-    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
+    fn light(&self, coords: Point3<i64>) -> BlockLight {
         self.0
             .get(&World::chunk_coords(coords))
             .map_or_else(Default::default, |light| light[World::block_coords(coords)])
@@ -393,6 +392,10 @@ impl WorldLight {
             self.0.entry(World::chunk_coords(coords)),
             World::block_coords(coords),
         )
+    }
+
+    fn chunk_light_area(coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
+        BlockLight::chunk_deltas().map(move |delta| coords + delta)
     }
 
     fn light_beam_value(chunks: &ChunkStore, coords: Point3<i64>) -> Rgb<u8> {
@@ -485,8 +488,8 @@ impl<'a> BlockLightRefMut<'a> {
     }
 
     fn get(&self) -> BlockLight {
-        if let Self::Occupied(block_light) = self {
-            **block_light
+        if let Self::Occupied(light) = self {
+            **light
         } else {
             Default::default()
         }
@@ -494,7 +497,7 @@ impl<'a> BlockLightRefMut<'a> {
 
     fn into_mut(self) -> &'a mut BlockLight {
         match self {
-            Self::Occupied(block_light) => block_light,
+            Self::Occupied(light) => light,
             Self::Vacant { entry, coords } => &mut entry.insert(Default::default())[coords],
         }
     }

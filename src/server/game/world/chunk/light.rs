@@ -1,25 +1,11 @@
 use super::{Chunk, ChunkArea};
 use crate::server::game::world::block::light::{BlockAreaLight, BlockLight};
 use nalgebra::{Point3, Vector3};
-use std::{
-    mem,
-    ops::{Index, IndexMut},
-};
+use std::ops::{Index, IndexMut};
 
 #[repr(align(16))]
 #[derive(Default)]
 pub struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
-
-impl ChunkLight {
-    pub fn is_empty(&self) -> bool {
-        let expected = unsafe { mem::transmute([BlockLight::default(); 4]) };
-        self.0
-            .iter()
-            .flatten()
-            .flat_map(|lights| lights.chunks_exact(4))
-            .all(|lights| *unsafe { &*lights.as_ptr().cast::<u128>() } == expected)
-    }
-}
 
 impl Index<Point3<u8>> for ChunkLight {
     type Output = BlockLight;

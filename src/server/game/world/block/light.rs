@@ -93,7 +93,7 @@ impl BlockLightSum {
     fn avg(self) -> BlockLight {
         let mut value = BlockLight::default();
         for (i, component) in self.components.into_iter().enumerate() {
-            value.set_component(i, component / self.count.max(1))
+            value.set_component(i, component / self.count.max(1));
         }
         value
     }
