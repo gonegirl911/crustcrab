@@ -51,19 +51,14 @@ impl WorldLight {
     {
         let area = points
             .into_iter()
-            .flat_map(Self::chunk_light_area)
+            .flat_map(|coords| BlockLight::chunk_deltas().map(move |delta| coords + delta))
             .collect::<FxHashSet<_>>();
 
         for coords in &area {
             self.0.remove(coords);
         }
 
-        self.insert_many(
-            chunks,
-            area.into_iter()
-                .flat_map(Self::chunk_light_area)
-                .collect::<FxHashSet<_>>(),
-        )
+        self.insert_many(chunks, area)
     }
 
     pub fn apply(
@@ -392,10 +387,6 @@ impl WorldLight {
             self.0.entry(World::chunk_coords(coords)),
             World::block_coords(coords),
         )
-    }
-
-    fn chunk_light_area(coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
-        BlockLight::chunk_deltas().map(move |delta| coords + delta)
     }
 
     fn light_beam_value(chunks: &ChunkStore, coords: Point3<i64>) -> Rgb<u8> {
