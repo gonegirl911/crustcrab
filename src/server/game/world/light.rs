@@ -37,11 +37,6 @@ impl WorldLight {
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        let points = points
-            .into_iter()
-            .filter_map(|coords| Some((coords, chunks.get(coords)?)))
-            .collect::<Vec<_>>();
-
         Default::default()
     }
 
@@ -49,16 +44,7 @@ impl WorldLight {
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        let area = points
-            .into_iter()
-            .flat_map(|coords| BlockLight::chunk_deltas().map(move |delta| coords + delta))
-            .collect::<FxHashSet<_>>();
-
-        for coords in &area {
-            self.0.remove(coords);
-        }
-
-        self.insert_many(chunks, area)
+        Default::default()
     }
 
     pub fn apply(
@@ -80,14 +66,14 @@ impl WorldLight {
         data: &BlockData,
     ) -> FxHashSet<Point3<i64>> {
         let mut updates = FxHashSet::default();
-        updates.extend(self.block_skylight(chunks, coords, data));
+        // updates.extend(self.block_skylight(chunks, coords, data));
         updates.extend(self.place_torchlight(chunks, coords, data));
         updates
     }
 
     fn destroy(&mut self, chunks: &ChunkStore, coords: Point3<i64>) -> FxHashSet<Point3<i64>> {
         let mut updates = FxHashSet::default();
-        updates.extend(self.unblock_skylight(chunks, coords));
+        // updates.extend(self.unblock_skylight(chunks, coords));
         updates.extend(self.destroy_torchlight(chunks, coords));
         updates
     }
