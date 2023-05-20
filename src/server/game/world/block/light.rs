@@ -37,8 +37,8 @@ impl BlockAreaLight {
         side: Side,
         area: BlockArea,
     ) -> EnumMap<Corner, BlockLight> {
+        let side_delta = SIDE_DELTAS[side];
         if data.smooth_lighting() {
-            let side_delta = SIDE_DELTAS[side];
             SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
                 component_deltas
                     .into_values()
@@ -49,7 +49,7 @@ impl BlockAreaLight {
                     .avg()
             })
         } else {
-            enum_map! { _ => self[SIDE_DELTAS[side]] }
+            enum_map! { _ => self[side_delta] }
         }
     }
 

@@ -80,19 +80,13 @@ impl World {
             .collect()
     }
 
-    fn unload_many<I>(&mut self, points: I) -> Vec<Result<Point3<i32>, Point3<i32>>>
+    fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
         points
             .into_iter()
-            .map(|coords| {
-                if self.chunks.unload(coords) {
-                    Err(coords)
-                } else {
-                    Ok(coords)
-                }
-            })
+            .filter(|coords| self.chunks.unload(*coords))
             .collect()
     }
 
@@ -322,12 +316,12 @@ impl EventHandler<WorldEvent> for World {
                 self.par_send_loads(loads, server_tx, false);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
-                let (unloads, removes) = Self::unzip(self.unload_many(prev.exclusive_points(curr)));
+                let unloads = self.unload_many(prev.exclusive_points(curr));
                 let (loads, inserts) = Self::unzip(self.load_many(curr.exclusive_points(prev)));
                 let updates = Self::updates(
                     &loads.iter().chain(&unloads).copied().collect(),
                     self.light
-                        .remove_many(&self.chunks, removes)
+                        .remove_many(&self.chunks, unloads.iter().copied())
                         .into_iter()
                         .chain(self.light.insert_many(&self.chunks, inserts)),
                     true,
