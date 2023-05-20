@@ -83,40 +83,47 @@ fn scatter(color: vec3<f32>, origin: vec3<f32>, dir: vec3<f32>, depth: f32) -> v
     let cos_theta = dot(dir, a.sun_dir);
     let phase_ray = phase_ray(cos_theta);
     let phase_mie = phase_mie(cos_theta);
+    
     var sum_ray = vec3(0.0);
     var sum_mie = vec3(0.0);
 
     let t = intersect(origin, dir, a.r_atmosphere);
     let length = mix(min(player.zfar * depth, t), t, f32(depth == 1.0));
     let step_size = length / f32(a.num_samples);
+    
     var t_curr = step_size * 0.5;
     var opt = vec3(0.0);
 
     for (var i = 0u; i < a.num_samples; i++) {
         let coords = origin + dir * t_curr;
         let density = density(coords) * step_size;
+
         t_curr += step_size;
         opt += density;
 
         let length = intersect(coords, a.sun_dir, a.r_atmosphere);
         let step_size = length / f32(a.num_light_samples);
+        
         var t_curr = step_size * 0.5;
         var opt_light = vec3(0.0);
 
         for (var i = 0u; i < a.num_light_samples; i++) {
             let coords = coords + a.sun_dir * t_curr;
             let density = density(coords) * step_size;
+            
             t_curr += step_size;
             opt_light += density;
         }
         
         let attn = exp(-a.b_ray * (opt.x + opt_light.x) - a.b_mie * (opt.y + opt_light.y) - a.b_ab * (opt.z + opt_light.z));
+        
         sum_ray += density.x * attn;
         sum_mie += density.y * attn;
     }
 
     let ex = exp(-a.b_ray * opt.x - a.b_mie * opt.y - a.b_ab * opt.z);
     let in = a.sun_intensity * (sum_ray * a.b_ray * phase_ray + sum_mie * a.b_mie * phase_mie);
+    
     return color * ex + in;
 }
 
