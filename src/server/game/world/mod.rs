@@ -17,7 +17,7 @@ use crate::{
             ray::{BlockIntersection, Ray},
             Player, WorldArea,
         },
-        ServerEvent, ServerSettings,
+        ServerEvent, ServerState,
     },
     shared::utils,
 };
@@ -44,9 +44,9 @@ pub struct World {
 impl World {
     const Y_RANGE: Range<i32> = -4..20;
 
-    pub fn new(settings: &ServerSettings) -> Self {
+    pub fn new(state: &ServerState) -> Self {
         Self {
-            reach: settings.reach.clone(),
+            reach: state.reach.clone(),
             ..Default::default()
         }
     }

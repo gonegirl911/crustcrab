@@ -22,6 +22,8 @@ pub enum Block {
     Air = 0,
     Sand,
     Glowstone,
+    GlassMagenta,
+    GlassCyan,
 }
 
 impl Block {

@@ -1,4 +1,4 @@
-use super::{ticker::Ticker, ServerEvent, ServerSettings};
+use super::{ticker::Ticker, ServerEvent, ServerState};
 use crate::client::ClientEvent;
 use flume::{Receiver, Sender};
 
@@ -12,12 +12,12 @@ impl EventLoop {
     pub fn new(
         server_tx: Sender<ServerEvent>,
         client_rx: Receiver<ClientEvent>,
-        settings: &ServerSettings,
+        state: &ServerState,
     ) -> Self {
         Self {
             server_tx,
             client_rx,
-            ticks_per_second: settings.ticks_per_second,
+            ticks_per_second: state.ticks_per_second,
         }
     }
 

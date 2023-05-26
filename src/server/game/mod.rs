@@ -9,7 +9,7 @@ use self::{
 };
 use super::{
     event_loop::{Event, EventHandler},
-    ServerEvent, ServerSettings,
+    ServerEvent, ServerState,
 };
 use flume::Sender;
 use std::thread;
@@ -21,10 +21,10 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(settings: &ServerSettings) -> Self {
+    pub fn new(state: &ServerState) -> Self {
         let player = Default::default();
         let clock = Default::default();
-        let mut world = World::new(settings);
+        let mut world = World::new(state);
         let (world_tx, world_rx) = flume::unbounded();
 
         thread::spawn(move || {

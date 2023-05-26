@@ -14,11 +14,12 @@ use crosshair::Crosshair;
 use nalgebra::Point3;
 use serde::Deserialize;
 use std::fs;
+use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
-    settings: ClientSettings,
+    state: ClientState,
 }
 
 impl Gui {
@@ -26,24 +27,24 @@ impl Gui {
         Self {
             blit: Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT),
             crosshair: Crosshair::new(renderer, input_bind_group_layout),
-            settings: ClientSettings::new(),
+            state: ClientState::new(),
         }
     }
 
     pub fn selected_block(&self) -> Option<Block> {
-        self.settings.selected_block
+        self.state.selected_block
     }
 
     pub fn render_distance(&self) -> u32 {
-        self.settings.render_distance
+        self.state.render_distance
     }
 
     pub fn origin(&self) -> Point3<f32> {
-        self.settings.origin
+        self.state.origin
     }
 
     pub fn fovy(&self) -> f32 {
-        self.settings.fovy
+        self.state.fovy
     }
 
     pub fn zfar(&self) -> f32 {
@@ -51,11 +52,11 @@ impl Gui {
     }
 
     pub fn speed(&self) -> f32 {
-        self.settings.speed
+        self.state.speed
     }
 
     pub fn sensitivity(&self) -> f32 {
-        self.settings.sensitivity
+        self.state.sensitivity
     }
 }
 
@@ -75,11 +76,33 @@ impl EventHandler for Gui {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         self.crosshair.handle(event, renderer);
+
+        if let Event::WindowEvent {
+            event:
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(keycode),
+                            state: ElementState::Pressed,
+                            ..
+                        },
+                    ..
+                },
+            ..
+        } = event
+        {
+            self.state.selected_block = match keycode {
+                VirtualKeyCode::Key1 => Some(Block::Glowstone),
+                VirtualKeyCode::Key2 => Some(Block::GlassMagenta),
+                VirtualKeyCode::Key3 => Some(Block::GlassCyan),
+                _ => self.state.selected_block,
+            };
+        }
     }
 }
 
 #[derive(Deserialize)]
-struct ClientSettings {
+struct ClientState {
     selected_block: Option<Block>,
     render_distance: u32,
     origin: Point3<f32>,
@@ -88,7 +111,7 @@ struct ClientSettings {
     sensitivity: f32,
 }
 
-impl ClientSettings {
+impl ClientState {
     fn new() -> Self {
         toml::from_str(&fs::read_to_string("assets/client.toml").expect("file should exist"))
             .expect("file should be valid")
