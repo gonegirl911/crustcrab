@@ -25,7 +25,7 @@ side_tex_paths.back = "glass_magenta.png"
 side_tex_paths.left = "glass_magenta.png"
 side_tex_paths.up = "glass_magenta.png"
 side_tex_paths.down = "glass_magenta.png"
-light_filter = [1.0, 1.0, 0.0]
+light_filter = [1.0, 0.0, 1.0]
 
 [glass_cyan]
 side_tex_paths.front = "glass_cyan.png"

@@ -53,7 +53,7 @@ impl World {
                 range: 0..mem::size_of::<BlockPushConstants>() as u32,
             }],
             PostProcessor::FORMAT,
-            None,
+            Some(wgpu::BlendState::ALPHA_BLENDING),
             Some(wgpu::Face::Back),
             Some(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
