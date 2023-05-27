@@ -60,13 +60,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.light, 16u, 4u)),
         f32(extractBits(vertex.light, 20u, 4u)),
     );
-
     let face_light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     let ambient_light = mix(0.2, 1.0, ao / 3.0);
     let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     let light_factor = saturate(global_light + local_light) * ambient_light * face_light;
-
     return VertexOutput(
         player.vp * vec4(coords, 1.0),
         tex_index,

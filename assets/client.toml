@@ -1,4 +1,4 @@
-selected_block = "glowstone"
+inventory = ["glowstone", "glass_magenta", "glass_cyan"]
 render_distance = 36
 origin = [0.0, 1.62, 0.0]
 fovy = 90.0

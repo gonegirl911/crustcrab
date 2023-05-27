@@ -1,5 +1,7 @@
 pub mod crosshair;
+pub mod inventory;
 
+use self::{crosshair::Crosshair, inventory::Inventory};
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
@@ -10,29 +12,33 @@ use crate::{
     },
     server::game::world::{block::Block, chunk::Chunk},
 };
-use crosshair::Crosshair;
-use nalgebra::Point3;
+use nalgebra::{vector, Matrix4, Point3};
 use serde::Deserialize;
 use std::fs;
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
+    inventory: Inventory,
     state: ClientState,
 }
 
 impl Gui {
     pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+        let blit = Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT);
+        let crosshair = Crosshair::new(renderer, input_bind_group_layout);
+        let state = ClientState::new();
+        let inventory = Inventory::new(renderer, state.inventory);
         Self {
-            blit: Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT),
-            crosshair: Crosshair::new(renderer, input_bind_group_layout),
-            state: ClientState::new(),
+            blit,
+            crosshair,
+            inventory,
+            state,
         }
     }
 
     pub fn selected_block(&self) -> Option<Block> {
-        self.state.selected_block
+        self.inventory.selected_block()
     }
 
     pub fn render_distance(&self) -> u32 {
@@ -58,6 +64,15 @@ impl Gui {
     pub fn sensitivity(&self) -> f32 {
         self.state.sensitivity
     }
+
+    fn element_scaling(config: &wgpu::SurfaceConfiguration) -> Matrix4<f32> {
+        let size = (config.height as f32 * 0.065).max(27.0);
+        Matrix4::new_nonuniform_scaling(&vector![
+            size / config.width as f32,
+            size / config.height as f32,
+            1.0
+        ])
+    }
 }
 
 impl Effect for Gui {
@@ -68,6 +83,7 @@ impl Effect for Gui {
     ) {
         self.blit.draw(render_pass, input_bind_group);
         self.crosshair.draw(render_pass, input_bind_group);
+        self.inventory.draw(render_pass);
     }
 }
 
@@ -76,34 +92,13 @@ impl EventHandler for Gui {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         self.crosshair.handle(event, renderer);
-
-        if let Event::WindowEvent {
-            event:
-                WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(keycode),
-                            state: ElementState::Pressed,
-                            ..
-                        },
-                    ..
-                },
-            ..
-        } = event
-        {
-            self.state.selected_block = match keycode {
-                VirtualKeyCode::Key1 => Some(Block::Glowstone),
-                VirtualKeyCode::Key2 => Some(Block::GlassMagenta),
-                VirtualKeyCode::Key3 => Some(Block::GlassCyan),
-                _ => self.state.selected_block,
-            };
-        }
+        self.inventory.handle(event, renderer);
     }
 }
 
 #[derive(Deserialize)]
 struct ClientState {
-    selected_block: Option<Block>,
+    inventory: [Option<Block>; 9],
     render_distance: u32,
     origin: Point3<f32>,
     fovy: f32,

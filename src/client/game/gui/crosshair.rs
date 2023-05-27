@@ -1,3 +1,4 @@
+use super::Gui;
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
@@ -6,7 +7,7 @@ use crate::client::{
     },
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Matrix4};
+use nalgebra::Matrix4;
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Crosshair {
@@ -58,10 +59,6 @@ impl Crosshair {
         );
         render_pass.draw(0..6, 0..1);
     }
-
-    fn size(screen_height: u32) -> f32 {
-        (screen_height as f32 * 0.065).max(27.0)
-    }
 }
 
 impl EventHandler for Crosshair {
@@ -82,14 +79,9 @@ impl EventHandler for Crosshair {
             }
             Event::RedrawRequested(_) => {
                 if self.is_resized {
-                    let size = Self::size(config.height);
                     self.uniform.write(
                         renderer,
-                        &CrosshairUniformData::new(Matrix4::new_nonuniform_scaling(&vector![
-                            size / config.width as f32,
-                            size / config.height as f32,
-                            1.0
-                        ])),
+                        &CrosshairUniformData::new(Gui::element_scaling(config)),
                     );
                 }
             }

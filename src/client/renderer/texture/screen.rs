@@ -166,12 +166,12 @@ impl<const N: usize> InputOutputTextureArray<N> {
         Renderer { device, .. }: &Renderer,
         textures: &[ScreenTexture; N],
         sampler: &wgpu::Sampler,
-        bind_group_layout: &wgpu::BindGroupLayout,
+        layout: &wgpu::BindGroupLayout,
     ) -> [wgpu::BindGroup; N] {
         array::from_fn(|i| {
             device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
-                layout: bind_group_layout,
+                layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
