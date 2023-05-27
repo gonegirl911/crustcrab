@@ -32,7 +32,11 @@ impl Player {
         let aspect = config.width as f32 / config.height as f32;
         let projection = Projection::new(gui.fovy(), aspect, 0.1, gui.zfar());
         let controller = Controller::new(gui.speed(), gui.sensitivity());
-        let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
+        let uniform = Uniform::new(
+            renderer,
+            Some(&Self::data(&view, &projection)),
+            wgpu::ShaderStages::VERTEX_FRAGMENT,
+        );
         Self {
             view,
             controller,
@@ -59,6 +63,16 @@ impl Player {
             self.projection.aspect(),
             self.projection.znear(),
             self.projection.zfar(),
+        )
+    }
+
+    fn data(view: &View, projection: &Projection) -> PlayerUniformData {
+        PlayerUniformData::new(
+            view.mat(),
+            projection.mat(),
+            view.origin(),
+            projection.znear(),
+            projection.zfar(),
         )
     }
 }
@@ -113,16 +127,8 @@ impl EventHandler for Player {
                 }
 
                 if changes.intersects(Changes::MATRIX_CHANGES) {
-                    self.uniform.write(
-                        renderer,
-                        &PlayerUniformData::new(
-                            self.view.mat(),
-                            self.projection.mat(),
-                            self.view.origin(),
-                            self.projection.znear(),
-                            self.projection.zfar(),
-                        ),
-                    );
+                    self.uniform
+                        .write(renderer, &Self::data(&self.view, &self.projection));
                 }
             }
             _ => {}

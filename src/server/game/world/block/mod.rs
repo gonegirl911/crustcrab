@@ -27,8 +27,6 @@ pub enum Block {
 }
 
 impl Block {
-    pub const MAX_VERTICES_COUNT: usize = Side::LENGTH * CORNERS.len();
-
     pub fn vertices(
         self,
         coords: Point3<u8>,

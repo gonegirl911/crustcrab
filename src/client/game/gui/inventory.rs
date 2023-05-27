@@ -1,45 +1,95 @@
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{program::Program, uniform::Uniform, Renderer},
+        game::world::BlockVertex,
+        renderer::{
+            effect::PostProcessor,
+            mesh::{Mesh, Vertex},
+            program::Program,
+            uniform::Uniform,
+            Renderer,
+        },
     },
     server::game::world::block::Block,
 };
+use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Matrix4;
 use std::mem;
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::{
+    dpi::PhysicalSize,
+    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+};
 
 pub struct Inventory {
+    mesh: Option<Mesh<BlockVertex>>,
     uniform: Uniform<InventoryUniformData>,
     program: Program,
-    inventory: [Option<Block>; 9],
-    selected_block: Option<Block>,
-    is_block_selection_updated: bool,
+    inventory: ArrayVec<Block, 9>,
+    index: usize,
+    is_updated: bool,
+    is_resized: bool,
 }
 
 impl Inventory {
-    pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
-        self.program.bind(render_pass, [self.uniform.bind_group()]);
-        render_pass.draw(0..Block::MAX_VERTICES_COUNT as u32, 0..1);
+    pub fn new(
+        renderer: &Renderer,
+        inventory: ArrayVec<Block, 9>,
+        textures_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let uniform = Uniform::new(renderer, None, wgpu::ShaderStages::VERTEX);
+        let program = Program::new(
+            renderer,
+            wgpu::include_wgsl!("../../../../assets/shaders/inventory.wgsl"),
+            &[BlockVertex::desc()],
+            &[uniform.bind_group_layout(), textures_bind_group_layout],
+            &[],
+            PostProcessor::FORMAT,
+            Some(wgpu::BlendState::ALPHA_BLENDING),
+            None,
+            None,
+        );
+        Self {
+            mesh: None,
+            uniform,
+            program,
+            inventory,
+            index: 0,
+            is_updated: true,
+            is_resized: true,
+        }
+    }
+
+    pub fn draw<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        textures_bind_group: &'a wgpu::BindGroup,
+    ) {
+        if let Some(mesh) = &self.mesh {
+            self.program.bind(
+                render_pass,
+                [self.uniform.bind_group(), textures_bind_group],
+            );
+            mesh.draw(render_pass);
+        }
     }
 
     pub fn selected_block(&self) -> Option<Block> {
-        self.selected_block
+        self.inventory.get(self.index).copied()
     }
 
-    fn block(&self, keycode: VirtualKeyCode) -> Result<Option<Block>, ()> {
+    fn index(&self, keycode: VirtualKeyCode) -> Option<usize> {
         match keycode {
-            VirtualKeyCode::Key1 => Ok(self.inventory[0]),
-            VirtualKeyCode::Key2 => Ok(self.inventory[1]),
-            VirtualKeyCode::Key3 => Ok(self.inventory[2]),
-            VirtualKeyCode::Key4 => Ok(self.inventory[3]),
-            VirtualKeyCode::Key5 => Ok(self.inventory[4]),
-            VirtualKeyCode::Key6 => Ok(self.inventory[5]),
-            VirtualKeyCode::Key7 => Ok(self.inventory[6]),
-            VirtualKeyCode::Key8 => Ok(self.inventory[7]),
-            VirtualKeyCode::Key9 => Ok(self.inventory[8]),
-            _ => Err(()),
+            VirtualKeyCode::Key1 => Some(0),
+            VirtualKeyCode::Key2 => Some(1),
+            VirtualKeyCode::Key3 => Some(2),
+            VirtualKeyCode::Key4 => Some(3),
+            VirtualKeyCode::Key5 => Some(4),
+            VirtualKeyCode::Key6 => Some(5),
+            VirtualKeyCode::Key7 => Some(6),
+            VirtualKeyCode::Key8 => Some(7),
+            VirtualKeyCode::Key9 => Some(8),
+            _ => None,
         }
     }
 }
@@ -47,32 +97,50 @@ impl Inventory {
 impl EventHandler for Inventory {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, renderer @ Renderer { config, .. }: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                virtual_keycode: Some(keycode),
-                                state: ElementState::Pressed,
-                                ..
-                            },
-                        ..
-                    },
-                ..
-            } => {
-                if let Ok(block) = self.block(*keycode) {
-                    if self.selected_block != block {
-                        self.selected_block = block;
-                        self.is_block_selection_updated = true;
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(keycode),
+                            state: ElementState::Pressed,
+                            ..
+                        },
+                    ..
+                } => {
+                    if let Some(idx) = self.index(*keycode) {
+                        self.is_updated = mem::replace(&mut self.index, idx) != idx;
                     }
                 }
-            }
-            Event::MainEventsCleared => {
-                if mem::take(&mut self.is_block_selection_updated) {
-                    todo!()
+                WindowEvent::Resized(PhysicalSize { width, height })
+                | WindowEvent::ScaleFactorChanged {
+                    new_inner_size: PhysicalSize { width, height },
+                    ..
+                } if *width != 0 && *height != 0 => {
+                    self.is_resized = true;
                 }
+                _ => {}
+            },
+            Event::MainEventsCleared => {
+                if mem::take(&mut self.is_updated) {
+                    self.mesh = self.selected_block().map(|block| {
+                        Mesh::new(
+                            renderer,
+                            &block
+                                .vertices(
+                                    Default::default(),
+                                    Default::default(),
+                                    Default::default(),
+                                )
+                                .into_iter()
+                                .flatten()
+                                .collect::<Vec<_>>(),
+                        )
+                    });
+                }
+
+                if mem::take(&mut self.is_resized) {}
             }
             _ => {}
         }

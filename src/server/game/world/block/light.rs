@@ -20,6 +20,7 @@ impl BlockLight {
     pub const COMPONENT_MAX: u8 = 15;
 }
 
+#[derive(Default)]
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {

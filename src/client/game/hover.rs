@@ -40,9 +40,9 @@ impl BlockHover {
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
+        depth_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        depth_buffer_view: &wgpu::TextureView,
     ) {
         if let Some(coords) = self.coords {
             self.highlight.draw(
@@ -57,7 +57,7 @@ impl BlockHover {
                         },
                     })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: depth_buffer_view,
+                        view: depth_view,
                         depth_ops: Some(wgpu::Operations {
                             load: wgpu::LoadOp::Load,
                             store: false,

@@ -12,6 +12,7 @@ use crate::{
     },
     server::game::world::{block::Block, chunk::Chunk},
 };
+use arrayvec::ArrayVec;
 use nalgebra::{vector, Matrix4, Point3};
 use serde::Deserialize;
 use std::fs;
@@ -24,17 +25,49 @@ pub struct Gui {
 }
 
 impl Gui {
-    pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
+        textures_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let blit = Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT);
         let crosshair = Crosshair::new(renderer, input_bind_group_layout);
         let state = ClientState::new();
-        let inventory = Inventory::new(renderer, state.inventory);
+        let inventory = Inventory::new(
+            renderer,
+            state.inventory.clone(),
+            textures_bind_group_layout,
+        );
         Self {
             blit,
             crosshair,
             inventory,
             state,
         }
+    }
+
+    pub fn draw(
+        &self,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        input_bind_group: &wgpu::BindGroup,
+        textures_bind_group: &wgpu::BindGroup,
+    ) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+        self.blit.draw(&mut render_pass, input_bind_group);
+        self.crosshair.draw(&mut render_pass, input_bind_group);
+        self.inventory.draw(&mut render_pass, textures_bind_group);
     }
 
     pub fn selected_block(&self) -> Option<Block> {
@@ -65,25 +98,13 @@ impl Gui {
         self.state.sensitivity
     }
 
-    fn element_scaling(config: &wgpu::SurfaceConfiguration) -> Matrix4<f32> {
+    fn element_scaling(Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
         let size = (config.height as f32 * 0.065).max(27.0);
         Matrix4::new_nonuniform_scaling(&vector![
             size / config.width as f32,
             size / config.height as f32,
             1.0
         ])
-    }
-}
-
-impl Effect for Gui {
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_group: &'a wgpu::BindGroup,
-    ) {
-        self.blit.draw(render_pass, input_bind_group);
-        self.crosshair.draw(render_pass, input_bind_group);
-        self.inventory.draw(render_pass);
     }
 }
 
@@ -98,7 +119,7 @@ impl EventHandler for Gui {
 
 #[derive(Deserialize)]
 struct ClientState {
-    inventory: [Option<Block>; 9],
+    inventory: ArrayVec<Block, 9>,
     render_distance: u32,
     origin: Point3<f32>,
     fovy: f32,

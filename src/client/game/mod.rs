@@ -4,7 +4,13 @@ pub mod player;
 pub mod sky;
 pub mod world;
 
-use self::{gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World};
+use self::{
+    gui::Gui,
+    hover::BlockHover,
+    player::Player,
+    sky::Sky,
+    world::{BlockTextureArray, World},
+};
 use super::{
     event_loop::{Event, EventHandler},
     renderer::{
@@ -18,6 +24,7 @@ use flume::Sender;
 use std::time::Duration;
 
 pub struct Game {
+    textures: BlockTextureArray,
     gui: Gui,
     player: Player,
     sky: Sky,
@@ -30,15 +37,20 @@ pub struct Game {
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
-        let depth = DepthBuffer::new(renderer);
+        let textures = BlockTextureArray::new(renderer);
         let processor = PostProcessor::new(renderer);
-        let gui = Gui::new(renderer, processor.bind_group_layout());
+        let gui = Gui::new(
+            renderer,
+            processor.bind_group_layout(),
+            textures.bind_group_layout(),
+        );
         let player = Player::new(renderer, &gui);
         let sky = Sky::new(renderer);
         let world = World::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
+            textures.bind_group_layout(),
         );
         let hover = BlockHover::new(
             renderer,
@@ -50,7 +62,9 @@ impl Game {
             processor.bind_group_layout(),
             PostProcessor::FORMAT,
         );
+        let depth = DepthBuffer::new(renderer);
         Self {
+            textures,
             gui,
             player,
             sky,
@@ -66,20 +80,24 @@ impl Game {
         self.world.draw(
             self.processor.view(),
             encoder,
+            self.depth.view(),
             self.player.bind_group(),
             self.sky.bind_group(),
-            self.depth.view(),
+            self.textures.bind_group(),
             &self.player.frustum(),
         );
         self.hover.draw(
             self.processor.view(),
             encoder,
+            self.depth.view(),
             self.player.bind_group(),
             self.sky.bind_group(),
-            self.depth.view(),
         );
         self.processor.apply(encoder, &self.aces);
-        self.processor.apply(encoder, &self.gui);
+        self.processor.apply_raw(|view, bind_group| {
+            self.gui
+                .draw(view, encoder, bind_group, self.textures.bind_group());
+        });
         self.processor.draw(view, encoder);
     }
 }

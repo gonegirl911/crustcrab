@@ -27,7 +27,6 @@ use std::{mem, sync::Arc, thread, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
-    textures: ImageTextureArray,
     program: Program,
 }
 
@@ -36,9 +35,9 @@ impl World {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
+        textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let meshes = ChunkMeshPool::new();
-        let textures = ImageTextureArray::new(renderer, Self::tex_paths(), true, true, 4);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
@@ -46,7 +45,7 @@ impl World {
             &[
                 player_bind_group_layout,
                 sky_bind_group_layout,
-                textures.bind_group_layout(),
+                textures_bind_group_layout,
             ],
             &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::VERTEX,
@@ -63,20 +62,18 @@ impl World {
                 bias: Default::default(),
             }),
         );
-        Self {
-            meshes,
-            textures,
-            program,
-        }
+        Self { meshes, program }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
+        depth_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        depth_view: &wgpu::TextureView,
+        textures_bind_group: &wgpu::BindGroup,
         frustum: &Frustum,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -85,7 +82,7 @@ impl World {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                     store: true,
                 },
             })],
@@ -100,19 +97,9 @@ impl World {
         });
         self.program.bind(
             &mut render_pass,
-            [
-                player_bind_group,
-                sky_bind_group,
-                self.textures.bind_group(),
-            ],
+            [player_bind_group, sky_bind_group, textures_bind_group],
         );
         self.meshes.draw(&mut render_pass, frustum);
-    }
-
-    fn tex_paths() -> impl Iterator<Item = String> {
-        TEX_PATHS
-            .iter()
-            .map(|path| format!("assets/textures/blocks/{path}"))
     }
 }
 
@@ -299,5 +286,33 @@ impl BlockPushConstants {
         Self {
             chunk_coords: chunk_coords.cast(),
         }
+    }
+}
+
+pub struct BlockTextureArray(ImageTextureArray);
+
+impl BlockTextureArray {
+    pub fn new(renderer: &Renderer) -> Self {
+        Self(ImageTextureArray::new(
+            renderer,
+            Self::tex_paths(),
+            true,
+            true,
+            4,
+        ))
+    }
+
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.0.bind_group_layout()
+    }
+
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        self.0.bind_group()
+    }
+
+    fn tex_paths() -> impl Iterator<Item = String> {
+        TEX_PATHS
+            .iter()
+            .map(|path| format!("assets/textures/blocks/{path}"))
     }
 }

@@ -20,7 +20,7 @@ pub struct Crosshair {
 
 impl Crosshair {
     pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let uniform = Uniform::new(renderer, wgpu::ShaderStages::VERTEX);
+        let uniform = Uniform::new(renderer, None, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::new(renderer, "assets/textures/crosshair.png", false, true, 1);
         let program = Program::new(
             renderer,
@@ -65,7 +65,7 @@ impl Crosshair {
 impl EventHandler for Crosshair {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, renderer @ Renderer { config, .. }: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::WindowEvent {
                 event:
@@ -82,7 +82,7 @@ impl EventHandler for Crosshair {
                 if mem::take(&mut self.is_resized) {
                     self.uniform.write(
                         renderer,
-                        &CrosshairUniformData::new(Gui::element_scaling(config)),
+                        &CrosshairUniformData::new(Gui::element_scaling(renderer)),
                     );
                 }
             }

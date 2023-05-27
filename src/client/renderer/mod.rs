@@ -17,7 +17,7 @@ pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    pub is_resized: bool,
+    is_resized: bool,
 }
 
 impl Renderer {
