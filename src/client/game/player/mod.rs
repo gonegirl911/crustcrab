@@ -22,7 +22,6 @@ pub struct Player {
     projection: Projection,
     controller: Controller,
     uniform: Uniform<PlayerUniformData>,
-    is_updated: bool,
 }
 
 impl Player {
@@ -39,7 +38,6 @@ impl Player {
             controller,
             projection,
             uniform,
-            is_updated: true,
         }
     }
 
@@ -114,10 +112,7 @@ impl EventHandler for Player {
                         .unwrap_or_else(|_| unreachable!());
                 }
 
-                self.is_updated = self.is_updated || changes.intersects(Changes::MATRIX_CHANGES);
-            }
-            Event::RedrawRequested(_) => {
-                if self.is_updated {
+                if changes.intersects(Changes::MATRIX_CHANGES) {
                     self.uniform.write(
                         renderer,
                         &PlayerUniformData::new(
@@ -129,9 +124,6 @@ impl EventHandler for Player {
                         ),
                     );
                 }
-            }
-            Event::RedrawEventsCleared => {
-                self.is_updated = false;
             }
             _ => {}
         }

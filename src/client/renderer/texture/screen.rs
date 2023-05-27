@@ -2,7 +2,7 @@ use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::Renderer,
 };
-use std::array;
+use std::{array, mem};
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 struct ScreenTexture {
@@ -62,8 +62,8 @@ impl EventHandler for ScreenTexture {
             } if *width != 0 && *height != 0 => {
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) => {
-                if self.is_resized {
+            Event::MainEventsCleared => {
+                if mem::take(&mut self.is_resized) {
                     *self = Self::new(renderer, self.format, self.usage);
                 }
             }
@@ -214,16 +214,15 @@ impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
             } if *width != 0 && *height != 0 => {
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) if self.is_resized => {
-                self.bind_groups = Self::create_bind_groups(
-                    renderer,
-                    &self.textures,
-                    &self.sampler,
-                    &self.bind_group_layout,
-                );
-            }
-            Event::RedrawEventsCleared => {
-                self.is_resized = false;
+            Event::MainEventsCleared => {
+                if mem::take(&mut self.is_resized) {
+                    self.bind_groups = Self::create_bind_groups(
+                        renderer,
+                        &self.textures,
+                        &self.sampler,
+                        &self.bind_group_layout,
+                    );
+                }
             }
             _ => {}
         }

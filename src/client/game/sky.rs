@@ -53,16 +53,13 @@ impl EventHandler for Sky {
             Event::UserEvent(ServerEvent::TimeUpdated(timestamp)) => {
                 self.updated_time = Some(*timestamp);
             }
-            Event::RedrawRequested(_) => {
-                if let Some(time) = self.updated_time {
+            Event::MainEventsCleared => {
+                if let Some(time) = self.updated_time.take() {
                     self.uniform.write(
                         renderer,
                         &SkyUniformData::new(Self::light_intensity(time.stage())),
                     );
                 }
-            }
-            Event::RedrawEventsCleared => {
-                self.updated_time = None;
             }
             _ => {}
         }

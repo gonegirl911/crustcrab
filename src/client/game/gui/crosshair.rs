@@ -8,6 +8,7 @@ use crate::client::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Matrix4;
+use std::mem;
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Crosshair {
@@ -77,16 +78,13 @@ impl EventHandler for Crosshair {
             } if *width != 0 && *height != 0 => {
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) => {
-                if self.is_resized {
+            Event::MainEventsCleared => {
+                if mem::take(&mut self.is_resized) {
                     self.uniform.write(
                         renderer,
                         &CrosshairUniformData::new(Gui::element_scaling(config)),
                     );
                 }
-            }
-            Event::RedrawEventsCleared => {
-                self.is_resized = false;
             }
             _ => {}
         }

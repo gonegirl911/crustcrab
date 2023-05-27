@@ -102,14 +102,6 @@ impl EventHandler for Game {
             dt,
         ): Self::Context<'_>,
     ) {
-        self.gui.handle(event, renderer);
-        self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-        self.sky.handle(event, renderer);
-        self.world.handle(event, renderer);
-        self.hover.handle(event, ());
-        self.depth.handle(event, renderer);
-        self.processor.handle(event, renderer);
-
         if let Event::RedrawRequested(_) = event {
             match surface.get_current_texture() {
                 Ok(surface) => {
@@ -122,6 +114,14 @@ impl EventHandler for Game {
                 Err(wgpu::SurfaceError::Lost) => renderer.recreate_surface(),
                 Err(_) => {},
             }
+        } else {
+            self.gui.handle(event, renderer);
+            self.player.handle(event, (client_tx, renderer, &self.gui, dt));
+            self.sky.handle(event, renderer);
+            self.world.handle(event, renderer);
+            self.hover.handle(event, ());
+            self.depth.handle(event, renderer);
+            self.processor.handle(event, renderer);
         }
     }
 }

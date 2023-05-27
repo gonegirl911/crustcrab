@@ -5,14 +5,19 @@ pub mod texture;
 pub mod uniform;
 
 use super::event_loop::{Event, EventHandler};
-use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window as RawWindow};
+use std::mem;
+use winit::{
+    dpi::PhysicalSize,
+    event::{StartCause, WindowEvent},
+    window::Window as RawWindow,
+};
 
 pub struct Renderer {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    is_resized: bool,
+    pub is_resized: bool,
 }
 
 impl Renderer {
@@ -56,7 +61,7 @@ impl Renderer {
             device,
             queue,
             config,
-            is_resized: true,
+            is_resized: false,
         }
     }
 
@@ -70,6 +75,9 @@ impl EventHandler for Renderer {
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
         match event {
+            Event::NewEvents(StartCause::Init) => {
+                self.recreate_surface();
+            }
             Event::WindowEvent {
                 event:
                     WindowEvent::Resized(PhysicalSize { width, height })
@@ -83,13 +91,10 @@ impl EventHandler for Renderer {
                 self.config.height = *height;
                 self.is_resized = true;
             }
-            Event::RedrawRequested(_) => {
-                if self.is_resized {
+            Event::MainEventsCleared => {
+                if mem::take(&mut self.is_resized) {
                     self.recreate_surface();
                 }
-            }
-            Event::RedrawEventsCleared => {
-                self.is_resized = false;
             }
             _ => {}
         }

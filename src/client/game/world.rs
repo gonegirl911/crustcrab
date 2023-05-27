@@ -227,7 +227,7 @@ impl EventHandler for ChunkMeshPool {
                 }
                 _ => {}
             },
-            Event::RedrawRequested(_) => {
+            Event::MainEventsCleared => {
                 for (coords, vertices, updated_at) in self.vertices_rx.drain() {
                     if !self.unloaded.contains(&coords) {
                         if !vertices.is_empty() {

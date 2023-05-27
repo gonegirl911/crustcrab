@@ -7,6 +7,7 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Matrix4;
+use std::mem;
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 pub struct Inventory {
@@ -68,13 +69,10 @@ impl EventHandler for Inventory {
                     }
                 }
             }
-            Event::RedrawRequested(_) => {
-                if self.is_block_selection_updated {
+            Event::MainEventsCleared => {
+                if mem::take(&mut self.is_block_selection_updated) {
                     todo!()
                 }
-            }
-            Event::RedrawEventsCleared => {
-                self.is_block_selection_updated = false;
             }
             _ => {}
         }
