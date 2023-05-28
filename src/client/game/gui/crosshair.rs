@@ -60,6 +60,10 @@ impl Crosshair {
         );
         render_pass.draw(0..6, 0..1);
     }
+
+    fn transform(renderer: &Renderer) -> Matrix4<f32> {
+        Gui::viewport(renderer) * Gui::element_scaling(Gui::element_size(renderer, 1.0))
+    }
 }
 
 impl EventHandler for Crosshair {
@@ -82,7 +86,7 @@ impl EventHandler for Crosshair {
                 if mem::take(&mut self.is_resized) {
                     self.uniform.write(
                         renderer,
-                        &CrosshairUniformData::new(Gui::element_scaling(renderer)),
+                        &CrosshairUniformData::new(Self::transform(renderer)),
                     );
                 }
             }

@@ -95,8 +95,13 @@ impl Game {
         );
         self.processor.apply(encoder, &self.aces);
         self.processor.apply_raw(|view, bind_group| {
-            self.gui
-                .draw(view, encoder, bind_group, self.textures.bind_group());
+            self.gui.draw(
+                view,
+                encoder,
+                self.depth.view(),
+                bind_group,
+                self.textures.bind_group(),
+            );
         });
         self.processor.draw(view, encoder);
     }

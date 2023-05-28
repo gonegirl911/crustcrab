@@ -19,7 +19,7 @@ var<uniform> crosshair: CrosshairUniform;
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32(((vertex.index + 2u) / 3u) % 2u);
     let y = f32(((vertex.index + 1u) / 3u) % 2u);
-    let coords = crosshair.transform * vec4(x - 0.5, y - 0.5, 0.0, 1.0);
+    let coords = crosshair.transform * vec4(x - 0.5, y - 0.5, 0.0, 1.0) + vec4(1.0, 1.0, 0.0, 0.0);
     return VertexOutput(coords, (1.0 + vec2(coords.x, -coords.y)) * 0.5, vec2(x, 1.0 - y));
 }
 

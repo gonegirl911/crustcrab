@@ -1,3 +1,4 @@
+use super::Gui;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
@@ -6,6 +7,7 @@ use crate::{
             effect::PostProcessor,
             mesh::{Mesh, Vertex},
             program::Program,
+            texture::screen::DepthBuffer,
             uniform::Uniform,
             Renderer,
         },
@@ -14,8 +16,11 @@ use crate::{
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Matrix4;
-use std::mem;
+use nalgebra::{vector, Matrix4, Vector3};
+use std::{
+    f32::consts::{FRAC_PI_4, FRAC_PI_6},
+    mem,
+};
 use winit::{
     dpi::PhysicalSize,
     event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -46,8 +51,14 @@ impl Inventory {
             &[],
             PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
-            None,
-            None,
+            Some(wgpu::Face::Back),
+            Some(wgpu::DepthStencilState {
+                format: DepthBuffer::FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
         );
         Self {
             mesh: None,
@@ -91,6 +102,21 @@ impl Inventory {
             VirtualKeyCode::Key9 => Some(8),
             _ => None,
         }
+    }
+
+    fn transform(renderer @ Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
+        let diagonal = 3.0f32.sqrt();
+        let size = Gui::element_size(renderer, 2.5 * diagonal);
+        let left = config.width as f32 - size * 1.3;
+        let bottom = config.height as f32 - size * 1.3;
+        Gui::viewport(renderer)
+            * Matrix4::new_translation(&vector![left, bottom, 0.0])
+            * Gui::element_scaling(size)
+            * Matrix4::new_translation(&Vector3::from_element(0.5))
+            * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+            * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
+            * Matrix4::new_scaling(1.0 / diagonal)
+            * Matrix4::new_translation(&Vector3::from_element(-0.5))
     }
 }
 
@@ -140,7 +166,12 @@ impl EventHandler for Inventory {
                     });
                 }
 
-                if mem::take(&mut self.is_resized) {}
+                if mem::take(&mut self.is_resized) {
+                    self.uniform.write(
+                        renderer,
+                        &InventoryUniformData::new(Self::transform(renderer)),
+                    )
+                }
             }
             _ => {}
         }
