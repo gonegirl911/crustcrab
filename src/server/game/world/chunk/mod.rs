@@ -40,14 +40,11 @@ impl Chunk {
         area_light: &'a ChunkAreaLight,
     ) -> impl Iterator<Item = BlockVertex> + 'a {
         self.blocks().flat_map(|(coords, block)| {
-            block
-                .vertices(
-                    coords,
-                    area.block_area(coords),
-                    area_light.block_area_light(coords),
-                )
-                .into_iter()
-                .flatten()
+            block.data().vertices(
+                coords,
+                area.block_area(coords),
+                area_light.block_area_light(coords),
+            )
         })
     }
 

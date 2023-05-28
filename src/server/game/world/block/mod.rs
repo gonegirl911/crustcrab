@@ -1,15 +1,11 @@
 pub mod data;
 pub mod light;
 
-use self::{
-    data::{BlockData, BLOCK_DATA},
-    light::BlockAreaLight,
-};
+use self::data::{BlockData, BLOCK_DATA};
 use super::action::BlockAction;
-use crate::client::game::world::BlockVertex;
 use bitvec::prelude::*;
 use enum_map::{enum_map, Enum, EnumMap};
-use nalgebra::{point, vector, Point2, Point3, Vector3};
+use nalgebra::{point, vector, Point2, Vector3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::ops::Range;
@@ -27,34 +23,6 @@ pub enum Block {
 }
 
 impl Block {
-    pub fn vertices(
-        self,
-        coords: Point3<u8>,
-        area: BlockArea,
-        area_light: BlockAreaLight,
-    ) -> Option<impl Iterator<Item = BlockVertex>> {
-        let data = self.data();
-        data.side_tex_indices.map(move |side_tex_indices| {
-            area.visible_sides().flat_map(move |side| {
-                let corner_deltas = SIDE_CORNER_DELTAS[side];
-                let tex_index = side_tex_indices[side];
-                let face = side.into();
-                let corner_aos = Self::corner_aos(data, side, area);
-                let corner_lights = area_light.corner_lights(data, side, area);
-                Self::corners(corner_aos).into_iter().map(move |corner| {
-                    BlockVertex::new(
-                        coords + corner_deltas[corner],
-                        tex_index,
-                        CORNER_TEX_COORDS[corner],
-                        face,
-                        corner_aos[corner],
-                        corner_lights[corner],
-                    )
-                })
-            })
-        })
-    }
-
     pub fn data(self) -> &'static BlockData {
         &BLOCK_DATA[self]
     }
@@ -83,40 +51,6 @@ impl Block {
             false
         }
     }
-
-    fn corner_aos(data: &BlockData, side: Side, area: BlockArea) -> EnumMap<Corner, u8> {
-        if data.smooth_lighting() {
-            enum_map! { corner => Self::ao(side, corner, area) }
-        } else {
-            enum_map! { _ => 3 }
-        }
-    }
-
-    fn corners(corner_aos: EnumMap<Corner, u8>) -> [Corner; 6] {
-        if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
-            > corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
-        {
-            FLIPPED_CORNERS
-        } else {
-            CORNERS
-        }
-    }
-
-    fn ao(side: Side, corner: Corner, area: BlockArea) -> u8 {
-        let components = area.components(side, corner);
-
-        let [edge1, edge2, corner] = [
-            components[Component::Edge1],
-            components[Component::Edge2],
-            components[Component::Corner],
-        ];
-
-        if edge1 && edge2 {
-            0
-        } else {
-            3 - (edge1 as u8 + edge2 as u8 + corner as u8)
-        }
-    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -142,8 +76,12 @@ impl BlockArea {
             .map(|(side, _)| side)
     }
 
-    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
-        SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self.is_opaque(delta))
+    fn corner_aos(self, side: Side, is_smoothly_lit: bool) -> EnumMap<Corner, u8> {
+        if is_smoothly_lit {
+            enum_map! { corner => self.ao(side, corner) }
+        } else {
+            enum_map! { _ => 3 }
+        }
     }
 
     fn is_transparent(self, delta: Vector3<i8>) -> bool {
@@ -158,6 +96,26 @@ impl BlockArea {
         unsafe {
             self.0.set_unchecked(Self::index(delta), is_opaque);
         }
+    }
+
+    fn ao(self, side: Side, corner: Corner) -> u8 {
+        let components = self.components(side, corner);
+
+        let [edge1, edge2, corner] = [
+            components[Component::Edge1],
+            components[Component::Edge2],
+            components[Component::Corner],
+        ];
+
+        if edge1 && edge2 {
+            0
+        } else {
+            3 - (edge1 as u8 + edge2 as u8 + corner as u8)
+        }
+    }
+
+    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
+        SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self.is_opaque(delta))
     }
 
     pub fn deltas() -> impl Iterator<Item = Vector3<i8>> {

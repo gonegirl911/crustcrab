@@ -1,4 +1,4 @@
-use super::{data::BlockData, BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
+use super::{BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
 use bitfield::bitfield;
 use enum_map::{enum_map, EnumMap};
 use nalgebra::{point, Point3, Vector3};
@@ -34,12 +34,12 @@ impl BlockAreaLight {
 
     pub fn corner_lights(
         &self,
-        data: &BlockData,
         side: Side,
         area: BlockArea,
+        is_smoothly_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
         let side_delta = SIDE_DELTAS[side];
-        if data.smooth_lighting() {
+        if is_smoothly_lit {
             SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
                 component_deltas
                     .into_values()

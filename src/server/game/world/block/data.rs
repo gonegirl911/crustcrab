@@ -1,6 +1,10 @@
-use super::{Block, Side};
-use crate::shared::color::Rgb;
+use super::{
+    light::BlockAreaLight, Block, BlockArea, Corner, Side, CORNERS, CORNER_TEX_COORDS,
+    FLIPPED_CORNERS, SIDE_CORNER_DELTAS,
+};
+use crate::{client::game::world::BlockVertex, shared::color::Rgb};
 use enum_map::EnumMap;
+use nalgebra::Point3;
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
@@ -13,6 +17,37 @@ pub struct BlockData {
 }
 
 impl BlockData {
+    pub fn vertices(
+        &self,
+        coords: Point3<u8>,
+        area: BlockArea,
+        area_light: BlockAreaLight,
+    ) -> impl Iterator<Item = BlockVertex> + '_ {
+        self.side_tex_indices
+            .map(move |side_tex_indices| {
+                area.visible_sides().flat_map(move |side| {
+                    let corner_deltas = SIDE_CORNER_DELTAS[side];
+                    let tex_idx = side_tex_indices[side];
+                    let face = side.into();
+                    let is_smoothly_lit = self.is_smoothly_lit();
+                    let corner_aos = area.corner_aos(side, is_smoothly_lit);
+                    let corner_lights = area_light.corner_lights(side, area, is_smoothly_lit);
+                    Self::corners(corner_aos).into_iter().map(move |corner| {
+                        BlockVertex::new(
+                            coords + corner_deltas[corner],
+                            tex_idx,
+                            CORNER_TEX_COORDS[corner],
+                            face,
+                            corner_aos[corner],
+                            corner_lights[corner],
+                        )
+                    })
+                })
+            })
+            .into_iter()
+            .flatten()
+    }
+
     pub fn is_glowing(&self) -> bool {
         self.luminance != Rgb::splat(0)
     }
@@ -25,8 +60,18 @@ impl BlockData {
         !self.is_transparent()
     }
 
-    pub fn smooth_lighting(&self) -> bool {
+    pub fn is_smoothly_lit(&self) -> bool {
         !self.is_glowing() && self.is_opaque()
+    }
+
+    fn corners(corner_aos: EnumMap<Corner, u8>) -> [Corner; 6] {
+        if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
+            > corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
+        {
+            FLIPPED_CORNERS
+        } else {
+            CORNERS
+        }
     }
 }
 

@@ -154,13 +154,12 @@ impl EventHandler for Inventory {
                         Mesh::new(
                             renderer,
                             &block
+                                .data()
                                 .vertices(
                                     Default::default(),
                                     Default::default(),
                                     Default::default(),
                                 )
-                                .into_iter()
-                                .flatten()
                                 .collect::<Vec<_>>(),
                         )
                     });
