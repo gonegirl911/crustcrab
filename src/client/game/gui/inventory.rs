@@ -106,9 +106,9 @@ impl Inventory {
 
     fn transform(renderer @ Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
         let diagonal = 3.0f32.sqrt();
-        let size = Gui::element_size(renderer, 2.3 * diagonal);
-        let left = config.width as f32 - size * 1.3;
-        let bottom = config.height as f32 - size * 1.3;
+        let size = Gui::element_size(renderer, 2.25 * diagonal);
+        let left = config.width as f32 - size * 1.315;
+        let bottom = config.height as f32 - size * 1.315;
         Gui::viewport(renderer)
             * Matrix4::new_translation(&vector![left, bottom, 0.0])
             * Gui::element_scaling(size)
