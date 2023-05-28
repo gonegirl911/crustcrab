@@ -1,10 +1,7 @@
-use super::{
-    light::BlockAreaLight, Block, BlockArea, Corner, Side, CORNERS, CORNER_TEX_COORDS,
-    FLIPPED_CORNERS, SIDE_CORNER_DELTAS,
-};
+use super::{light::BlockAreaLight, Block, BlockArea};
 use crate::{client::game::world::BlockVertex, shared::color::Rgb};
-use enum_map::EnumMap;
-use nalgebra::Point3;
+use enum_map::{enum_map, Enum, EnumMap};
+use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
@@ -103,6 +100,55 @@ impl RawBlockData {
     }
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum Face {
+    X = 0,
+    Ypos = 1,
+    Yneg = 2,
+    Z = 3,
+}
+
+impl From<Side> for Face {
+    fn from(side: Side) -> Self {
+        match side {
+            Side::Left | Side::Right => Face::X,
+            Side::Up => Face::Ypos,
+            Side::Down => Face::Yneg,
+            Side::Front | Side::Back => Face::Z,
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Enum, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Side {
+    Front,
+    Right,
+    Back,
+    Left,
+    Up,
+    Down,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Enum)]
+pub enum Corner {
+    LowerLeft,
+    LowerRight,
+    UpperRight,
+    UpperLeft,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Enum)]
+pub enum Component {
+    Edge1,
+    Edge2,
+    Corner,
+}
+
 pub static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
     Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
 
@@ -134,3 +180,106 @@ static RAW_BLOCK_DATA: Lazy<EnumMap<Block, RawBlockData>> = Lazy::new(|| {
     toml::from_str(&fs::read_to_string("assets/blocks.toml").expect("file should exist"))
         .expect("file should be valid")
 });
+
+static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy::new(|| {
+    enum_map! {
+        Side::Front => enum_map! {
+            Corner::LowerLeft => [Side::Left, Side::Down],
+            Corner::LowerRight => [Side::Right, Side::Down],
+            Corner::UpperRight => [Side::Right, Side::Up],
+            Corner::UpperLeft => [Side::Left, Side::Up],
+        },
+        Side::Right => enum_map! {
+            Corner::LowerLeft => [Side::Front, Side::Down],
+            Corner::LowerRight => [Side::Back, Side::Down],
+            Corner::UpperRight => [Side::Back, Side::Up],
+            Corner::UpperLeft => [Side::Front, Side::Up],
+        },
+        Side::Back => enum_map! {
+            Corner::LowerLeft => [Side::Right, Side::Down],
+            Corner::LowerRight => [Side::Left, Side::Down],
+            Corner::UpperRight => [Side::Left, Side::Up],
+            Corner::UpperLeft => [Side::Right, Side::Up],
+        },
+        Side::Left => enum_map! {
+            Corner::LowerLeft => [Side::Back, Side::Down],
+            Corner::LowerRight => [Side::Front, Side::Down],
+            Corner::UpperRight => [Side::Front, Side::Up],
+            Corner::UpperLeft => [Side::Back, Side::Up],
+        },
+        Side::Up => enum_map! {
+            Corner::LowerLeft => [Side::Left, Side::Front],
+            Corner::LowerRight => [Side::Right, Side::Front],
+            Corner::UpperRight => [Side::Right, Side::Back],
+            Corner::UpperLeft => [Side::Left, Side::Back],
+        },
+        Side::Down => enum_map! {
+            Corner::LowerLeft => [Side::Left, Side::Back],
+            Corner::LowerRight => [Side::Right, Side::Back],
+            Corner::UpperRight => [Side::Right, Side::Front],
+            Corner::UpperLeft => [Side::Left, Side::Front],
+        },
+    }
+});
+
+pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
+    enum_map! {
+        Side::Front => -Vector3::z(),
+        Side::Right => Vector3::x(),
+        Side::Back => Vector3::z(),
+        Side::Left => -Vector3::x(),
+        Side::Up => Vector3::y(),
+        Side::Down => -Vector3::y(),
+    }
+});
+
+static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> = Lazy::new(|| {
+    SIDE_CORNER_SIDES.map(|s1, corner_sides| {
+        corner_sides.map(|_, [s2, s3]| {
+            (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
+        })
+    })
+});
+
+#[allow(clippy::type_complexity)]
+pub static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
+    EnumMap<Side, EnumMap<Corner, EnumMap<Component, Vector3<i8>>>>,
+> = Lazy::new(|| {
+    SIDE_CORNER_SIDES.map(|s1, corner_sides| {
+        corner_sides.map(|_, [s2, s3]| {
+            let delta = SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3];
+            enum_map! {
+                Component::Edge1 => delta - SIDE_DELTAS[s3],
+                Component::Edge2 => delta - SIDE_DELTAS[s2],
+                Component::Corner => delta,
+            }
+        })
+    })
+});
+
+static CORNER_TEX_COORDS: Lazy<EnumMap<Corner, Point2<u8>>> = Lazy::new(|| {
+    enum_map! {
+        Corner::LowerLeft => point![0, 1],
+        Corner::LowerRight => point![1, 1],
+        Corner::UpperRight => point![1, 0],
+        Corner::UpperLeft => point![0, 0],
+    }
+});
+
+const CORNERS: [Corner; 6] = [
+    Corner::LowerLeft,
+    Corner::LowerRight,
+    Corner::UpperLeft,
+    Corner::LowerRight,
+    Corner::UpperRight,
+    Corner::UpperLeft,
+];
+
+const FLIPPED_CORNERS: [Corner; 6] = [
+    Corner::LowerLeft,
+    Corner::LowerRight,
+    Corner::UpperRight,
+    Corner::LowerLeft,
+    Corner::UpperRight,
+    Corner::UpperLeft,
+];

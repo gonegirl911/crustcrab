@@ -1,5 +1,9 @@
 use super::{
-    block::{data::BlockData, light::BlockLight, Block, SIDE_DELTAS},
+    block::{
+        data::{BlockData, SIDE_DELTAS},
+        light::BlockLight,
+        Block,
+    },
     chunk::{
         light::{ChunkAreaLight, ChunkLight},
         Chunk, ChunkArea,
