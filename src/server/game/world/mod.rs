@@ -502,7 +502,7 @@ pub struct ChunkData {
 }
 
 impl ChunkData {
-    pub fn vertices(&self) -> impl Iterator<Item = BlockVertex> + '_ {
+    pub fn vertices(&self) -> impl Iterator<Item = (impl Iterator<Item = BlockVertex>, bool)> + '_ {
         self.chunk.vertices(&self.area, &self.area_light)
     }
 }

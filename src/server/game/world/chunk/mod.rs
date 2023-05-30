@@ -38,12 +38,16 @@ impl Chunk {
         &'a self,
         area: &'a ChunkArea,
         area_light: &'a ChunkAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> + 'a {
-        self.blocks().flat_map(|(coords, block)| {
-            block.data().vertices(
-                coords,
-                area.block_area(coords),
-                area_light.block_area_light(coords),
+    ) -> impl Iterator<Item = (impl Iterator<Item = BlockVertex>, bool)> + 'a {
+        self.blocks().map(|(coords, block)| {
+            let data = block.data();
+            (
+                data.vertices(
+                    coords,
+                    area.block_area(coords),
+                    area_light.block_area_light(coords),
+                ),
+                data.is_transparent(),
             )
         })
     }

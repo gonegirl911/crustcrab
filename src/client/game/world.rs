@@ -115,11 +115,12 @@ impl EventHandler for World {
 }
 
 struct ChunkMeshPool {
-    meshes: FxHashMap<Point3<i32>, (Mesh<BlockVertex>, Instant)>,
+    meshes: FxHashMap<Point3<i32>, (Mesh<BlockVertex>, Mesh<BlockVertex>, Instant)>,
     unloaded: FxHashSet<Point3<i32>>,
     priority_data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
-    vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Instant)>,
+    #[allow(clippy::type_complexity)]
+    vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant)>,
 }
 
 impl ChunkMeshPool {
@@ -136,8 +137,24 @@ impl ChunkMeshPool {
             let vertices_tx = vertices_tx.clone();
             thread::spawn(move || {
                 for (coords, data, updated_at) in priority_data_rx {
+                    let mut transparent_vertices = vec![];
                     vertices_tx
-                        .send((coords, data.vertices().collect(), updated_at))
+                        .send((
+                            coords,
+                            data.vertices()
+                                .filter_map(|(vertices, is_transparent)| {
+                                    if is_transparent {
+                                        transparent_vertices.extend(vertices);
+                                        None
+                                    } else {
+                                        Some(vertices)
+                                    }
+                                })
+                                .flatten()
+                                .collect(),
+                            transparent_vertices,
+                            updated_at,
+                        ))
                         .unwrap_or_else(|_| unreachable!());
                 }
             });
@@ -148,8 +165,24 @@ impl ChunkMeshPool {
             let vertices_tx = vertices_tx.clone();
             thread::spawn(move || {
                 for (coords, data, updated_at) in data_rx {
+                    let mut transparent_vertices = vec![];
                     vertices_tx
-                        .send((coords, data.vertices().collect(), updated_at))
+                        .send((
+                            coords,
+                            data.vertices()
+                                .filter_map(|(vertices, is_transparent)| {
+                                    if is_transparent {
+                                        transparent_vertices.extend(vertices);
+                                        None
+                                    } else {
+                                        Some(vertices)
+                                    }
+                                })
+                                .flatten()
+                                .collect(),
+                            transparent_vertices,
+                            updated_at,
+                        ))
                         .unwrap_or_else(|_| unreachable!());
                 }
             });
@@ -165,15 +198,27 @@ impl ChunkMeshPool {
     }
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
-        for (coords, (mesh, _)) in &self.meshes {
-            if Chunk::bounding_sphere(*coords).is_visible(frustum) {
+        let mut transparent_meshes = vec![];
+
+        for (&coords, (mesh, transparent_mesh, _)) in &self.meshes {
+            if Chunk::bounding_sphere(coords).is_visible(frustum) {
+                transparent_meshes.push((coords, transparent_mesh));
                 render_pass.set_push_constants(
                     wgpu::ShaderStages::VERTEX,
                     0,
-                    bytemuck::cast_slice(&[BlockPushConstants::new(*coords)]),
+                    bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
                 );
                 mesh.draw(render_pass);
             }
+        }
+
+        for (coords, mesh) in transparent_meshes {
+            render_pass.set_push_constants(
+                wgpu::ShaderStages::VERTEX,
+                0,
+                bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
+            );
+            mesh.draw(render_pass);
         }
     }
 
@@ -217,25 +262,34 @@ impl EventHandler for ChunkMeshPool {
                 }
                 _ => {}
             },
+            #[rustfmt::skip]
             Event::MainEventsCleared => {
-                for (coords, vertices, updated_at) in self.vertices_rx.drain() {
+                for (coords, vertices, transparent_vertices, updated_at) in self.vertices_rx.drain()
+                {
                     if !self.unloaded.contains(&coords) {
-                        if !vertices.is_empty() {
+                        if !vertices.is_empty() || !transparent_vertices.is_empty() {
                             self.meshes
                                 .entry(coords)
-                                .and_modify(|(mesh, last_updated_at)| {
+                                .and_modify(|(mesh, transparent_mesh, last_updated_at)| {
                                     if *last_updated_at < updated_at {
                                         *mesh = Mesh::new(renderer, &vertices);
+                                        *transparent_mesh = Mesh::new(renderer, &transparent_vertices);
                                         *last_updated_at = updated_at;
                                     }
                                 })
-                                .or_insert_with(|| (Mesh::new(renderer, &vertices), updated_at));
+                                .or_insert_with(|| {
+                                    (
+                                        Mesh::new(renderer, &vertices),
+                                        Mesh::new(renderer, &transparent_vertices),
+                                        updated_at,
+                                    )
+                                });
                         } else {
                             self.meshes.remove(&coords);
                         }
                     }
                 }
-            }
+            },
             _ => {}
         }
     }

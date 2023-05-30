@@ -76,7 +76,12 @@ impl Game {
         }
     }
 
-    fn draw(&mut self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
+    fn draw(
+        &mut self,
+        renderer: &Renderer,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+    ) {
         self.world.draw(
             self.processor.view(),
             encoder,
@@ -130,7 +135,7 @@ impl EventHandler for Game {
                 Ok(surface) => {
                     let view = surface.texture.create_view(&Default::default());
                     let mut encoder = device.create_command_encoder(&Default::default());
-                    self.draw(&view, &mut encoder);
+                    self.draw(renderer, &view, &mut encoder);
                     queue.submit([encoder.finish()]);
                     surface.present();
                 }
