@@ -142,8 +142,8 @@ impl ChunkMeshPool {
                         .send((
                             coords,
                             data.vertices()
-                                .filter_map(|(vertices, is_transparent)| {
-                                    if is_transparent {
+                                .filter_map(|(data, vertices)| {
+                                    if data.is_transparent() {
                                         transparent_vertices.extend(vertices);
                                         None
                                     } else {
@@ -170,8 +170,8 @@ impl ChunkMeshPool {
                         .send((
                             coords,
                             data.vertices()
-                                .filter_map(|(vertices, is_transparent)| {
-                                    if is_transparent {
+                                .filter_map(|(data, vertices)| {
+                                    if data.is_transparent() {
                                         transparent_vertices.extend(vertices);
                                         None
                                     } else {

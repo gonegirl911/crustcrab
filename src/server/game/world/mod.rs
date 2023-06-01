@@ -5,7 +5,7 @@ pub mod light;
 
 use self::{
     action::{ActionStore, BlockAction},
-    block::{Block, BlockArea},
+    block::{data::BlockData, Block, BlockArea},
     chunk::{generator::ChunkGenerator, light::ChunkAreaLight, Chunk, ChunkArea},
     light::WorldLight,
 };
@@ -502,7 +502,9 @@ pub struct ChunkData {
 }
 
 impl ChunkData {
-    pub fn vertices(&self) -> impl Iterator<Item = (impl Iterator<Item = BlockVertex>, bool)> + '_ {
+    pub fn vertices(
+        &self,
+    ) -> impl Iterator<Item = (&'static BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
         self.chunk.vertices(&self.area, &self.area_light)
     }
 }

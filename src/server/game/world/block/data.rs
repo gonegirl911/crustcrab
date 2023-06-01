@@ -1,4 +1,7 @@
-use super::{light::BlockAreaLight, Block, BlockArea};
+use super::{
+    light::{BlockAreaLight, BlockLight},
+    Block, BlockArea,
+};
 use crate::{client::game::world::BlockVertex, shared::color::Rgb};
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3, Vector3};
@@ -29,16 +32,18 @@ impl BlockData {
                     let is_smoothly_lit = self.is_smoothly_lit();
                     let corner_aos = area.corner_aos(side, is_smoothly_lit);
                     let corner_lights = area_light.corner_lights(side, area, is_smoothly_lit);
-                    Self::corners(corner_aos).into_iter().map(move |corner| {
-                        BlockVertex::new(
-                            coords + corner_deltas[corner],
-                            tex_idx,
-                            CORNER_TEX_COORDS[corner],
-                            face,
-                            corner_aos[corner],
-                            corner_lights[corner],
-                        )
-                    })
+                    Self::corners(corner_aos, corner_lights)
+                        .into_iter()
+                        .map(move |corner| {
+                            BlockVertex::new(
+                                coords + corner_deltas[corner],
+                                tex_idx,
+                                CORNER_TEX_COORDS[corner],
+                                face,
+                                corner_aos[corner],
+                                corner_lights[corner],
+                            )
+                        })
                 })
             })
             .into_iter()
@@ -61,7 +66,10 @@ impl BlockData {
         !self.is_glowing() && self.is_opaque()
     }
 
-    fn corners(corner_aos: EnumMap<Corner, u8>) -> [Corner; 6] {
+    fn corners(
+        corner_aos: EnumMap<Corner, u8>,
+        corner_lights: EnumMap<Corner, BlockLight>,
+    ) -> [Corner; 6] {
         if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
             > corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
         {
