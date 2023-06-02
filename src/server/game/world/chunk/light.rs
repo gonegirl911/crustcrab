@@ -3,7 +3,6 @@ use crate::server::game::world::block::light::{BlockAreaLight, BlockLight};
 use nalgebra::{Point3, Vector3};
 use std::ops::{Index, IndexMut};
 
-#[repr(align(16))]
 #[derive(Default)]
 pub struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
