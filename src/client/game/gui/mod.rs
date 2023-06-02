@@ -124,12 +124,12 @@ impl Gui {
         self.state.sensitivity
     }
 
-    fn element_scaling(size: f32) -> Matrix4<f32> {
-        Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0])
-    }
-
     fn element_size(Renderer { config, .. }: &Renderer, factor: f32) -> f32 {
         (config.height as f32 * 0.0325).max(13.5) * factor
+    }
+
+    fn element_scaling(size: f32) -> Matrix4<f32> {
+        Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0])
     }
 
     fn viewport(Renderer { config, .. }: &Renderer) -> Matrix4<f32> {

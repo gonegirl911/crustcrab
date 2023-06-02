@@ -12,10 +12,10 @@ use winit::{
 };
 
 pub struct View {
-    origin: Point3<f32>,
-    forward: Vector3<f32>,
-    right: Vector3<f32>,
-    up: Vector3<f32>,
+    pub origin: Point3<f32>,
+    pub forward: Vector3<f32>,
+    pub right: Vector3<f32>,
+    pub up: Vector3<f32>,
     yaw: f32,
     pitch: f32,
 }
@@ -37,22 +37,6 @@ impl View {
         }
     }
 
-    pub fn origin(&self) -> Point3<f32> {
-        self.origin
-    }
-
-    pub fn forward(&self) -> Vector3<f32> {
-        self.forward
-    }
-
-    pub fn right(&self) -> Vector3<f32> {
-        self.right
-    }
-
-    pub fn up(&self) -> Vector3<f32> {
-        self.up
-    }
-
     pub fn mat(&self) -> Matrix4<f32> {
         matrix![
             self.right.x,   self.right.y,   self.right.z,   -self.origin.coords.dot(&self.right);
@@ -64,10 +48,10 @@ impl View {
 }
 
 pub struct Projection {
-    fovy: f32,
-    aspect: f32,
-    znear: f32,
-    zfar: f32,
+    pub fovy: f32,
+    pub aspect: f32,
+    pub znear: f32,
+    pub zfar: f32,
 }
 
 impl Projection {
@@ -78,22 +62,6 @@ impl Projection {
             znear,
             zfar,
         }
-    }
-
-    pub fn fovy(&self) -> f32 {
-        self.fovy
-    }
-
-    pub fn aspect(&self) -> f32 {
-        self.aspect
-    }
-
-    pub fn znear(&self) -> f32 {
-        self.znear
-    }
-
-    pub fn zfar(&self) -> f32 {
-        self.zfar
     }
 
     pub fn mat(&self) -> Matrix4<f32> {

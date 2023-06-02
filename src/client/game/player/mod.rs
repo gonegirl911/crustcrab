@@ -55,14 +55,14 @@ impl Player {
 
     pub fn frustum(&self) -> Frustum {
         Frustum::new(
-            self.view.origin(),
-            self.view.forward(),
-            self.view.right(),
-            self.view.up(),
-            self.projection.fovy(),
-            self.projection.aspect(),
-            self.projection.znear(),
-            self.projection.zfar(),
+            self.view.origin,
+            self.view.forward,
+            self.view.right,
+            self.view.up,
+            self.projection.fovy,
+            self.projection.aspect,
+            self.projection.znear,
+            self.projection.zfar,
         )
     }
 
@@ -70,9 +70,9 @@ impl Player {
         PlayerUniformData::new(
             view.mat(),
             projection.mat(),
-            view.origin(),
-            projection.znear(),
-            projection.zfar(),
+            view.origin,
+            projection.znear,
+            projection.zfar,
         )
     }
 }
@@ -87,8 +87,8 @@ impl EventHandler for Player {
             Event::NewEvents(StartCause::Init) => {
                 client_tx
                     .send(ClientEvent::InitialRenderRequested {
-                        origin: self.view.origin(),
-                        dir: self.view.forward(),
+                        origin: self.view.origin,
+                        dir: self.view.forward,
                         render_distance: gui.render_distance(),
                     })
                     .unwrap_or_else(|_| unreachable!());
@@ -101,7 +101,7 @@ impl EventHandler for Player {
                 if changes.contains(Changes::MOVED) {
                     client_tx
                         .send(ClientEvent::PlayerPositionChanged {
-                            origin: self.view.origin(),
+                            origin: self.view.origin,
                         })
                         .unwrap_or_else(|_| unreachable!());
                 }
@@ -109,7 +109,7 @@ impl EventHandler for Player {
                 if changes.contains(Changes::ROTATED) {
                     client_tx
                         .send(ClientEvent::PlayerOrientationChanged {
-                            dir: self.view.forward(),
+                            dir: self.view.forward,
                         })
                         .unwrap_or_else(|_| unreachable!());
                 }
