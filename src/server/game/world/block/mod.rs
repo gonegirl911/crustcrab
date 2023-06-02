@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::ops::Range;
 
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Default, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Block {
     #[default]

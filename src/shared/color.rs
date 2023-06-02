@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::{array, ops::Index};
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq, Default, Zeroable, Pod, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Default, Zeroable, Pod, Deserialize)]
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
