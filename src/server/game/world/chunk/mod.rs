@@ -68,6 +68,10 @@ impl Chunk {
         self[coords].apply(action)
     }
 
+    pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
+        self[coords].apply_unchecked(action)
+    }
+
     fn points() -> impl Iterator<Item = Point3<u8>> {
         (0..Self::DIM).flat_map(|x| {
             (0..Self::DIM).flat_map(move |y| (0..Self::DIM).map(move |z| point![x, y, z].cast()))

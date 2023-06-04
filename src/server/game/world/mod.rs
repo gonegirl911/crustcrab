@@ -183,7 +183,7 @@ impl World {
     fn gen(&self, coords: Point3<i32>) -> Option<ChunkCell> {
         let mut chunk = self.generator.gen(coords);
         for (coords, action) in self.actions.actions(coords) {
-            chunk.apply(coords, action);
+            chunk.apply_unchecked(coords, action);
         }
         ChunkCell::new(chunk)
     }

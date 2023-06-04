@@ -35,22 +35,37 @@ impl Block {
         }
     }
 
+    pub fn apply_unchecked(&mut self, action: &BlockAction) {
+        match action {
+            BlockAction::Place(block) => self.place_unchecked(*block),
+            BlockAction::Destroy => self.destroy_unchecked(),
+        }
+    }
+
     fn place(&mut self, block: Block) -> bool {
         if *self == Self::Air && block != Self::Air {
-            *self = block;
+            self.place_unchecked(block);
             true
         } else {
             false
         }
     }
 
+    fn place_unchecked(&mut self, block: Block) {
+        *self = block;
+    }
+
     fn destroy(&mut self) -> bool {
         if *self != Self::Air {
-            *self = Self::Air;
+            self.destroy_unchecked();
             true
         } else {
             false
         }
+    }
+
+    fn destroy_unchecked(&mut self) {
+        *self = Block::Air;
     }
 }
 
