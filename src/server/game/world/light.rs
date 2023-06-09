@@ -397,9 +397,9 @@ impl WorldLight {
             .map(|(_, _, block)| block.data().light_filter)
             .try_fold(Rgb::splat(BlockLight::COMPONENT_MAX), |accum, f| {
                 let value = accum.zip_map(f, Self::apply_filter);
-                (value != Rgb::splat(0)).then_some(value)
+                (value != Default::default()).then_some(value)
             })
-            .unwrap_or(Rgb::splat(0))
+            .unwrap_or_default()
     }
 
     fn floor(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {

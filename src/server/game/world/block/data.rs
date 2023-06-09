@@ -46,11 +46,11 @@ impl BlockData {
     }
 
     pub fn is_glowing(&self) -> bool {
-        self.luminance != Rgb::splat(0)
+        self.luminance != Default::default()
     }
 
     pub fn is_transparent(&self) -> bool {
-        self.light_filter != Rgb::splat(0.0)
+        self.light_filter != Default::default()
     }
 
     pub fn is_opaque(&self) -> bool {
