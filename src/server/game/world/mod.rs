@@ -22,7 +22,7 @@ use crate::{
     shared::utils,
 };
 use flume::Sender;
-use nalgebra::{Point, Point3};
+use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -231,7 +231,7 @@ impl World {
         include_outline: bool,
     ) -> FxHashSet<Point3<i32>> {
         Self::block_area_points(block_updates)
-            .map(Self::chunk_coords)
+            .map(utils::chunk_coords)
             .chain(
                 include_outline
                     .then_some(Self::chunk_area_points(points.iter().copied()))
@@ -277,21 +277,6 @@ impl World {
             }
         }
         (all, err)
-    }
-
-    fn chunk_coords<const D: usize>(coords: Point<i64, D>) -> Point<i32, D> {
-        coords.map(|c| utils::div_floor(c, Chunk::DIM as i64) as i32)
-    }
-
-    fn block_coords<const D: usize>(coords: Point<i64, D>) -> Point<u8, D> {
-        coords.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
-    }
-
-    fn coords<const D: usize>(
-        chunk_coords: Point<i32, D>,
-        block_coords: Point<u8, D>,
-    ) -> Point<i64, D> {
-        chunk_coords.cast() * Chunk::DIM as i64 + block_coords.coords.cast()
     }
 }
 
@@ -383,8 +368,8 @@ impl ChunkStore {
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(World::chunk_coords(coords))
-            .map_or(Block::Air, |chunk| chunk[World::block_coords(coords)])
+        self.get(utils::chunk_coords(coords))
+            .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
@@ -417,8 +402,8 @@ impl ChunkStore {
         coords: Point3<i64>,
         action: &BlockAction,
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
-        let chunk_coords = World::chunk_coords(coords);
-        let block_coords = World::block_coords(coords);
+        let chunk_coords = utils::chunk_coords(coords);
+        let block_coords = utils::block_coords(coords);
         if World::Y_RANGE.contains(&chunk_coords.y) {
             if let Some(cell) = self.0.remove(&chunk_coords) {
                 match cell.apply(block_coords, action) {

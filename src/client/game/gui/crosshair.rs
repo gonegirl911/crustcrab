@@ -12,7 +12,7 @@ use std::mem;
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Crosshair {
-    uniform: Uniform<CrosshairUniformData>,
+    uniform: Uniform<CrosshairUniform>,
     texture: ImageTexture,
     program: Program,
     is_resized: bool,
@@ -20,7 +20,7 @@ pub struct Crosshair {
 
 impl Crosshair {
     pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let uniform = Uniform::new(renderer, None, wgpu::ShaderStages::VERTEX);
+        let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::new(renderer, "assets/textures/crosshair.png", false, true, 1);
         let program = Program::new(
             renderer,
@@ -84,10 +84,8 @@ impl EventHandler for Crosshair {
             }
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_resized) {
-                    self.uniform.write(
-                        renderer,
-                        &CrosshairUniformData::new(Self::transform(renderer)),
-                    );
+                    self.uniform
+                        .set(renderer, &CrosshairUniform::new(Self::transform(renderer)));
                 }
             }
             _ => {}
@@ -97,11 +95,11 @@ impl EventHandler for Crosshair {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct CrosshairUniformData {
+struct CrosshairUniform {
     transform: Matrix4<f32>,
 }
 
-impl CrosshairUniformData {
+impl CrosshairUniform {
     fn new(transform: Matrix4<f32>) -> Self {
         Self { transform }
     }

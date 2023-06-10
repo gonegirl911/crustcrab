@@ -1,4 +1,5 @@
-use super::{block::Block, World};
+use super::block::Block;
+use crate::shared::utils;
 use nalgebra::Point3;
 use rustc_hash::FxHashMap;
 
@@ -16,9 +17,9 @@ impl ActionStore {
 
     pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
         self.0
-            .entry(World::chunk_coords(coords))
+            .entry(utils::chunk_coords(coords))
             .or_default()
-            .insert(World::block_coords(coords), action);
+            .insert(utils::block_coords(coords), action);
     }
 }
 

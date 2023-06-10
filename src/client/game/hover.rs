@@ -95,7 +95,7 @@ impl BlockHighlight {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
-            mesh: IndexedMesh::new(
+            mesh: IndexedMesh::from_data(
                 renderer,
                 &DELTAS.map(|delta| BlockHighlightVertex::new(delta.into())),
                 &INDICES,

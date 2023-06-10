@@ -10,7 +10,7 @@ use super::{
     },
     {BlockAction, ChunkStore, World},
 };
-use crate::shared::color::Rgb;
+use crate::shared::{color::Rgb, utils};
 use nalgebra::{point, Point3, Vector3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -368,20 +368,20 @@ impl WorldLight {
 
     fn light(&self, coords: Point3<i64>) -> BlockLight {
         self.0
-            .get(&World::chunk_coords(coords))
-            .map_or_else(Default::default, |light| light[World::block_coords(coords)])
+            .get(&utils::chunk_coords(coords))
+            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
     }
 
     fn block_light_mut(&mut self, coords: Point3<i64>) -> BlockLightRefMut {
         BlockLightRefMut::new(
-            self.0.entry(World::chunk_coords(coords)),
-            World::block_coords(coords),
+            self.0.entry(utils::chunk_coords(coords)),
+            utils::block_coords(coords),
         )
     }
 
     fn light_beam_value(chunks: &ChunkStore, coords: Point3<i64>) -> Rgb<u8> {
-        let [chunk_x, chunk_z] = <[_; 2]>::from(World::chunk_coords(coords.xz()));
-        let [block_x, block_z] = <[_; 2]>::from(World::block_coords(coords.xz()));
+        let [chunk_x, chunk_z] = <[_; 2]>::from(utils::chunk_coords(coords.xz()));
+        let [block_x, block_z] = <[_; 2]>::from(utils::block_coords(coords.xz()));
         World::Y_RANGE
             .rev()
             .filter_map(|y| Some((y, chunks.get(point![chunk_x, y, chunk_z])?)))
@@ -392,7 +392,7 @@ impl WorldLight {
             })
             .filter(|(_, _, block)| *block != Block::Air)
             .take_while(|(chunk_y, block_y, _)| {
-                World::coords(point![*chunk_y], point![*block_y]).x >= coords.y
+                utils::coords((point![*chunk_y], point![*block_y])).x >= coords.y
             })
             .map(|(_, _, block)| block.data().light_filter)
             .try_fold(Rgb::splat(BlockLight::COMPONENT_MAX), |accum, f| {
@@ -403,7 +403,7 @@ impl WorldLight {
     }
 
     fn floor(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
-        let bottom = World::coords(point![World::Y_RANGE.start], Default::default()).x;
+        let bottom = utils::coords((point![World::Y_RANGE.start], Default::default())).x;
         (bottom..coords.y)
             .rev()
             .map(move |y| point![coords.x, y, coords.z])

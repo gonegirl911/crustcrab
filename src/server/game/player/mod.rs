@@ -1,7 +1,6 @@
 pub mod ray;
 
 use self::ray::Ray;
-use super::world::chunk::Chunk;
 use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},
@@ -14,12 +13,6 @@ pub struct Player {
     pub prev: WorldArea,
     pub curr: WorldArea,
     pub ray: Ray,
-}
-
-impl Player {
-    fn chunk_coords(coords: Point3<f32>) -> Point3<i32> {
-        coords.map(|c| (c / Chunk::DIM as f32).floor() as i32)
-    }
 }
 
 impl EventHandler<Event> for Player {
@@ -36,7 +29,7 @@ impl EventHandler<Event> for Player {
                     render_distance,
                 } => {
                     self.curr = WorldArea {
-                        center: Self::chunk_coords(*origin),
+                        center: utils::chunk_coords(*origin),
                         radius: *render_distance,
                     };
                     self.ray = Ray {
@@ -48,7 +41,7 @@ impl EventHandler<Event> for Player {
                     self.ray.dir = *dir;
                 }
                 ClientEvent::PlayerPositionChanged { origin } => {
-                    self.curr.center = Self::chunk_coords(*origin);
+                    self.curr.center = utils::chunk_coords(*origin);
                     self.ray.origin = *origin;
                 }
                 _ => {}

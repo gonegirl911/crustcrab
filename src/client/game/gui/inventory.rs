@@ -28,7 +28,7 @@ use winit::{
 
 pub struct Inventory {
     mesh: Option<Mesh<BlockVertex>>,
-    uniform: Uniform<InventoryUniformData>,
+    uniform: Uniform<InventoryUniform>,
     program: Program,
     inventory: ArrayVec<Block, 9>,
     index: usize,
@@ -42,7 +42,7 @@ impl Inventory {
         inventory: ArrayVec<Block, 9>,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let uniform = Uniform::new(renderer, None, wgpu::ShaderStages::VERTEX);
+        let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../../assets/shaders/inventory.wgsl"),
@@ -151,7 +151,7 @@ impl EventHandler for Inventory {
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_updated) {
                     self.mesh = self.selected_block().map(|block| {
-                        Mesh::new(
+                        Mesh::from_data(
                             renderer,
                             &block
                                 .data()
@@ -166,10 +166,8 @@ impl EventHandler for Inventory {
                 }
 
                 if mem::take(&mut self.is_resized) {
-                    self.uniform.write(
-                        renderer,
-                        &InventoryUniformData::new(Self::transform(renderer)),
-                    )
+                    self.uniform
+                        .set(renderer, &InventoryUniform::new(Self::transform(renderer)))
                 }
             }
             _ => {}
@@ -179,11 +177,11 @@ impl EventHandler for Inventory {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct InventoryUniformData {
+struct InventoryUniform {
     transform: Matrix4<f32>,
 }
 
-impl InventoryUniformData {
+impl InventoryUniform {
     fn new(transform: Matrix4<f32>) -> Self {
         Self { transform }
     }

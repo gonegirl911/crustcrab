@@ -11,22 +11,31 @@ pub struct Uniform<T> {
 }
 
 impl<T: Pod> Uniform<T> {
-    pub fn new(
+    pub fn from_value_mut(renderer: &Renderer, value: &T, visibility: wgpu::ShaderStages) -> Self {
+        Self::new(renderer, Some(value), visibility, true)
+    }
+
+    pub fn uninit_mut(renderer: &Renderer, visibility: wgpu::ShaderStages) -> Self {
+        Self::new(renderer, None, visibility, true)
+    }
+
+    fn new(
         Renderer { device, .. }: &Renderer,
-        data: Option<&T>,
+        value: Option<&T>,
         visibility: wgpu::ShaderStages,
+        is_mutable: bool,
     ) -> Self {
-        let buffer = if let Some(data) = data {
+        let buffer = if let Some(value) = value {
             device.create_buffer_init(&BufferInitDescriptor {
                 label: None,
-                contents: bytemuck::cast_slice(slice::from_ref(data)),
-                usage: Self::usage(),
+                contents: bytemuck::cast_slice(slice::from_ref(value)),
+                usage: Self::usage(is_mutable),
             })
         } else {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: None,
                 size: mem::size_of::<T>() as u64,
-                usage: Self::usage(),
+                usage: Self::usage(is_mutable),
                 mapped_at_creation: false,
             })
         };
@@ -67,11 +76,19 @@ impl<T: Pod> Uniform<T> {
         &self.bind_group
     }
 
-    pub fn write(&self, Renderer { queue, .. }: &Renderer, data: &T) {
-        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(slice::from_ref(data)));
+    pub fn set(&self, Renderer { queue, .. }: &Renderer, value: &T) {
+        queue.write_buffer(
+            &self.buffer,
+            0,
+            bytemuck::cast_slice(slice::from_ref(value)),
+        );
     }
 
-    fn usage() -> wgpu::BufferUsages {
-        wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
+    fn usage(is_mutable: bool) -> wgpu::BufferUsages {
+        if is_mutable {
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
+        } else {
+            wgpu::BufferUsages::UNIFORM
+        }
     }
 }

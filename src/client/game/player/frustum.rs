@@ -2,7 +2,7 @@ use crate::shared::bound::BoundingSphere;
 use nalgebra::{Point3, Vector3};
 
 pub struct Frustum {
-    origin: Point3<f32>,
+    pub origin: Point3<f32>,
     forward: Vector3<f32>,
     right: Vector3<f32>,
     up: Vector3<f32>,

@@ -21,7 +21,7 @@ pub struct Player {
     view: View,
     projection: Projection,
     controller: Controller,
-    uniform: Uniform<PlayerUniformData>,
+    uniform: Uniform<PlayerUniform>,
 }
 
 impl Player {
@@ -32,9 +32,9 @@ impl Player {
         let aspect = config.width as f32 / config.height as f32;
         let projection = Projection::new(gui.fovy(), aspect, 0.1, gui.zfar());
         let controller = Controller::new(gui.speed(), gui.sensitivity());
-        let uniform = Uniform::new(
+        let uniform = Uniform::from_value_mut(
             renderer,
-            Some(&Self::data(&view, &projection)),
+            &Self::data(&view, &projection),
             wgpu::ShaderStages::VERTEX_FRAGMENT,
         );
         Self {
@@ -66,8 +66,8 @@ impl Player {
         )
     }
 
-    fn data(view: &View, projection: &Projection) -> PlayerUniformData {
-        PlayerUniformData::new(
+    fn data(view: &View, projection: &Projection) -> PlayerUniform {
+        PlayerUniform::new(
             view.mat(),
             projection.mat(),
             view.origin,
@@ -128,7 +128,7 @@ impl EventHandler for Player {
 
                 if changes.intersects(Changes::MATRIX_CHANGES) {
                     self.uniform
-                        .write(renderer, &Self::data(&self.view, &self.projection));
+                        .set(renderer, &Self::data(&self.view, &self.projection));
                 }
             }
             _ => {}
@@ -138,7 +138,7 @@ impl EventHandler for Player {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct PlayerUniformData {
+struct PlayerUniform {
     vp: Matrix4<f32>,
     inv_v: Matrix4<f32>,
     inv_p: Matrix4<f32>,
@@ -148,7 +148,7 @@ struct PlayerUniformData {
     padding: [f32; 3],
 }
 
-impl PlayerUniformData {
+impl PlayerUniform {
     fn new(v: Matrix4<f32>, p: Matrix4<f32>, origin: Point3<f32>, znear: f32, zfar: f32) -> Self {
         Self {
             vp: p * v,

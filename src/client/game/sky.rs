@@ -12,7 +12,7 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 
 pub struct Sky {
-    uniform: Uniform<SkyUniformData>,
+    uniform: Uniform<SkyUniform>,
     updated_time: Option<Time>,
 }
 
@@ -22,7 +22,7 @@ impl Sky {
 
     pub fn new(renderer: &Renderer) -> Self {
         Self {
-            uniform: Uniform::new(renderer, None, wgpu::ShaderStages::VERTEX),
+            uniform: Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX),
             updated_time: Some(Default::default()),
         }
     }
@@ -55,9 +55,9 @@ impl EventHandler for Sky {
             }
             Event::MainEventsCleared => {
                 if let Some(time) = self.updated_time.take() {
-                    self.uniform.write(
+                    self.uniform.set(
                         renderer,
-                        &SkyUniformData::new(Self::light_intensity(time.stage())),
+                        &SkyUniform::new(Self::light_intensity(time.stage())),
                     );
                 }
             }
@@ -68,11 +68,11 @@ impl EventHandler for Sky {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct SkyUniformData {
+struct SkyUniform {
     light_intensity: Float3,
 }
 
-impl SkyUniformData {
+impl SkyUniform {
     fn new(light_intensity: Rgb<f32>) -> Self {
         Self {
             light_intensity: light_intensity.into(),

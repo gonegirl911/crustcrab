@@ -4,7 +4,7 @@ use crate::{
         game::player::frustum::{Frustum, FrustumCheck},
         renderer::{
             effect::PostProcessor,
-            mesh::{Mesh, Vertex},
+            mesh::{Mesh, TransparentMesh, Vertex},
             program::Program,
             texture::{image::ImageTextureArray, screen::DepthBuffer},
             Renderer,
@@ -21,12 +21,14 @@ use crate::{
         },
         ServerEvent,
     },
+    shared::utils,
 };
+use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use flume::{Receiver, Sender};
-use nalgebra::{Point2, Point3};
+use nalgebra::{point, Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{mem, sync::Arc, thread, time::Instant};
+use std::{cmp::Reverse, collections::hash_map::Entry, mem, sync::Arc, thread, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
@@ -70,7 +72,8 @@ impl World {
 
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
-        &self,
+        &mut self,
+        renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         depth_view: &wgpu::TextureView,
@@ -102,7 +105,7 @@ impl World {
             &mut render_pass,
             [player_bind_group, sky_bind_group, textures_bind_group],
         );
-        self.meshes.draw(&mut render_pass, frustum);
+        self.meshes.draw(renderer, &mut render_pass, frustum);
     }
 }
 
@@ -114,12 +117,19 @@ impl EventHandler for World {
     }
 }
 
+#[allow(clippy::type_complexity)]
 struct ChunkMeshPool {
-    meshes: FxHashMap<Point3<i32>, (Mesh<BlockVertex>, Mesh<BlockVertex>, Instant)>,
+    meshes: FxHashMap<
+        Point3<i32>,
+        (
+            Mesh<BlockVertex>,
+            Option<TransparentMesh<BlockVertex>>,
+            Instant,
+        ),
+    >,
     unloaded: FxHashSet<Point3<i32>>,
     priority_data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
     data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
-    #[allow(clippy::type_complexity)]
     vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant)>,
 }
 
@@ -197,28 +207,45 @@ impl ChunkMeshPool {
         }
     }
 
-    pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, frustum: &Frustum) {
+    pub fn draw<'a>(
+        &'a mut self,
+        renderer: &Renderer,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        frustum: &Frustum,
+    ) {
         let mut transparent_meshes = vec![];
 
-        for (&coords, (mesh, transparent_mesh, _)) in &self.meshes {
-            if Chunk::bounding_sphere(coords).is_visible(frustum) {
-                transparent_meshes.push((coords, transparent_mesh));
+        for (&chunk_coords, (mesh, transparent_mesh, _)) in &mut self.meshes {
+            if Chunk::bounding_sphere(chunk_coords).is_visible(frustum) {
+                if let Some(mesh) = transparent_mesh {
+                    transparent_meshes.push((chunk_coords, mesh));
+                }
                 render_pass.set_push_constants(
                     wgpu::ShaderStages::VERTEX,
                     0,
-                    bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
+                    bytemuck::cast_slice(&[BlockPushConstants::new(chunk_coords)]),
                 );
                 mesh.draw(render_pass);
             }
         }
 
-        for (coords, mesh) in transparent_meshes {
+        transparent_meshes.sort_unstable_by_key(|(chunk_coords, _)| {
+            Reverse(utils::magnitude_squared(
+                chunk_coords - utils::chunk_coords(frustum.origin),
+            ))
+        });
+
+        for (chunk_coords, mesh) in transparent_meshes {
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX,
                 0,
-                bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
+                bytemuck::cast_slice(&[BlockPushConstants::new(chunk_coords)]),
             );
-            mesh.draw(render_pass);
+            mesh.draw(renderer, render_pass, |v| {
+                utils::magnitude_squared(
+                    utils::coords((chunk_coords, v.coords())) - utils::coords(frustum.origin),
+                )
+            });
         }
     }
 
@@ -228,6 +255,13 @@ impl ChunkMeshPool {
         } else {
             &self.data_tx
         }
+    }
+
+    fn transparent_mesh(
+        renderer: &Renderer,
+        vertices: Vec<BlockVertex>,
+    ) -> Option<TransparentMesh<BlockVertex>> {
+        (!vertices.is_empty()).then(|| TransparentMesh::new(renderer, vertices))
     }
 }
 
@@ -262,34 +296,36 @@ impl EventHandler for ChunkMeshPool {
                 }
                 _ => {}
             },
-            #[rustfmt::skip]
             Event::MainEventsCleared => {
                 for (coords, vertices, transparent_vertices, updated_at) in self.vertices_rx.drain()
                 {
                     if !self.unloaded.contains(&coords) {
                         if !vertices.is_empty() || !transparent_vertices.is_empty() {
-                            self.meshes
-                                .entry(coords)
-                                .and_modify(|(mesh, transparent_mesh, last_updated_at)| {
+                            match self.meshes.entry(coords) {
+                                Entry::Occupied(entry) => {
+                                    let (_, _, last_updated_at) = entry.get();
                                     if *last_updated_at < updated_at {
-                                        *mesh = Mesh::new(renderer, &vertices);
-                                        *transparent_mesh = Mesh::new(renderer, &transparent_vertices);
-                                        *last_updated_at = updated_at;
+                                        *entry.into_mut() = (
+                                            Mesh::from_data(renderer, &vertices),
+                                            Self::transparent_mesh(renderer, transparent_vertices),
+                                            updated_at,
+                                        );
                                     }
-                                })
-                                .or_insert_with(|| {
-                                    (
-                                        Mesh::new(renderer, &vertices),
-                                        Mesh::new(renderer, &transparent_vertices),
+                                }
+                                Entry::Vacant(entry) => {
+                                    entry.insert((
+                                        Mesh::from_data(renderer, &vertices),
+                                        Self::transparent_mesh(renderer, transparent_vertices),
                                         updated_at,
-                                    )
-                                });
+                                    ));
+                                }
+                            }
                         } else {
                             self.meshes.remove(&coords);
                         }
                     }
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -312,18 +348,26 @@ impl BlockVertex {
         light: BlockLight,
     ) -> Self {
         let mut data = 0;
-        data |= coords.x as u32;
-        data |= (coords.y as u32) << 5;
-        data |= (coords.z as u32) << 10;
-        data |= (tex_index as u32) << 15;
-        data |= (tex_coords.x as u32) << 23;
-        data |= (tex_coords.y as u32) << 24;
-        data |= (face as u32) << 25;
-        data |= (ao as u32) << 27;
+        data.set_bit_range(4, 0, coords.x);
+        data.set_bit_range(9, 5, coords.y);
+        data.set_bit_range(14, 10, coords.z);
+        data.set_bit_range(22, 15, tex_index);
+        data.set_bit_range(23, 23, tex_coords.x);
+        data.set_bit_range(24, 24, tex_coords.y);
+        data.set_bit_range(26, 25, face as u8);
+        data.set_bit_range(28, 27, ao);
         Self {
             data,
             light: light.0,
         }
+    }
+
+    fn coords(self) -> Point3<u8> {
+        point![
+            self.data.bit_range(4, 0),
+            self.data.bit_range(9, 5),
+            self.data.bit_range(14, 10)
+        ]
     }
 }
 

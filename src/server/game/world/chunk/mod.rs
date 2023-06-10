@@ -5,7 +5,6 @@ use self::light::ChunkAreaLight;
 use super::{
     action::BlockAction,
     block::{data::BlockData, Block, BlockArea},
-    World,
 };
 use crate::{
     client::game::world::BlockVertex,
@@ -80,7 +79,7 @@ impl Chunk {
 
     fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
-            World::coords(coords, Default::default()).cast(),
+            utils::coords((coords, Default::default())).cast(),
             Vector3::from_element(Self::DIM).cast(),
         )
     }
@@ -147,7 +146,7 @@ impl ChunkArea {
                                 Self::block_axis_range(dz).map(move |z| {
                                     (
                                         point![x, y, z],
-                                        World::coords(point![dx, dy, dz], point![x, y, z])
+                                        utils::coords((point![dx, dy, dz], point![x, y, z]))
                                             .coords
                                             .cast(),
                                     )
