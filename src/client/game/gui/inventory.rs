@@ -28,7 +28,7 @@ use winit::{
 
 pub struct Inventory {
     mesh: Option<Mesh<BlockVertex>>,
-    uniform: Uniform<InventoryUniform>,
+    uniform: Uniform<InventoryUniformData>,
     program: Program,
     inventory: ArrayVec<Block, 9>,
     index: usize,
@@ -166,8 +166,10 @@ impl EventHandler for Inventory {
                 }
 
                 if mem::take(&mut self.is_resized) {
-                    self.uniform
-                        .set(renderer, &InventoryUniform::new(Self::transform(renderer)))
+                    self.uniform.set(
+                        renderer,
+                        &InventoryUniformData::new(Self::transform(renderer)),
+                    )
                 }
             }
             _ => {}
@@ -177,11 +179,11 @@ impl EventHandler for Inventory {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct InventoryUniform {
+struct InventoryUniformData {
     transform: Matrix4<f32>,
 }
 
-impl InventoryUniform {
+impl InventoryUniformData {
     fn new(transform: Matrix4<f32>) -> Self {
         Self { transform }
     }

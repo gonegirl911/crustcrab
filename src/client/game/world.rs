@@ -241,9 +241,10 @@ impl ChunkMeshPool {
                 0,
                 bytemuck::cast_slice(&[BlockPushConstants::new(chunk_coords)]),
             );
-            mesh.draw(renderer, render_pass, |v| {
+            mesh.draw(renderer, render_pass, |[v1, v2, v3]| {
+                let coords = (v1.coords() + v2.coords().coords + v3.coords().coords) / 3;
                 utils::magnitude_squared(
-                    utils::coords((chunk_coords, v.coords())) - utils::coords(frustum.origin),
+                    utils::coords((chunk_coords, coords)) - utils::coords(frustum.origin),
                 )
             });
         }

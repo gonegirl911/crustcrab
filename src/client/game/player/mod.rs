@@ -21,7 +21,7 @@ pub struct Player {
     view: View,
     projection: Projection,
     controller: Controller,
-    uniform: Uniform<PlayerUniform>,
+    uniform: Uniform<PlayerUniformData>,
 }
 
 impl Player {
@@ -66,8 +66,8 @@ impl Player {
         )
     }
 
-    fn data(view: &View, projection: &Projection) -> PlayerUniform {
-        PlayerUniform::new(
+    fn data(view: &View, projection: &Projection) -> PlayerUniformData {
+        PlayerUniformData::new(
             view.mat(),
             projection.mat(),
             view.origin,
@@ -138,7 +138,7 @@ impl EventHandler for Player {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct PlayerUniform {
+struct PlayerUniformData {
     vp: Matrix4<f32>,
     inv_v: Matrix4<f32>,
     inv_p: Matrix4<f32>,
@@ -148,7 +148,7 @@ struct PlayerUniform {
     padding: [f32; 3],
 }
 
-impl PlayerUniform {
+impl PlayerUniformData {
     fn new(v: Matrix4<f32>, p: Matrix4<f32>, origin: Point3<f32>, znear: f32, zfar: f32) -> Self {
         Self {
             vp: p * v,

@@ -66,7 +66,7 @@ impl<V: Vertex> TransparentMesh<V> {
         mut dist: F,
     ) where
         K: Ord,
-        F: FnMut(&V) -> K,
+        F: FnMut([V; 3]) -> K,
     {
         // self.vertices.sort_by_key(|v| Reverse(dist(v)));
         self.mesh.write(renderer, &self.vertices);
