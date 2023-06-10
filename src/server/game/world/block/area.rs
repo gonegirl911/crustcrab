@@ -13,7 +13,7 @@ use std::{
 pub struct BlockArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl BlockArea {
-    pub const DIM: usize = 1 + Self::PADDING * 2;
+    const DIM: usize = 1 + Self::PADDING * 2;
     pub const PADDING: usize = 1;
     const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..1 + Self::PADDING as i8;
 
@@ -23,12 +23,6 @@ impl BlockArea {
                 array::from_fn(|z| f(unsafe { Self::delta_unchecked(point![x, y, z]) }))
             })
         }))
-    }
-
-    pub fn from_block(block: Block) -> Self {
-        let mut value = Self::default();
-        value[Default::default()] = block;
-        value
     }
 
     pub fn visible_sides(self) -> impl Iterator<Item = Side> {
@@ -84,6 +78,14 @@ impl BlockArea {
         delta
             .map(|c| (c + BlockArea::PADDING as i8) as usize)
             .into()
+    }
+}
+
+impl From<Block> for BlockArea {
+    fn from(block: Block) -> Self {
+        let mut value = Self::default();
+        value[Default::default()] = block;
+        value
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
             Renderer,
         },
     },
-    server::game::world::block::{area::BlockArea, Block},
+    server::game::world::block::Block,
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
@@ -155,11 +155,7 @@ impl EventHandler for Inventory {
                             renderer,
                             &block
                                 .data()
-                                .vertices(
-                                    Default::default(),
-                                    BlockArea::from_block(block),
-                                    Default::default(),
-                                )
+                                .vertices(Default::default(), block.into(), Default::default())
                                 .collect::<Vec<_>>(),
                         )
                     });

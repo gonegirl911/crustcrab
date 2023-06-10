@@ -31,7 +31,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::LinkedList,
-    ops::{Deref, Index, Range},
+    ops::{Deref, Range},
     sync::Arc,
 };
 
@@ -196,7 +196,6 @@ impl World {
         ServerEvent::ChunkLoaded {
             coords,
             data: Arc::new(ChunkData {
-                chunk: self.chunks[coords].clone(),
                 area: self.chunks.chunk_area(coords),
                 area_light: self.light.chunk_area_light(coords),
             }),
@@ -212,7 +211,6 @@ impl World {
         Some(ServerEvent::ChunkUpdated {
             coords,
             data: Arc::new(ChunkData {
-                chunk: self.chunks.get(coords)?.clone(),
                 area: self.chunks.chunk_area(coords),
                 area_light: self.light.chunk_area_light(coords),
             }),
@@ -437,14 +435,6 @@ impl ChunkStore {
     }
 }
 
-impl Index<Point3<i32>> for ChunkStore {
-    type Output = Chunk;
-
-    fn index(&self, coords: Point3<i32>) -> &Self::Output {
-        &self.0[&coords]
-    }
-}
-
 struct ChunkCell(Box<Chunk>);
 
 impl ChunkCell {
@@ -485,7 +475,6 @@ impl Deref for ChunkCell {
 }
 
 pub struct ChunkData {
-    chunk: Chunk,
     area: ChunkArea,
     area_light: ChunkAreaLight,
 }
@@ -494,7 +483,17 @@ impl ChunkData {
     pub fn vertices(
         &self,
     ) -> impl Iterator<Item = (&'static BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
-        self.chunk.vertices(&self.area, &self.area_light)
+        Chunk::points().map(|coords| {
+            let data = self.area[coords.coords.cast()].data();
+            (
+                data,
+                data.vertices(
+                    coords,
+                    self.area.block_area(coords),
+                    self.area_light.block_area_light(coords),
+                ),
+            )
+        })
     }
 }
 

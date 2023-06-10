@@ -1,17 +1,13 @@
 pub mod area;
 pub mod generator;
 
-use self::area::{ChunkArea, ChunkAreaLight};
 use super::{
     action::BlockAction,
-    block::{data::BlockData, Block, BlockLight},
+    block::{Block, BlockLight},
 };
-use crate::{
-    client::game::world::BlockVertex,
-    shared::{
-        bound::{Aabb, BoundingSphere},
-        utils,
-    },
+use crate::shared::{
+    bound::{Aabb, BoundingSphere},
+    utils,
 };
 use nalgebra::{point, Point3, Vector3};
 use std::{
@@ -32,28 +28,6 @@ impl Chunk {
         }))
     }
 
-    pub fn vertices<'a>(
-        &'a self,
-        area: &'a ChunkArea,
-        area_light: &'a ChunkAreaLight,
-    ) -> impl Iterator<Item = (&'static BlockData, impl Iterator<Item = BlockVertex>)> + 'a {
-        self.blocks().map(|(coords, block)| {
-            let data = block.data();
-            (
-                data,
-                data.vertices(
-                    coords,
-                    area.block_area(coords),
-                    area_light.block_area_light(coords),
-                ),
-            )
-        })
-    }
-
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
-        Self::points().zip(self.0.iter().flatten().flatten().copied())
-    }
-
     pub fn is_empty(&self) -> bool {
         let expected = unsafe { mem::transmute([Block::Air; Self::DIM]) };
         self.0
@@ -70,7 +44,7 @@ impl Chunk {
         self[coords].apply_unchecked(action)
     }
 
-    fn points() -> impl Iterator<Item = Point3<u8>> {
+    pub fn points() -> impl Iterator<Item = Point3<u8>> {
         (0..Self::DIM).flat_map(|x| {
             (0..Self::DIM).flat_map(move |y| (0..Self::DIM).map(move |z| point![x, y, z].cast()))
         })

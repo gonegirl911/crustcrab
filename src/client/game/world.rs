@@ -147,25 +147,7 @@ impl ChunkMeshPool {
             let vertices_tx = vertices_tx.clone();
             thread::spawn(move || {
                 for (coords, data, updated_at) in priority_data_rx {
-                    let mut transparent_vertices = vec![];
-                    vertices_tx
-                        .send((
-                            coords,
-                            data.vertices()
-                                .filter_map(|(data, vertices)| {
-                                    if data.is_transparent() {
-                                        transparent_vertices.extend(vertices);
-                                        None
-                                    } else {
-                                        Some(vertices)
-                                    }
-                                })
-                                .flatten()
-                                .collect(),
-                            transparent_vertices,
-                            updated_at,
-                        ))
-                        .unwrap_or_else(|_| unreachable!());
+                    Self::send(vertices_tx.clone(), coords, data, updated_at);
                 }
             });
         }
@@ -175,25 +157,7 @@ impl ChunkMeshPool {
             let vertices_tx = vertices_tx.clone();
             thread::spawn(move || {
                 for (coords, data, updated_at) in data_rx {
-                    let mut transparent_vertices = vec![];
-                    vertices_tx
-                        .send((
-                            coords,
-                            data.vertices()
-                                .filter_map(|(data, vertices)| {
-                                    if data.is_transparent() {
-                                        transparent_vertices.extend(vertices);
-                                        None
-                                    } else {
-                                        Some(vertices)
-                                    }
-                                })
-                                .flatten()
-                                .collect(),
-                            transparent_vertices,
-                            updated_at,
-                        ))
-                        .unwrap_or_else(|_| unreachable!());
+                    Self::send(vertices_tx.clone(), coords, data, updated_at);
                 }
             });
         }
@@ -220,11 +184,13 @@ impl ChunkMeshPool {
                 if let Some(mesh) = transparent_mesh {
                     transparent_meshes.push((coords, mesh));
                 }
+
                 render_pass.set_push_constants(
                     wgpu::ShaderStages::VERTEX,
                     0,
                     bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
                 );
+
                 mesh.draw(render_pass);
             }
         }
@@ -241,6 +207,7 @@ impl ChunkMeshPool {
                 0,
                 bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
             );
+
             mesh.draw(renderer, render_pass, |coords| {
                 utils::magnitude_squared(coords - utils::coords(frustum.origin))
             });
@@ -253,6 +220,34 @@ impl ChunkMeshPool {
         } else {
             &self.data_tx
         }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn send(
+        vertices_tx: Sender<(Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant)>,
+        coords: Point3<i32>,
+        data: Arc<ChunkData>,
+        updated_at: Instant,
+    ) {
+        let mut transparent_vertices = vec![];
+        vertices_tx
+            .send((
+                coords,
+                data.vertices()
+                    .filter_map(|(data, vertices)| {
+                        if data.is_transparent() {
+                            transparent_vertices.extend(vertices);
+                            None
+                        } else {
+                            Some(vertices)
+                        }
+                    })
+                    .flatten()
+                    .collect(),
+                transparent_vertices,
+                updated_at,
+            ))
+            .unwrap_or_else(|_| unreachable!());
     }
 
     fn transparent_mesh(
