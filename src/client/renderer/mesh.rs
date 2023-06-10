@@ -46,16 +46,25 @@ impl<V: Vertex> Mesh<V> {
     }
 }
 
-pub struct TransparentMesh<V> {
-    vertices: Vec<V>,
+pub struct TransparentMesh<C, V> {
+    vertices: Vec<(C, [V; 3])>,
     mesh: Mesh<V>,
 }
 
-impl<V: Vertex> TransparentMesh<V> {
-    pub fn new(renderer: &Renderer, vertices: Vec<V>) -> Self {
+impl<C, V: Vertex> TransparentMesh<C, V> {
+    pub fn new<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
+    where
+        F: FnMut([V; 3]) -> C,
+    {
         Self {
             mesh: Mesh::uninit_mut(renderer, vertices.len()),
-            vertices,
+            vertices: vertices
+                .chunks_exact(3)
+                .map(|v| {
+                    let v = v.try_into().unwrap_or_else(|_| unreachable!());
+                    (coords(v), v)
+                })
+                .collect(),
         }
     }
 
@@ -66,10 +75,18 @@ impl<V: Vertex> TransparentMesh<V> {
         mut dist: F,
     ) where
         K: Ord,
-        F: FnMut([V; 3]) -> K,
+        F: FnMut(&C) -> K,
     {
-        // self.vertices.sort_by_key(|v| Reverse(dist(v)));
-        self.mesh.write(renderer, &self.vertices);
+        self.vertices.sort_by_key(|(c, _)| Reverse(dist(c)));
+        self.mesh.write(
+            renderer,
+            &self
+                .vertices
+                .iter()
+                .flat_map(|(_, v)| v)
+                .copied()
+                .collect::<Vec<_>>(),
+        );
         self.mesh.draw(render_pass);
     }
 }

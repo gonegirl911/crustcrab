@@ -123,7 +123,7 @@ struct ChunkMeshPool {
         Point3<i32>,
         (
             Mesh<BlockVertex>,
-            Option<TransparentMesh<BlockVertex>>,
+            Option<TransparentMesh<Point3<i64>, BlockVertex>>,
             Instant,
         ),
     >,
@@ -215,37 +215,34 @@ impl ChunkMeshPool {
     ) {
         let mut transparent_meshes = vec![];
 
-        for (&chunk_coords, (mesh, transparent_mesh, _)) in &mut self.meshes {
-            if Chunk::bounding_sphere(chunk_coords).is_visible(frustum) {
+        for (&coords, (mesh, transparent_mesh, _)) in &mut self.meshes {
+            if Chunk::bounding_sphere(coords).is_visible(frustum) {
                 if let Some(mesh) = transparent_mesh {
-                    transparent_meshes.push((chunk_coords, mesh));
+                    transparent_meshes.push((coords, mesh));
                 }
                 render_pass.set_push_constants(
                     wgpu::ShaderStages::VERTEX,
                     0,
-                    bytemuck::cast_slice(&[BlockPushConstants::new(chunk_coords)]),
+                    bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
                 );
                 mesh.draw(render_pass);
             }
         }
 
-        transparent_meshes.sort_unstable_by_key(|(chunk_coords, _)| {
+        transparent_meshes.sort_unstable_by_key(|(coords, _)| {
             Reverse(utils::magnitude_squared(
-                chunk_coords - utils::chunk_coords(frustum.origin),
+                coords - utils::chunk_coords(frustum.origin),
             ))
         });
 
-        for (chunk_coords, mesh) in transparent_meshes {
+        for (coords, mesh) in transparent_meshes {
             render_pass.set_push_constants(
                 wgpu::ShaderStages::VERTEX,
                 0,
-                bytemuck::cast_slice(&[BlockPushConstants::new(chunk_coords)]),
+                bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
             );
-            mesh.draw(renderer, render_pass, |[v1, v2, v3]| {
-                let coords = (v1.coords() + v2.coords().coords + v3.coords().coords) / 3;
-                utils::magnitude_squared(
-                    utils::coords((chunk_coords, coords)) - utils::coords(frustum.origin),
-                )
+            mesh.draw(renderer, render_pass, |coords| {
+                utils::magnitude_squared(coords - utils::coords(frustum.origin))
             });
         }
     }
@@ -260,9 +257,17 @@ impl ChunkMeshPool {
 
     fn transparent_mesh(
         renderer: &Renderer,
+        coords: Point3<i32>,
         vertices: Vec<BlockVertex>,
-    ) -> Option<TransparentMesh<BlockVertex>> {
-        (!vertices.is_empty()).then(|| TransparentMesh::new(renderer, vertices))
+    ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
+        (!vertices.is_empty()).then(|| {
+            TransparentMesh::new(renderer, &vertices, |[v1, v2, v3]| {
+                utils::coords((
+                    coords,
+                    (v1.coords() + v2.coords().coords + v3.coords().coords) / 3,
+                ))
+            })
+        })
     }
 }
 
@@ -308,7 +313,11 @@ impl EventHandler for ChunkMeshPool {
                                     if *last_updated_at < updated_at {
                                         *entry.into_mut() = (
                                             Mesh::from_data(renderer, &vertices),
-                                            Self::transparent_mesh(renderer, transparent_vertices),
+                                            Self::transparent_mesh(
+                                                renderer,
+                                                coords,
+                                                transparent_vertices,
+                                            ),
                                             updated_at,
                                         );
                                     }
@@ -316,7 +325,11 @@ impl EventHandler for ChunkMeshPool {
                                 Entry::Vacant(entry) => {
                                     entry.insert((
                                         Mesh::from_data(renderer, &vertices),
-                                        Self::transparent_mesh(renderer, transparent_vertices),
+                                        Self::transparent_mesh(
+                                            renderer,
+                                            coords,
+                                            transparent_vertices,
+                                        ),
                                         updated_at,
                                     ));
                                 }
