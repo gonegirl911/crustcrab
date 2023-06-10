@@ -13,7 +13,6 @@ use crate::{
         utils,
     },
 };
-use bitvec::BitArr;
 use nalgebra::{point, vector, Point3, Vector3};
 use std::{
     array, mem,
@@ -104,7 +103,7 @@ impl IndexMut<Point3<u8>> for Chunk {
 }
 
 #[derive(Default)]
-pub struct ChunkArea(BitArr!(for Self::DIM * Self::DIM * Self::DIM, in usize));
+pub struct ChunkArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl ChunkArea {
     pub const DIM: usize = Chunk::DIM + Self::PADDING * 2;
@@ -117,17 +116,7 @@ impl ChunkArea {
 
     fn block_area(&self, coords: Point3<u8>) -> BlockArea {
         let coords = coords.coords.cast();
-        BlockArea::from_fn(|delta| self.is_opaque(coords + delta))
-    }
-
-    fn is_opaque(&self, delta: Vector3<i8>) -> bool {
-        unsafe { *self.0.get_unchecked(Self::index(delta)) }
-    }
-
-    pub fn set(&mut self, delta: Vector3<i8>, is_opaque: bool) {
-        unsafe {
-            self.0.set_unchecked(Self::index(delta), is_opaque);
-        }
+        BlockArea::from_fn(|delta| self[coords + delta])
     }
 
     pub fn deltas() -> impl Iterator<
@@ -166,20 +155,6 @@ impl ChunkArea {
         })
     }
 
-    fn index(delta: Vector3<i8>) -> usize {
-        assert!(
-            Self::AXIS_RANGE.contains(&delta.x)
-                && Self::AXIS_RANGE.contains(&delta.y)
-                && Self::AXIS_RANGE.contains(&delta.z)
-        );
-        unsafe { Self::index_unchecked(delta) }
-    }
-
-    unsafe fn index_unchecked(delta: Vector3<i8>) -> usize {
-        let idx = delta.map(|c| (c + Self::PADDING as i8) as usize);
-        idx.x * Self::DIM.pow(2) + idx.y * Self::DIM + idx.z
-    }
-
     fn block_axis_range(dc: i32) -> Range<u8> {
         if dc == Self::CHUNK_AXIS_RANGE.start {
             (Chunk::DIM - Self::REM) as u8..Chunk::DIM as u8
@@ -188,5 +163,27 @@ impl ChunkArea {
         } else {
             0..Chunk::DIM as u8
         }
+    }
+
+    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
+        delta
+            .map(|c| (c + ChunkArea::PADDING as i8) as usize)
+            .into()
+    }
+}
+
+impl Index<Vector3<i8>> for ChunkArea {
+    type Output = Block;
+
+    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
+        let idx = unsafe { Self::index_unchecked(delta) };
+        &self.0[idx.x][idx.y][idx.z]
+    }
+}
+
+impl IndexMut<Vector3<i8>> for ChunkArea {
+    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
+        let idx = unsafe { Self::index_unchecked(delta) };
+        &mut self.0[idx.x][idx.y][idx.z]
     }
 }

@@ -360,7 +360,7 @@ impl ChunkStore {
         for (chunk_delta, deltas) in ChunkArea::deltas() {
             if let Some(chunk) = self.get(coords + chunk_delta) {
                 for (block_coords, delta) in deltas {
-                    value.set(delta, chunk[block_coords].data().is_opaque());
+                    value[delta] = chunk[block_coords];
                 }
             }
         }

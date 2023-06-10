@@ -1,7 +1,7 @@
 use super::{BlockArea, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS};
 use bitfield::bitfield;
 use enum_map::{enum_map, EnumMap};
-use nalgebra::{point, Point3, Vector3};
+use nalgebra::{point, Vector3};
 use std::{
     array,
     iter::Sum,
@@ -27,7 +27,7 @@ impl BlockAreaLight {
     pub fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| {
-                array::from_fn(|z| f(unsafe { Self::delta_unchecked(point![x, y, z]) }))
+                array::from_fn(|z| f(unsafe { BlockArea::delta_unchecked(point![x, y, z]) }))
             })
         }))
     }
@@ -38,30 +38,21 @@ impl BlockAreaLight {
         area: BlockArea,
         is_smoothly_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
-        let side_delta = SIDE_DELTAS[side];
+        let delta = SIDE_DELTAS[side];
         if is_smoothly_lit {
+            let is_transparent = area[delta].data().is_transparent();
             SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
                 component_deltas
                     .into_values()
-                    .chain([side_delta])
-                    .filter(|delta| area.is_transparent(*delta))
+                    .filter(|delta| area[*delta].data().is_transparent())
                     .map(|delta| self[delta])
+                    .chain(is_transparent.then(|| self[delta]))
                     .sum::<BlockLightSum>()
                     .avg()
             })
         } else {
-            enum_map! { _ => self[side_delta] }
+            enum_map! { _ => self[delta] }
         }
-    }
-
-    unsafe fn delta_unchecked(index: Point3<usize>) -> Vector3<i8> {
-        index.coords.map(|c| c as i8 - BlockArea::PADDING as i8)
-    }
-
-    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
-        delta
-            .map(|c| (c + BlockArea::PADDING as i8) as usize)
-            .into()
     }
 }
 
@@ -69,7 +60,7 @@ impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
+        let idx = unsafe { BlockArea::index_unchecked(delta) };
         &self.0[idx.x][idx.y][idx.z]
     }
 }

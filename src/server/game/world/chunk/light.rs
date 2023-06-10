@@ -28,26 +28,20 @@ impl ChunkAreaLight {
         let coords = coords.coords.cast();
         BlockAreaLight::from_fn(|delta| self[coords + delta])
     }
-
-    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
-        delta
-            .map(|c| (c + ChunkArea::PADDING as i8) as usize)
-            .into()
-    }
 }
 
 impl Index<Vector3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
+        let idx = unsafe { ChunkArea::index_unchecked(delta) };
         &self.0[idx.x][idx.y][idx.z]
     }
 }
 
 impl IndexMut<Vector3<i8>> for ChunkAreaLight {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
+        let idx = unsafe { ChunkArea::index_unchecked(delta) };
         &mut self.0[idx.x][idx.y][idx.z]
     }
 }
