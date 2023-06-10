@@ -41,7 +41,7 @@ impl EventHandler<Event> for Clock {
                 self.send(server_tx);
             }
             Event::Tick => {
-                // self.ticks = (self.ticks + 1) % Self::TICKS_PER_DAY;
+                self.ticks = (self.ticks + 1) % Self::TICKS_PER_DAY;
                 self.send(server_tx);
             }
             _ => {}

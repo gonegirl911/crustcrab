@@ -1,12 +1,11 @@
 use super::{
     block::{
         data::{BlockData, SIDE_DELTAS},
-        light::BlockLight,
-        Block,
+        Block, BlockLight,
     },
     chunk::{
-        light::{ChunkAreaLight, ChunkLight},
-        Chunk, ChunkArea,
+        area::{ChunkArea, ChunkAreaLight},
+        Chunk, ChunkLight,
     },
     {BlockAction, ChunkStore, World},
 };
@@ -27,9 +26,9 @@ pub struct WorldLight(FxHashMap<Point3<i32>, ChunkLight>);
 impl WorldLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
         let mut value = ChunkAreaLight::default();
-        for (chunk_delta, deltas) in ChunkArea::deltas() {
-            if let Some(light) = self.0.get(&(coords + chunk_delta)) {
-                for (block_coords, delta) in deltas {
+        for delta in ChunkArea::chunk_deltas() {
+            if let Some(light) = self.0.get(&(coords + delta)) {
+                for (block_coords, delta) in ChunkArea::block_deltas(delta) {
                     value[delta] = light[block_coords];
                 }
             }
@@ -391,9 +390,7 @@ impl WorldLight {
                     .map(move |y| (chunk_y, y, chunk[point![block_x, y, block_z]]))
             })
             .filter(|(_, _, block)| *block != Block::Air)
-            .take_while(|(chunk_y, block_y, _)| {
-                utils::coords((point![*chunk_y], point![*block_y])).x >= coords.y
-            })
+            .take_while(|(chunk_y, block_y, _)| utils::coords((*chunk_y, *block_y)) >= coords.y)
             .map(|(_, _, block)| block.data().light_filter)
             .try_fold(Rgb::splat(BlockLight::COMPONENT_MAX), |accum, f| {
                 let value = accum.zip_map(f, Self::apply_filter);
@@ -403,7 +400,7 @@ impl WorldLight {
     }
 
     fn floor(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
-        let bottom = utils::coords((point![World::Y_RANGE.start], Default::default())).x;
+        let bottom = utils::coords((World::Y_RANGE.start, Default::default()));
         (bottom..coords.y)
             .rev()
             .map(move |y| point![coords.x, y, coords.z])

@@ -14,7 +14,7 @@ use crate::{
         game::world::{
             block::{
                 data::{Face, TEX_PATHS},
-                light::BlockLight,
+                BlockLight,
             },
             chunk::Chunk,
             ChunkData,

@@ -5,8 +5,12 @@ pub mod light;
 
 use self::{
     action::{ActionStore, BlockAction},
-    block::{data::BlockData, Block, BlockArea},
-    chunk::{generator::ChunkGenerator, light::ChunkAreaLight, Chunk, ChunkArea},
+    block::{area::BlockArea, data::BlockData, Block},
+    chunk::{
+        area::{ChunkArea, ChunkAreaLight},
+        generator::ChunkGenerator,
+        Chunk,
+    },
     light::WorldLight,
 };
 use crate::{
@@ -357,10 +361,10 @@ pub struct ChunkStore(FxHashMap<Point3<i32>, ChunkCell>);
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
-        for (chunk_delta, deltas) in ChunkArea::deltas() {
-            if let Some(chunk) = self.get(coords + chunk_delta) {
-                for (block_coords, delta) in deltas {
-                    value[delta] = chunk[block_coords];
+        for delta in ChunkArea::chunk_deltas() {
+            if let Some(light) = self.0.get(&(coords + delta)) {
+                for (block_coords, delta) in ChunkArea::block_deltas(delta) {
+                    value[delta] = light[block_coords];
                 }
             }
         }

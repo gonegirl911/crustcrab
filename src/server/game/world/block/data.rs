@@ -1,4 +1,7 @@
-use super::{light::BlockAreaLight, Block, BlockArea};
+use super::{
+    area::{BlockArea, BlockAreaLight},
+    Block,
+};
 use crate::{client::game::world::BlockVertex, shared::color::Rgb};
 use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3, Vector3};

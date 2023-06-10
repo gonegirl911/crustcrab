@@ -1,10 +1,10 @@
+pub mod area;
 pub mod generator;
-pub mod light;
 
-use self::light::ChunkAreaLight;
+use self::area::{ChunkArea, ChunkAreaLight};
 use super::{
     action::BlockAction,
-    block::{data::BlockData, Block, BlockArea},
+    block::{data::BlockData, Block, BlockLight},
 };
 use crate::{
     client::game::world::BlockVertex,
@@ -13,10 +13,10 @@ use crate::{
         utils,
     },
 };
-use nalgebra::{point, vector, Point3, Vector3};
+use nalgebra::{point, Point3, Vector3};
 use std::{
     array, mem,
-    ops::{Index, IndexMut, Range},
+    ops::{Index, IndexMut},
 };
 
 #[repr(align(16))]
@@ -103,87 +103,18 @@ impl IndexMut<Point3<u8>> for Chunk {
 }
 
 #[derive(Default)]
-pub struct ChunkArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
+pub struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
-impl ChunkArea {
-    pub const DIM: usize = Chunk::DIM + Self::PADDING * 2;
-    pub const PADDING: usize = BlockArea::PADDING;
-    const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..(Chunk::DIM + Self::PADDING) as i8;
-    const CHUNK_PADDING: usize = utils::div_ceil(Self::PADDING, Chunk::DIM);
-    const CHUNK_AXIS_RANGE: Range<i32> =
-        -(Self::CHUNK_PADDING as i32)..1 + Self::CHUNK_PADDING as i32;
-    const REM: usize = Self::PADDING % Chunk::DIM;
+impl Index<Point3<u8>> for ChunkLight {
+    type Output = BlockLight;
 
-    fn block_area(&self, coords: Point3<u8>) -> BlockArea {
-        let coords = coords.coords.cast();
-        BlockArea::from_fn(|delta| self[coords + delta])
-    }
-
-    pub fn deltas() -> impl Iterator<
-        Item = (
-            Vector3<i32>,
-            impl Iterator<Item = (Point3<u8>, Vector3<i8>)>,
-        ),
-    > {
-        Self::CHUNK_AXIS_RANGE.flat_map(|dx| {
-            Self::CHUNK_AXIS_RANGE.flat_map(move |dy| {
-                Self::CHUNK_AXIS_RANGE.map(move |dz| {
-                    (
-                        vector![dx, dy, dz],
-                        Self::block_axis_range(dx).flat_map(move |x| {
-                            Self::block_axis_range(dy).flat_map(move |y| {
-                                Self::block_axis_range(dz).map(move |z| {
-                                    (
-                                        point![x, y, z],
-                                        utils::coords((point![dx, dy, dz], point![x, y, z]))
-                                            .coords
-                                            .cast(),
-                                    )
-                                })
-                            })
-                        }),
-                    )
-                })
-            })
-        })
-    }
-
-    pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        Self::CHUNK_AXIS_RANGE.flat_map(|dx| {
-            Self::CHUNK_AXIS_RANGE
-                .flat_map(move |dy| Self::CHUNK_AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
-        })
-    }
-
-    fn block_axis_range(dc: i32) -> Range<u8> {
-        if dc == Self::CHUNK_AXIS_RANGE.start {
-            (Chunk::DIM - Self::REM) as u8..Chunk::DIM as u8
-        } else if dc == Self::CHUNK_AXIS_RANGE.end - 1 {
-            0..Self::REM as u8
-        } else {
-            0..Chunk::DIM as u8
-        }
-    }
-
-    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
-        delta
-            .map(|c| (c + ChunkArea::PADDING as i8) as usize)
-            .into()
+    fn index(&self, coords: Point3<u8>) -> &Self::Output {
+        &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }
 }
 
-impl Index<Vector3<i8>> for ChunkArea {
-    type Output = Block;
-
-    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
-        &self.0[idx.x][idx.y][idx.z]
-    }
-}
-
-impl IndexMut<Vector3<i8>> for ChunkArea {
-    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
-        &mut self.0[idx.x][idx.y][idx.z]
+impl IndexMut<Point3<u8>> for ChunkLight {
+    fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
+        &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }
 }

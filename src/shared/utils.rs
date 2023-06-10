@@ -61,6 +61,38 @@ impl<const D: usize> IntoWorldCoords for (Point<i32, D>, Point<u8, D>) {
     }
 }
 
+impl<const D: usize> IntoWorldCoords for (SVector<i32, D>, SVector<u8, D>) {
+    type Point<T: Scalar> = SVector<T, D>;
+
+    fn into_chunk_coords(self) -> Self::Point<i32> {
+        self.0
+    }
+
+    fn into_block_coords(self) -> Self::Point<u8> {
+        self.1
+    }
+
+    fn into_coords(self) -> Self::Point<i64> {
+        self.0.cast() * Chunk::DIM as i64 + self.1.cast()
+    }
+}
+
+impl IntoWorldCoords for (i32, u8) {
+    type Point<T: Scalar> = T;
+
+    fn into_chunk_coords(self) -> Self::Point<i32> {
+        self.0
+    }
+
+    fn into_block_coords(self) -> Self::Point<u8> {
+        self.1
+    }
+
+    fn into_coords(self) -> Self::Point<i64> {
+        self.0 as i64 * Chunk::DIM as i64 + self.1 as i64
+    }
+}
+
 impl<const D: usize> IntoWorldCoords for Point<i64, D> {
     type Point<T: Scalar> = Point<T, D>;
 
