@@ -3,12 +3,16 @@ use serde::Deserialize;
 use std::{array, ops::Index};
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Default, Zeroable, Pod, Deserialize)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Default, Zeroable, Pod, Deserialize)]
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
     pub const fn new(r: T, g: T, b: T) -> Self {
         Self([r, g, b])
+    }
+
+    pub fn from_fn<F: FnMut(usize) -> T>(f: F) -> Self {
+        Self(array::from_fn(f))
     }
 
     pub fn zip_map<F, U, V>(self, rhs: Rgb<U>, mut f: F) -> Rgb<V>

@@ -3,10 +3,11 @@ pub mod data;
 
 use self::data::{BlockData, BLOCK_DATA};
 use super::action::BlockAction;
+use crate::shared::color::Rgb;
 use bitfield::bitfield;
 use enum_map::Enum;
 use serde::Deserialize;
-use std::ops::Range;
+use std::ops::{Add, Range};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Default, Enum, Deserialize)]
@@ -85,5 +86,15 @@ impl From<[u8; 6]> for BlockLight {
             value.set_component(i, c);
         }
         value
+    }
+}
+
+impl Add for BlockLight {
+    type Output = Rgb<u8>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Rgb::from_fn(|i| {
+            self.component(i) + self.component(i + 3) + rhs.component(i) + rhs.component(i + 3)
+        })
     }
 }
