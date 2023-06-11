@@ -1,9 +1,13 @@
 use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
-use std::{array, ops::Index};
+use std::{
+    array,
+    iter::Sum,
+    ops::{Add, Index, Mul},
+};
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, PartialOrd, Default, Zeroable, Pod, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Default, Zeroable, Pod, Deserialize)]
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
@@ -15,13 +19,21 @@ impl<T> Rgb<T> {
         Self(array::from_fn(f))
     }
 
-    pub fn zip_map<F, U, V>(self, rhs: Rgb<U>, mut f: F) -> Rgb<V>
+    pub fn map<U, F: FnMut(T) -> U>(self, f: F) -> Rgb<U> {
+        Rgb(self.0.map(f))
+    }
+
+    pub fn zip_map<U, V, F>(self, rhs: Rgb<U>, mut f: F) -> Rgb<V>
     where
         T: Copy,
         U: Copy,
         F: FnMut(T, U) -> V,
     {
         Rgb(array::from_fn(|i| f(self[i], rhs[i])))
+    }
+
+    fn sum<S: Sum<T>>(self) -> S {
+        self.into_iter().sum()
     }
 }
 
@@ -31,7 +43,17 @@ impl<T: Copy> Rgb<T> {
     }
 }
 
+impl<T: Mul + Copy> Rgb<T> {
+    fn dot<S: Sum<T::Output>>(self, other: Rgb<T>) -> S {
+        (self * other).sum()
+    }
+}
+
 impl Rgb<f32> {
+    pub fn lum(self) -> f32 {
+        self.dot(Rgb::new(0.2126, 0.7152, 0.0722))
+    }
+
     pub fn lerp(self, rhs: Self, t: f32) -> Self {
         self.zip_map(rhs, |a, b| a * (1.0 - t) + b * t)
     }
@@ -42,6 +64,22 @@ impl<T> Index<usize> for Rgb<T> {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
+    }
+}
+
+impl<T: Add + Copy> Add for Rgb<T> {
+    type Output = Rgb<T::Output>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.zip_map(rhs, Add::add)
+    }
+}
+
+impl<T: Mul + Copy> Mul for Rgb<T> {
+    type Output = Rgb<T::Output>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.zip_map(rhs, Mul::mul)
     }
 }
 

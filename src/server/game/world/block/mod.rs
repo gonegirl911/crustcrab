@@ -7,7 +7,7 @@ use crate::shared::color::Rgb;
 use bitfield::bitfield;
 use enum_map::Enum;
 use serde::Deserialize;
-use std::ops::{Add, Range};
+use std::ops::Range;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Default, Enum, Deserialize)]
@@ -77,6 +77,24 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
     pub const COMPONENT_MAX: u8 = 15;
+
+    fn lum(self) -> f32 {
+        (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
+            .map(|c| c.clamp(0.0, 1.0))
+            .lum()
+    }
+
+    fn skylight(self) -> Rgb<u8> {
+        Rgb::from_fn(|i| self.component(i + Self::SKYLIGHT_RANGE.start))
+    }
+
+    fn torchlight(self) -> Rgb<u8> {
+        Rgb::from_fn(|i| self.component(i + Self::TORCHLIGHT_RANGE.start))
+    }
+
+    fn linearize(color: Rgb<u8>) -> Rgb<f32> {
+        color.map(|c| 0.8f32.powi((Self::COMPONENT_MAX - c) as i32))
+    }
 }
 
 impl From<[u8; 6]> for BlockLight {
@@ -86,15 +104,5 @@ impl From<[u8; 6]> for BlockLight {
             value.set_component(i, c);
         }
         value
-    }
-}
-
-impl Add for BlockLight {
-    type Output = Rgb<u8>;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Rgb::from_fn(|i| {
-            self.component(i) + self.component(i + 3) + rhs.component(i) + rhs.component(i + 3)
-        })
     }
 }
