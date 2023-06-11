@@ -77,3 +77,13 @@ impl BlockLight {
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
     pub const COMPONENT_MAX: u8 = 15;
 }
+
+impl From<[u8; 6]> for BlockLight {
+    fn from(components: [u8; 6]) -> Self {
+        let mut value = Self::default();
+        for (i, c) in components.into_iter().enumerate() {
+            value.set_component(i, c);
+        }
+        value
+    }
+}

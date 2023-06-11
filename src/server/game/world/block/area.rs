@@ -123,7 +123,22 @@ impl BlockAreaLight {
         area: BlockArea,
         is_smoothly_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
-        enum_map! { _ => Default::default() }
+        let delta = SIDE_DELTAS[side];
+        if is_smoothly_lit {
+            SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
+                let (count, sum) = component_deltas
+                    .into_values()
+                    .chain([delta])
+                    .filter(|delta| area[*delta].data().is_transparent())
+                    .map(|delta| self[delta])
+                    .fold((0, [0; 6]), |(count, sum), light| {
+                        (count + 1, array::from_fn(|i| sum[i] + light.component(i)))
+                    });
+                sum.map(|c| c / count.max(1)).into()
+            })
+        } else {
+            enum_map! { _ => self[delta] }
+        }
     }
 }
 

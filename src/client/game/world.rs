@@ -184,13 +184,11 @@ impl ChunkMeshPool {
                 if let Some(mesh) = transparent_mesh {
                     transparent_meshes.push((coords, mesh));
                 }
-
                 render_pass.set_push_constants(
                     wgpu::ShaderStages::VERTEX,
                     0,
                     bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
                 );
-
                 mesh.draw(render_pass);
             }
         }
@@ -207,7 +205,6 @@ impl ChunkMeshPool {
                 0,
                 bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
             );
-
             mesh.draw(renderer, render_pass, |coords| {
                 utils::magnitude_squared(coords - utils::coords(frustum.origin))
             });
