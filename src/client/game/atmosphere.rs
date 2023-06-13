@@ -63,7 +63,7 @@ impl Atmosphere {
             &mut render_pass,
             [player_bind_group, self.uniform.bind_group()],
         );
-        render_pass.draw(0..6, 0..1);
+        render_pass.draw(0..3, 0..1);
     }
 }
 
@@ -113,18 +113,18 @@ impl AtmosphereUniformData {
                 sun_theta,
                 turbidity,
                 matrix![
-                    0.0017, -0.0037, 0.0021, 0.0000;
-                    -0.0290, 0.0638, -0.0320, 0.0039;
-                    0.1169, -0.2120, 0.0605, 0.2589
+                    0.00166, -0.00375, 0.00209, 0.00000;
+                    -0.02903, 0.06377, -0.03202, 0.00394;
+                    0.11693, -0.21196, 0.06052, 0.25886
                 ],
             ),
             Self::zenith_chromacity(
                 sun_theta,
                 turbidity,
                 matrix![
-                    0.0028, -0.0061, 0.0032, 0.0000;
-                    -0.0421, 0.0897, -0.0415, 0.0052;
-                    0.1535, -0.2676, 0.0667, 0.2669
+                    0.00275, -0.00610, 0.00317, 0.00000;
+                    -0.04214, 0.08970, -0.04153, 0.00516;
+                    0.15346, -0.26756, 0.06670, 0.26688
                 ],
             ),
             Self::zenith_luminance(sun_theta, turbidity)

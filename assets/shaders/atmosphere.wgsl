@@ -46,7 +46,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let cos_theta = saturate(dir.y);
     let cos_gamma = dot(dir, a.sun_dir);
     let gamma = acos(cos_gamma);
-    return vec4(XYZ_to_RGB(xyY_to_XYZ(a.z * perez(cos_theta, gamma, cos_gamma))) * 0.025, 1.0);
+    return vec4(XYZ_to_RGB(xyY_to_XYZ(a.z * perez(cos_theta, gamma, cos_gamma))), 1.0);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
@@ -69,7 +69,7 @@ fn XYZ_to_RGB(XYZ: vec3<f32>) -> vec3<f32> {
 }
 
 const XYZ_TO_RGB = mat3x3<f32>(
-    vec3<f32>(3.240479, -0.969256, 0.055648),
-    vec3<f32>(-1.537150, 1.875992, -0.204043),
-    vec3<f32>(-0.498535, 0.041556, 1.057311),
+    vec3<f32>(3.24096994, -0.96924364, 0.05563008),
+    vec3<f32>(-1.53738318, 1.8759675, -0.20397696),
+    vec3<f32>(-0.49861076, 0.04155506, 1.05697151),
 );
