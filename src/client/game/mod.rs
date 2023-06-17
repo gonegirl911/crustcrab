@@ -1,4 +1,3 @@
-pub mod atmosphere;
 pub mod gui;
 pub mod hover;
 pub mod player;
@@ -6,7 +5,6 @@ pub mod sky;
 pub mod world;
 
 use self::{
-    atmosphere::Atmosphere,
     gui::Gui,
     hover::BlockHover,
     player::Player,
@@ -29,7 +27,6 @@ pub struct Game {
     textures: BlockTextureArray,
     gui: Gui,
     player: Player,
-    atmosphere: Atmosphere,
     sky: Sky,
     world: World,
     hover: BlockHover,
@@ -48,7 +45,6 @@ impl Game {
             textures.bind_group_layout(),
         );
         let player = Player::new(renderer, &gui);
-        let atmosphere = Atmosphere::new(renderer, player.bind_group_layout());
         let sky = Sky::new(renderer);
         let world = World::new(
             renderer,
@@ -71,7 +67,6 @@ impl Game {
             textures,
             gui,
             player,
-            atmosphere,
             sky,
             world,
             aces,
@@ -88,7 +83,6 @@ impl Game {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
-        self.atmosphere.draw(self.processor.view(), encoder, self.player.bind_group());
         self.world.draw(
             renderer,
             self.processor.view(),
@@ -153,7 +147,6 @@ impl EventHandler for Game {
         } else {
             self.gui.handle(event, renderer);
             self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-            self.atmosphere.handle(event, renderer);
             self.sky.handle(event, renderer);
             self.world.handle(event, renderer);
             self.hover.handle(event, ());
