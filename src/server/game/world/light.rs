@@ -1,5 +1,6 @@
 use super::{
     block::{
+        area::BlockAreaLight,
         data::{BlockData, SIDE_DELTAS},
         Block, BlockLight,
     },
@@ -34,6 +35,10 @@ impl WorldLight {
             }
         }
         value
+    }
+
+    pub fn block_area_light(&self, coords: Point3<i64>) -> BlockAreaLight {
+        BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
     pub fn insert_many<I>(&mut self, chunks: &ChunkStore, points: I) -> FxHashSet<Point3<i64>>
@@ -308,7 +313,7 @@ impl WorldLight {
     }
 
     fn component(&self, coords: Point3<i64>, index: usize) -> u8 {
-        self.light(coords).component(index)
+        self.block_light(coords).component(index)
     }
 
     fn set_component(
@@ -365,7 +370,7 @@ impl WorldLight {
             .unwrap_or_else(|| unreachable!())
     }
 
-    fn light(&self, coords: Point3<i64>) -> BlockLight {
+    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
         self.0
             .get(&utils::chunk_coords(coords))
             .map_or_else(Default::default, |light| light[utils::block_coords(coords)])

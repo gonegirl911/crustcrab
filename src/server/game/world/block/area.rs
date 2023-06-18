@@ -105,7 +105,7 @@ impl IndexMut<Vector3<i8>> for BlockArea {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {

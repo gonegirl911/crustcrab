@@ -9,7 +9,10 @@ use crate::{
             Renderer,
         },
     },
-    server::ServerEvent,
+    server::{
+        game::world::{block::BlockLight, BlockHoverData},
+        ServerEvent,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Point3, Vector3};
@@ -17,7 +20,7 @@ use std::mem;
 
 pub struct BlockHover {
     highlight: BlockHighlight,
-    coords: Option<Point3<i64>>,
+    data: Option<BlockHoverData>,
 }
 
 impl BlockHover {
@@ -32,7 +35,7 @@ impl BlockHover {
                 player_bind_group_layout,
                 sky_bind_group_layout,
             ),
-            coords: None,
+            data: None,
         }
     }
 
@@ -44,7 +47,7 @@ impl BlockHover {
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
     ) {
-        if let Some(coords) = self.coords {
+        if let Some(BlockHoverData { coords, brightness }) = self.data {
             self.highlight.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: None,
@@ -67,7 +70,7 @@ impl BlockHover {
                 }),
                 player_bind_group,
                 sky_bind_group,
-                coords,
+                BlockHighlightPushConstants::new(coords, brightness),
             );
         }
     }
@@ -77,8 +80,8 @@ impl EventHandler for BlockHover {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
-        if let Event::UserEvent(ServerEvent::BlockHovered { coords }) = event {
-            self.coords = *coords;
+        if let Event::UserEvent(ServerEvent::BlockHovered(data)) = event {
+            self.data = *data;
         }
     }
 }
@@ -133,13 +136,13 @@ impl BlockHighlight {
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
         sky_bind_group: &'a wgpu::BindGroup,
-        coords: Point3<i64>,
+        push_constants: BlockHighlightPushConstants,
     ) {
         self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX,
             0,
-            bytemuck::cast_slice(&[BlockHighlightPushConstants::new(coords)]),
+            bytemuck::cast_slice(&[push_constants]),
         );
         self.mesh.draw(render_pass);
     }
@@ -165,12 +168,14 @@ impl Vertex for BlockHighlightVertex {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct BlockHighlightPushConstants {
     coords: Point3<f32>,
+    brightness: u32,
 }
 
 impl BlockHighlightPushConstants {
-    fn new(coords: Point3<i64>) -> Self {
+    fn new(coords: Point3<i64>, brightness: BlockLight) -> Self {
         Self {
             coords: coords.cast(),
+            brightness: brightness.0,
         }
     }
 }

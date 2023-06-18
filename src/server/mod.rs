@@ -4,7 +4,11 @@ pub mod ticker;
 
 use self::{
     event_loop::EventLoop,
-    game::{clock::Time, world::ChunkData, Game},
+    game::{
+        clock::Time,
+        world::{BlockHoverData, ChunkData},
+        Game,
+    },
 };
 use crate::{
     client::ClientEvent,
@@ -73,7 +77,5 @@ pub enum ServerEvent {
         data: Arc<ChunkData>,
         is_important: bool,
     },
-    BlockHovered {
-        coords: Option<Point3<i64>>,
-    },
+    BlockHovered(Option<BlockHoverData>),
 }

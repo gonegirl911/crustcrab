@@ -16,6 +16,7 @@ struct SkyUniform {
 
 struct PushConstants {
     coords: vec3<f32>,
+    brightness: u32,
 }
 
 struct VertexOutput {
@@ -33,9 +34,22 @@ var<push_constant> pc: PushConstants;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
+    // let skylight = vec3(
+    //     f32(extractBits(pc.brightness, 0u, 4u)),
+    //     f32(extractBits(pc.brightness, 4u, 4u)),
+    //     f32(extractBits(pc.brightness, 8u, 4u)),
+    // );
+    let skylight = vec3(15.0);
+    let torchlight = vec3(
+        f32(extractBits(pc.brightness, 12u, 4u)),
+        f32(extractBits(pc.brightness, 16u, 4u)),
+        f32(extractBits(pc.brightness, 20u, 4u)),
+    );
+    let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
+    let local_light = pow(vec3(0.8), (15.0 - torchlight));
     return VertexOutput(
         player.vp * vec4(pc.coords + vertex.coords, 1.0),
-        vec4(vec3(1.0), 0.1 * luminance(sky.light_intensity)),
+        vec4(vec3(1.0), 0.1 * luminance(saturate(global_light + local_light))),
     );
 }
 

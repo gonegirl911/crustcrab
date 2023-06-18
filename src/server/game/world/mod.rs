@@ -5,7 +5,11 @@ pub mod light;
 
 use self::{
     action::{ActionStore, BlockAction},
-    block::{area::BlockArea, data::BlockData, Block},
+    block::{
+        area::{BlockArea, BlockAreaLight},
+        data::BlockData,
+        Block, BlockLight,
+    },
     chunk::{
         area::{ChunkArea, ChunkAreaLight},
         generator::ChunkGenerator,
@@ -25,11 +29,13 @@ use crate::{
     },
     shared::utils,
 };
+use enum_map::enum_map;
 use flume::Sender;
 use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
+    cmp,
     collections::LinkedList,
     ops::{Deref, Range},
     sync::Arc,
@@ -333,9 +339,16 @@ impl EventHandler<WorldEvent> for World {
                 if self.hovered_block != hovered_block {
                     self.hovered_block = hovered_block;
                     server_tx
-                        .send(ServerEvent::BlockHovered {
-                            coords: self.hovered_block.map(|data| data.coords),
-                        })
+                        .send(ServerEvent::BlockHovered(hovered_block.map(
+                            |BlockIntersection { coords, .. }| {
+                                BlockHoverData::new(
+                                    coords,
+                                    self.chunks.block(coords),
+                                    self.chunks.block_area(coords),
+                                    self.light.block_area_light(coords),
+                                )
+                            },
+                        )))
                         .unwrap_or_else(|_| unreachable!());
                 }
             }
@@ -367,6 +380,10 @@ impl ChunkStore {
             }
         }
         value
+    }
+
+    fn block_area(&self, coords: Point3<i64>) -> BlockArea {
+        BlockArea::from_fn(|delta| self.block(coords + delta.cast()))
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
@@ -493,6 +510,42 @@ impl ChunkData {
                     self.area_light.block_area_light(coords),
                 ),
             )
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct BlockHoverData {
+    pub coords: Point3<i64>,
+    pub brightness: BlockLight,
+}
+
+impl BlockHoverData {
+    fn new(
+        coords: Point3<i64>,
+        block: Block,
+        block_area: BlockArea,
+        block_area_light: BlockAreaLight,
+    ) -> Self {
+        Self {
+            coords,
+            brightness: Self::brightness(block, block_area, block_area_light),
+        }
+    }
+
+    fn brightness(
+        block: Block,
+        block_area: BlockArea,
+        block_area_light: BlockAreaLight,
+    ) -> BlockLight {
+        let is_smoothly_lit = block.data().is_smoothly_lit();
+        enum_map! {
+            side => block_area_light.corner_lights(side, block_area, is_smoothly_lit),
+        }
+        .into_values()
+        .flat_map(|corner_lights| corner_lights.into_values())
+        .fold(Default::default(), |accum, light| {
+            cmp::max_by(accum, light, |a, b| a.lum().total_cmp(&b.lum()))
         })
     }
 }

@@ -78,7 +78,7 @@ impl BlockLight {
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
     pub const COMPONENT_MAX: u8 = 15;
 
-    fn lum(self) -> f32 {
+    pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
             .map(|c| c.clamp(0.0, 1.0))
             .lum()
