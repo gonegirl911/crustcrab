@@ -68,14 +68,14 @@ impl<C, V: Vertex> TransparentMesh<C, V> {
         }
     }
 
-    pub fn draw<'a, K, F>(
+    pub fn draw<'a, D, F>(
         &'a mut self,
         renderer: &Renderer,
         render_pass: &mut wgpu::RenderPass<'a>,
         mut dist: F,
     ) where
-        K: Ord,
-        F: FnMut(&C) -> K,
+        D: Ord,
+        F: FnMut(&C) -> D,
     {
         self.vertices.sort_by_key(|(c, _)| Reverse(dist(c)));
         self.mesh.write(
