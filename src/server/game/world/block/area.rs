@@ -32,7 +32,7 @@ impl BlockArea {
             .map(|(side, _)| side)
     }
 
-    pub fn corner_aos(&self, side: Side, is_smoothly_lit: bool) -> EnumMap<Corner, u8> {
+    pub fn corner_aos(self, side: Side, is_smoothly_lit: bool) -> EnumMap<Corner, u8> {
         if is_smoothly_lit {
             enum_map! { corner => self.ao(side, corner) }
         } else {
@@ -40,15 +40,15 @@ impl BlockArea {
         }
     }
 
-    pub fn block(&self) -> Block {
+    pub fn block(self) -> Block {
         self[Default::default()]
     }
 
-    fn is_visible(&self, delta: Vector3<i8>) -> bool {
+    fn is_visible(self, delta: Vector3<i8>) -> bool {
         self[delta] != self[Default::default()] && self[delta].data().is_transparent()
     }
 
-    fn ao(&self, side: Side, corner: Corner) -> u8 {
+    fn ao(self, side: Side, corner: Corner) -> u8 {
         let components = self.components(side, corner);
 
         let [edge1, edge2, corner] = [
@@ -64,7 +64,7 @@ impl BlockArea {
         }
     }
 
-    fn components(&self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
+    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self[delta].data().is_opaque())
     }
 

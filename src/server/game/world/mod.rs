@@ -344,7 +344,7 @@ impl EventHandler<WorldEvent> for World {
                                 BlockHoverData::new(
                                     coords,
                                     self.chunks.block_area(coords),
-                                    self.light.block_area_light(coords),
+                                    &self.light.block_area_light(coords),
                                 )
                             },
                         )))
@@ -520,14 +520,14 @@ pub struct BlockHoverData {
 }
 
 impl BlockHoverData {
-    fn new(coords: Point3<i64>, area: BlockArea, area_light: BlockAreaLight) -> Self {
+    fn new(coords: Point3<i64>, area: BlockArea, area_light: &BlockAreaLight) -> Self {
         Self {
             coords,
             brightness: Self::brightness(area, area_light),
         }
     }
 
-    fn brightness(area: BlockArea, area_light: BlockAreaLight) -> BlockLight {
+    fn brightness(area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         let is_smoothly_lit = area.block().data().is_smoothly_lit();
         enum_map! {
             side => area_light.corner_lights(side, area, is_smoothly_lit),
