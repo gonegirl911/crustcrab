@@ -16,7 +16,7 @@ use std::{
 };
 
 #[repr(align(16))]
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl Chunk {
