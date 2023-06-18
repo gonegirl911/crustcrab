@@ -4,11 +4,7 @@ pub mod ticker;
 
 use self::{
     event_loop::EventLoop,
-    game::{
-        clock::Time,
-        world::{block::area::BlockArea, ChunkData},
-        Game,
-    },
+    game::{clock::Time, world::ChunkData, Game},
 };
 use crate::{
     client::ClientEvent,
