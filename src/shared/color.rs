@@ -30,7 +30,7 @@ impl<T> Rgb<T> {
         U: Copy,
         F: FnMut(T, U) -> V,
     {
-        Rgb(array::from_fn(|i| f(self[i], rhs[i])))
+        Rgb::from_fn(|i| f(self[i], rhs[i]))
     }
 
     fn sum<S: Sum<T>>(self) -> S {
