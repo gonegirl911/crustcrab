@@ -22,6 +22,10 @@ impl ChunkArea {
         BlockArea::from_fn(|delta| self[coords.coords.cast() + delta])
     }
 
+    pub fn block(&self, coords: Point3<u8>) -> Block {
+        self[coords.coords.cast()]
+    }
+
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
         Self::AXIS_RANGE.flat_map(|dx| {
             Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))

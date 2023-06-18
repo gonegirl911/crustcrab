@@ -40,6 +40,10 @@ impl BlockArea {
         }
     }
 
+    pub fn block(&self) -> Block {
+        self[Default::default()]
+    }
+
     fn is_visible(&self, delta: Vector3<i8>) -> bool {
         self[delta] != self[Default::default()] && self[delta].data().is_transparent()
     }
@@ -105,7 +109,7 @@ impl IndexMut<Vector3<i8>> for BlockArea {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Default)]
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {
