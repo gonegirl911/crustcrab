@@ -21,14 +21,13 @@ use crate::{
         },
         ServerEvent,
     },
-    shared::utils,
+    shared::{pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
-use flume::{Receiver, Sender};
 use nalgebra::{point, Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cmp::Reverse, collections::hash_map::Entry, mem, sync::Arc, thread, time::Instant};
+use std::{cmp::Reverse, collections::hash_map::Entry, mem, sync::Arc, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
@@ -117,57 +116,30 @@ impl EventHandler for World {
     }
 }
 
-#[allow(clippy::type_complexity)]
 struct ChunkMeshPool {
-    meshes: FxHashMap<
-        Point3<i32>,
-        (
-            Mesh<BlockVertex>,
-            Option<TransparentMesh<Point3<i64>, BlockVertex>>,
-            Instant,
-        ),
-    >,
+    meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     unloaded: FxHashSet<Point3<i32>>,
-    priority_data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
-    data_tx: Sender<(Point3<i32>, Arc<ChunkData>, Instant)>,
-    vertices_rx: Receiver<(Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant)>,
+    priority_workers: ThreadPool<ChunkInput, ChunkOutput>,
+    workers: ThreadPool<ChunkInput, ChunkOutput>,
 }
+
+type ChunkMesh = (
+    Mesh<BlockVertex>,
+    Option<TransparentMesh<Point3<i64>, BlockVertex>>,
+    Instant,
+);
+
+type ChunkInput = (Point3<i32>, Arc<ChunkData>, Instant);
+
+type ChunkOutput = (Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant);
 
 impl ChunkMeshPool {
     fn new() -> Self {
-        let meshes = FxHashMap::default();
-        let unloaded = FxHashSet::default();
-        let (priority_data_tx, priority_data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
-        let (data_tx, data_rx) = flume::unbounded::<(_, Arc<ChunkData>, _)>();
-        let (vertices_tx, vertices_rx) = flume::unbounded();
-        let num_cpus = num_cpus::get();
-
-        for _ in 0..num_cpus {
-            let priority_data_rx = priority_data_rx.clone();
-            let vertices_tx = vertices_tx.clone();
-            thread::spawn(move || {
-                for (coords, data, updated_at) in priority_data_rx {
-                    Self::send(vertices_tx.clone(), coords, data, updated_at);
-                }
-            });
-        }
-
-        for _ in 0..num_cpus {
-            let data_rx = data_rx.clone();
-            let vertices_tx = vertices_tx.clone();
-            thread::spawn(move || {
-                for (coords, data, updated_at) in data_rx {
-                    Self::send(vertices_tx.clone(), coords, data, updated_at);
-                }
-            });
-        }
-
         Self {
-            meshes,
-            unloaded,
-            priority_data_tx,
-            data_tx,
-            vertices_rx,
+            meshes: FxHashMap::default(),
+            unloaded: FxHashSet::default(),
+            priority_workers: ThreadPool::new(Self::data),
+            workers: ThreadPool::new(Self::data),
         }
     }
 
@@ -211,40 +183,32 @@ impl ChunkMeshPool {
         }
     }
 
-    fn data_tx(&self, is_important: bool) -> &Sender<(Point3<i32>, Arc<ChunkData>, Instant)> {
+    fn workers(&self, is_important: bool) -> &ThreadPool<ChunkInput, ChunkOutput> {
         if is_important {
-            &self.priority_data_tx
+            &self.priority_workers
         } else {
-            &self.data_tx
+            &self.workers
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    fn send(
-        vertices_tx: Sender<(Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant)>,
-        coords: Point3<i32>,
-        data: Arc<ChunkData>,
-        updated_at: Instant,
-    ) {
+    fn data((coords, data, updated_at): ChunkInput) -> ChunkOutput {
         let mut transparent_vertices = vec![];
-        vertices_tx
-            .send((
-                coords,
-                data.vertices()
-                    .filter_map(|(data, vertices)| {
-                        if data.is_transparent() {
-                            transparent_vertices.extend(vertices);
-                            None
-                        } else {
-                            Some(vertices)
-                        }
-                    })
-                    .flatten()
-                    .collect(),
-                transparent_vertices,
-                updated_at,
-            ))
-            .unwrap_or_else(|_| unreachable!());
+        (
+            coords,
+            data.vertices()
+                .filter_map(|(data, vertices)| {
+                    if data.is_transparent() {
+                        transparent_vertices.extend(vertices);
+                        None
+                    } else {
+                        Some(vertices)
+                    }
+                })
+                .flatten()
+                .collect(),
+            transparent_vertices,
+            updated_at,
+        )
     }
 
     fn transparent_mesh(
@@ -275,7 +239,7 @@ impl EventHandler for ChunkMeshPool {
                     is_important,
                 } => {
                     self.unloaded.remove(coords);
-                    self.data_tx(*is_important)
+                    self.workers(*is_important)
                         .send((*coords, data.clone(), Instant::now()))
                         .unwrap_or_else(|_| unreachable!());
                 }
@@ -288,14 +252,15 @@ impl EventHandler for ChunkMeshPool {
                     data,
                     is_important,
                 } => {
-                    self.data_tx(*is_important)
+                    self.workers(*is_important)
                         .send((*coords, data.clone(), Instant::now()))
                         .unwrap_or_else(|_| unreachable!());
                 }
                 _ => {}
             },
             Event::MainEventsCleared => {
-                for (coords, vertices, transparent_vertices, updated_at) in self.vertices_rx.drain()
+                for (coords, vertices, transparent_vertices, updated_at) in
+                    self.priority_workers.drain().chain(self.workers.drain())
                 {
                     if !self.unloaded.contains(&coords) {
                         if !vertices.is_empty() || !transparent_vertices.is_empty() {
