@@ -1,4 +1,4 @@
-use flume::{Receiver, SendError as RawSendError, Sender};
+use flume::{Receiver, SendError, Sender};
 use once_cell::sync::Lazy;
 use std::thread;
 
@@ -8,7 +8,7 @@ pub struct ThreadPool<I, O> {
 }
 
 impl<I, O> ThreadPool<I, O> {
-    pub fn send(&self, data: I) -> Result<(), RawSendError<I>> {
+    pub fn send(&self, data: I) -> Result<(), SendError<I>> {
         self.in_tx.send(data)
     }
 
