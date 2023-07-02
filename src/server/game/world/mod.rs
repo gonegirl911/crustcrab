@@ -47,7 +47,7 @@ pub struct World {
     generator: ChunkGenerator,
     actions: ActionStore,
     light: WorldLight,
-    hovered_block: Option<BlockIntersection>,
+    hover: Option<BlockIntersection>,
     reach: Range<f32>,
 }
 
@@ -330,16 +330,16 @@ impl EventHandler<WorldEvent> for World {
                 self.par_send_updates(updates, server_tx, false);
             }
             WorldEvent::BlockHoverRequested { ray } => {
-                let hovered_block =
+                let hover =
                     ray.cast(self.reach.clone())
                         .find(|BlockIntersection { coords, .. }| {
                             self.chunks.block(*coords) != Block::Air
                         });
 
-                if self.hovered_block != hovered_block {
-                    self.hovered_block = hovered_block;
+                if self.hover != hover {
+                    self.hover = hover;
                     server_tx
-                        .send(ServerEvent::BlockHovered(hovered_block.map(
+                        .send(ServerEvent::BlockHovered(hover.map(
                             |BlockIntersection { coords, .. }| {
                                 BlockHoverData::new(
                                     coords,
@@ -352,12 +352,12 @@ impl EventHandler<WorldEvent> for World {
                 }
             }
             WorldEvent::BlockPlaced { block, ray } => {
-                if let Some(BlockIntersection { coords, normal }) = self.hovered_block {
+                if let Some(BlockIntersection { coords, normal }) = self.hover {
                     self.apply(coords + normal, BlockAction::Place(*block), server_tx, *ray);
                 }
             }
             WorldEvent::BlockDestroyed { ray } => {
-                if let Some(BlockIntersection { coords, .. }) = self.hovered_block {
+                if let Some(BlockIntersection { coords, .. }) = self.hover {
                     self.apply(coords, BlockAction::Destroy, server_tx, *ray);
                 }
             }
