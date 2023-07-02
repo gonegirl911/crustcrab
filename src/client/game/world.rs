@@ -138,8 +138,8 @@ impl ChunkMeshPool {
         Self {
             meshes: FxHashMap::default(),
             unloaded: FxHashSet::default(),
-            priority_workers: ThreadPool::new(Self::data),
-            workers: ThreadPool::new(Self::data),
+            priority_workers: ThreadPool::new(Self::vertices),
+            workers: ThreadPool::new(Self::vertices),
         }
     }
 
@@ -191,7 +191,7 @@ impl ChunkMeshPool {
         }
     }
 
-    fn data((coords, data, updated_at): ChunkInput) -> ChunkOutput {
+    fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
         let mut transparent_vertices = vec![];
         (
             coords,
