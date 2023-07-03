@@ -8,8 +8,8 @@ pub struct ThreadPool<I, O> {
 }
 
 impl<I, O> ThreadPool<I, O> {
-    pub fn send(&self, data: I) -> Result<(), SendError<I>> {
-        self.in_tx.send(data)
+    pub fn send(&self, input: I) -> Result<(), SendError<I>> {
+        self.in_tx.send(input)
     }
 
     pub fn drain(&self) -> impl Iterator<Item = O> + '_ {
@@ -26,8 +26,8 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
             let in_rx = in_rx.clone();
             let out_tx = out_tx.clone();
             thread::spawn(move || {
-                for data in in_rx {
-                    if out_tx.send(f(data)).is_err() {
+                for input in in_rx {
+                    if out_tx.send(f(input)).is_err() {
                         break;
                     }
                 }
