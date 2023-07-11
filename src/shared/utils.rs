@@ -1,16 +1,16 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
 
-pub fn chunk_coords<T: IntoWorldCoords>(t: T) -> T::Point<i32> {
-    t.into_chunk_coords()
+pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
+    t.chunk_coords()
 }
 
-pub fn block_coords<T: IntoWorldCoords>(t: T) -> T::Point<u8> {
-    t.into_block_coords()
+pub fn block_coords<T: WorldCoords>(t: T) -> T::Point<u8> {
+    t.block_coords()
 }
 
-pub fn coords<T: IntoWorldCoords>(t: T) -> T::Point<i64> {
-    t.into_coords()
+pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
+    t.coords()
 }
 
 pub fn magnitude_squared<T: MagnitudeSquared>(t: T) -> T::Output {
@@ -37,90 +37,90 @@ pub const fn div_ceil(a: usize, b: usize) -> usize {
     }
 }
 
-pub trait IntoWorldCoords {
+pub trait WorldCoords {
     type Point<T: Scalar>;
 
-    fn into_chunk_coords(self) -> Self::Point<i32>;
-    fn into_block_coords(self) -> Self::Point<u8>;
-    fn into_coords(self) -> Self::Point<i64>;
+    fn chunk_coords(self) -> Self::Point<i32>;
+    fn block_coords(self) -> Self::Point<u8>;
+    fn coords(self) -> Self::Point<i64>;
 }
 
-impl<const D: usize> IntoWorldCoords for (Point<i32, D>, Point<u8, D>) {
+impl<const D: usize> WorldCoords for (Point<i32, D>, Point<u8, D>) {
     type Point<T: Scalar> = Point<T, D>;
 
-    fn into_chunk_coords(self) -> Self::Point<i32> {
+    fn chunk_coords(self) -> Self::Point<i32> {
         self.0
     }
 
-    fn into_block_coords(self) -> Self::Point<u8> {
+    fn block_coords(self) -> Self::Point<u8> {
         self.1
     }
 
-    fn into_coords(self) -> Self::Point<i64> {
+    fn coords(self) -> Self::Point<i64> {
         self.0.cast() * Chunk::DIM as i64 + self.1.coords.cast()
     }
 }
 
-impl<const D: usize> IntoWorldCoords for (SVector<i32, D>, SVector<u8, D>) {
+impl<const D: usize> WorldCoords for (SVector<i32, D>, SVector<u8, D>) {
     type Point<T: Scalar> = SVector<T, D>;
 
-    fn into_chunk_coords(self) -> Self::Point<i32> {
+    fn chunk_coords(self) -> Self::Point<i32> {
         self.0
     }
 
-    fn into_block_coords(self) -> Self::Point<u8> {
+    fn block_coords(self) -> Self::Point<u8> {
         self.1
     }
 
-    fn into_coords(self) -> Self::Point<i64> {
+    fn coords(self) -> Self::Point<i64> {
         self.0.cast() * Chunk::DIM as i64 + self.1.cast()
     }
 }
 
-impl IntoWorldCoords for (i32, u8) {
+impl WorldCoords for (i32, u8) {
     type Point<T: Scalar> = T;
 
-    fn into_chunk_coords(self) -> Self::Point<i32> {
+    fn chunk_coords(self) -> Self::Point<i32> {
         self.0
     }
 
-    fn into_block_coords(self) -> Self::Point<u8> {
+    fn block_coords(self) -> Self::Point<u8> {
         self.1
     }
 
-    fn into_coords(self) -> Self::Point<i64> {
+    fn coords(self) -> Self::Point<i64> {
         self.0 as i64 * Chunk::DIM as i64 + self.1 as i64
     }
 }
 
-impl<const D: usize> IntoWorldCoords for Point<i64, D> {
+impl<const D: usize> WorldCoords for Point<i64, D> {
     type Point<T: Scalar> = Point<T, D>;
 
-    fn into_chunk_coords(self) -> Self::Point<i32> {
+    fn chunk_coords(self) -> Self::Point<i32> {
         self.map(|c| div_floor(c, Chunk::DIM as i64) as i32)
     }
 
-    fn into_block_coords(self) -> Self::Point<u8> {
+    fn block_coords(self) -> Self::Point<u8> {
         self.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
 
-    fn into_coords(self) -> Self::Point<i64> {
+    fn coords(self) -> Self::Point<i64> {
         self
     }
 }
 
-impl<const D: usize> IntoWorldCoords for Point<f32, D> {
+impl<const D: usize> WorldCoords for Point<f32, D> {
     type Point<T: Scalar> = Point<T, D>;
 
-    fn into_chunk_coords(self) -> Self::Point<i32> {
+    fn chunk_coords(self) -> Self::Point<i32> {
         self.map(|c| (c / Chunk::DIM as f32).floor() as i32)
     }
 
-    fn into_block_coords(self) -> Self::Point<u8> {
+    fn block_coords(self) -> Self::Point<u8> {
         self.map(|c| c.rem_euclid(Chunk::DIM as f32) as u8)
     }
 
-    fn into_coords(self) -> Self::Point<i64> {
+    fn coords(self) -> Self::Point<i64> {
         self.map(|c| c as i64)
     }
 }

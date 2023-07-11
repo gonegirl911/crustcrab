@@ -29,8 +29,8 @@ impl WorldLight {
         let mut value = ChunkAreaLight::default();
         for delta in ChunkArea::chunk_deltas() {
             if let Some(light) = self.0.get(&(coords + delta)) {
-                for (block_coords, delta) in ChunkArea::block_deltas(delta) {
-                    value[delta] = light[block_coords];
+                for (coords, delta) in ChunkArea::block_deltas(delta) {
+                    value[delta] = light[coords];
                 }
             }
         }

@@ -75,8 +75,7 @@ impl Game {
             processor,
         }
     }
-    
-    #[rustfmt::skip]
+
     fn draw(
         &mut self,
         renderer: &Renderer,

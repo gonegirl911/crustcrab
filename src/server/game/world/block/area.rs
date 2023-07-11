@@ -28,7 +28,7 @@ impl BlockArea {
     pub fn visible_sides(self) -> impl Iterator<Item = Side> {
         SIDE_DELTAS
             .into_iter()
-            .filter(move |(_, delta)| self.is_visible(*delta))
+            .filter(move |(_, delta)| self.is_side_visible(*delta))
             .map(|(side, _)| side)
     }
 
@@ -44,8 +44,12 @@ impl BlockArea {
         self[Default::default()]
     }
 
-    fn is_visible(self, delta: Vector3<i8>) -> bool {
-        self[delta] != self[Default::default()] && self[delta].data().is_transparent()
+    fn block_mut(&mut self) -> &mut Block {
+        &mut self[Default::default()]
+    }
+
+    fn is_side_visible(self, delta: Vector3<i8>) -> bool {
+        self[delta] != self.block() && self[delta].data().is_transparent()
     }
 
     fn ao(self, side: Side, corner: Corner) -> u8 {
@@ -88,7 +92,7 @@ impl BlockArea {
 impl From<Block> for BlockArea {
     fn from(block: Block) -> Self {
         let mut value = Self::default();
-        value[Default::default()] = block;
+        *value.block_mut() = block;
         value
     }
 }
