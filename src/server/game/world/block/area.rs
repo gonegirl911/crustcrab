@@ -139,7 +139,7 @@ impl BlockAreaLight {
                     .chain([side_delta])
                     .filter(|delta| area[*delta].data().is_transparent())
                     .map(|delta| self[delta])
-                    .fold((0, [0; 6]), |(count, sum), light| {
+                    .fold((0, [0; BlockLight::LEN]), |(count, sum), light| {
                         (count + 1, array::from_fn(|i| sum[i] + light.component(i)))
                     });
                 sum.map(|c| c / count.max(1)).into()

@@ -70,13 +70,14 @@ impl Block {
 bitfield! {
     #[derive(Clone, Copy, Default)]
     pub struct BlockLight(u32);
-    pub u8, component, set_component: 3, 0, 6;
+    pub u8, component, set_component: Self::COMPONENT_MAX.ilog2() as usize, 0, Self::LEN;
 }
 
 impl BlockLight {
+    const LEN: usize = 6;
+    pub const COMPONENT_MAX: u8 = 15;
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
-    pub const COMPONENT_MAX: u8 = 15;
 
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
@@ -97,8 +98,8 @@ impl BlockLight {
     }
 }
 
-impl From<[u8; 6]> for BlockLight {
-    fn from(components: [u8; 6]) -> Self {
+impl From<[u8; Self::LEN]> for BlockLight {
+    fn from(components: [u8; Self::LEN]) -> Self {
         let mut value = Self::default();
         for (i, c) in components.into_iter().enumerate() {
             value.set_component(i, c);
