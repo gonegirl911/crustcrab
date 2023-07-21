@@ -41,7 +41,7 @@ impl Chunk {
     }
 
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
-        self[coords].apply_unchecked(action)
+        self[coords].apply_unchecked(action);
     }
 
     pub fn points() -> impl Iterator<Item = Point3<u8>> {
