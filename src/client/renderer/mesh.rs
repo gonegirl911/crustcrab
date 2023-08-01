@@ -9,7 +9,7 @@ pub struct Mesh<V> {
 }
 
 impl<V: Vertex> Mesh<V> {
-    pub fn from_data(Renderer { device, .. }: &Renderer, vertices: &[V]) -> Self {
+    pub fn from_vertices(Renderer { device, .. }: &Renderer, vertices: &[V]) -> Self {
         Self {
             vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
                 label: None,
@@ -52,7 +52,7 @@ pub struct TransparentMesh<C, V> {
 }
 
 impl<C, V: Vertex> TransparentMesh<C, V> {
-    pub fn new<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
+    pub fn from_vertices<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
     where
         F: FnMut([V; 3]) -> C,
     {

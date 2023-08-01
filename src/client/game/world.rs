@@ -217,7 +217,7 @@ impl ChunkMeshPool {
         vertices: Vec<BlockVertex>,
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
         (!vertices.is_empty()).then(|| {
-            TransparentMesh::new(renderer, &vertices, |[v1, v2, v3]| {
+            TransparentMesh::from_vertices(renderer, &vertices, |[v1, v2, v3]| {
                 utils::coords((
                     coords,
                     (v1.coords() + v2.coords().coords + v3.coords().coords) / 3,
@@ -269,7 +269,7 @@ impl EventHandler for ChunkMeshPool {
                                     let (_, _, last_updated_at) = entry.get();
                                     if *last_updated_at < updated_at {
                                         *entry.into_mut() = (
-                                            Mesh::from_data(renderer, &vertices),
+                                            Mesh::from_vertices(renderer, &vertices),
                                             Self::transparent_mesh(
                                                 renderer,
                                                 coords,
@@ -281,7 +281,7 @@ impl EventHandler for ChunkMeshPool {
                                 }
                                 Entry::Vacant(entry) => {
                                     entry.insert((
-                                        Mesh::from_data(renderer, &vertices),
+                                        Mesh::from_vertices(renderer, &vertices),
                                         Self::transparent_mesh(
                                             renderer,
                                             coords,

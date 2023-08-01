@@ -151,7 +151,7 @@ impl EventHandler for Inventory {
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_updated) {
                     self.mesh = self.selected_block().map(|block| {
-                        Mesh::from_data(
+                        Mesh::from_vertices(
                             renderer,
                             &block
                                 .data()
