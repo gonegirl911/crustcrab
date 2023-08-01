@@ -217,7 +217,7 @@ impl ChunkMeshPool {
         vertices: Vec<BlockVertex>,
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
         (!vertices.is_empty()).then(|| {
-            TransparentMesh::from_vertices(renderer, &vertices, |[v1, v2, v3]| {
+            TransparentMesh::from_data(renderer, &vertices, |[v1, v2, v3]| {
                 utils::coords((
                     coords,
                     (v1.coords() + v2.coords().coords + v3.coords().coords) / 3,

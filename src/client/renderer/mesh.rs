@@ -52,7 +52,7 @@ pub struct TransparentMesh<C, V> {
 }
 
 impl<C, V: Vertex> TransparentMesh<C, V> {
-    pub fn from_vertices<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
+    pub fn from_data<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
     where
         F: FnMut([V; 3]) -> C,
     {
