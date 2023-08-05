@@ -269,7 +269,7 @@ impl EventHandler for ChunkMeshPool {
                                     let (_, _, last_updated_at) = entry.get();
                                     if *last_updated_at < updated_at {
                                         *entry.into_mut() = (
-                                            Mesh::from_vertices(renderer, &vertices),
+                                            Mesh::from_data(renderer, &vertices),
                                             Self::transparent_mesh(
                                                 renderer,
                                                 coords,
@@ -281,7 +281,7 @@ impl EventHandler for ChunkMeshPool {
                                 }
                                 Entry::Vacant(entry) => {
                                     entry.insert((
-                                        Mesh::from_vertices(renderer, &vertices),
+                                        Mesh::from_data(renderer, &vertices),
                                         Self::transparent_mesh(
                                             renderer,
                                             coords,

@@ -9,7 +9,7 @@ pub struct Mesh<V> {
 }
 
 impl<V: Vertex> Mesh<V> {
-    pub fn from_vertices(Renderer { device, .. }: &Renderer, vertices: &[V]) -> Self {
+    pub fn from_data(Renderer { device, .. }: &Renderer, vertices: &[V]) -> Self {
         Self {
             vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
                 label: None,
