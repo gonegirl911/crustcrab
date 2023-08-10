@@ -40,7 +40,6 @@ impl Renderer {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    label: None,
                     features: wgpu::Features::PUSH_CONSTANTS
                         | wgpu::Features::TEXTURE_BINDING_ARRAY
                         | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
@@ -48,6 +47,7 @@ impl Renderer {
                         max_push_constant_size: 128,
                         ..Default::default()
                     },
+                    ..Default::default()
                 },
                 None,
             )
