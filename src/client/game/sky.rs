@@ -195,7 +195,7 @@ struct ObjectsPushConstants {
 }
 
 impl ObjectsPushConstants {
-    const SIZE: f32 = 0.15;
+    const SIZE: f32 = 0.125;
 
     fn sun(dir: Vector3<f32>, intensity: f32, is_am: bool) -> Self {
         Self::new(dir, Self::SIZE, 0, intensity.max(1.0), is_am)
