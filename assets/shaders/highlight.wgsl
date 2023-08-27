@@ -13,6 +13,7 @@ struct PlayerUniform {
 
 struct SkyUniform {
     light_intensity: vec3<f32>,
+    sun_intensity: f32,
 }
 
 struct PushConstants {
