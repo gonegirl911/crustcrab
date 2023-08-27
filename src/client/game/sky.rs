@@ -15,7 +15,7 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Point3, Vector3};
-use std::{f32::consts::PI, mem};
+use std::mem;
 
 pub struct Sky {
     objects: Objects,
@@ -174,13 +174,13 @@ impl Objects {
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX_FRAGMENT,
             0,
-            bytemuck::cast_slice(&[ObjectsPushConstants::sun(sun_dir, sun_intensity, is_am)]),
+            bytemuck::cast_slice(&[ObjectsPushConstants::new_sun(sun_dir, sun_intensity, is_am)]),
         );
         render_pass.draw(0..6, 0..1);
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX_FRAGMENT,
             0,
-            bytemuck::cast_slice(&[ObjectsPushConstants::moon(moon_dir, is_am)]),
+            bytemuck::cast_slice(&[ObjectsPushConstants::new_moon(moon_dir, is_am)]),
         );
         render_pass.draw(0..6, 0..1);
     }
@@ -197,26 +197,28 @@ struct ObjectsPushConstants {
 impl ObjectsPushConstants {
     const SIZE: f32 = 0.125;
 
-    fn sun(dir: Vector3<f32>, intensity: f32, is_am: bool) -> Self {
+    fn new_sun(dir: Vector3<f32>, intensity: f32, is_am: bool) -> Self {
         Self::new(dir, Self::SIZE, 0, intensity.max(1.0), is_am)
     }
 
-    fn moon(dir: Vector3<f32>, is_am: bool) -> Self {
+    fn new_moon(dir: Vector3<f32>, is_am: bool) -> Self {
         Self::new(dir, Self::SIZE, 1, 1.0, is_am)
     }
 
     fn new(dir: Vector3<f32>, size: f32, tex_idx: u32, brightness: f32, is_am: bool) -> Self {
         Self {
-            transform: Matrix4::face_towards(&dir.into(), &Point3::origin(), &Player::WORLD_UP)
-                * Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0])
-                * if is_am {
-                    Matrix4::new_rotation(Vector3::y() * PI)
-                        * Matrix4::new_rotation(Vector3::x() * PI)
-                } else {
-                    Matrix4::identity()
-                },
+            transform: Matrix4::face_towards(&dir.into(), &Point3::origin(), &Self::up(is_am))
+                * Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0]),
             tex_idx,
             brightness,
+        }
+    }
+
+    fn up(is_am: bool) -> Vector3<f32> {
+        if is_am {
+            -Player::WORLD_UP
+        } else {
+            Player::WORLD_UP
         }
     }
 }
