@@ -18,8 +18,10 @@ impl Clock {
     const TICKS_PER_DAY: u16 = 24000;
     const DAWN_START: u16 = 0;
     const DAY_START: u16 = 500;
+    const NOON: u16 = 6000;
     const DUSK_START: u16 = 11500;
     const NIGHT_START: u16 = 12000;
+    const MIDNIGHT: u16 = 18000;
 
     fn send(&self, server_tx: Sender<ServerEvent>) {
         server_tx
@@ -58,6 +60,7 @@ impl Time {
     const DAWN_RANGE: Range<u16> = Clock::DAWN_START..Clock::DAY_START;
     const DAY_RANGE: Range<u16> = Clock::DAY_START..Clock::DUSK_START;
     const DUSK_RANGE: Range<u16> = Clock::DUSK_START..Clock::NIGHT_START;
+    const PM_RANGE: Range<u16> = Clock::NOON..Clock::MIDNIGHT;
 
     pub fn sun_dir(&self) -> Vector3<f32> {
         let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;
@@ -83,6 +86,14 @@ impl Time {
         } else {
             Stage::Night
         }
+    }
+
+    pub fn is_am(&self) -> bool {
+        !self.is_pm()
+    }
+
+    fn is_pm(&self) -> bool {
+        Self::PM_RANGE.contains(&self.ticks)
     }
 
     fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
