@@ -11,10 +11,7 @@ use crate::{
         game::clock::{Stage, Time},
         ServerEvent,
     },
-    shared::{
-        color::{Float3, Rgb},
-        utils,
-    },
+    shared::{color::Rgb, utils},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Point3, Vector3};
@@ -23,17 +20,16 @@ use std::mem;
 pub struct Sky {
     objects: Objects,
     uniform: Uniform<SkyUniformData>,
+    sun_intensity: Option<f32>,
     time: Result<Time, Time>,
 }
 
 impl Sky {
-    const DAY_INTENSITY: Rgb<f32> = Rgb::splat(1.0);
-    const NIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
-
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         Self {
             objects: Objects::new(renderer, player_bind_group_layout),
             uniform: Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX),
+            sun_intensity: None,
             time: Err(Default::default()),
         }
     }
@@ -52,6 +48,7 @@ impl Sky {
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
     ) {
+        let time = self.time.unwrap_or_else(|_| unreachable!());
         self.objects.draw(
             &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
@@ -66,21 +63,10 @@ impl Sky {
                 depth_stencil_attachment: None,
             }),
             player_bind_group,
-            self.time.unwrap_or_else(|_| unreachable!()),
+            time.sun_dir(),
+            self.sun_intensity.unwrap_or_else(|| unreachable!()),
+            time.moon_dir(),
         );
-    }
-
-    fn light_intensity(stage: Stage) -> Rgb<f32> {
-        match stage {
-            Stage::Dawn { progress } => {
-                utils::lerp(Self::NIGHT_INTENSITY, Self::DAY_INTENSITY, progress)
-            }
-            Stage::Day => Self::DAY_INTENSITY,
-            Stage::Dusk { progress } => {
-                utils::lerp(Self::DAY_INTENSITY, Self::NIGHT_INTENSITY, progress)
-            }
-            Stage::Night => Self::NIGHT_INTENSITY,
-        }
     }
 }
 
@@ -94,10 +80,9 @@ impl EventHandler for Sky {
             }
             Event::MainEventsCleared => {
                 if let Err(time) = self.time {
-                    self.uniform.set(
-                        renderer,
-                        &SkyUniformData::new(Self::light_intensity(time.stage())),
-                    );
+                    let data = SkyUniformData::new(time.stage());
+                    self.uniform.set(renderer, &data);
+                    self.sun_intensity = Some(data.sun_intensity);
                     self.time = Ok(time);
                 }
             }
@@ -109,13 +94,33 @@ impl EventHandler for Sky {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct SkyUniformData {
-    light_intensity: Float3,
+    light_intensity: Rgb<f32>,
+    sun_intensity: f32,
 }
 
 impl SkyUniformData {
-    fn new(light_intensity: Rgb<f32>) -> Self {
-        Self {
-            light_intensity: light_intensity.into(),
+    const DAY_INTENSITY: Rgb<f32> = Rgb::splat(1.0);
+    const NIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
+    const SUN_INTENSITY: f32 = 15.0;
+
+    fn new(stage: Stage) -> Self {
+        match stage {
+            Stage::Dawn { progress } => Self {
+                light_intensity: utils::lerp(Self::NIGHT_INTENSITY, Self::DAY_INTENSITY, progress),
+                sun_intensity: utils::lerp(0.0, Self::SUN_INTENSITY, progress),
+            },
+            Stage::Day => Self {
+                light_intensity: Self::DAY_INTENSITY,
+                sun_intensity: Self::SUN_INTENSITY,
+            },
+            Stage::Dusk { progress } => Self {
+                light_intensity: utils::lerp(Self::DAY_INTENSITY, Self::NIGHT_INTENSITY, progress),
+                sun_intensity: utils::lerp(Self::SUN_INTENSITY, 0.0, progress),
+            },
+            Stage::Night => Self {
+                light_intensity: Self::NIGHT_INTENSITY,
+                sun_intensity: 0.0,
+            },
         }
     }
 }
@@ -159,19 +164,21 @@ impl Objects {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
-        time: Time,
+        sun_dir: Vector3<f32>,
+        sun_intensity: f32,
+        moon_dir: Vector3<f32>,
     ) {
         self.program.bind(render_pass, [player_bind_group, self.textures.bind_group()]);
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX_FRAGMENT,
             0,
-            bytemuck::cast_slice(&[ObjectsPushConstants::sun(time)]),
+            bytemuck::cast_slice(&[ObjectsPushConstants::sun(sun_dir, sun_intensity)]),
         );
         render_pass.draw(0..6, 0..1);
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX_FRAGMENT,
             0,
-            bytemuck::cast_slice(&[ObjectsPushConstants::moon(time)]),
+            bytemuck::cast_slice(&[ObjectsPushConstants::moon(moon_dir)]),
         );
         render_pass.draw(0..6, 0..1);
     }
@@ -187,19 +194,13 @@ struct ObjectsPushConstants {
 
 impl ObjectsPushConstants {
     const SIZE: f32 = 0.15;
-    const SUN_BRIGHTNESS: f32 = 15.0;
 
-    fn sun(time: Time) -> Self {
-        Self::new(
-            time.sun_dir(),
-            Self::SIZE,
-            0,
-            Self::sun_brightness(time.stage()),
-        )
+    fn sun(dir: Vector3<f32>, intensity: f32) -> Self {
+        Self::new(dir, Self::SIZE, 0, intensity.max(1.0))
     }
 
-    fn moon(time: Time) -> Self {
-        Self::new(time.moon_dir(), Self::SIZE, 1, 1.0)
+    fn moon(dir: Vector3<f32>) -> Self {
+        Self::new(dir, Self::SIZE, 1, 1.0)
     }
 
     fn new(dir: Vector3<f32>, size: f32, tex_idx: u32, brightness: f32) -> Self {
@@ -208,15 +209,6 @@ impl ObjectsPushConstants {
                 * Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0]),
             tex_idx,
             brightness,
-        }
-    }
-
-    fn sun_brightness(stage: Stage) -> f32 {
-        match stage {
-            Stage::Dawn { progress } => utils::lerp(1.0, Self::SUN_BRIGHTNESS, progress),
-            Stage::Day => Self::SUN_BRIGHTNESS,
-            Stage::Dusk { progress } => utils::lerp(Self::SUN_BRIGHTNESS, 1.0, progress),
-            Stage::Night => 1.0,
         }
     }
 }
