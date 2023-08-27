@@ -41,7 +41,7 @@ impl EventHandler<Event> for Clock {
                 self.send(server_tx);
             }
             Event::Tick => {
-                // self.ticks = (self.ticks + 1) % Self::TICKS_PER_DAY;
+                self.ticks = (self.ticks + 1) % Self::TICKS_PER_DAY;
                 self.send(server_tx);
             }
             _ => {}
@@ -63,6 +63,10 @@ impl Time {
         let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;
         let theta = TAU * time;
         vector![theta.cos(), theta.sin(), 0.0]
+    }
+
+    pub fn moon_dir(&self) -> Vector3<f32> {
+        -self.sun_dir()
     }
 
     pub fn stage(&self) -> Stage {

@@ -45,7 +45,7 @@ impl Game {
             textures.bind_group_layout(),
         );
         let player = Player::new(renderer, &gui);
-        let sky = Sky::new(renderer);
+        let sky = Sky::new(renderer, player.bind_group_layout());
         let world = World::new(
             renderer,
             player.bind_group_layout(),
@@ -76,12 +76,14 @@ impl Game {
         }
     }
 
+    #[rustfmt::skip]
     fn draw(
         &mut self,
         renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
+        self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
         self.world.draw(
             renderer,
             self.processor.view(),

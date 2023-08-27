@@ -13,7 +13,7 @@ use crate::client::{
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
-use nalgebra::{vector, Matrix4, Vector3};
+use nalgebra::{vector, Matrix4, Point3, Vector3};
 use std::time::Duration;
 use winit::event::StartCause;
 
@@ -70,6 +70,7 @@ impl Player {
         PlayerUniformData::new(
             view.mat(),
             projection.mat(),
+            view.origin,
             projection.znear,
             projection.zfar,
         )
@@ -141,20 +142,22 @@ struct PlayerUniformData {
     vp: Matrix4<f32>,
     inv_v: Matrix4<f32>,
     inv_p: Matrix4<f32>,
+    origin: Point3<f32>,
     znear: f32,
     zfar: f32,
-    padding: [f32; 2],
+    padding: [f32; 3],
 }
 
 impl PlayerUniformData {
-    fn new(v: Matrix4<f32>, p: Matrix4<f32>, znear: f32, zfar: f32) -> Self {
+    fn new(v: Matrix4<f32>, p: Matrix4<f32>, origin: Point3<f32>, znear: f32, zfar: f32) -> Self {
         Self {
             vp: p * v,
             inv_v: v.try_inverse().unwrap_or_else(|| unreachable!()),
             inv_p: p.try_inverse().unwrap_or_else(|| unreachable!()),
+            origin,
             znear,
             zfar,
-            padding: [0.0; 2],
+            padding: [0.0; 3],
         }
     }
 }

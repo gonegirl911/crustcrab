@@ -1,21 +1,6 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
-
-pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
-    t.chunk_coords()
-}
-
-pub fn block_coords<T: WorldCoords>(t: T) -> T::Point<u8> {
-    t.block_coords()
-}
-
-pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
-    t.coords()
-}
-
-pub fn magnitude_squared<T: MagnitudeSquared>(t: T) -> T::Output {
-    t.magnitude_squared()
-}
+use std::ops::{Add, Mul};
 
 pub fn div_floor(a: i64, b: i64) -> i64 {
     let d = a / b;
@@ -35,6 +20,30 @@ pub const fn div_ceil(a: usize, b: usize) -> usize {
     } else {
         d
     }
+}
+
+pub fn lerp<T>(a: T, b: T, t: f32) -> <T::Output as Add>::Output
+where
+    T: Mul<f32>,
+    T::Output: Add,
+{
+    a * (1.0 - t) + b * t
+}
+
+pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
+    t.chunk_coords()
+}
+
+pub fn block_coords<T: WorldCoords>(t: T) -> T::Point<u8> {
+    t.block_coords()
+}
+
+pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
+    t.coords()
+}
+
+pub fn magnitude_squared<T: MagnitudeSquared>(t: T) -> T::Output {
+    t.magnitude_squared()
 }
 
 pub trait WorldCoords {
