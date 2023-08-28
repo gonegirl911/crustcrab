@@ -20,16 +20,20 @@ use std::mem;
 pub struct Sky {
     objects: Objects,
     uniform: Uniform<SkyUniformData>,
-    sun_intensity: Option<f32>,
     time: Result<Time, Time>,
 }
 
 impl Sky {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+        let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
+        let objects = Objects::new(
+            renderer,
+            player_bind_group_layout,
+            uniform.bind_group_layout(),
+        );
         Self {
-            objects: Objects::new(renderer, player_bind_group_layout),
-            uniform: Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX),
-            sun_intensity: None,
+            objects,
+            uniform,
             time: Err(Default::default()),
         }
     }
@@ -63,8 +67,8 @@ impl Sky {
                 depth_stencil_attachment: None,
             }),
             player_bind_group,
+            self.uniform.bind_group(),
             time.sun_dir(),
-            self.sun_intensity.unwrap_or_else(|| unreachable!()),
             time.moon_dir(),
             time.is_am(),
         );
@@ -74,6 +78,7 @@ impl Sky {
 impl EventHandler for Sky {
     type Context<'a> = &'a Renderer;
 
+    #[rustfmt::skip]
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
@@ -81,9 +86,7 @@ impl EventHandler for Sky {
             }
             Event::MainEventsCleared => {
                 if let Err(time) = self.time {
-                    let data = SkyUniformData::new(time.stage());
-                    self.uniform.set(renderer, &data);
-                    self.sun_intensity = Some(data.sun_intensity);
+                    self.uniform.set(renderer, &SkyUniformData::new(time.stage()));
                     self.time = Ok(time);
                 }
             }
@@ -132,7 +135,11 @@ struct Objects {
 }
 
 impl Objects {
-    fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    fn new(
+        renderer: &Renderer,
+        player_bind_group_layout: &wgpu::BindGroupLayout,
+        sky_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let textures = ImageTextureArray::new(
             renderer,
             [
@@ -147,7 +154,11 @@ impl Objects {
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/object.wgsl"),
             &[],
-            &[player_bind_group_layout, textures.bind_group_layout()],
+            &[
+                player_bind_group_layout,
+                sky_bind_group_layout,
+                textures.bind_group_layout(),
+            ],
             &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 range: 0..mem::size_of::<ObjectsPushConstants>() as u32,
@@ -160,21 +171,27 @@ impl Objects {
         Self { textures, program }
     }
 
-    #[rustfmt::skip]
     fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
+        sky_bind_group: &'a wgpu::BindGroup,
         sun_dir: Vector3<f32>,
-        sun_intensity: f32,
         moon_dir: Vector3<f32>,
         is_am: bool,
     ) {
-        self.program.bind(render_pass, [player_bind_group, self.textures.bind_group()]);
+        self.program.bind(
+            render_pass,
+            [
+                player_bind_group,
+                sky_bind_group,
+                self.textures.bind_group(),
+            ],
+        );
         render_pass.set_push_constants(
             wgpu::ShaderStages::VERTEX_FRAGMENT,
             0,
-            bytemuck::cast_slice(&[ObjectsPushConstants::new_sun(sun_dir, sun_intensity, is_am)]),
+            bytemuck::cast_slice(&[ObjectsPushConstants::new_sun(sun_dir, is_am)]),
         );
         render_pass.draw(0..6, 0..1);
         render_pass.set_push_constants(
@@ -189,28 +206,26 @@ impl Objects {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct ObjectsPushConstants {
-    transform: Matrix4<f32>,
+    m: Matrix4<f32>,
     tex_idx: u32,
-    brightness: f32,
 }
 
 impl ObjectsPushConstants {
     const SIZE: f32 = 0.125;
 
-    fn new_sun(dir: Vector3<f32>, intensity: f32, is_am: bool) -> Self {
-        Self::new(dir, Self::SIZE, 0, intensity.max(1.0), is_am)
+    fn new_sun(dir: Vector3<f32>, is_am: bool) -> Self {
+        Self::new(dir, Self::SIZE, 0, is_am)
     }
 
     fn new_moon(dir: Vector3<f32>, is_am: bool) -> Self {
-        Self::new(dir, Self::SIZE, 1, 1.0, is_am)
+        Self::new(dir, Self::SIZE, 1, is_am)
     }
 
-    fn new(dir: Vector3<f32>, size: f32, tex_idx: u32, brightness: f32, is_am: bool) -> Self {
+    fn new(dir: Vector3<f32>, size: f32, tex_idx: u32, is_am: bool) -> Self {
         Self {
-            transform: Matrix4::face_towards(&dir.into(), &Point3::origin(), &Self::up(is_am))
+            m: Matrix4::face_towards(&dir.into(), &Point3::origin(), &Self::up(is_am))
                 * Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0]),
             tex_idx,
-            brightness,
         }
     }
 
