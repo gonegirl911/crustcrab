@@ -24,6 +24,7 @@ nalgebra = { version = "0.32.3", features = ["bytemuck", "serde-serialize"] }
 num_cpus = "1.16.0"
 once_cell = "1.18.0"
 pollster = "0.3.0"
+rand = "0.8.5"
 rayon = "1.7.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0.188", features = ["derive", "rc"] }

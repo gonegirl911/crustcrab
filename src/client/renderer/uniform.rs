@@ -1,13 +1,10 @@
-use super::Renderer;
+use super::{buffer::Buffer, Renderer};
 use bytemuck::Pod;
-use std::{marker::PhantomData, mem, slice};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct Uniform<T> {
-    buffer: wgpu::Buffer,
+    buffer: Buffer<T>,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
-    phantom: PhantomData<T>,
 }
 
 impl<T: Pod> Uniform<T> {
@@ -20,24 +17,15 @@ impl<T: Pod> Uniform<T> {
     }
 
     fn new(
-        Renderer { device, .. }: &Renderer,
+        renderer @ Renderer { device, .. }: &Renderer,
         value: Option<&T>,
         visibility: wgpu::ShaderStages,
         is_mutable: bool,
     ) -> Self {
         let buffer = if let Some(value) = value {
-            device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(slice::from_ref(value)),
-                usage: Self::usage(is_mutable),
-            })
+            Buffer::<T>::new(renderer, Some(value), Self::usage(is_mutable))
         } else {
-            device.create_buffer(&wgpu::BufferDescriptor {
-                label: None,
-                size: mem::size_of::<T>() as u64,
-                usage: Self::usage(is_mutable),
-                mapped_at_creation: false,
-            })
+            Buffer::<T>::new(renderer, None, Self::usage(is_mutable))
         };
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -64,7 +52,6 @@ impl<T: Pod> Uniform<T> {
             buffer,
             bind_group_layout,
             bind_group,
-            phantom: PhantomData,
         }
     }
 
@@ -76,12 +63,8 @@ impl<T: Pod> Uniform<T> {
         &self.bind_group
     }
 
-    pub fn set(&self, Renderer { queue, .. }: &Renderer, value: &T) {
-        queue.write_buffer(
-            &self.buffer,
-            0,
-            bytemuck::cast_slice(slice::from_ref(value)),
-        );
+    pub fn set(&self, renderer: &Renderer, value: &T) {
+        self.buffer.set(renderer, value);
     }
 
     fn usage(is_mutable: bool) -> wgpu::BufferUsages {

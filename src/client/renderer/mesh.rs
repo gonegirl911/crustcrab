@@ -1,48 +1,35 @@
-use super::Renderer;
+use super::{buffer::Buffer, Renderer};
 use bytemuck::Pod;
-use std::{cmp::Reverse, marker::PhantomData, mem};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use std::{cmp::Reverse, mem};
 
 pub struct Mesh<V> {
-    vertex_buffer: wgpu::Buffer,
-    phantom: PhantomData<V>,
+    vertex_buffer: Buffer<[V]>,
 }
 
-impl<V: Vertex> Mesh<V> {
-    pub fn from_data(Renderer { device, .. }: &Renderer, vertices: &[V]) -> Self {
+impl<V: Pod> Mesh<V> {
+    pub fn from_data(renderer: &Renderer, vertices: &[V]) -> Self {
         Self {
-            vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }),
-            phantom: PhantomData,
+            vertex_buffer: Buffer::<[_]>::new(renderer, Ok(vertices), wgpu::BufferUsages::VERTEX),
         }
     }
 
-    fn uninit_mut(Renderer { device, .. }: &Renderer, len: usize) -> Self {
+    fn uninit_mut(renderer: &Renderer, len: usize) -> Self {
         Self {
-            vertex_buffer: device.create_buffer(&wgpu::BufferDescriptor {
-                label: None,
-                size: (len * mem::size_of::<V>()) as u64,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
-            phantom: PhantomData,
+            vertex_buffer: Buffer::<[_]>::new(
+                renderer,
+                Err(len),
+                wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            ),
         }
     }
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..self.len(), 0..1);
+        render_pass.draw(0..self.vertex_buffer.len(), 0..1);
     }
 
-    fn write(&self, Renderer { queue, .. }: &Renderer, vertices: &[V]) {
-        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(vertices));
-    }
-
-    fn len(&self) -> u32 {
-        (self.vertex_buffer.size() / mem::size_of::<V>() as u64) as u32
+    fn write(&self, renderer: &Renderer, vertices: &[V]) {
+        self.vertex_buffer.write(renderer, vertices);
     }
 }
 
@@ -51,7 +38,7 @@ pub struct TransparentMesh<C, V> {
     mesh: Mesh<V>,
 }
 
-impl<C, V: Vertex> TransparentMesh<C, V> {
+impl<C, V: Pod> TransparentMesh<C, V> {
     pub fn from_data<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
     where
         F: FnMut([V; 3]) -> C,
@@ -92,46 +79,33 @@ impl<C, V: Vertex> TransparentMesh<C, V> {
 }
 
 pub struct IndexedMesh<V, I> {
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    phantom: PhantomData<(V, I)>,
+    vertex_buffer: Buffer<[V]>,
+    index_buffer: Buffer<[I]>,
 }
 
-impl<V: Vertex, I: Index> IndexedMesh<V, I> {
-    pub fn from_data(Renderer { device, .. }: &Renderer, vertices: &[V], indices: &[I]) -> Self {
+impl<V: Pod, I: Index> IndexedMesh<V, I> {
+    pub fn from_data(renderer: &Renderer, vertices: &[V], indices: &[I]) -> Self {
         Self {
-            vertex_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }),
-            index_buffer: device.create_buffer_init(&BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::cast_slice(indices),
-                usage: wgpu::BufferUsages::INDEX,
-            }),
-            phantom: PhantomData,
+            vertex_buffer: Buffer::<[V]>::new(renderer, Ok(vertices), wgpu::BufferUsages::VERTEX),
+            index_buffer: Buffer::<[I]>::new(renderer, Ok(indices), wgpu::BufferUsages::INDEX),
         }
     }
 
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), I::FORMAT);
-        render_pass.draw_indexed(0..self.len(), 0, 0..1);
-    }
-
-    fn len(&self) -> u32 {
-        (self.index_buffer.size() / mem::size_of::<I>() as u64) as u32
+        render_pass.draw_indexed(0..self.index_buffer.len(), 0, 0..1);
     }
 }
 
 pub trait Vertex: Pod {
     const ATTRIBS: &'static [wgpu::VertexAttribute];
+    const STEP_MODE: wgpu::VertexStepMode = wgpu::VertexStepMode::Vertex;
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
+            step_mode: Self::STEP_MODE,
             attributes: Self::ATTRIBS,
         }
     }

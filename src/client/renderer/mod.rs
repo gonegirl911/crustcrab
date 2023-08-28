@@ -1,3 +1,4 @@
+pub mod buffer;
 pub mod effect;
 pub mod mesh;
 pub mod program;

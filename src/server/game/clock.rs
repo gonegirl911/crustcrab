@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use flume::Sender;
-use nalgebra::{vector, Vector3};
+use nalgebra::{UnitQuaternion, Vector3};
 use std::{f32::consts::TAU, ops::Range};
 
 #[derive(Default)]
@@ -62,14 +62,10 @@ impl Time {
     const DUSK_RANGE: Range<u16> = Clock::DUSK_START..Clock::NIGHT_START;
     const PM_RANGE: Range<u16> = Clock::NOON..Clock::MIDNIGHT;
 
-    pub fn sun_dir(&self) -> Vector3<f32> {
+    pub fn earth_rotation(&self) -> UnitQuaternion<f32> {
         let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;
         let theta = TAU * time;
-        vector![theta.cos(), theta.sin(), 0.0]
-    }
-
-    pub fn moon_dir(&self) -> Vector3<f32> {
-        -self.sun_dir()
+        UnitQuaternion::from_scaled_axis(Vector3::z() * theta)
     }
 
     pub fn stage(&self) -> Stage {
