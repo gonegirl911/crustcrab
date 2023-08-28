@@ -7,22 +7,15 @@ use crate::{
 };
 use flume::Sender;
 use nalgebra::{UnitQuaternion, Vector3};
-use std::{f32::consts::TAU, ops::Range};
+use once_cell::sync::Lazy;
+use serde::Deserialize;
+use std::{f32::consts::TAU, fs, ops::Range};
 
-#[derive(Default)]
 pub struct Clock {
     ticks: u16,
 }
 
 impl Clock {
-    const TICKS_PER_DAY: u16 = 24000;
-    const DAWN_START: u16 = 0;
-    const DAY_START: u16 = 500;
-    const NOON: u16 = 6000;
-    const DUSK_START: u16 = 11500;
-    const NIGHT_START: u16 = 12000;
-    const MIDNIGHT: u16 = 18000;
-
     fn send(&self, server_tx: Sender<ServerEvent>) {
         server_tx
             .send(ServerEvent::TimeUpdated(self.time()))
@@ -31,6 +24,14 @@ impl Clock {
 
     fn time(&self) -> Time {
         Time { ticks: self.ticks }
+    }
+}
+
+impl Default for Clock {
+    fn default() -> Self {
+        Self {
+            ticks: CLOCK_STATE.starting_ticks(),
+        }
     }
 }
 
@@ -43,7 +44,7 @@ impl EventHandler<Event> for Clock {
                 self.send(server_tx);
             }
             Event::Tick => {
-                self.ticks = (self.ticks + 1) % Self::TICKS_PER_DAY;
+                self.ticks = (self.ticks + 1) % CLOCK_STATE.ticks_per_day;
                 self.send(server_tx);
             }
             _ => {}
@@ -57,43 +58,18 @@ pub struct Time {
 }
 
 impl Time {
-    const DAWN_RANGE: Range<u16> = Clock::DAWN_START..Clock::DAY_START;
-    const DAY_RANGE: Range<u16> = Clock::DAY_START..Clock::DUSK_START;
-    const DUSK_RANGE: Range<u16> = Clock::DUSK_START..Clock::NIGHT_START;
-    const PM_RANGE: Range<u16> = Clock::NOON..Clock::MIDNIGHT;
-
-    pub fn earth_rotation(&self) -> UnitQuaternion<f32> {
-        let time = self.ticks as f32 / Clock::TICKS_PER_DAY as f32;
+    pub fn earth_rotation(self) -> UnitQuaternion<f32> {
+        let time = self.ticks as f32 / CLOCK_STATE.ticks_per_day as f32;
         let theta = TAU * time;
         UnitQuaternion::from_scaled_axis(Vector3::z() * theta)
     }
 
-    pub fn stage(&self) -> Stage {
-        if Self::DAWN_RANGE.contains(&self.ticks) {
-            Stage::Dawn {
-                progress: Self::inv_lerp(Self::DAWN_RANGE, self.ticks),
-            }
-        } else if Self::DAY_RANGE.contains(&self.ticks) {
-            Stage::Day
-        } else if Self::DUSK_RANGE.contains(&self.ticks) {
-            Stage::Dusk {
-                progress: Self::inv_lerp(Self::DUSK_RANGE, self.ticks),
-            }
-        } else {
-            Stage::Night
-        }
+    pub fn stage(self) -> Stage {
+        CLOCK_STATE.stage(self.ticks)
     }
 
-    pub fn is_am(&self) -> bool {
-        !self.is_pm()
-    }
-
-    fn is_pm(&self) -> bool {
-        Self::PM_RANGE.contains(&self.ticks)
-    }
-
-    fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
-        (value - start) as f32 / (end - 1 - start) as f32
+    pub fn is_am(self) -> bool {
+        CLOCK_STATE.is_am(self.ticks)
     }
 }
 
@@ -110,3 +86,103 @@ pub enum Stage {
     Dusk { progress: f32 },
     Night,
 }
+
+#[derive(Deserialize)]
+struct ClockState {
+    ticks_per_day: u16,
+    twilight_duration: u16,
+    starting_stage: StartingStage,
+}
+
+impl ClockState {
+    fn starting_ticks(&self) -> u16 {
+        match self.starting_stage {
+            StartingStage::Dawn => self.dawn_start(),
+            StartingStage::Day => self.day_start(),
+            StartingStage::Dusk => self.dusk_start(),
+            StartingStage::Night => self.night_start(),
+        }
+    }
+
+    fn stage(&self, ticks: u16) -> Stage {
+        if self.dawn_range().contains(&ticks) {
+            Stage::Dawn {
+                progress: Self::inv_lerp(self.dawn_range(), ticks),
+            }
+        } else if self.day_range().contains(&ticks) {
+            Stage::Day
+        } else if self.dusk_range().contains(&ticks) {
+            Stage::Dusk {
+                progress: Self::inv_lerp(self.dusk_range(), ticks),
+            }
+        } else {
+            Stage::Night
+        }
+    }
+
+    fn is_am(&self, ticks: u16) -> bool {
+        !self.is_pm(ticks)
+    }
+
+    fn is_pm(&self, ticks: u16) -> bool {
+        self.pm_range().contains(&ticks)
+    }
+
+    fn dawn_range(&self) -> Range<u16> {
+        self.dawn_start()..self.day_start()
+    }
+
+    fn day_range(&self) -> Range<u16> {
+        self.day_start()..self.dusk_start()
+    }
+
+    fn dusk_range(&self) -> Range<u16> {
+        self.dusk_start()..self.night_start()
+    }
+
+    fn pm_range(&self) -> Range<u16> {
+        self.noon()..self.midnight()
+    }
+
+    fn dawn_start(&self) -> u16 {
+        0
+    }
+
+    fn day_start(&self) -> u16 {
+        self.twilight_duration
+    }
+
+    fn noon(&self) -> u16 {
+        self.ticks_per_day / 4
+    }
+
+    fn dusk_start(&self) -> u16 {
+        self.night_start() - self.twilight_duration
+    }
+
+    fn night_start(&self) -> u16 {
+        self.ticks_per_day / 2
+    }
+
+    fn midnight(&self) -> u16 {
+        self.ticks_per_day / 4 * 3
+    }
+
+    fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
+        (value - start) as f32 / (end - 1 - start) as f32
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum StartingStage {
+    Dawn,
+    Day,
+    Dusk,
+    Night,
+}
+
+static CLOCK_STATE: Lazy<ClockState> = Lazy::new(|| {
+    toml::from_str(&fs::read_to_string("assets/clock.toml").expect("file should exist"))
+        .expect("file should be valid")
+});

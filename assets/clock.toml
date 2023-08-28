@@ -1,0 +1,3 @@
+ticks_per_day = 24000
+twilight_duration = 500
+starting_stage = "dawn"

@@ -1,4 +1,3 @@
-use super::Player;
 use crate::client::event_loop::{Event, EventHandler};
 use bitflags::bitflags;
 use nalgebra::{matrix, vector, Matrix4, Point3, Vector3};
@@ -23,7 +22,7 @@ pub struct View {
 impl View {
     pub fn new(origin: Point3<f32>, dir: Vector3<f32>) -> Self {
         let forward = dir.normalize();
-        let right = Player::WORLD_UP.cross(&forward).normalize();
+        let right = Vector3::y().cross(&forward).normalize();
         let up = forward.cross(&right);
         let yaw = forward.z.atan2(forward.x);
         let pitch = forward.y.asin();
@@ -140,14 +139,14 @@ impl Controller {
         view.yaw = (view.yaw - self.dx * self.sensitivity) % TAU;
         view.pitch = (view.pitch - self.dy * self.sensitivity).clamp(-BOUND_Y, BOUND_Y);
         view.forward = Self::forward(view.yaw, view.pitch);
-        view.right = Player::WORLD_UP.cross(&view.forward).normalize();
+        view.right = Vector3::y().cross(&view.forward).normalize();
         view.up = view.forward.cross(&view.right);
     }
 
     fn apply_movement(&mut self, view: &mut View, dt: Duration) {
         let mut dir = Vector3::zeros();
         let right = view.right;
-        let up = Player::WORLD_UP;
+        let up = Vector3::y();
         let forward = right.cross(&up);
 
         if self.relevant_keys.contains(Keys::W) {

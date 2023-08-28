@@ -13,7 +13,7 @@ use crate::client::{
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
-use nalgebra::{vector, Matrix4, Point3, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3};
 use std::time::Duration;
 use winit::event::StartCause;
 
@@ -25,8 +25,6 @@ pub struct Player {
 }
 
 impl Player {
-    pub const WORLD_UP: Vector3<f32> = vector![0.0, 1.0, 0.0];
-
     pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
         let view = View::new(gui.origin(), Vector3::x());
         let aspect = config.width as f32 / config.height as f32;

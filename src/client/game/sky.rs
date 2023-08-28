@@ -1,4 +1,3 @@
-use super::player::Player;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
@@ -15,11 +14,12 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, vector, Matrix4, Point3, UnitQuaternion, Vector3};
+use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use serde::Deserialize;
 use std::{
-    array,
     f32::consts::{FRAC_PI_2, PI},
-    mem,
+    fs, mem,
 };
 
 pub struct Sky {
@@ -89,7 +89,7 @@ impl EventHandler for Sky {
             Event::MainEventsCleared => {
                 if let Some(time) = self.updated_time.take() {
                     self.uniform
-                        .set(renderer, &SkyUniformData::new(time.stage()));
+                        .set(renderer, &SKY_STATE.sky_data(time.stage()));
                 }
             }
             _ => {}
@@ -105,28 +105,10 @@ struct SkyUniformData {
 }
 
 impl SkyUniformData {
-    const DAY_INTENSITY: Rgb<f32> = Rgb::splat(1.0);
-    const NIGHT_INTENSITY: Rgb<f32> = Rgb::new(0.15, 0.15, 0.3);
-    const SUN_INTENSITY: f32 = 15.0;
-
-    fn new(stage: Stage) -> Self {
-        match stage {
-            Stage::Dawn { progress } => Self {
-                light_intensity: utils::lerp(Self::NIGHT_INTENSITY, Self::DAY_INTENSITY, progress),
-                sun_intensity: utils::lerp(0.0, Self::SUN_INTENSITY, progress),
-            },
-            Stage::Day => Self {
-                light_intensity: Self::DAY_INTENSITY,
-                sun_intensity: Self::SUN_INTENSITY,
-            },
-            Stage::Dusk { progress } => Self {
-                light_intensity: utils::lerp(Self::DAY_INTENSITY, Self::NIGHT_INTENSITY, progress),
-                sun_intensity: utils::lerp(Self::SUN_INTENSITY, 0.0, progress),
-            },
-            Stage::Night => Self {
-                light_intensity: Self::NIGHT_INTENSITY,
-                sun_intensity: 0.0,
-            },
+    fn new(light_intensity: Rgb<f32>, sun_intensity: f32) -> Self {
+        Self {
+            light_intensity,
+            sun_intensity,
         }
     }
 }
@@ -232,14 +214,10 @@ struct ObjectsPushConstants {
 }
 
 impl ObjectsPushConstants {
-    const SUN_DIR: Vector3<f32> = vector![1.0, 0.0, 0.0];
-    const MOON_DIR: Vector3<f32> = vector![-1.0, 0.0, 0.0];
-    const SIZE: f32 = 0.1;
-
     fn new_sun(time: Time) -> Self {
         Self::new(
-            time.earth_rotation() * Self::SUN_DIR,
-            Self::SIZE,
+            time.earth_rotation() * Vector3::x(),
+            SKY_STATE.sun_size,
             0,
             time.is_am(),
         )
@@ -247,8 +225,8 @@ impl ObjectsPushConstants {
 
     fn new_moon(time: Time) -> Self {
         Self::new(
-            time.earth_rotation() * Self::MOON_DIR,
-            Self::SIZE,
+            time.earth_rotation() * -Vector3::x(),
+            SKY_STATE.moon_size,
             1,
             time.is_am(),
         )
@@ -264,33 +242,34 @@ impl ObjectsPushConstants {
 
     fn up(is_am: bool) -> Vector3<f32> {
         if is_am {
-            -Player::WORLD_UP
+            -Vector3::y()
         } else {
-            Player::WORLD_UP
+            Vector3::y()
         }
     }
 }
 
 struct StarDome {
-    stars: [Star; Self::COUNT],
+    stars: Vec<Star>,
     instance_buffer: Buffer<[StarInstance]>,
     program: Program,
     updated_rotation: Option<UnitQuaternion<f32>>,
 }
 
 impl StarDome {
-    const COUNT: usize = 1500;
-
     fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let mut rng = StdRng::seed_from_u64(808);
-        let stars = array::from_fn(|_| Star::new(&mut rng));
+        let count = SKY_STATE.star_count;
+        let stars = {
+            let mut rng = StdRng::seed_from_u64(808);
+            (0..count).map(|_| Star::new(&mut rng)).collect()
+        };
         let instance_buffer = Buffer::<[_]>::new(
             renderer,
-            Err(Self::COUNT),
+            Err(count),
             wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
         let program = Program::new(
@@ -379,17 +358,16 @@ struct StarInstance {
 }
 
 impl StarInstance {
-    const SIZE: f32 = 0.005;
-
     fn new(Star { coords, rotation }: Star, earth_rotation: UnitQuaternion<f32>) -> Self {
+        let size = SKY_STATE.star_size;
         Self {
             m: Matrix4::new_rotation(Vector3::z() * rotation)
                 * Matrix4::face_towards(
                     &(earth_rotation * coords),
                     &Point3::origin(),
-                    &Player::WORLD_UP,
+                    &Vector3::y(),
                 )
-                .prepend_nonuniform_scaling(&vector![Self::SIZE, Self::SIZE, 1.0]),
+                .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
         }
     }
 }
@@ -399,3 +377,36 @@ impl Vertex for StarInstance {
         &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4];
     const STEP_MODE: wgpu::VertexStepMode = wgpu::VertexStepMode::Instance;
 }
+
+#[derive(Deserialize)]
+struct SkyState {
+    day_intensity: Rgb<f32>,
+    night_intensity: Rgb<f32>,
+    sun_intensity: f32,
+    sun_size: f32,
+    moon_size: f32,
+    star_size: f32,
+    star_count: usize,
+}
+
+impl SkyState {
+    fn sky_data(&self, stage: Stage) -> SkyUniformData {
+        match stage {
+            Stage::Dawn { progress } => SkyUniformData::new(
+                utils::lerp(self.night_intensity, self.day_intensity, progress),
+                utils::lerp(0.0, self.sun_intensity, progress),
+            ),
+            Stage::Day => SkyUniformData::new(self.day_intensity, self.sun_intensity),
+            Stage::Dusk { progress } => SkyUniformData::new(
+                utils::lerp(self.day_intensity, self.night_intensity, progress),
+                utils::lerp(self.sun_intensity, 0.0, progress),
+            ),
+            Stage::Night => SkyUniformData::new(self.night_intensity, 0.0),
+        }
+    }
+}
+
+static SKY_STATE: Lazy<SkyState> = Lazy::new(|| {
+    toml::from_str(&fs::read_to_string("assets/sky.toml").expect("file should exist"))
+        .expect("file should be valid")
+});
