@@ -112,11 +112,11 @@ struct ObjectPushConstants {
 
 impl ObjectPushConstants {
     fn new_sun(time: Time) -> Self {
-        Self::new(time.rotation() * Vector3::x(), 0, time.is_am())
+        Self::new(time.sky_rotation() * Vector3::x(), 0, time.is_am())
     }
 
     fn new_moon(time: Time) -> Self {
-        Self::new(time.rotation() * -Vector3::x(), 1, time.is_am())
+        Self::new(time.sky_rotation() * -Vector3::x(), 1, time.is_am())
     }
 
     fn new(dir: Vector3<f32>, tex_idx: u32, is_am: bool) -> Self {

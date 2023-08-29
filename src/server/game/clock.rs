@@ -57,7 +57,7 @@ pub struct Time {
 }
 
 impl Time {
-    pub fn rotation(self) -> UnitQuaternion<f32> {
+    pub fn sky_rotation(self) -> UnitQuaternion<f32> {
         let time = self.ticks as f32 / SERVER_CONFIG.clock.ticks_per_day as f32;
         let theta = TAU * time;
         UnitQuaternion::new(Vector3::z() * theta)

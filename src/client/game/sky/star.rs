@@ -75,17 +75,17 @@ impl EventHandler for StarDome {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
-                self.updated_rotation = Some(time.rotation());
+                self.updated_rotation = Some(time.sky_rotation());
             }
             Event::MainEventsCleared => {
-                if let Some(rotation) = self.updated_rotation {
+                if let Some(sky_rotation) = self.updated_rotation {
                     self.instance_buffer.write(
                         renderer,
                         &self
                             .stars
                             .iter()
                             .copied()
-                            .map(|star| StarInstance::new(star, rotation))
+                            .map(|star| StarInstance::new(star, sky_rotation))
                             .collect::<Vec<_>>(),
                     );
                 }
@@ -123,16 +123,12 @@ struct StarInstance {
 }
 
 impl StarInstance {
-    fn new(Star { coords, rotation }: Star, earth_rotation: UnitQuaternion<f32>) -> Self {
+    fn new(Star { coords, rotation }: Star, sky_rotation: UnitQuaternion<f32>) -> Self {
         let size = CLIENT_CONFIG.sky.star.size;
         Self {
             m: Matrix4::new_rotation(Vector3::z() * rotation)
-                * Matrix4::face_towards(
-                    &(earth_rotation * coords),
-                    &Point3::origin(),
-                    &Vector3::y(),
-                )
-                .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
+                * Matrix4::face_towards(&(sky_rotation * coords), &Point3::origin(), &Vector3::y())
+                    .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
         }
     }
 }
