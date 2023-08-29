@@ -5,9 +5,11 @@ use crate::client::{
         effect::PostProcessor, program::Program, texture::image::ImageTexture, uniform::Uniform,
         Renderer,
     },
+    CLIENT_CONFIG,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Matrix4;
+use serde::Deserialize;
 use std::mem;
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
@@ -67,8 +69,10 @@ impl Crosshair {
         render_pass.draw(0..6, 0..1);
     }
 
-    fn transform(renderer: &Renderer) -> Matrix4<f32> {
-        Gui::viewport(renderer) * Gui::element_scaling(Gui::element_size(renderer, 1.0))
+    fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
+        Gui::viewport(renderer).prepend_nonuniform_scaling(&Gui::element_scaling(
+            Gui::element_size(renderer, CLIENT_CONFIG.gui.crosshair.size),
+        ))
     }
 }
 
@@ -92,7 +96,7 @@ impl EventHandler for Crosshair {
                 if mem::take(&mut self.is_resized) {
                     self.uniform.set(
                         renderer,
-                        &CrosshairUniformData::new(Self::transform(renderer)),
+                        &CrosshairUniformData::new(self.transform(renderer)),
                     );
                 }
             }
@@ -111,4 +115,9 @@ impl CrosshairUniformData {
     fn new(transform: Matrix4<f32>) -> Self {
         Self { transform }
     }
+}
+
+#[derive(Deserialize)]
+pub struct CrosshairConfig {
+    size: f32,
 }

@@ -2,14 +2,13 @@ use crate::{
     client::ClientEvent,
     server::{
         event_loop::{Event, EventHandler},
-        ServerEvent,
+        ServerEvent, SERVER_CONFIG,
     },
 };
 use flume::Sender;
 use nalgebra::{UnitQuaternion, Vector3};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::{f32::consts::TAU, fs, ops::Range};
+use std::{f32::consts::TAU, ops::Range};
 
 pub struct Clock {
     ticks: u16,
@@ -30,7 +29,7 @@ impl Clock {
 impl Default for Clock {
     fn default() -> Self {
         Self {
-            ticks: CLOCK_STATE.starting_ticks(),
+            ticks: SERVER_CONFIG.clock.starting_ticks(),
         }
     }
 }
@@ -44,7 +43,7 @@ impl EventHandler<Event> for Clock {
                 self.send(server_tx);
             }
             Event::Tick => {
-                self.ticks = (self.ticks + 1) % CLOCK_STATE.ticks_per_day;
+                self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
                 self.send(server_tx);
             }
             _ => {}
@@ -58,18 +57,18 @@ pub struct Time {
 }
 
 impl Time {
-    pub fn earth_rotation(self) -> UnitQuaternion<f32> {
-        let time = self.ticks as f32 / CLOCK_STATE.ticks_per_day as f32;
+    pub fn rotation(self) -> UnitQuaternion<f32> {
+        let time = self.ticks as f32 / SERVER_CONFIG.clock.ticks_per_day as f32;
         let theta = TAU * time;
-        UnitQuaternion::from_scaled_axis(Vector3::z() * theta)
+        UnitQuaternion::new(Vector3::z() * theta)
     }
 
     pub fn stage(self) -> Stage {
-        CLOCK_STATE.stage(self.ticks)
+        SERVER_CONFIG.clock.stage(self.ticks)
     }
 
     pub fn is_am(self) -> bool {
-        CLOCK_STATE.is_am(self.ticks)
+        SERVER_CONFIG.clock.is_am(self.ticks)
     }
 }
 
@@ -88,7 +87,7 @@ pub enum Stage {
 }
 
 #[derive(Deserialize)]
-struct ClockState {
+pub struct ClockState {
     ticks_per_day: u16,
     twilight_duration: u16,
     starting_stage: StartingStage,
@@ -181,8 +180,3 @@ enum StartingStage {
     Dusk,
     Night,
 }
-
-static CLOCK_STATE: Lazy<ClockState> = Lazy::new(|| {
-    toml::from_str(&fs::read_to_string("assets/clock.toml").expect("file should exist"))
-        .expect("file should be valid")
-});

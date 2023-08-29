@@ -1,7 +1,0 @@
-day_intensity = [1.0, 1.0, 1.0]
-night_intensity = [0.15, 0.15, 0.3]
-sun_intensity = 15.0
-sun_size = 0.1
-moon_size = 0.1
-star_size = 0.005
-star_count = 1500

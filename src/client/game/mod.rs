@@ -44,7 +44,7 @@ impl Game {
             processor.bind_group_layout(),
             textures.bind_group_layout(),
         );
-        let player = Player::new(renderer, &gui);
+        let player = Player::new(renderer);
         let sky = Sky::new(renderer, player.bind_group_layout());
         let world = World::new(
             renderer,
@@ -147,7 +147,7 @@ impl EventHandler for Game {
             }
         } else {
             self.gui.handle(event, renderer);
-            self.player.handle(event, (client_tx, renderer, &self.gui, dt));
+            self.player.handle(event, (client_tx, renderer, &self.gui.inventory, dt));
             self.sky.handle(event, renderer);
             self.world.handle(event, renderer);
             self.hover.handle(event, ());

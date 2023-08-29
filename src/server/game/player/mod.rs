@@ -7,6 +7,8 @@ use crate::{
     shared::utils,
 };
 use nalgebra::{vector, Point3};
+use serde::Deserialize;
+use std::ops::Range;
 
 #[derive(Default)]
 pub struct Player {
@@ -78,4 +80,9 @@ impl WorldArea {
             })
         })
     }
+}
+
+#[derive(Deserialize)]
+pub struct PlayerConfig {
+    pub reach: Range<f32>,
 }

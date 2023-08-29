@@ -9,7 +9,7 @@ use self::{
 };
 use super::{
     event_loop::{Event, EventHandler},
-    ServerEvent, ServerState,
+    ServerEvent,
 };
 use flume::Sender;
 use std::thread;
@@ -21,10 +21,23 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(state: &ServerState) -> Self {
+    fn send_world_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
+    where
+        I: IntoIterator<Item = WorldEvent>,
+    {
+        for event in events {
+            self.world_tx
+                .send((event, server_tx.clone()))
+                .unwrap_or_else(|_| unreachable!());
+        }
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
         let player = Default::default();
         let clock = Default::default();
-        let mut world = World::new(state);
+        let mut world = World::default();
         let (world_tx, world_rx) = flume::unbounded();
 
         thread::spawn(move || {
@@ -37,17 +50,6 @@ impl Game {
             player,
             clock,
             world_tx,
-        }
-    }
-
-    fn send_world_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
-    where
-        I: IntoIterator<Item = WorldEvent>,
-    {
-        for event in events {
-            self.world_tx
-                .send((event, server_tx.clone()))
-                .unwrap_or_else(|_| unreachable!());
         }
     }
 }

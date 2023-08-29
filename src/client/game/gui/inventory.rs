@@ -11,12 +11,14 @@ use crate::{
             uniform::Uniform,
             Renderer,
         },
+        CLIENT_CONFIG,
     },
     server::game::world::block::Block,
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Vector3};
+use serde::Deserialize;
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
     mem,
@@ -30,18 +32,13 @@ pub struct Inventory {
     mesh: Option<Mesh<BlockVertex>>,
     uniform: Uniform<InventoryUniformData>,
     program: Program,
-    inventory: ArrayVec<Block, 9>,
     index: usize,
     is_updated: bool,
     is_resized: bool,
 }
 
 impl Inventory {
-    pub fn new(
-        renderer: &Renderer,
-        inventory: ArrayVec<Block, 9>,
-        textures_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
+    pub fn new(renderer: &Renderer, textures_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX);
         let program = Program::new(
             renderer,
@@ -64,7 +61,6 @@ impl Inventory {
             mesh: None,
             uniform,
             program,
-            inventory,
             index: 0,
             is_updated: true,
             is_resized: true,
@@ -86,7 +82,7 @@ impl Inventory {
     }
 
     pub fn selected_block(&self) -> Option<Block> {
-        self.inventory.get(self.index).copied()
+        CLIENT_CONFIG.gui.inventory.content.get(self.index).copied()
     }
 
     fn index(&self, keycode: VirtualKeyCode) -> Option<usize> {
@@ -104,19 +100,19 @@ impl Inventory {
         }
     }
 
-    fn transform(renderer @ Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
+    fn transform(&self, renderer @ Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
         let diagonal = 3.0f32.sqrt();
-        let size = Gui::element_size(renderer, 2.25 * diagonal);
+        let size = Gui::element_size(renderer, CLIENT_CONFIG.gui.inventory.size * diagonal);
         let left = config.width as f32 - size * 1.315;
         let bottom = config.height as f32 - size * 1.315;
         Gui::viewport(renderer)
             * Matrix4::new_translation(&vector![left, bottom, 0.0])
-            * Gui::element_scaling(size)
-            * Matrix4::new_translation(&Vector3::from_element(0.5))
+                .prepend_nonuniform_scaling(&Gui::element_scaling(size))
+                .prepend_translation(&Vector3::from_element(0.5))
             * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
             * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
-            * Matrix4::new_scaling(1.0 / diagonal)
-            * Matrix4::new_translation(&Vector3::from_element(-0.5))
+                .prepend_scaling(1.0 / diagonal)
+                .prepend_translation(&Vector3::from_element(-0.5))
     }
 }
 
@@ -164,7 +160,7 @@ impl EventHandler for Inventory {
                 if mem::take(&mut self.is_resized) {
                     self.uniform.set(
                         renderer,
-                        &InventoryUniformData::new(Self::transform(renderer)),
+                        &InventoryUniformData::new(self.transform(renderer)),
                     )
                 }
             }
@@ -183,4 +179,10 @@ impl InventoryUniformData {
     fn new(transform: Matrix4<f32>) -> Self {
         Self { transform }
     }
+}
+
+#[derive(Deserialize)]
+pub struct InventoryConfig {
+    content: ArrayVec<Block, 9>,
+    size: f32,
 }

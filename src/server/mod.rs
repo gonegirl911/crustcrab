@@ -3,9 +3,10 @@ pub mod game;
 pub mod ticker;
 
 use self::{
-    event_loop::EventLoop,
+    event_loop::{EventLoop, EventLoopConfig},
     game::{
-        clock::Time,
+        clock::{ClockState, Time},
+        player::PlayerConfig,
         world::{BlockHoverData, ChunkData},
         Game,
     },
@@ -16,8 +17,9 @@ use crate::{
 };
 use flume::{Receiver, Sender};
 use nalgebra::Point3;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::{fs, ops::Range, sync::Arc};
+use std::{fs, sync::Arc};
 
 pub struct Server {
     event_loop: EventLoop,
@@ -26,10 +28,10 @@ pub struct Server {
 
 impl Server {
     pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
-        let state = ServerState::new();
-        let event_loop = EventLoop::new(server_tx, client_rx, &state);
-        let game = Game::new(&state);
-        Self { event_loop, game }
+        Self {
+            event_loop: EventLoop::new(server_tx, client_rx),
+            game: Default::default(),
+        }
     }
 
     pub fn run(self) -> ! {
@@ -50,17 +52,16 @@ impl Server {
 }
 
 #[derive(Deserialize)]
-pub struct ServerState {
-    ticks_per_second: u32,
-    reach: Range<f32>,
+pub struct ServerConfig {
+    event_loop: EventLoopConfig,
+    player: PlayerConfig,
+    clock: ClockState,
 }
 
-impl ServerState {
-    fn new() -> Self {
-        toml::from_str(&fs::read_to_string("assets/server.toml").expect("file should exist"))
-            .expect("file should be valid")
-    }
-}
+pub static SERVER_CONFIG: Lazy<ServerConfig> = Lazy::new(|| {
+    toml::from_str(&fs::read_to_string("assets/config/server.toml").expect("file should exist"))
+        .expect("file should be valid")
+});
 
 pub enum ServerEvent {
     TimeUpdated(Time),

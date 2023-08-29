@@ -6,14 +6,16 @@ pub mod window;
 
 use self::{
     event_loop::{Event, EventHandler, EventLoop},
-    game::Game,
+    game::{gui::GuiConfig, player::PlayerConfig, sky::SkyConfig, Game},
     renderer::Renderer,
     window::Window,
 };
 use crate::server::{game::world::block::Block, ServerEvent};
 use flume::{Receiver, Sender};
 use nalgebra::{Point3, Vector3};
-use std::time::Duration;
+use once_cell::sync::Lazy;
+use serde::Deserialize;
+use std::{fs, time::Duration};
 use winit::event_loop::ControlFlow;
 
 pub struct Client {
@@ -82,3 +84,15 @@ pub enum ClientEvent {
     },
     BlockDestroyed,
 }
+
+#[derive(Deserialize)]
+pub struct ClientConfig {
+    player: PlayerConfig,
+    sky: SkyConfig,
+    gui: GuiConfig,
+}
+
+pub static CLIENT_CONFIG: Lazy<ClientConfig> = Lazy::new(|| {
+    toml::from_str(&fs::read_to_string("assets/config/client.toml").expect("file should exist"))
+        .expect("file should be valid")
+});

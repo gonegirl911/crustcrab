@@ -187,7 +187,7 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
 });
 
 static RAW_BLOCK_DATA: Lazy<EnumMap<Block, RawBlockData>> = Lazy::new(|| {
-    toml::from_str(&fs::read_to_string("assets/blocks.toml").expect("file should exist"))
+    toml::from_str(&fs::read_to_string("assets/config/blocks.toml").expect("file should exist"))
         .expect("file should be valid")
 });
 

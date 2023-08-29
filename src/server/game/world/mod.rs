@@ -25,7 +25,7 @@ use crate::{
             ray::{BlockIntersection, Ray},
             Player, WorldArea,
         },
-        ServerEvent, ServerState,
+        ServerEvent, SERVER_CONFIG,
     },
     shared::utils,
 };
@@ -48,18 +48,10 @@ pub struct World {
     actions: ActionStore,
     light: WorldLight,
     hover: Option<BlockIntersection>,
-    reach: Range<f32>,
 }
 
 impl World {
     const Y_RANGE: Range<i32> = -4..20;
-
-    pub fn new(state: &ServerState) -> Self {
-        Self {
-            reach: state.reach.clone(),
-            ..Default::default()
-        }
-    }
 
     fn load_many<I>(&mut self, points: I) -> Vec<Result<Point3<i32>, Point3<i32>>>
     where
@@ -107,7 +99,9 @@ impl World {
         server_tx: Sender<ServerEvent>,
         ray: Ray,
     ) {
-        let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
+        let Ok((load, unload)) = self.chunks.apply(coords, &action) else {
+            return;
+        };
         let updates = Self::updates(
             &load.into_iter().chain(unload).collect(),
             self.light
@@ -330,11 +324,9 @@ impl EventHandler<WorldEvent> for World {
                 self.par_send_updates(updates, server_tx, false);
             }
             WorldEvent::BlockHoverRequested { ray } => {
-                let hover =
-                    ray.cast(self.reach.clone())
-                        .find(|BlockIntersection { coords, .. }| {
-                            self.chunks.block(*coords) != Block::Air
-                        });
+                let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
+                    |BlockIntersection { coords, .. }| self.chunks.block(*coords) != Block::Air,
+                );
 
                 if self.hover != hover {
                     self.hover = hover;

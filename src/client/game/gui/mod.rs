@@ -1,27 +1,24 @@
 pub mod crosshair;
 pub mod inventory;
 
-use self::{crosshair::Crosshair, inventory::Inventory};
-use crate::{
-    client::{
-        event_loop::{Event, EventHandler},
-        renderer::{
-            effect::{Blit, Effect, PostProcessor},
-            Renderer,
-        },
-    },
-    server::game::world::{block::Block, chunk::Chunk},
+use self::{
+    crosshair::{Crosshair, CrosshairConfig},
+    inventory::{Inventory, InventoryConfig},
 };
-use arrayvec::ArrayVec;
-use nalgebra::{vector, Matrix4, Point3};
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::{
+        effect::{Blit, Effect, PostProcessor},
+        Renderer,
+    },
+};
+use nalgebra::{vector, Matrix4, Vector3};
 use serde::Deserialize;
-use std::fs;
 
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
-    inventory: Inventory,
-    state: ClientState,
+    pub inventory: Inventory,
 }
 
 impl Gui {
@@ -30,19 +27,10 @@ impl Gui {
         input_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let blit = Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT);
-        let crosshair = Crosshair::new(renderer, input_bind_group_layout);
-        let state = ClientState::new();
-        let inventory = Inventory::new(
-            renderer,
-            state.inventory.clone(),
-            textures_bind_group_layout,
-        );
         Self {
-            blit,
-            crosshair,
-            inventory,
-            state,
+            blit: Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT),
+            crosshair: Crosshair::new(renderer, input_bind_group_layout),
+            inventory: Inventory::new(renderer, textures_bind_group_layout),
         }
     }
 
@@ -96,49 +84,20 @@ impl Gui {
         }
     }
 
-    pub fn selected_block(&self) -> Option<Block> {
-        self.inventory.selected_block()
-    }
-
-    pub fn render_distance(&self) -> u32 {
-        self.state.render_distance
-    }
-
-    pub fn origin(&self) -> Point3<f32> {
-        self.state.origin
-    }
-
-    pub fn fovy(&self) -> f32 {
-        self.state.fovy
-    }
-
-    pub fn zfar(&self) -> f32 {
-        ((self.render_distance() + 1) * Chunk::DIM as u32) as f32
-    }
-
-    pub fn speed(&self) -> f32 {
-        self.state.speed
-    }
-
-    pub fn sensitivity(&self) -> f32 {
-        self.state.sensitivity
-    }
-
     fn element_size(Renderer { config, .. }: &Renderer, factor: f32) -> f32 {
         (config.height as f32 * 0.0325).max(13.5) * factor
     }
 
-    fn element_scaling(size: f32) -> Matrix4<f32> {
-        Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0])
+    fn element_scaling(size: f32) -> Vector3<f32> {
+        vector![size, size, 1.0]
     }
 
     fn viewport(Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
-        Matrix4::new_translation(&vector![-1.0, -1.0, 0.0])
-            * Matrix4::new_nonuniform_scaling(&vector![
-                2.0 / config.width as f32,
-                2.0 / config.height as f32,
-                1.0
-            ])
+        Matrix4::new_translation(&vector![-1.0, -1.0, 0.0]).prepend_nonuniform_scaling(&vector![
+            2.0 / config.width as f32,
+            2.0 / config.height as f32,
+            1.0
+        ])
     }
 }
 
@@ -152,18 +111,7 @@ impl EventHandler for Gui {
 }
 
 #[derive(Deserialize)]
-struct ClientState {
-    inventory: ArrayVec<Block, 9>,
-    render_distance: u32,
-    origin: Point3<f32>,
-    fovy: f32,
-    speed: f32,
-    sensitivity: f32,
-}
-
-impl ClientState {
-    fn new() -> Self {
-        toml::from_str(&fs::read_to_string("assets/client.toml").expect("file should exist"))
-            .expect("file should be valid")
-    }
+pub struct GuiConfig {
+    crosshair: CrosshairConfig,
+    inventory: InventoryConfig,
 }

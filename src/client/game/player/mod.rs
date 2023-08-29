@@ -5,15 +5,19 @@ use self::{
     camera::{Changes, Controller, Projection, View},
     frustum::Frustum,
 };
-use super::gui::Gui;
-use crate::client::{
-    event_loop::{Event, EventHandler},
-    renderer::{uniform::Uniform, Renderer},
-    ClientEvent,
+use super::gui::inventory::Inventory;
+use crate::{
+    client::{
+        event_loop::{Event, EventHandler},
+        renderer::{uniform::Uniform, Renderer},
+        ClientEvent, CLIENT_CONFIG,
+    },
+    server::game::world::chunk::Chunk,
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
 use nalgebra::{Matrix4, Point3, Vector3};
+use serde::Deserialize;
 use std::time::Duration;
 use winit::event::StartCause;
 
@@ -25,11 +29,12 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(renderer @ Renderer { config, .. }: &Renderer, gui: &Gui) -> Self {
-        let view = View::new(gui.origin(), Vector3::x());
+    pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
+        let state = &CLIENT_CONFIG.player;
+        let view = View::new(state.origin, Vector3::x());
         let aspect = config.width as f32 / config.height as f32;
-        let projection = Projection::new(gui.fovy(), aspect, 0.1, gui.zfar());
-        let controller = Controller::new(gui.speed(), gui.sensitivity());
+        let projection = Projection::new(state.fovy, aspect, 0.1, state.zfar());
+        let controller = Controller::new(state.speed, state.sensitivity);
         let uniform = Uniform::from_value_mut(
             renderer,
             &Self::data(&view, &projection),
@@ -76,9 +81,9 @@ impl Player {
 }
 
 impl EventHandler for Player {
-    type Context<'a> = (Sender<ClientEvent>, &'a Renderer, &'a Gui, Duration);
+    type Context<'a> = (Sender<ClientEvent>, &'a Renderer, &'a Inventory, Duration);
 
-    fn handle(&mut self, event: &Event, (client_tx, renderer, gui, dt): Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, (client_tx, renderer, inventory, dt): Self::Context<'_>) {
         self.controller.handle(event, ());
 
         match event {
@@ -87,7 +92,7 @@ impl EventHandler for Player {
                     .send(ClientEvent::InitialRenderRequested {
                         origin: self.view.origin,
                         dir: self.view.forward,
-                        render_distance: gui.render_distance(),
+                        render_distance: CLIENT_CONFIG.player.render_distance,
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
@@ -113,7 +118,7 @@ impl EventHandler for Player {
                 }
 
                 if changes.contains(Changes::BLOCK_PLACED) {
-                    if let Some(block) = gui.selected_block() {
+                    if let Some(block) = inventory.selected_block() {
                         client_tx
                             .send(ClientEvent::BlockPlaced { block })
                             .unwrap_or_else(|_| unreachable!());
@@ -157,5 +162,20 @@ impl PlayerUniformData {
             zfar,
             padding: [0.0; 3],
         }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct PlayerConfig {
+    origin: Point3<f32>,
+    fovy: f32,
+    speed: f32,
+    sensitivity: f32,
+    render_distance: u32,
+}
+
+impl PlayerConfig {
+    fn zfar(&self) -> f32 {
+        ((self.render_distance + 1) * Chunk::DIM as u32) as f32
     }
 }

@@ -1,0 +1,25 @@
+[player]
+origin = [0.0, 1.62, 0.0]
+fovy = 90.0
+speed = 25.0
+sensitivity = 0.0025
+render_distance = 36
+
+[sky]
+day_intensity = [1.0, 1.0, 1.0]
+night_intensity = [0.15, 0.15, 0.3]
+sun_intensity = 15.0
+
+[sky.object]
+size = 0.1
+
+[sky.star]
+size = 0.005
+count = 1500
+
+[gui.crosshair]
+size = 1.0
+
+[gui.inventory]
+content = ["glowstone", "glass_magenta", "glass_cyan"]
+size = 2.25
