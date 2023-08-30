@@ -1,6 +1,7 @@
 pub mod ray;
 
 use self::ray::Ray;
+use super::world::World;
 use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},
@@ -71,14 +72,13 @@ impl WorldArea {
     ) -> impl Iterator<Item = Point3<i32>> + 'a {
         self.points().filter(|point| {
             utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
-                || (point.y - other.center.y).unsigned_abs() > other.radius
         })
     }
 
     fn cube_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
         let radius = self.radius as i32;
         (-radius..=radius).flat_map(move |dx| {
-            (-radius..=radius).flat_map(move |dy| {
+            World::Y_RANGE.flat_map(move |dy| {
                 (-radius..=radius).map(move |dz| self.center + vector![dx, dy, dz])
             })
         })

@@ -72,22 +72,22 @@ impl EventHandler for ScreenTexture {
     }
 }
 
-struct InputOutputTexture(InputOutputTextureArray<1>);
+pub struct InputOutputTexture(InputOutputTextureArray<1>);
 
 impl InputOutputTexture {
-    fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
+    pub fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
         Self(InputOutputTextureArray::new(renderer, format))
     }
 
-    fn view(&self) -> &wgpu::TextureView {
+    pub fn view(&self) -> &wgpu::TextureView {
         self.0.view(0)
     }
 
-    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         self.0.bind_group_layout()
     }
 
-    fn bind_group(&self) -> &wgpu::BindGroup {
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.0.bind_group(0)
     }
 }

@@ -2,7 +2,7 @@ mod object;
 mod star;
 
 use self::{
-    object::{ObjectArray, ObjectConfig},
+    object::{ObjectConfig, ObjectSet},
     star::{StarConfig, StarDome},
 };
 use crate::{
@@ -22,7 +22,7 @@ use serde::Deserialize;
 
 pub struct Sky {
     stars: StarDome,
-    objects: ObjectArray,
+    objects: ObjectSet,
     uniform: Uniform<SkyUniformData>,
     updated_time: Option<Time>,
 }
@@ -35,7 +35,7 @@ impl Sky {
             player_bind_group_layout,
             uniform.bind_group_layout(),
         );
-        let objects = ObjectArray::new(
+        let objects = ObjectSet::new(
             renderer,
             player_bind_group_layout,
             uniform.bind_group_layout(),

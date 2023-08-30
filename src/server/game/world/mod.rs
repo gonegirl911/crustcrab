@@ -51,7 +51,7 @@ pub struct World {
 }
 
 impl World {
-    const Y_RANGE: Range<i32> = -4..20;
+    pub const Y_RANGE: Range<i32> = -4..20;
 
     fn load_many<I>(&mut self, points: I) -> Vec<Result<Point3<i32>, Point3<i32>>>
     where

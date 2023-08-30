@@ -17,12 +17,11 @@ impl ImageTexture {
         is_srgb: bool,
         is_pixelated: bool,
         mip_level_count: u32,
-        visibility: wgpu::ShaderStages,
     ) -> Self {
         let view = Self::create_view(renderer, path, is_srgb, mip_level_count);
         let sampler = Self::create_sampler(renderer, is_pixelated, mip_level_count);
         let bind_group_layout =
-            ImageTextureArray::create_bind_group_layout(renderer, None, is_pixelated, visibility);
+            ImageTextureArray::create_bind_group_layout(renderer, None, is_pixelated);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -235,7 +234,6 @@ impl ImageTextureArray {
             renderer,
             NonZeroU32::new(views.len() as u32),
             is_pixelated,
-            wgpu::ShaderStages::FRAGMENT,
         );
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -283,14 +281,13 @@ impl ImageTextureArray {
         Renderer { device, .. }: &Renderer,
         count: Option<NonZeroU32>,
         is_pixelated: bool,
-        visibility: wgpu::ShaderStages,
     ) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
@@ -302,7 +299,7 @@ impl ImageTextureArray {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(if is_pixelated {
                         wgpu::SamplerBindingType::NonFiltering
                     } else {

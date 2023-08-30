@@ -78,6 +78,34 @@ impl<C, V: Pod> TransparentMesh<C, V> {
     }
 }
 
+pub struct InstancedMesh<V, E> {
+    vertex_buffer: Buffer<[V]>,
+    instance_buffer: Buffer<[E]>,
+}
+
+impl<V: Pod, E: Pod> InstancedMesh<V, E> {
+    pub fn from_data(renderer: &Renderer, vertices: &[V], instances: &[E]) -> Self {
+        Self {
+            vertex_buffer: Buffer::<[_]>::new(renderer, Ok(vertices), wgpu::BufferUsages::VERTEX),
+            instance_buffer: Buffer::<[_]>::new(
+                renderer,
+                Ok(instances),
+                wgpu::BufferUsages::VERTEX,
+            ),
+        }
+    }
+
+    pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+        render_pass.draw_indexed(
+            0..self.vertex_buffer.len(),
+            0,
+            0..self.instance_buffer.len(),
+        );
+    }
+}
+
 pub struct IndexedMesh<V, I> {
     vertex_buffer: Buffer<[V]>,
     index_buffer: Buffer<[I]>,

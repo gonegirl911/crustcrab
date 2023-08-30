@@ -13,14 +13,14 @@ use nalgebra::{vector, Matrix4, Point3, Vector3};
 use serde::Deserialize;
 use std::mem;
 
-pub struct ObjectArray {
+pub struct ObjectSet {
     textures: ImageTextureArray,
     program: Program,
     sun_pc: ObjectPushConstants,
     moon_pc: ObjectPushConstants,
 }
 
-impl ObjectArray {
+impl ObjectSet {
     pub fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
@@ -91,7 +91,7 @@ impl ObjectArray {
     }
 }
 
-impl EventHandler for ObjectArray {
+impl EventHandler for ObjectSet {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
