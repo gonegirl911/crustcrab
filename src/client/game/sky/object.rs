@@ -57,12 +57,11 @@ impl ObjectArray {
         Self {
             textures,
             program,
-            sun_pc: ObjectPushConstants::new_sun(Time::default()),
-            moon_pc: ObjectPushConstants::new_moon(Time::default()),
+            sun_pc: ObjectPushConstants::new_sun(Default::default()),
+            moon_pc: ObjectPushConstants::new_moon(Default::default()),
         }
     }
 
-    #[rustfmt::skip]
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,

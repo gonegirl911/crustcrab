@@ -86,8 +86,8 @@ pub struct IndexedMesh<V, I> {
 impl<V: Pod, I: Index> IndexedMesh<V, I> {
     pub fn from_data(renderer: &Renderer, vertices: &[V], indices: &[I]) -> Self {
         Self {
-            vertex_buffer: Buffer::<[V]>::new(renderer, Ok(vertices), wgpu::BufferUsages::VERTEX),
-            index_buffer: Buffer::<[I]>::new(renderer, Ok(indices), wgpu::BufferUsages::INDEX),
+            vertex_buffer: Buffer::<[_]>::new(renderer, Ok(vertices), wgpu::BufferUsages::VERTEX),
+            index_buffer: Buffer::<[_]>::new(renderer, Ok(indices), wgpu::BufferUsages::INDEX),
         }
     }
 

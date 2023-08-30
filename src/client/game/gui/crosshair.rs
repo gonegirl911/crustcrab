@@ -29,6 +29,7 @@ impl Crosshair {
             false,
             true,
             1,
+            wgpu::ShaderStages::FRAGMENT,
         );
         let program = Program::new(
             renderer,

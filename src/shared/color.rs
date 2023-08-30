@@ -11,7 +11,7 @@ use std::{
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
-    pub const fn new(r: T, g: T, b: T) -> Self {
+    fn new(r: T, g: T, b: T) -> Self {
         Self([r, g, b])
     }
 

@@ -60,19 +60,22 @@ pub struct WorldArea {
 
 impl WorldArea {
     pub fn points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
-        self.square_points()
-            .filter(|point| utils::magnitude_squared(point - self.center) <= self.radius.pow(2))
+        self.cube_points().filter(|point| {
+            utils::magnitude_squared(point.xz() - self.center.xz()) <= self.radius.pow(2)
+        })
     }
 
     pub fn exclusive_points<'a>(
         &'a self,
         other: &'a WorldArea,
     ) -> impl Iterator<Item = Point3<i32>> + 'a {
-        self.points()
-            .filter(|point| utils::magnitude_squared(point - other.center) > other.radius.pow(2))
+        self.points().filter(|point| {
+            utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
+                || (point.y - other.center.y).unsigned_abs() > other.radius
+        })
     }
 
-    fn square_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
+    fn cube_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
         let radius = self.radius as i32;
         (-radius..=radius).flat_map(move |dx| {
             (-radius..=radius).flat_map(move |dy| {

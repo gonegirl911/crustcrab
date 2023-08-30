@@ -2,7 +2,7 @@ use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
 use std::ops::{Add, Mul};
 
-pub fn div_floor(a: i64, b: i64) -> i64 {
+fn div_floor(a: i64, b: i64) -> i64 {
     let d = a / b;
     let r = a % b;
     if (r > 0 && b < 0) || (r < 0 && b > 0) {

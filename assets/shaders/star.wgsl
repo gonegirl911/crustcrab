@@ -42,12 +42,6 @@ struct SkyUniform {
 @group(1) @binding(0)
 var<uniform> sky: SkyUniform;
 
-@group(2) @binding(0)
-var t_object: binding_array<texture_2d<f32>>;
-
-@group(2) @binding(1)
-var s_object: sampler;
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(vec3(0.15), 1.0 - min(sky.sun_intensity, 10.0) / 10.0);

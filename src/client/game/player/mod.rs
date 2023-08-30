@@ -18,7 +18,7 @@ use bytemuck::{Pod, Zeroable};
 use flume::Sender;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
-use std::time::Duration;
+use std::{f32::consts::SQRT_2, time::Duration};
 use winit::event::StartCause;
 
 pub struct Player {
@@ -38,7 +38,7 @@ impl Player {
         let uniform = Uniform::from_value_mut(
             renderer,
             &Self::data(&view, &projection),
-            wgpu::ShaderStages::VERTEX_FRAGMENT,
+            wgpu::ShaderStages::VERTEX,
         );
         Self {
             view,
@@ -176,6 +176,6 @@ pub struct PlayerConfig {
 
 impl PlayerConfig {
     fn zfar(&self) -> f32 {
-        ((self.render_distance + 1) * Chunk::DIM as u32) as f32
+        (SQRT_2 * self.render_distance as f32 + 1.0) * Chunk::DIM as f32
     }
 }

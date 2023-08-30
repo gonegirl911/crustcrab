@@ -24,13 +24,13 @@ use flume::Sender;
 use std::time::Duration;
 
 pub struct Game {
-    textures: BlockTextureArray,
     gui: Gui,
     player: Player,
     sky: Sky,
     world: World,
     hover: BlockHover,
     aces: Aces,
+    textures: BlockTextureArray,
     depth: DepthBuffer,
     processor: PostProcessor,
 }
@@ -64,13 +64,13 @@ impl Game {
         );
         let depth = DepthBuffer::new(renderer);
         Self {
-            textures,
             gui,
             player,
             sky,
             world,
-            aces,
             hover,
+            aces,
+            textures,
             depth,
             processor,
         }

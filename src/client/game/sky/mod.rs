@@ -21,8 +21,8 @@ use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
 
 pub struct Sky {
-    objects: ObjectArray,
     stars: StarDome,
+    objects: ObjectArray,
     uniform: Uniform<SkyUniformData>,
     updated_time: Option<Time>,
 }
@@ -30,19 +30,19 @@ pub struct Sky {
 impl Sky {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
-        let objects = ObjectArray::new(
-            renderer,
-            player_bind_group_layout,
-            uniform.bind_group_layout(),
-        );
         let stars = StarDome::new(
             renderer,
             player_bind_group_layout,
             uniform.bind_group_layout(),
         );
+        let objects = ObjectArray::new(
+            renderer,
+            player_bind_group_layout,
+            uniform.bind_group_layout(),
+        );
         Self {
-            objects,
             stars,
+            objects,
             uniform,
             updated_time: Some(Default::default()),
         }
@@ -91,8 +91,8 @@ impl EventHandler for Sky {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.objects.handle(event, ());
         self.stars.handle(event, renderer);
+        self.objects.handle(event, ());
 
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
