@@ -19,14 +19,6 @@ impl Window {
     }
 }
 
-impl Deref for Window {
-    type Target = RawWindow;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl EventHandler for Window {
     type Context<'a> = &'a mut ControlFlow;
 
@@ -64,5 +56,13 @@ impl EventHandler for Window {
             Event::MainEventsCleared => self.0.request_redraw(),
             _ => {}
         }
+    }
+}
+
+impl Deref for Window {
+    type Target = RawWindow;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

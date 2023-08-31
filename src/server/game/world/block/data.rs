@@ -83,11 +83,11 @@ impl BlockData {
 }
 
 impl From<RawBlockData> for BlockData {
-    fn from(raw_data: RawBlockData) -> Self {
+    fn from(data: RawBlockData) -> Self {
         Self {
-            side_tex_indices: raw_data.side_tex_indices(),
-            luminance: raw_data.luminance,
-            light_filter: raw_data.light_filter,
+            side_tex_indices: data.side_tex_indices(),
+            luminance: data.luminance,
+            light_filter: data.light_filter,
         }
     }
 }
@@ -160,7 +160,7 @@ pub enum Component {
 }
 
 pub static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
-    Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, raw_data| raw_data.into()));
+    Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
 
 pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
     let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
@@ -173,7 +173,7 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|raw_data| raw_data.side_tex_paths.as_ref())
+        .filter_map(|data| data.side_tex_paths.as_ref())
         .flat_map(|side_tex_paths| side_tex_paths.values())
         .cloned()
         .for_each(|path| {

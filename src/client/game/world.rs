@@ -6,17 +6,14 @@ use crate::{
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
             mesh::TransparentMesh,
-            program::Program,
-            texture::{image::ImageTextureArray, screen::DepthBuffer},
+            program::{Program, PushConstants},
+            texture::screen::DepthBuffer,
             Renderer,
         },
     },
     server::{
         game::world::{
-            block::{
-                data::{Face, TEX_PATHS},
-                BlockLight,
-            },
+            block::{data::Face, BlockLight},
             chunk::Chunk,
             ChunkData,
         },
@@ -28,7 +25,7 @@ use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cmp::Reverse, collections::hash_map::Entry, mem, sync::Arc, time::Instant};
+use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
 
 pub struct World {
     meshes: ChunkMeshPool,
@@ -52,10 +49,7 @@ impl World {
                 sky_bind_group_layout,
                 textures_bind_group_layout,
             ],
-            &[wgpu::PushConstantRange {
-                stages: wgpu::ShaderStages::VERTEX,
-                range: 0..mem::size_of::<BlockPushConstants>() as u32,
-            }],
+            &[BlockPushConstants::range()],
             PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
             Some(wgpu::Face::Back),
@@ -76,10 +70,10 @@ impl World {
         renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        depth_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
+        depth_view: &wgpu::TextureView,
         frustum: &Frustum,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -157,11 +151,7 @@ impl ChunkMeshPool {
                 if let Some(mesh) = transparent_mesh {
                     transparent_meshes.push((coords, mesh));
                 }
-                render_pass.set_push_constants(
-                    wgpu::ShaderStages::VERTEX,
-                    0,
-                    bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
-                );
+                BlockPushConstants::new(coords).set(render_pass);
                 buffer.draw(render_pass);
             }
         }
@@ -173,11 +163,7 @@ impl ChunkMeshPool {
         });
 
         for (coords, mesh) in transparent_meshes {
-            render_pass.set_push_constants(
-                wgpu::ShaderStages::VERTEX,
-                0,
-                bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
-            );
+            BlockPushConstants::new(coords).set(render_pass);
             mesh.draw(renderer, render_pass, |coords| {
                 utils::magnitude_squared(coords - utils::coords(frustum.origin))
             });
@@ -312,7 +298,7 @@ impl EventHandler for ChunkMeshPool {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 pub struct BlockVertex {
-    data: u32,
+    pub data: u32,
     light: u32,
 }
 
@@ -368,30 +354,6 @@ impl BlockPushConstants {
     }
 }
 
-pub struct BlockTextureArray(ImageTextureArray);
-
-impl BlockTextureArray {
-    pub fn new(renderer: &Renderer) -> Self {
-        Self(ImageTextureArray::new(
-            renderer,
-            Self::tex_paths(),
-            true,
-            true,
-            4,
-        ))
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group()
-    }
-
-    fn tex_paths() -> impl Iterator<Item = String> {
-        TEX_PATHS
-            .iter()
-            .map(|path| format!("assets/textures/blocks/{path}"))
-    }
+impl PushConstants for BlockPushConstants {
+    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
 }

@@ -6,33 +6,33 @@ pub mod sky;
 pub mod world;
 
 use self::{
-    gui::Gui,
-    hover::BlockHover,
-    player::Player,
-    sky::Sky,
-    world::{BlockTextureArray, World},
+    cloud::CloudLayer, gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World,
 };
 use super::{
     event_loop::{Event, EventHandler},
     renderer::{
+        blender::Blender,
         effect::{Aces, PostProcessor},
-        texture::screen::DepthBuffer,
+        texture::{image::ImageTextureArray, screen::DepthBuffer},
         Renderer,
     },
     ClientEvent,
 };
+use crate::server::game::world::block::data::TEX_PATHS;
 use flume::Sender;
-use std::time::Duration;
+use std::{ops::Deref, time::Duration};
 
 pub struct Game {
     gui: Gui,
     player: Player,
     sky: Sky,
     world: World,
+    clouds: CloudLayer,
     hover: BlockHover,
     aces: Aces,
     textures: BlockTextureArray,
     depth: DepthBuffer,
+    blender: Blender,
     processor: PostProcessor,
 }
 
@@ -53,6 +53,11 @@ impl Game {
             sky.bind_group_layout(),
             textures.bind_group_layout(),
         );
+        let clouds = CloudLayer::new(
+            renderer,
+            player.bind_group_layout(),
+            sky.bind_group_layout(),
+        );
         let hover = BlockHover::new(
             renderer,
             player.bind_group_layout(),
@@ -64,15 +69,18 @@ impl Game {
             PostProcessor::FORMAT,
         );
         let depth = DepthBuffer::new(renderer);
+        let blender = Blender::new(renderer, PostProcessor::FORMAT);
         Self {
             gui,
             player,
             sky,
             world,
+            clouds,
             hover,
             aces,
             textures,
             depth,
+            blender,
             processor,
         }
     }
@@ -89,27 +97,35 @@ impl Game {
             renderer,
             self.processor.view(),
             encoder,
-            self.depth.view(),
             self.player.bind_group(),
             self.sky.bind_group(),
             self.textures.bind_group(),
+            self.depth.view(),
             &self.player.frustum(),
+        );
+        self.clouds.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.sky.bind_group(),
+            self.depth.view(),
+            &self.blender,
         );
         self.hover.draw(
             self.processor.view(),
             encoder,
-            self.depth.view(),
             self.player.bind_group(),
             self.sky.bind_group(),
+            self.depth.view(),
         );
         self.processor.apply(encoder, &self.aces);
         self.processor.apply_raw(|view, bind_group| {
             self.gui.draw(
                 view,
                 encoder,
-                self.depth.view(),
                 bind_group,
                 self.textures.bind_group(),
+                self.depth.view(),
             );
         });
         self.processor.draw(view, encoder);
@@ -151,9 +167,39 @@ impl EventHandler for Game {
             self.player.handle(event, (client_tx, renderer, &self.gui.inventory, dt));
             self.sky.handle(event, renderer);
             self.world.handle(event, renderer);
+            self.clouds.handle(event, dt);
             self.hover.handle(event, ());
             self.depth.handle(event, renderer);
+            self.blender.handle(event, renderer);
             self.processor.handle(event, renderer);
         }
+    }
+}
+
+struct BlockTextureArray(ImageTextureArray);
+
+impl BlockTextureArray {
+    fn new(renderer: &Renderer) -> Self {
+        Self(ImageTextureArray::new(
+            renderer,
+            Self::tex_paths(),
+            true,
+            true,
+            4,
+        ))
+    }
+
+    fn tex_paths() -> impl Iterator<Item = String> {
+        TEX_PATHS
+            .iter()
+            .map(|path| format!("assets/textures/blocks/{path}"))
+    }
+}
+
+impl Deref for BlockTextureArray {
+    type Target = ImageTextureArray;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

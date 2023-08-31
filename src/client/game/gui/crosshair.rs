@@ -29,6 +29,7 @@ impl Crosshair {
             false,
             true,
             1,
+            Default::default(),
         );
         let program = Program::new(
             renderer,

@@ -1,4 +1,6 @@
 use super::Renderer;
+use bytemuck::Pod;
+use std::{mem, slice};
 
 pub struct Program(wgpu::RenderPipeline);
 
@@ -57,6 +59,25 @@ impl Program {
         render_pass.set_pipeline(&self.0);
         for (bind_group, i) in bind_groups.into_iter().zip(0..) {
             render_pass.set_bind_group(i, bind_group, &[]);
+        }
+    }
+}
+
+pub trait PushConstants: Pod {
+    const STAGES: wgpu::ShaderStages;
+
+    fn set(&self, render_pass: &mut wgpu::RenderPass) {
+        render_pass.set_push_constants(
+            Self::STAGES,
+            0,
+            bytemuck::cast_slice(slice::from_ref(self)),
+        );
+    }
+
+    fn range() -> wgpu::PushConstantRange {
+        wgpu::PushConstantRange {
+            stages: Self::STAGES,
+            range: 0..mem::size_of::<Self>() as u32,
         }
     }
 }

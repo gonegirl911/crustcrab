@@ -38,9 +38,9 @@ impl Gui {
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        depth_view: &wgpu::TextureView,
         input_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
+        depth_view: &wgpu::TextureView,
     ) {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

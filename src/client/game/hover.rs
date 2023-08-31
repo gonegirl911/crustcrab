@@ -4,7 +4,7 @@ use crate::{
         renderer::{
             buffer::{IndexBuffer, MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            program::Program,
+            program::{Program, PushConstants},
             texture::screen::DepthBuffer,
             Renderer,
         },
@@ -16,7 +16,6 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Point3, Vector3};
-use std::mem;
 
 pub struct BlockHover {
     highlight: BlockHighlight,
@@ -43,9 +42,9 @@ impl BlockHover {
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        depth_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
+        depth_view: &wgpu::TextureView,
     ) {
         if let Some(BlockHoverData { coords, brightness }) = self.data {
             self.highlight.draw(
@@ -111,10 +110,7 @@ impl BlockHighlight {
                 wgpu::include_wgsl!("../../../assets/shaders/highlight.wgsl"),
                 &[BlockHighlightVertex::desc()],
                 &[player_bind_group_layout, sky_bind_group_layout],
-                &[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStages::VERTEX,
-                    range: 0..mem::size_of::<BlockHighlightPushConstants>() as u32,
-                }],
+                &[BlockHighlightPushConstants::range()],
                 PostProcessor::FORMAT,
                 Some(wgpu::BlendState::ALPHA_BLENDING),
                 Some(wgpu::Face::Back),
@@ -139,14 +135,10 @@ impl BlockHighlight {
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
         sky_bind_group: &'a wgpu::BindGroup,
-        push_constants: BlockHighlightPushConstants,
+        pc: BlockHighlightPushConstants,
     ) {
         self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
-        render_pass.set_push_constants(
-            wgpu::ShaderStages::VERTEX,
-            0,
-            bytemuck::cast_slice(&[push_constants]),
-        );
+        pc.set(render_pass);
         self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
     }
 }
@@ -181,6 +173,10 @@ impl BlockHighlightPushConstants {
             brightness: brightness.0,
         }
     }
+}
+
+impl PushConstants for BlockHighlightPushConstants {
+    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
 }
 
 const DELTAS: [Vector3<f32>; 8] = [

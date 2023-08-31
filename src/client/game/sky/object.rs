@@ -2,7 +2,10 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
-            effect::PostProcessor, program::Program, texture::image::ImageTextureArray, Renderer,
+            effect::PostProcessor,
+            program::{Program, PushConstants},
+            texture::image::ImageTextureArray,
+            Renderer,
         },
         CLIENT_CONFIG,
     },
@@ -11,7 +14,6 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Point3, Vector3};
 use serde::Deserialize;
-use std::mem;
 
 pub struct ObjectSet {
     textures: ImageTextureArray,
@@ -45,10 +47,7 @@ impl ObjectSet {
                 sky_bind_group_layout,
                 textures.bind_group_layout(),
             ],
-            &[wgpu::PushConstantRange {
-                stages: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                range: 0..mem::size_of::<ObjectPushConstants>() as u32,
-            }],
+            &[ObjectPushConstants::range()],
             PostProcessor::FORMAT,
             None,
             None,
@@ -76,17 +75,9 @@ impl ObjectSet {
                 self.textures.bind_group(),
             ],
         );
-        render_pass.set_push_constants(
-            wgpu::ShaderStages::VERTEX_FRAGMENT,
-            0,
-            bytemuck::cast_slice(&[self.sun_pc]),
-        );
+        self.sun_pc.set(render_pass);
         render_pass.draw(0..6, 0..1);
-        render_pass.set_push_constants(
-            wgpu::ShaderStages::VERTEX_FRAGMENT,
-            0,
-            bytemuck::cast_slice(&[self.moon_pc]),
-        );
+        self.moon_pc.set(render_pass);
         render_pass.draw(0..6, 0..1);
     }
 }
@@ -134,6 +125,10 @@ impl ObjectPushConstants {
             Vector3::y()
         }
     }
+}
+
+impl PushConstants for ObjectPushConstants {
+    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX_FRAGMENT;
 }
 
 #[derive(Deserialize)]

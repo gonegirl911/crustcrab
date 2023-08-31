@@ -1,5 +1,5 @@
 [player]
-origin = [0.0, 1.62, 0.0]
+origin = [0.0, 65.62, 0.0]
 fovy = 90.0
 speed = 25.0
 sensitivity = 0.0025
@@ -16,6 +16,11 @@ size = 0.1
 [sky.star]
 size = 0.005
 count = 1500
+
+[cloud]
+width = 12
+opacity = 0.85
+speed = 100.0
 
 [gui.crosshair]
 size = 1.0

@@ -2,25 +2,28 @@ use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::Renderer,
 };
-use std::{array, mem};
+use std::{
+    array, mem,
+    ops::{Deref, DerefMut},
+};
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
-struct ScreenTexture(ScreenTextureArray<1>);
+pub struct ScreenTexture(ScreenTextureArray<1>);
 
 impl ScreenTexture {
-    fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
+    pub fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
         Self(ScreenTextureArray::new(renderer, format))
     }
 
-    fn view(&self) -> &wgpu::TextureView {
+    pub fn view(&self) -> &wgpu::TextureView {
         self.0.view(0)
     }
 
-    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         self.0.bind_group_layout()
     }
 
-    fn bind_group(&self) -> &wgpu::BindGroup {
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.0.bind_group(0)
     }
 }
@@ -187,24 +190,18 @@ impl DepthBuffer {
     pub fn new(renderer: &Renderer) -> Self {
         Self(ScreenTexture::new(renderer, Self::FORMAT))
     }
+}
 
-    pub fn view(&self) -> &wgpu::TextureView {
-        self.0.view()
-    }
+impl Deref for DepthBuffer {
+    type Target = ScreenTexture;
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group()
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl EventHandler for DepthBuffer {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.0.handle(event, renderer);
+impl DerefMut for DepthBuffer {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

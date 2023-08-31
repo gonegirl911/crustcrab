@@ -6,7 +6,7 @@ pub mod window;
 
 use self::{
     event_loop::{Event, EventHandler, EventLoop},
-    game::{gui::GuiConfig, player::PlayerConfig, sky::SkyConfig, Game},
+    game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig, Game},
     renderer::Renderer,
     window::Window,
 };
@@ -85,10 +85,20 @@ pub enum ClientEvent {
     BlockDestroyed,
 }
 
+impl ClientEvent {
+    pub fn is_mergeable(&self) -> bool {
+        matches!(
+            self,
+            Self::PlayerPositionChanged { .. } | Self::PlayerOrientationChanged { .. }
+        )
+    }
+}
+
 #[derive(Deserialize)]
 pub struct ClientConfig {
     player: PlayerConfig,
     sky: SkyConfig,
+    cloud: CloudConfig,
     gui: GuiConfig,
 }
 

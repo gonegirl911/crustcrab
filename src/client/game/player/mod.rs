@@ -171,7 +171,7 @@ pub struct PlayerConfig {
     fovy: f32,
     speed: f32,
     sensitivity: f32,
-    render_distance: u32,
+    pub render_distance: u32,
 }
 
 impl PlayerConfig {

@@ -7,7 +7,7 @@ use crate::{
     server::event_loop::{Event, EventHandler},
     shared::utils,
 };
-use nalgebra::{point, Point3};
+use nalgebra::{vector, Point3};
 use serde::Deserialize;
 use std::ops::Range;
 
@@ -72,14 +72,17 @@ impl WorldArea {
     ) -> impl Iterator<Item = Point3<i32>> + 'a {
         self.points().filter(|point| {
             utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
+                || (point.y - other.center.y).unsigned_abs() > other.radius
         })
     }
 
     fn cube_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
         let radius = self.radius as i32;
         (-radius..=radius).flat_map(move |dx| {
-            World::Y_RANGE.flat_map(move |y| {
-                (-radius..=radius).map(move |dz| point![self.center.x + dx, y, self.center.z + dz])
+            (-radius..=radius).flat_map(move |dy| {
+                (-radius..=radius)
+                    .map(move |dz| self.center + vector![dx, dy, dz])
+                    .filter(|point| World::Y_RANGE.contains(&point.y))
             })
         })
     }

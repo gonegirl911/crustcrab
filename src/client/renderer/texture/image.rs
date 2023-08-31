@@ -17,9 +17,10 @@ impl ImageTexture {
         is_srgb: bool,
         is_pixelated: bool,
         mip_level_count: u32,
+        address_mode: wgpu::AddressMode,
     ) -> Self {
         let view = Self::create_view(renderer, path, is_srgb, mip_level_count);
-        let sampler = Self::create_sampler(renderer, is_pixelated, mip_level_count);
+        let sampler = Self::create_sampler(renderer, is_pixelated, mip_level_count, address_mode);
         let bind_group_layout =
             ImageTextureArray::create_bind_group_layout(renderer, None, is_pixelated);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -111,8 +112,11 @@ impl ImageTexture {
         Renderer { device, .. }: &Renderer,
         is_pixelated: bool,
         mip_level_count: u32,
+        address_mode: wgpu::AddressMode,
     ) -> wgpu::Sampler {
         device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: address_mode,
+            address_mode_v: address_mode,
             mag_filter: if is_pixelated {
                 wgpu::FilterMode::Nearest
             } else {
@@ -229,7 +233,12 @@ impl ImageTextureArray {
         mip_level_count: u32,
     ) -> Self {
         let views = Self::create_views(renderer, paths, is_srgb, mip_level_count);
-        let sampler = ImageTexture::create_sampler(renderer, is_pixelated, mip_level_count);
+        let sampler = ImageTexture::create_sampler(
+            renderer,
+            is_pixelated,
+            mip_level_count,
+            Default::default(),
+        );
         let bind_group_layout = Self::create_bind_group_layout(
             renderer,
             NonZeroU32::new(views.len() as u32),

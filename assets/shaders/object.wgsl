@@ -30,7 +30,7 @@ var<push_constant> pc: PushConstants;
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32(((vertex.index + 2u) / 3u) % 2u);
     let y = f32(((vertex.index + 1u) / 3u) % 2u);
-    let coords = player.vp * (pc.m * vec4(x - 0.5, y - 0.5, 0.0, 1.0) + vec4(player.origin, 0.0));
+    let coords = player.vp * (vec4(player.origin, 0.0) + pc.m * vec4(x - 0.5, y - 0.5, 0.0, 1.0));
     return VertexOutput(coords, vec2(x, 1.0 - y));
 }
 
