@@ -5,15 +5,7 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
 
-impl<V: Pod> VertexBuffer<V> {
-    pub fn new(renderer: &Renderer, state: MemoryState<[V], usize>) -> Self {
-        Self(Buffer::<[_]>::new(
-            renderer,
-            state.data(),
-            state.usage(wgpu::BufferUsages::VERTEX),
-        ))
-    }
-
+impl<V> VertexBuffer<V> {
     pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_vertex_buffer(0, self.slice(..));
         render_pass.draw(0..self.len(), 0..1);
@@ -29,7 +21,7 @@ impl<V: Pod> VertexBuffer<V> {
         render_pass.draw_indexed(0..index_buffer.len(), 0, 0..1);
     }
 
-    pub fn draw_instanced<'a, E: Pod>(
+    pub fn draw_instanced<'a, E>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         instance_buffer: &'a InstanceBuffer<E>,
@@ -37,6 +29,16 @@ impl<V: Pod> VertexBuffer<V> {
         render_pass.set_vertex_buffer(0, self.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
         render_pass.draw(0..self.len(), 0..instance_buffer.len());
+    }
+}
+
+impl<V: Pod> VertexBuffer<V> {
+    pub fn new(renderer: &Renderer, state: MemoryState<[V], usize>) -> Self {
+        Self(Buffer::<[_]>::new(
+            renderer,
+            state.data(),
+            state.usage(wgpu::BufferUsages::VERTEX),
+        ))
     }
 }
 
@@ -233,12 +235,11 @@ impl<T> MemoryState<'_, T, ()> {
 
 pub trait Vertex: Pod {
     const ATTRIBS: &'static [wgpu::VertexAttribute];
-    const STEP_MODE: wgpu::VertexStepMode = wgpu::VertexStepMode::Vertex;
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: Self::STEP_MODE,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: Self::ATTRIBS,
         }
     }
@@ -254,4 +255,16 @@ impl Index for u16 {
 
 impl Index for u32 {
     const FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
+}
+
+pub trait Instance: Pod {
+    const ATTRIBS: &'static [wgpu::VertexAttribute];
+
+    fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: Self::ATTRIBS,
+        }
+    }
 }

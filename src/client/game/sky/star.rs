@@ -2,7 +2,7 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
-            buffer::{InstanceBuffer, MemoryState, Vertex},
+            buffer::{Instance, InstanceBuffer, MemoryState},
             effect::PostProcessor,
             program::Program,
             Renderer,
@@ -132,10 +132,9 @@ impl StarInstance {
     }
 }
 
-impl Vertex for StarInstance {
+impl Instance for StarInstance {
     const ATTRIBS: &'static [wgpu::VertexAttribute] =
         &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4];
-    const STEP_MODE: wgpu::VertexStepMode = wgpu::VertexStepMode::Instance;
 }
 
 #[derive(Deserialize)]

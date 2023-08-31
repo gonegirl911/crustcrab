@@ -3,7 +3,7 @@ struct VertexInput {
 }
 
 struct InstanceInput {
-    @location(1) offset: vec2<i32>,
+    @location(1) offset: vec2<f32>,
 }
 
 struct PlayerUniform {
@@ -38,10 +38,11 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
         f32(extractBits(vertex.data, 10u, 5u)),
     );
     let face = extractBits(vertex.data, 25u, 2u);
+    let offset = instance.offset + pc.offset - player.origin.xz;
     let light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     return VertexOutput(
-        player.vp * vec4(coords + vec3(offset.x, 192.0, offset.y), 1.0),
-        offset / 12.0 / 255.0,
+        player.vp * vec4(coords + vec3(offset.x, 192.0, offset.y), 1.0) + vec4(player.origin, 0.0),
+        floor(offset / 12.0) / 255.0,
         light,
     );
 }
