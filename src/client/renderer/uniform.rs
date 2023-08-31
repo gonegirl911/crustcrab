@@ -1,32 +1,22 @@
-use super::{buffer::Buffer, Renderer};
+use super::{
+    buffer::{MemoryState, UniformBuffer},
+    Renderer,
+};
 use bytemuck::Pod;
 
 pub struct Uniform<T> {
-    buffer: Buffer<T>,
+    buffer: UniformBuffer<T>,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
 }
 
 impl<T: Pod> Uniform<T> {
-    pub fn from_value_mut(renderer: &Renderer, value: &T, visibility: wgpu::ShaderStages) -> Self {
-        Self::new(renderer, Some(value), visibility, true)
-    }
-
-    pub fn uninit_mut(renderer: &Renderer, visibility: wgpu::ShaderStages) -> Self {
-        Self::new(renderer, None, visibility, true)
-    }
-
-    fn new(
+    pub fn new(
         renderer @ Renderer { device, .. }: &Renderer,
-        value: Option<&T>,
+        state: MemoryState<T>,
         visibility: wgpu::ShaderStages,
-        is_mutable: bool,
     ) -> Self {
-        let buffer = if let Some(value) = value {
-            Buffer::<T>::new(renderer, Some(value), Self::usage(is_mutable))
-        } else {
-            Buffer::<T>::new(renderer, None, Self::usage(is_mutable))
-        };
+        let buffer = UniformBuffer::new(renderer, state);
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -65,13 +55,5 @@ impl<T: Pod> Uniform<T> {
 
     pub fn set(&self, renderer: &Renderer, value: &T) {
         self.buffer.set(renderer, value);
-    }
-
-    fn usage(is_mutable: bool) -> wgpu::BufferUsages {
-        if is_mutable {
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
-        } else {
-            wgpu::BufferUsages::UNIFORM
-        }
     }
 }

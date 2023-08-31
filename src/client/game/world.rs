@@ -3,8 +3,9 @@ use crate::{
         event_loop::{Event, EventHandler},
         game::player::frustum::{Frustum, FrustumCheck},
         renderer::{
+            buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            mesh::{Mesh, TransparentMesh, Vertex},
+            mesh::TransparentMesh,
             program::Program,
             texture::{image::ImageTextureArray, screen::DepthBuffer},
             Renderer,
@@ -124,7 +125,7 @@ struct ChunkMeshPool {
 }
 
 type ChunkMesh = (
-    Mesh<BlockVertex>,
+    VertexBuffer<BlockVertex>,
     Option<TransparentMesh<Point3<i64>, BlockVertex>>,
     Instant,
 );
@@ -136,8 +137,8 @@ type ChunkOutput = (Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant);
 impl ChunkMeshPool {
     fn new() -> Self {
         Self {
-            meshes: FxHashMap::default(),
-            unloaded: FxHashSet::default(),
+            meshes: Default::default(),
+            unloaded: Default::default(),
             priority_workers: ThreadPool::new(Self::vertices),
             workers: ThreadPool::new(Self::vertices),
         }
@@ -151,7 +152,7 @@ impl ChunkMeshPool {
     ) {
         let mut transparent_meshes = vec![];
 
-        for (&coords, (mesh, transparent_mesh, _)) in &mut self.meshes {
+        for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
             if Chunk::bounding_sphere(coords).is_visible(frustum) {
                 if let Some(mesh) = transparent_mesh {
                     transparent_meshes.push((coords, mesh));
@@ -161,7 +162,7 @@ impl ChunkMeshPool {
                     0,
                     bytemuck::cast_slice(&[BlockPushConstants::new(coords)]),
                 );
-                mesh.draw(render_pass);
+                buffer.draw(render_pass);
             }
         }
 
@@ -217,7 +218,7 @@ impl ChunkMeshPool {
         vertices: Vec<BlockVertex>,
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
         (!vertices.is_empty()).then(|| {
-            TransparentMesh::from_data(renderer, &vertices, |[v1, v2, v3]| {
+            TransparentMesh::new(renderer, &vertices, |[v1, v2, v3]| {
                 utils::coords((
                     coords,
                     (v1.coords() + v2.coords().coords + v3.coords().coords) / 3,
@@ -269,7 +270,10 @@ impl EventHandler for ChunkMeshPool {
                                     let (_, _, last_updated_at) = entry.get();
                                     if *last_updated_at < updated_at {
                                         *entry.into_mut() = (
-                                            Mesh::from_data(renderer, &vertices),
+                                            VertexBuffer::new(
+                                                renderer,
+                                                MemoryState::Immutable(&vertices),
+                                            ),
                                             Self::transparent_mesh(
                                                 renderer,
                                                 coords,
@@ -281,7 +285,10 @@ impl EventHandler for ChunkMeshPool {
                                 }
                                 Entry::Vacant(entry) => {
                                     entry.insert((
-                                        Mesh::from_data(renderer, &vertices),
+                                        VertexBuffer::new(
+                                            renderer,
+                                            MemoryState::Immutable(&vertices),
+                                        ),
                                         Self::transparent_mesh(
                                             renderer,
                                             coords,

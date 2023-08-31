@@ -5,44 +5,23 @@ use crate::client::{
 use std::{array, mem};
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
-struct ScreenTexture {
-    view: wgpu::TextureView,
-    format: wgpu::TextureFormat,
-    usage: wgpu::TextureUsages,
-    is_resized: bool,
-}
+struct ScreenTexture(ScreenTextureArray<1>);
 
 impl ScreenTexture {
-    fn new(
-        Renderer { device, config, .. }: &Renderer,
-        format: wgpu::TextureFormat,
-        usage: wgpu::TextureUsages,
-    ) -> Self {
-        Self {
-            view: device
-                .create_texture(&wgpu::TextureDescriptor {
-                    label: None,
-                    size: wgpu::Extent3d {
-                        width: config.width,
-                        height: config.height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format,
-                    usage,
-                    view_formats: &[],
-                })
-                .create_view(&Default::default()),
-            format,
-            usage,
-            is_resized: false,
-        }
+    fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
+        Self(ScreenTextureArray::new(renderer, format))
     }
 
     fn view(&self) -> &wgpu::TextureView {
-        &self.view
+        self.0.view(0)
+    }
+
+    fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
+        self.0.bind_group_layout()
+    }
+
+    fn bind_group(&self) -> &wgpu::BindGroup {
+        self.0.bind_group(0)
     }
 }
 
@@ -50,73 +29,22 @@ impl EventHandler for ScreenTexture {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        match event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::Resized(PhysicalSize { width, height })
-                    | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: PhysicalSize { width, height },
-                        ..
-                    },
-                ..
-            } if *width != 0 && *height != 0 => {
-                self.is_resized = true;
-            }
-            Event::MainEventsCleared => {
-                if mem::take(&mut self.is_resized) {
-                    *self = Self::new(renderer, self.format, self.usage);
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-pub struct InputOutputTexture(InputOutputTextureArray<1>);
-
-impl InputOutputTexture {
-    pub fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
-        Self(InputOutputTextureArray::new(renderer, format))
-    }
-
-    pub fn view(&self) -> &wgpu::TextureView {
-        self.0.view(0)
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group(0)
-    }
-}
-
-impl EventHandler for InputOutputTexture {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         self.0.handle(event, renderer);
     }
 }
 
-pub struct InputOutputTextureArray<const N: usize> {
-    textures: [ScreenTexture; N],
+pub struct ScreenTextureArray<const N: usize> {
+    views: [wgpu::TextureView; N],
     sampler: wgpu::Sampler,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_groups: [wgpu::BindGroup; N],
+    format: wgpu::TextureFormat,
     is_resized: bool,
 }
 
-impl<const N: usize> InputOutputTextureArray<N> {
+impl<const N: usize> ScreenTextureArray<N> {
     pub fn new(renderer @ Renderer { device, .. }: &Renderer, format: wgpu::TextureFormat) -> Self {
-        let textures = array::from_fn(|_| {
-            ScreenTexture::new(
-                renderer,
-                format,
-                wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            )
-        });
+        let views = Self::create_views(renderer, format);
         let sampler = device.create_sampler(&Default::default());
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -139,19 +67,19 @@ impl<const N: usize> InputOutputTextureArray<N> {
                 },
             ],
         });
-        let bind_groups =
-            Self::create_bind_groups(renderer, &textures, &sampler, &bind_group_layout);
+        let bind_groups = Self::create_bind_groups(renderer, &views, &sampler, &bind_group_layout);
         Self {
-            textures,
+            views,
             sampler,
             bind_group_layout,
             bind_groups,
+            format,
             is_resized: false,
         }
     }
 
     pub fn view(&self, index: usize) -> &wgpu::TextureView {
-        self.textures[index].view()
+        &self.views[index]
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
@@ -162,9 +90,34 @@ impl<const N: usize> InputOutputTextureArray<N> {
         &self.bind_groups[index]
     }
 
+    fn create_views(
+        Renderer { device, config, .. }: &Renderer,
+        format: wgpu::TextureFormat,
+    ) -> [wgpu::TextureView; N] {
+        array::from_fn(|_| {
+            device
+                .create_texture(&wgpu::TextureDescriptor {
+                    label: None,
+                    size: wgpu::Extent3d {
+                        width: config.width,
+                        height: config.height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                        | wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                })
+                .create_view(&Default::default())
+        })
+    }
+
     fn create_bind_groups(
         Renderer { device, .. }: &Renderer,
-        textures: &[ScreenTexture; N],
+        views: &[wgpu::TextureView; N],
         sampler: &wgpu::Sampler,
         layout: &wgpu::BindGroupLayout,
     ) -> [wgpu::BindGroup; N] {
@@ -175,7 +128,7 @@ impl<const N: usize> InputOutputTextureArray<N> {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(textures[i].view()),
+                        resource: wgpu::BindingResource::TextureView(&views[i]),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -187,21 +140,17 @@ impl<const N: usize> InputOutputTextureArray<N> {
     }
 }
 
-impl InputOutputTextureArray<2> {
+impl ScreenTextureArray<2> {
     pub fn swap(&mut self) {
-        self.textures.swap(0, 1);
+        self.views.swap(0, 1);
         self.bind_groups.swap(0, 1);
     }
 }
 
-impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
+impl<const N: usize> EventHandler for ScreenTextureArray<N> {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        for texture in &mut self.textures {
-            texture.handle(event, renderer);
-        }
-
         match event {
             Event::WindowEvent {
                 event:
@@ -216,9 +165,10 @@ impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
             }
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_resized) {
+                    self.views = Self::create_views(renderer, self.format);
                     self.bind_groups = Self::create_bind_groups(
                         renderer,
-                        &self.textures,
+                        &self.views,
                         &self.sampler,
                         &self.bind_group_layout,
                     );
@@ -229,13 +179,13 @@ impl<const N: usize> EventHandler for InputOutputTextureArray<N> {
     }
 }
 
-pub struct DepthBuffer(InputOutputTexture);
+pub struct DepthBuffer(ScreenTexture);
 
 impl DepthBuffer {
     pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
     pub fn new(renderer: &Renderer) -> Self {
-        Self(InputOutputTexture::new(renderer, Self::FORMAT))
+        Self(ScreenTexture::new(renderer, Self::FORMAT))
     }
 
     pub fn view(&self) -> &wgpu::TextureView {

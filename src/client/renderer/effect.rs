@@ -1,8 +1,8 @@
-use super::{program::Program, texture::screen::InputOutputTextureArray, Renderer};
+use super::{program::Program, texture::screen::ScreenTextureArray, Renderer};
 use crate::client::event_loop::{Event, EventHandler};
 
 pub struct PostProcessor {
-    textures: InputOutputTextureArray<2>,
+    textures: ScreenTextureArray<2>,
     blit: Blit,
 }
 
@@ -10,7 +10,7 @@ impl PostProcessor {
     pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
     pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
-        let textures = InputOutputTextureArray::new(renderer, Self::FORMAT);
+        let textures = ScreenTextureArray::new(renderer, Self::FORMAT);
         let blit = Blit::new(renderer, textures.bind_group_layout(), config.format);
         Self { textures, blit }
     }

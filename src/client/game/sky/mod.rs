@@ -8,7 +8,7 @@ use self::{
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{uniform::Uniform, Renderer},
+        renderer::{buffer::MemoryState, uniform::Uniform, Renderer},
         CLIENT_CONFIG,
     },
     server::{
@@ -29,7 +29,11 @@ pub struct Sky {
 
 impl Sky {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX_FRAGMENT);
+        let uniform = Uniform::new(
+            renderer,
+            MemoryState::UNINIT,
+            wgpu::ShaderStages::VERTEX_FRAGMENT,
+        );
         let stars = StarDome::new(
             renderer,
             player_bind_group_layout,

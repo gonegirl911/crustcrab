@@ -2,8 +2,8 @@ use super::Gui;
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
-        effect::PostProcessor, program::Program, texture::image::ImageTexture, uniform::Uniform,
-        Renderer,
+        buffer::MemoryState, effect::PostProcessor, program::Program, texture::image::ImageTexture,
+        uniform::Uniform, Renderer,
     },
     CLIENT_CONFIG,
 };
@@ -22,7 +22,7 @@ pub struct Crosshair {
 
 impl Crosshair {
     pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX);
+        let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::new(
             renderer,
             "assets/textures/gui/crosshair.png",

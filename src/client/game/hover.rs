@@ -2,8 +2,8 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
+            buffer::{IndexBuffer, MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            mesh::{IndexedMesh, Vertex},
             program::Program,
             texture::screen::DepthBuffer,
             Renderer,
@@ -87,7 +87,8 @@ impl EventHandler for BlockHover {
 }
 
 struct BlockHighlight {
-    mesh: IndexedMesh<BlockHighlightVertex, u16>,
+    vertex_buffer: VertexBuffer<BlockHighlightVertex>,
+    index_buffer: IndexBuffer<u16>,
     program: Program,
 }
 
@@ -98,11 +99,13 @@ impl BlockHighlight {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
-            mesh: IndexedMesh::from_data(
+            vertex_buffer: VertexBuffer::new(
                 renderer,
-                &DELTAS.map(|delta| BlockHighlightVertex::new(delta.into())),
-                &INDICES,
+                MemoryState::Immutable(
+                    &DELTAS.map(|delta| BlockHighlightVertex::new(delta.into())),
+                ),
             ),
+            index_buffer: IndexBuffer::new(renderer, MemoryState::Immutable(&INDICES)),
             program: Program::new(
                 renderer,
                 wgpu::include_wgsl!("../../../assets/shaders/highlight.wgsl"),
@@ -144,7 +147,7 @@ impl BlockHighlight {
             0,
             bytemuck::cast_slice(&[push_constants]),
         );
-        self.mesh.draw(render_pass);
+        self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
     }
 }
 

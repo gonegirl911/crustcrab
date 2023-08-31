@@ -4,8 +4,8 @@ use crate::{
         event_loop::{Event, EventHandler},
         game::world::BlockVertex,
         renderer::{
+            buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            mesh::{Mesh, Vertex},
             program::Program,
             texture::screen::DepthBuffer,
             uniform::Uniform,
@@ -29,7 +29,7 @@ use winit::{
 };
 
 pub struct Inventory {
-    mesh: Option<Mesh<BlockVertex>>,
+    buffer: Option<VertexBuffer<BlockVertex>>,
     uniform: Uniform<InventoryUniformData>,
     program: Program,
     index: usize,
@@ -39,7 +39,7 @@ pub struct Inventory {
 
 impl Inventory {
     pub fn new(renderer: &Renderer, textures_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
-        let uniform = Uniform::uninit_mut(renderer, wgpu::ShaderStages::VERTEX);
+        let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../../assets/shaders/inventory.wgsl"),
@@ -58,7 +58,7 @@ impl Inventory {
             }),
         );
         Self {
-            mesh: None,
+            buffer: None,
             uniform,
             program,
             index: 0,
@@ -72,12 +72,12 @@ impl Inventory {
         render_pass: &mut wgpu::RenderPass<'a>,
         textures_bind_group: &'a wgpu::BindGroup,
     ) {
-        if let Some(mesh) = &self.mesh {
+        if let Some(buffer) = &self.buffer {
             self.program.bind(
                 render_pass,
                 [self.uniform.bind_group(), textures_bind_group],
             );
-            mesh.draw(render_pass);
+            buffer.draw(render_pass);
         }
     }
 
@@ -146,13 +146,15 @@ impl EventHandler for Inventory {
             },
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_updated) {
-                    self.mesh = self.selected_block().map(|block| {
-                        Mesh::from_data(
+                    self.buffer = self.selected_block().map(|block| {
+                        VertexBuffer::new(
                             renderer,
-                            &block
-                                .data()
-                                .vertices(Default::default(), block.into(), Default::default())
-                                .collect::<Vec<_>>(),
+                            MemoryState::Immutable(
+                                &block
+                                    .data()
+                                    .vertices(Default::default(), block.into(), Default::default())
+                                    .collect::<Vec<_>>(),
+                            ),
                         )
                     });
                 }

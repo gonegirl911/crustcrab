@@ -2,7 +2,10 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
-            buffer::Buffer, effect::PostProcessor, mesh::Vertex, program::Program, Renderer,
+            buffer::{InstanceBuffer, MemoryState, Vertex},
+            effect::PostProcessor,
+            program::Program,
+            Renderer,
         },
         CLIENT_CONFIG,
     },
@@ -16,7 +19,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 pub struct StarDome {
     stars: Vec<Star>,
-    instance_buffer: Buffer<[StarInstance]>,
+    buffer: InstanceBuffer<StarInstance>,
     program: Program,
     updated_rotation: Option<UnitQuaternion<f32>>,
 }
@@ -32,11 +35,7 @@ impl StarDome {
             let mut rng = StdRng::seed_from_u64(808);
             (0..count).map(|_| Star::new(&mut rng)).collect()
         };
-        let instance_buffer = Buffer::<[_]>::new(
-            renderer,
-            Err(count),
-            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        );
+        let buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../../assets/shaders/star.wgsl"),
@@ -50,7 +49,7 @@ impl StarDome {
         );
         Self {
             stars,
-            instance_buffer,
+            buffer,
             program,
             updated_rotation: Some(Default::default()),
         }
@@ -64,8 +63,8 @@ impl StarDome {
         sky_bind_group: &'a wgpu::BindGroup,
     ) {
         self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
-        render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
-        render_pass.draw(0..6, 0..self.instance_buffer.len());
+        render_pass.set_vertex_buffer(0, self.buffer.slice(..));
+        render_pass.draw(0..6, 0..self.buffer.len());
     }
 }
 
@@ -79,7 +78,7 @@ impl EventHandler for StarDome {
             }
             Event::MainEventsCleared => {
                 if let Some(sky_rotation) = self.updated_rotation {
-                    self.instance_buffer.write(
+                    self.buffer.write(
                         renderer,
                         &self
                             .stars

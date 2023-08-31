@@ -9,7 +9,7 @@ use super::gui::inventory::Inventory;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        renderer::{uniform::Uniform, Renderer},
+        renderer::{buffer::MemoryState, uniform::Uniform, Renderer},
         ClientEvent, CLIENT_CONFIG,
     },
     server::game::world::chunk::Chunk,
@@ -35,9 +35,9 @@ impl Player {
         let aspect = config.width as f32 / config.height as f32;
         let projection = Projection::new(state.fovy, aspect, 0.1, state.zfar());
         let controller = Controller::new(state.speed, state.sensitivity);
-        let uniform = Uniform::from_value_mut(
+        let uniform = Uniform::new(
             renderer,
-            &Self::data(&view, &projection),
+            MemoryState::Mutable(&Self::data(&view, &projection)),
             wgpu::ShaderStages::VERTEX,
         );
         Self {
