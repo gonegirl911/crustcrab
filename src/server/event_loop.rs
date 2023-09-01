@@ -1,9 +1,7 @@
 use super::{ticker::Ticker, ServerEvent, SERVER_CONFIG};
 use crate::client::ClientEvent;
 use flume::{Receiver, Sender};
-use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::mem;
 
 pub struct EventLoop {
     server_tx: Sender<ServerEvent>,
@@ -26,29 +24,11 @@ impl EventLoop {
 
         handler.handle(&Event::Init, self.server_tx.clone());
         loop {
-            for event in Self::process_client_events(self.client_rx.drain()) {
+            for event in self.client_rx.drain() {
                 handler.handle(&Event::ClientEvent(event), self.server_tx.clone());
             }
             ticker.wait(|| handler.handle(&Event::Tick, self.server_tx.clone()));
         }
-    }
-
-    fn process_client_events<I>(events: I) -> impl Iterator<Item = ClientEvent>
-    where
-        I: IntoIterator<Item = ClientEvent>,
-    {
-        let mut mergeable = FxHashMap::default();
-        let mut rest = vec![];
-
-        for event in events {
-            if event.is_mergeable() {
-                mergeable.insert(mem::discriminant(&event), event);
-            } else {
-                rest.push(event);
-            }
-        }
-
-        mergeable.into_values().chain(rest)
     }
 }
 

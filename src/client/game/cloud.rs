@@ -127,11 +127,11 @@ impl CloudLayer {
     }
 
     fn instances() -> impl Iterator<Item = CloudInstance> {
-        let render_distance = CLIENT_CONFIG.player.render_distance;
-        let width = CLIENT_CONFIG.cloud.width;
-        let radius = (render_distance * Chunk::DIM as u32 / width) as i32;
+        let radius = (CLIENT_CONFIG.player.render_distance * Chunk::DIM as u32 / 12) as i32;
         (-radius..=radius).flat_map(move |dx| {
-            (-radius..=radius).map(move |dz| CloudInstance::new(vector![dx, dz]))
+            (-radius..=radius)
+                .filter(move |dz| dx.pow(2) + dz.pow(2) <= radius.pow(2))
+                .map(move |dz| CloudInstance::new(vector![dx, dz]))
         })
     }
 }
@@ -171,7 +171,7 @@ struct CloudInstance {
 impl CloudInstance {
     fn new(offset: Vector2<i32>) -> Self {
         Self {
-            offset: (offset * CLIENT_CONFIG.cloud.width as i32).cast(),
+            offset: (offset * 12).cast(),
         }
     }
 }
@@ -181,26 +181,15 @@ impl Instance for CloudInstance {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
+#[derive(Clone, Copy, Default, Zeroable, Pod)]
 struct CloudPushConstants {
     offset: Vector2<f32>,
-    width: f32,
 }
 
 impl CloudPushConstants {
     fn move_forward(&mut self, dt: Duration) {
-        let limit = CLIENT_CONFIG.cloud.width as f32 * 256.0;
         self.offset -= Vector2::x() * CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
-        self.offset = self.offset.map(|c| c % limit);
-    }
-}
-
-impl Default for CloudPushConstants {
-    fn default() -> Self {
-        Self {
-            offset: Default::default(),
-            width: CLIENT_CONFIG.cloud.width as f32,
-        }
+        self.offset = self.offset.map(|c| c % (12.0 * 256.0));
     }
 }
 
@@ -210,7 +199,6 @@ impl PushConstants for CloudPushConstants {
 
 #[derive(Deserialize)]
 pub struct CloudConfig {
-    width: u32,
     opacity: f32,
     speed: f32,
 }
