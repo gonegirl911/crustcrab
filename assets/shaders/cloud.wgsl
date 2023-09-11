@@ -38,13 +38,18 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
         f32(extractBits(vertex.data, 10u, 5u)),
     );
     let face = extractBits(vertex.data, 25u, 2u);
-    let offset = player.origin.xz + instance.offset + (pc.offset - player.origin.xz) % 12.0;
+    let offset = player.origin.xz + instance.offset - rem_euclid(player.origin.xz - pc.offset, 12.0);
     let light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     return VertexOutput(
         player.vp * vec4(coords + vec3(offset.x, 192.0, offset.y), 1.0),
         (player.origin.xz + instance.offset - pc.offset) / 12.0 / 256.0,
         light,
     );
+}
+
+fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {
+    let r = a % b;
+    return mix(r, r + abs(b), vec2<f32>(r < 0.0));
 }
 
 struct SkyUniform {
