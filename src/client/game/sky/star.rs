@@ -9,7 +9,7 @@ use crate::{
         },
         CLIENT_CONFIG,
     },
-    server::ServerEvent,
+    server::{game::clock::Time, ServerEvent},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, vector, Matrix4, Point3, UnitQuaternion, Vector3};
@@ -51,7 +51,7 @@ impl StarDome {
             stars,
             buffer,
             program,
-            updated_rotation: Some(Default::default()),
+            updated_rotation: Some(Time::default().sky_rotation()),
         }
     }
 
