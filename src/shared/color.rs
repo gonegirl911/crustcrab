@@ -23,7 +23,7 @@ impl<T> Rgb<T> {
         Rgb(self.0.map(f))
     }
 
-    pub fn zip_map<U, V, F>(self, other: Rgb<U>, mut f: F) -> Rgb<V>
+    fn zip_map<U, V, F>(self, other: Rgb<U>, mut f: F) -> Rgb<V>
     where
         T: Copy,
         U: Copy,
@@ -34,12 +34,6 @@ impl<T> Rgb<T> {
 
     fn sum<S: Sum<T>>(self) -> S {
         self.into_iter().sum()
-    }
-}
-
-impl<T: Copy> Rgb<T> {
-    pub const fn splat(v: T) -> Self {
-        Self([v; 3])
     }
 }
 

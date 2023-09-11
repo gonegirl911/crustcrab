@@ -85,15 +85,24 @@ pub enum ClientEvent {
     BlockDestroyed,
 }
 
+impl ClientEvent {
+    pub fn is_mergeable(&self) -> bool {
+        matches!(
+            self,
+            Self::PlayerPositionChanged { .. } | Self::PlayerOrientationChanged { .. },
+        )
+    }
+}
+
 #[derive(Deserialize)]
-pub struct ClientConfig {
+struct ClientConfig {
     player: PlayerConfig,
     sky: SkyConfig,
     cloud: CloudConfig,
     gui: GuiConfig,
 }
 
-pub static CLIENT_CONFIG: Lazy<ClientConfig> = Lazy::new(|| {
+static CLIENT_CONFIG: Lazy<ClientConfig> = Lazy::new(|| {
     toml::from_str(&fs::read_to_string("assets/config/client.toml").expect("file should exist"))
         .expect("file should be valid")
 });

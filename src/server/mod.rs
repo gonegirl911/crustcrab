@@ -51,18 +51,6 @@ impl Server {
     }
 }
 
-#[derive(Deserialize)]
-pub struct ServerConfig {
-    event_loop: EventLoopConfig,
-    player: PlayerConfig,
-    clock: ClockState,
-}
-
-pub static SERVER_CONFIG: Lazy<ServerConfig> = Lazy::new(|| {
-    toml::from_str(&fs::read_to_string("assets/config/server.toml").expect("file should exist"))
-        .expect("file should be valid")
-});
-
 pub enum ServerEvent {
     TimeUpdated(Time),
     ChunkLoaded {
@@ -80,3 +68,15 @@ pub enum ServerEvent {
     },
     BlockHovered(Option<BlockHoverData>),
 }
+
+#[derive(Deserialize)]
+struct ServerConfig {
+    event_loop: EventLoopConfig,
+    player: PlayerConfig,
+    clock: ClockState,
+}
+
+static SERVER_CONFIG: Lazy<ServerConfig> = Lazy::new(|| {
+    toml::from_str(&fs::read_to_string("assets/config/server.toml").expect("file should exist"))
+        .expect("file should be valid")
+});

@@ -86,22 +86,6 @@ impl<const D: usize> WorldCoords for (SVector<i32, D>, SVector<u8, D>) {
     }
 }
 
-impl WorldCoords for (i32, u8) {
-    type Point<T: Scalar> = T;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        self.0
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.1
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        self.0 as i64 * Chunk::DIM as i64 + self.1 as i64
-    }
-}
-
 impl<const D: usize> WorldCoords for Point<i64, D> {
     type Point<T: Scalar> = Point<T, D>;
 

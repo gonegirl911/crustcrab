@@ -1,7 +1,7 @@
 [player]
 origin = [0.0, 65.62, 0.0]
 fovy = 90.0
-speed = 25.0
+speed = 250.0
 sensitivity = 0.0025
 render_distance = 36
 
@@ -19,7 +19,7 @@ count = 1500
 
 [cloud]
 opacity = 0.85
-speed = 100.0
+speed = 0.0
 
 [gui.crosshair]
 size = 1.0

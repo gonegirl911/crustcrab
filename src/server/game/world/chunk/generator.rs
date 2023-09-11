@@ -2,7 +2,7 @@ use super::Chunk;
 use crate::server::game::world::{block::Block, World};
 use nalgebra::Point3;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ChunkGenerator;
 
 impl ChunkGenerator {
