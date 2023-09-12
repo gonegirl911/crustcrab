@@ -3,9 +3,8 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
-            blender::Blender,
             buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
-            effect::PostProcessor,
+            effect::{Blender, PostProcessor},
             program::{Program, PushConstants},
             texture::{image::ImageTexture, screen::DepthBuffer},
             Renderer,
@@ -24,6 +23,7 @@ pub struct CloudLayer {
     instance_buffer: InstanceBuffer<CloudInstance>,
     texture: ImageTexture,
     program: Program,
+    blender: Blender,
     pc: CloudPushConstants,
 }
 
@@ -32,6 +32,7 @@ impl CloudLayer {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
+        spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let vertex_buffer = VertexBuffer::new(
             renderer,
@@ -70,30 +71,34 @@ impl CloudLayer {
                 bias: Default::default(),
             }),
         );
+        let blender = Blender::new(renderer, spare_bind_group_layout, PostProcessor::FORMAT);
         Self {
             vertex_buffer,
             instance_buffer,
             texture,
             program,
+            blender,
             pc: Default::default(),
         }
     }
 
     #[rustfmt::skip]
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
+        spare_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
-        blender: &Blender,
+        spare_bind_group: &wgpu::BindGroup,
     ) {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: blender.view(),
+                    view: spare_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(Default::default()),
@@ -116,7 +121,7 @@ impl CloudLayer {
             self.pc.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
-        blender.draw(view, encoder, CLIENT_CONFIG.cloud.opacity);
+        self.blender.draw(view, encoder, spare_bind_group, CLIENT_CONFIG.cloud.opacity);
     }
 
     fn vertices() -> impl Iterator<Item = CloudVertex> {

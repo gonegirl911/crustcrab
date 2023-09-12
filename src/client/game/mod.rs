@@ -11,7 +11,6 @@ use self::{
 use super::{
     event_loop::{Event, EventHandler},
     renderer::{
-        blender::Blender,
         effect::{Aces, PostProcessor},
         texture::{image::ImageTextureArray, screen::DepthBuffer},
         Renderer,
@@ -32,7 +31,6 @@ pub struct Game {
     aces: Aces,
     textures: BlockTextureArray,
     depth: DepthBuffer,
-    blender: Blender,
     processor: PostProcessor,
 }
 
@@ -57,6 +55,7 @@ impl Game {
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
+            processor.bind_group_layout(),
         );
         let hover = BlockHover::new(
             renderer,
@@ -69,7 +68,6 @@ impl Game {
             PostProcessor::FORMAT,
         );
         let depth = DepthBuffer::new(renderer);
-        let blender = Blender::new(renderer, PostProcessor::FORMAT);
         Self {
             gui,
             player,
@@ -80,7 +78,6 @@ impl Game {
             aces,
             textures,
             depth,
-            blender,
             processor,
         }
     }
@@ -106,10 +103,11 @@ impl Game {
         self.clouds.draw(
             self.processor.view(),
             encoder,
+            self.processor.spare_view(),
             self.player.bind_group(),
             self.sky.bind_group(),
             self.depth.view(),
-            &self.blender,
+            self.processor.spare_bind_group(),
         );
         self.hover.draw(
             self.processor.view(),
@@ -170,7 +168,6 @@ impl EventHandler for Game {
             self.clouds.handle(event, dt);
             self.hover.handle(event, ());
             self.depth.handle(event, renderer);
-            self.blender.handle(event, renderer);
             self.processor.handle(event, renderer);
         }
     }

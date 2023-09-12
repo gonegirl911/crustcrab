@@ -1,4 +1,3 @@
-pub mod blender;
 pub mod buffer;
 pub mod effect;
 pub mod mesh;
