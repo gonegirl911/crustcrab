@@ -196,13 +196,13 @@ impl<T: ?Sized> Deref for Buffer<T> {
     }
 }
 
-pub enum MemoryState<'a, T: ?Sized, F = ()> {
+pub enum MemoryState<'a, T: ?Sized, U = ()> {
     Mutable(&'a T),
     Immutable(&'a T),
-    Uninit(F),
+    Uninit(U),
 }
 
-impl<T: ?Sized, F> MemoryState<'_, T, F> {
+impl<T: ?Sized, U> MemoryState<'_, T, U> {
     fn usage(&self, usage: wgpu::BufferUsages) -> wgpu::BufferUsages {
         if matches!(self, Self::Mutable(_) | Self::Uninit(_)) {
             usage | wgpu::BufferUsages::COPY_DST
