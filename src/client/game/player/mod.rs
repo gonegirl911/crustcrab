@@ -13,6 +13,7 @@ use crate::{
         ClientEvent, CLIENT_CONFIG,
     },
     server::game::world::chunk::Chunk,
+    shared::color::Float3,
 };
 use bytemuck::{Pod, Zeroable};
 use flume::Sender;
@@ -74,6 +75,7 @@ impl Player {
             view.mat(),
             projection.mat(),
             view.origin,
+            view.forward,
             projection.znear,
             projection.zfar,
         )
@@ -145,22 +147,33 @@ struct PlayerUniformData {
     vp: Matrix4<f32>,
     inv_v: Matrix4<f32>,
     inv_p: Matrix4<f32>,
-    origin: Point3<f32>,
+    origin: Float3,
+    forward: Vector3<f32>,
+    render_distance: u32,
     znear: f32,
     zfar: f32,
-    padding: [f32; 3],
+    padding: [f32; 2],
 }
 
 impl PlayerUniformData {
-    fn new(v: Matrix4<f32>, p: Matrix4<f32>, origin: Point3<f32>, znear: f32, zfar: f32) -> Self {
+    fn new(
+        v: Matrix4<f32>,
+        p: Matrix4<f32>,
+        origin: Point3<f32>,
+        forward: Vector3<f32>,
+        znear: f32,
+        zfar: f32,
+    ) -> Self {
         Self {
             vp: p * v,
             inv_v: v.try_inverse().unwrap_or_else(|| unreachable!()),
             inv_p: p.try_inverse().unwrap_or_else(|| unreachable!()),
-            origin,
+            origin: origin.into(),
+            forward,
+            render_distance: CLIENT_CONFIG.player.render_distance,
             znear,
             zfar,
-            padding: [0.0; 3],
+            padding: [0.0; 2],
         }
     }
 }

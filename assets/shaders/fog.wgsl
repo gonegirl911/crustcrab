@@ -5,6 +5,7 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) screen_coords: vec2<f32>,
+    @location(1) input_coords: vec2<f32>,
 }
 
 @vertex
@@ -12,7 +13,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32((vertex.index << 1u) & 2u);
     let y = f32(vertex.index & 2u);
     let coords = -1.0 + vec2(x, y) * 2.0;
-    return VertexOutput(vec4(coords, 0.0, 1.0), coords);
+    return VertexOutput(vec4(coords, 0.0, 1.0), coords, vec2(x, 1.0 - y));
 }
 
 struct PlayerUniform {
@@ -21,7 +22,7 @@ struct PlayerUniform {
     inv_p: mat4x4<f32>,
     origin: vec3<f32>,
     forward: vec3<f32>,
-    render_distance: f32,
+    render_distance: u32,
     znear: f32,
     zfar: f32,
 }
@@ -39,11 +40,27 @@ var<uniform> player: PlayerUniform;
 @group(1) @binding(0)
 var<uniform> sky: SkyUniform;
 
+@group(2) @binding(0)
+var t_input: texture_2d<f32>;
+
+@group(2) @binding(1)
+var s_input: sampler;
+
+@group(3) @binding(0)
+var t_depth: texture_2d<f32>;
+
+@group(3) @binding(1)
+var s_depth: sampler;
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = dir(in.screen_coords);
-    let theta = deg(asin(dir.y));
-    return vec4(mix(sky.horizon_color, sky.color, pow(saturate(inv_lerp(2.0, 10.0, theta)), 2.0)), 1.0);
+    let cos_theta = sqrt(1.0 - dir.y * dir.y);
+    let cos_gamma = dot(normalize(dir.xz), normalize(player.forward.xz));
+    let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x);
+    let fog_distance = f32(player.render_distance) * 16.0 * 0.8 / cos_theta * cos_gamma;
+    let factor = pow(saturate(distance / fog_distance), 4.0);
+    return mix(textureSample(t_input, s_input, in.input_coords), vec4(sky.horizon_color, 1.0), factor);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
@@ -52,10 +69,6 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
     return normalize(dir.xyz);
 }
 
-fn deg(rad: f32) -> f32 {
-    return rad * 57.2957795130823208767981548141051703;
-}
-
-fn inv_lerp(a: f32, b: f32, v: f32) -> f32 {
-    return (v - a) / (b - a);
+fn linearize(depth: f32) -> f32 {
+    return 1.0 / mix(depth, 1.0, player.zfar / player.znear);
 }

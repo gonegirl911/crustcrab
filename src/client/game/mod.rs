@@ -1,4 +1,5 @@
 pub mod cloud;
+pub mod fog;
 pub mod gui;
 pub mod hover;
 pub mod player;
@@ -6,7 +7,8 @@ pub mod sky;
 pub mod world;
 
 use self::{
-    cloud::CloudLayer, gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World,
+    cloud::CloudLayer, fog::Fog, gui::Gui, hover::BlockHover, player::Player, sky::Sky,
+    world::World,
 };
 use super::{
     event_loop::{Event, EventHandler},
@@ -27,6 +29,7 @@ pub struct Game {
     sky: Sky,
     world: World,
     clouds: CloudLayer,
+    fog: Fog,
     hover: BlockHover,
     aces: Aces,
     textures: BlockTextureArray,
@@ -37,6 +40,7 @@ pub struct Game {
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
         let textures = BlockTextureArray::new(renderer);
+        let depth = DepthBuffer::new(renderer);
         let processor = PostProcessor::new(renderer);
         let gui = Gui::new(
             renderer,
@@ -57,6 +61,13 @@ impl Game {
             sky.bind_group_layout(),
             processor.bind_group_layout(),
         );
+        let fog = Fog::new(
+            renderer,
+            player.bind_group_layout(),
+            sky.bind_group_layout(),
+            processor.bind_group_layout(),
+            depth.bind_group_layout(),
+        );
         let hover = BlockHover::new(
             renderer,
             player.bind_group_layout(),
@@ -67,13 +78,13 @@ impl Game {
             processor.bind_group_layout(),
             PostProcessor::FORMAT,
         );
-        let depth = DepthBuffer::new(renderer);
         Self {
             gui,
             player,
             sky,
             world,
             clouds,
+            fog,
             hover,
             aces,
             textures,
@@ -109,6 +120,16 @@ impl Game {
             self.depth.view(),
             self.processor.spare_bind_group(),
         );
+        self.processor.apply_raw(|view, bind_group| {
+            self.fog.draw(
+                view,
+                encoder,
+                self.player.bind_group(),
+                self.sky.bind_group(),
+                bind_group,
+                self.depth.bind_group(),
+            );
+        });
         self.hover.draw(
             self.processor.view(),
             encoder,
