@@ -6,10 +6,17 @@ sensitivity = 0.0025
 render_distance = 36
 
 [sky]
-day_intensity = [1.0, 1.0, 1.0]
-night_intensity = [0.15, 0.15, 0.3]
 sun_intensity = 15.0
-color = [0.16, 0.44, 1.0]
+
+[sky.day]
+intensity = [1.0, 1.0, 1.0]
+color = [0.25, 0.53, 1.0]
+horizon_color = [0.37, 0.62, 1.0]
+
+[sky.night]
+intensity = [0.15, 0.15, 0.3]
+color = [0.0, 0.0, 0.0]
+horizon_color = [0.025, 0.025, 0.04]
 
 [sky.object]
 size = 0.1

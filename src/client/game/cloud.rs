@@ -164,7 +164,9 @@ impl EventHandler for CloudLayer {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
                 self.opacity = Self::opacity(time.stage());
             }
-            Event::MainEventsCleared => self.pc.move_forward(dt),
+            Event::MainEventsCleared => {
+                self.pc.move_forward(dt);
+            }
             _ => {}
         }
     }

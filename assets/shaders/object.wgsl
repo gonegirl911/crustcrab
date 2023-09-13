@@ -38,6 +38,7 @@ struct SkyUniform {
     light_intensity: vec3<f32>,
     sun_intensity: f32,
     color: vec3<f32>,
+    horizon_color: vec3<f32>,
 }
 
 @group(1) @binding(0)
@@ -52,6 +53,5 @@ var s_object: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_object[pc.tex_index], s_object, in.tex_coords);
-    let intensity = mix(max(sky.sun_intensity, 1.0), 1.0, f32(pc.tex_index));
-    return color * vec4(vec3(intensity), 1.0);
+    return color * vec4(vec3(max(sky.sun_intensity, 1.0)), 1.0);
 }

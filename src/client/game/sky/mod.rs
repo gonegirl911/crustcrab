@@ -37,7 +37,11 @@ impl Sky {
             MemoryState::UNINIT,
             wgpu::ShaderStages::VERTEX_FRAGMENT,
         );
-        let atmosphere = Atmosphere::new(renderer, uniform.bind_group_layout());
+        let atmosphere = Atmosphere::new(
+            renderer,
+            player_bind_group_layout,
+            uniform.bind_group_layout(),
+        );
         let stars = StarDome::new(renderer, player_bind_group_layout);
         let objects = ObjectSet::new(
             renderer,
@@ -61,7 +65,6 @@ impl Sky {
         self.uniform.bind_group()
     }
 
-    #[rustfmt::skip]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -80,7 +83,11 @@ impl Sky {
             })],
             depth_stencil_attachment: None,
         });
-        self.atmosphere.draw(&mut render_pass, self.uniform.bind_group());
+        self.atmosphere.draw(
+            &mut render_pass,
+            player_bind_group,
+            self.uniform.bind_group(),
+        );
         self.stars.draw(&mut render_pass, player_bind_group);
         self.objects.draw(
             &mut render_pass,
@@ -118,34 +125,48 @@ struct SkyUniformData {
     light_intensity: Rgb<f32>,
     sun_intensity: f32,
     color: Float3,
+    horizon_color: Float3,
 }
 
 impl SkyUniformData {
-    fn new(light_intensity: Rgb<f32>, sun_intensity: f32, color: Rgb<f32>) -> Self {
+    fn new(
+        light_intensity: Rgb<f32>,
+        sun_intensity: f32,
+        color: Rgb<f32>,
+        horizon_color: Rgb<f32>,
+    ) -> Self {
         Self {
             light_intensity,
             sun_intensity,
             color: color.into(),
+            horizon_color: horizon_color.into(),
         }
     }
 }
 
 #[derive(Deserialize)]
 pub struct SkyConfig {
-    day_intensity: Rgb<f32>,
-    night_intensity: Rgb<f32>,
     sun_intensity: f32,
-    color: Rgb<f32>,
+    day: PeriodConfig,
+    night: PeriodConfig,
     object: ObjectConfig,
     star: StarConfig,
+}
+
+#[derive(Deserialize)]
+struct PeriodConfig {
+    intensity: Rgb<f32>,
+    color: Rgb<f32>,
+    horizon_color: Rgb<f32>,
 }
 
 impl SkyConfig {
     fn sky_data(&self, stage: Stage) -> SkyUniformData {
         SkyUniformData::new(
-            stage.lerp(self.day_intensity, self.night_intensity),
+            stage.lerp(self.day.intensity, self.night.intensity),
             stage.lerp(self.sun_intensity, 0.0),
-            stage.lerp(self.color, Default::default()),
+            stage.lerp(self.day.color, self.night.color),
+            stage.lerp(self.day.horizon_color, self.night.horizon_color),
         )
     }
 }

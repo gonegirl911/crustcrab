@@ -38,7 +38,7 @@ impl Player {
         let uniform = Uniform::new(
             renderer,
             MemoryState::Mutable(&Self::data(&view, &projection)),
-            wgpu::ShaderStages::VERTEX,
+            wgpu::ShaderStages::VERTEX_FRAGMENT,
         );
         Self {
             view,
