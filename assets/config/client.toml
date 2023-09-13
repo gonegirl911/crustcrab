@@ -10,7 +10,7 @@ sun_intensity = 15.0
 
 [sky.day]
 intensity = [1.0, 1.0, 1.0]
-color = [0.22, 0.5, 1]
+color = [0.22, 0.5, 1.0]
 horizon_color = [0.37, 0.62, 1.0]
 
 [sky.night]

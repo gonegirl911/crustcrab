@@ -65,7 +65,6 @@ impl Game {
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
-            processor.bind_group_layout(),
             depth.bind_group_layout(),
         );
         let hover = BlockHover::new(
@@ -103,7 +102,7 @@ impl Game {
         self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
         self.world.draw(
             renderer,
-            self.processor.view(),
+            self.fog.view(),
             encoder,
             self.player.bind_group(),
             self.sky.bind_group(),
@@ -112,7 +111,7 @@ impl Game {
             &self.player.frustum(),
         );
         self.clouds.draw(
-            self.processor.view(),
+            self.fog.view(),
             encoder,
             self.processor.spare_view(),
             self.player.bind_group(),
@@ -120,16 +119,13 @@ impl Game {
             self.depth.view(),
             self.processor.spare_bind_group(),
         );
-        self.processor.apply_raw(|view, bind_group| {
-            self.fog.draw(
-                view,
-                encoder,
-                self.player.bind_group(),
-                self.sky.bind_group(),
-                bind_group,
-                self.depth.bind_group(),
-            );
-        });
+        self.fog.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.sky.bind_group(),
+            self.depth.bind_group(),
+        );
         self.hover.draw(
             self.processor.view(),
             encoder,

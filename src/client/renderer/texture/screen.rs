@@ -11,7 +11,7 @@ use winit::{dpi::PhysicalSize, event::WindowEvent};
 pub struct ScreenTexture(ScreenTextureArray<1>);
 
 impl ScreenTexture {
-    fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
+    pub fn new(renderer: &Renderer, format: wgpu::TextureFormat) -> Self {
         Self(ScreenTextureArray::new(renderer, format))
     }
 
