@@ -55,6 +55,7 @@ fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {
 struct SkyUniform {
     light_intensity: vec3<f32>,
     sun_intensity: f32,
+    color: vec3<f32>,
 }
 
 @group(1) @binding(0)

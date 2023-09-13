@@ -89,3 +89,19 @@ impl<T> IntoIterator for Rgb<T> {
         self.0.into_iter()
     }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Default, Zeroable, Pod)]
+pub struct Float3 {
+    data: [f32; 3],
+    padding: f32,
+}
+
+impl From<Rgb<f32>> for Float3 {
+    fn from(color: Rgb<f32>) -> Self {
+        Self {
+            data: color.0,
+            ..Default::default()
+        }
+    }
+}

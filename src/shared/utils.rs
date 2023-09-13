@@ -22,11 +22,7 @@ pub const fn div_ceil(a: usize, b: usize) -> usize {
     }
 }
 
-pub fn lerp<T>(a: T, b: T, t: f32) -> <T::Output as Add>::Output
-where
-    T: Mul<f32>,
-    T::Output: Add,
-{
+pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a * (1.0 - t) + b * t
 }
 
@@ -45,6 +41,10 @@ pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
 pub fn magnitude_squared<T: MagnitudeSquared>(t: T) -> T::Output {
     t.magnitude_squared()
 }
+
+pub trait Lerp: Mul<f32, Output = Self> + Add<Output = Self> + Sized {}
+
+impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {}
 
 pub trait WorldCoords {
     type Point<T: Scalar>;

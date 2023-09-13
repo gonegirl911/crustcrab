@@ -1,7 +1,9 @@
+mod atmosphere;
 mod object;
 mod star;
 
 use self::{
+    atmosphere::Atmosphere,
     object::{ObjectConfig, ObjectSet},
     star::{StarConfig, StarDome},
 };
@@ -15,12 +17,13 @@ use crate::{
         game::clock::{Stage, Time},
         ServerEvent,
     },
-    shared::{color::Rgb, utils},
+    shared::color::{Float3, Rgb},
 };
 use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
 
 pub struct Sky {
+    atmosphere: Atmosphere,
     stars: StarDome,
     objects: ObjectSet,
     uniform: Uniform<SkyUniformData>,
@@ -34,17 +37,15 @@ impl Sky {
             MemoryState::UNINIT,
             wgpu::ShaderStages::VERTEX_FRAGMENT,
         );
-        let stars = StarDome::new(
-            renderer,
-            player_bind_group_layout,
-            uniform.bind_group_layout(),
-        );
+        let atmosphere = Atmosphere::new(renderer, uniform.bind_group_layout());
+        let stars = StarDome::new(renderer, player_bind_group_layout);
         let objects = ObjectSet::new(
             renderer,
             player_bind_group_layout,
             uniform.bind_group_layout(),
         );
         Self {
+            atmosphere,
             stars,
             objects,
             uniform,
@@ -60,6 +61,7 @@ impl Sky {
         self.uniform.bind_group()
     }
 
+    #[rustfmt::skip]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -78,11 +80,8 @@ impl Sky {
             })],
             depth_stencil_attachment: None,
         });
-        self.stars.draw(
-            &mut render_pass,
-            player_bind_group,
-            self.uniform.bind_group(),
-        );
+        self.atmosphere.draw(&mut render_pass, self.uniform.bind_group());
+        self.stars.draw(&mut render_pass, player_bind_group);
         self.objects.draw(
             &mut render_pass,
             player_bind_group,
@@ -118,13 +117,15 @@ impl EventHandler for Sky {
 struct SkyUniformData {
     light_intensity: Rgb<f32>,
     sun_intensity: f32,
+    color: Float3,
 }
 
 impl SkyUniformData {
-    fn new(light_intensity: Rgb<f32>, sun_intensity: f32) -> Self {
+    fn new(light_intensity: Rgb<f32>, sun_intensity: f32, color: Rgb<f32>) -> Self {
         Self {
             light_intensity,
             sun_intensity,
+            color: color.into(),
         }
     }
 }
@@ -134,23 +135,17 @@ pub struct SkyConfig {
     day_intensity: Rgb<f32>,
     night_intensity: Rgb<f32>,
     sun_intensity: f32,
+    color: Rgb<f32>,
     object: ObjectConfig,
     star: StarConfig,
 }
 
 impl SkyConfig {
     fn sky_data(&self, stage: Stage) -> SkyUniformData {
-        match stage {
-            Stage::Dawn { progress } => SkyUniformData::new(
-                utils::lerp(self.night_intensity, self.day_intensity, progress),
-                utils::lerp(0.0, self.sun_intensity, progress),
-            ),
-            Stage::Day => SkyUniformData::new(self.day_intensity, self.sun_intensity),
-            Stage::Dusk { progress } => SkyUniformData::new(
-                utils::lerp(self.day_intensity, self.night_intensity, progress),
-                utils::lerp(self.sun_intensity, 0.0, progress),
-            ),
-            Stage::Night => SkyUniformData::new(self.night_intensity, 0.0),
-        }
+        SkyUniformData::new(
+            stage.lerp(self.day_intensity, self.night_intensity),
+            stage.lerp(self.sun_intensity, 0.0),
+            stage.lerp(self.color, Default::default()),
+        )
     }
 }

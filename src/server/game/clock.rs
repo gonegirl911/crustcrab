@@ -4,6 +4,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         ServerEvent, SERVER_CONFIG,
     },
+    shared::utils::{self, Lerp},
 };
 use flume::Sender;
 use nalgebra::{UnitQuaternion, Vector3};
@@ -84,6 +85,23 @@ pub enum Stage {
     Day,
     Dusk { progress: f32 },
     Night,
+}
+
+impl Stage {
+    pub fn lerp<T: Lerp>(self, day_value: T, night_value: T) -> T {
+        match self {
+            Stage::Dawn { progress } => utils::lerp(night_value, day_value, progress),
+            Stage::Day => day_value,
+            Stage::Dusk { progress } => utils::lerp(day_value, night_value, progress),
+            Stage::Night => night_value,
+        }
+    }
+}
+
+impl Default for Stage {
+    fn default() -> Self {
+        Time::default().stage()
+    }
 }
 
 #[derive(Deserialize)]

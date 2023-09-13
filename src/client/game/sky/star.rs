@@ -4,12 +4,15 @@ use crate::{
         renderer::{
             buffer::{Instance, InstanceBuffer, MemoryState},
             effect::PostProcessor,
-            program::Program,
+            program::{Program, PushConstants},
             Renderer,
         },
         CLIENT_CONFIG,
     },
-    server::{game::clock::Time, ServerEvent},
+    server::{
+        game::clock::{Stage, Time},
+        ServerEvent,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, vector, Matrix4, Point3, UnitQuaternion, Vector3};
@@ -21,15 +24,12 @@ pub struct StarDome {
     stars: Vec<Star>,
     buffer: InstanceBuffer<StarInstance>,
     program: Program,
+    pc: StarPushConstants,
     updated_rotation: Option<UnitQuaternion<f32>>,
 }
 
 impl StarDome {
-    pub fn new(
-        renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
+    pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let count = CLIENT_CONFIG.sky.star.count;
         let stars = {
             let mut rng = StdRng::seed_from_u64(808);
@@ -40,8 +40,8 @@ impl StarDome {
             renderer,
             wgpu::include_wgsl!("../../../../assets/shaders/star.wgsl"),
             &[StarInstance::desc()],
-            &[player_bind_group_layout, sky_bind_group_layout],
-            &[],
+            &[player_bind_group_layout],
+            &[StarPushConstants::range()],
             PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
             None,
@@ -51,18 +51,18 @@ impl StarDome {
             stars,
             buffer,
             program,
+            pc: StarPushConstants::new(Default::default()),
             updated_rotation: Some(Time::default().sky_rotation()),
         }
     }
 
-    #[rustfmt::skip]
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
-        sky_bind_group: &'a wgpu::BindGroup,
     ) {
-        self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
+        self.program.bind(render_pass, [player_bind_group]);
+        self.pc.set(render_pass);
         render_pass.set_vertex_buffer(0, self.buffer.slice(..));
         render_pass.draw(0..6, 0..self.buffer.len());
     }
@@ -74,17 +74,18 @@ impl EventHandler for StarDome {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
+                self.pc = StarPushConstants::new(time.stage());
                 self.updated_rotation = Some(time.sky_rotation());
             }
             Event::MainEventsCleared => {
-                if let Some(sky_rotation) = self.updated_rotation {
+                if let Some(rotation) = self.updated_rotation {
                     self.buffer.write(
                         renderer,
                         &self
                             .stars
                             .iter()
                             .copied()
-                            .map(|star| StarInstance::new(star, sky_rotation))
+                            .map(|star| StarInstance::new(star, rotation))
                             .collect::<Vec<_>>(),
                     );
                 }
@@ -137,8 +138,28 @@ impl Instance for StarInstance {
         &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4];
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Zeroable, Pod)]
+struct StarPushConstants {
+    opacity: f32,
+}
+
+impl StarPushConstants {
+    fn new(stage: Stage) -> Self {
+        let brightness = CLIENT_CONFIG.sky.star.brightness;
+        Self {
+            opacity: stage.lerp(-brightness * 2.0, brightness).max(0.0),
+        }
+    }
+}
+
+impl PushConstants for StarPushConstants {
+    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
+}
+
 #[derive(Deserialize)]
 pub struct StarConfig {
     size: f32,
+    brightness: f32,
     count: usize,
 }

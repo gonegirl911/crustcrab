@@ -11,7 +11,13 @@ use crate::{
         },
         CLIENT_CONFIG,
     },
-    server::game::world::{block::Block, chunk::Chunk},
+    server::{
+        game::{
+            clock::Stage,
+            world::{block::Block, chunk::Chunk},
+        },
+        ServerEvent,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Vector2};
@@ -25,6 +31,7 @@ pub struct CloudLayer {
     program: Program,
     blender: Blender,
     pc: CloudPushConstants,
+    opacity: f32,
 }
 
 impl CloudLayer {
@@ -79,6 +86,7 @@ impl CloudLayer {
             program,
             blender,
             pc: Default::default(),
+            opacity: Self::opacity(Default::default()),
         }
     }
 
@@ -121,7 +129,7 @@ impl CloudLayer {
             self.pc.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
-        self.blender.draw(view, encoder, spare_bind_group, CLIENT_CONFIG.cloud.opacity);
+        self.blender.draw(view, encoder, spare_bind_group, self.opacity);
     }
 
     fn vertices() -> impl Iterator<Item = CloudVertex> {
@@ -139,14 +147,25 @@ impl CloudLayer {
                 .map(move |dz| CloudInstance::new(vector![dx, dz]))
         })
     }
+
+    fn opacity(stage: Stage) -> f32 {
+        stage.lerp(
+            CLIENT_CONFIG.cloud.day_opacity,
+            CLIENT_CONFIG.cloud.night_opacity,
+        )
+    }
 }
 
 impl EventHandler for CloudLayer {
     type Context<'a> = Duration;
 
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
-        if let Event::MainEventsCleared = event {
-            self.pc.move_forward(dt);
+        match event {
+            Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
+                self.opacity = Self::opacity(time.stage());
+            }
+            Event::MainEventsCleared => self.pc.move_forward(dt),
+            _ => {}
         }
     }
 }
@@ -204,6 +223,7 @@ impl PushConstants for CloudPushConstants {
 
 #[derive(Deserialize)]
 pub struct CloudConfig {
-    opacity: f32,
+    day_opacity: f32,
+    night_opacity: f32,
     speed: f32,
 }
