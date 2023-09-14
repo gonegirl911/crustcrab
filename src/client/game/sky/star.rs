@@ -61,10 +61,12 @@ impl StarDome {
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
     ) {
-        self.program.bind(render_pass, [player_bind_group]);
-        self.pc.set(render_pass);
-        render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-        render_pass.draw(0..6, 0..self.buffer.len());
+        if self.pc.opacity != 0.0 {
+            self.program.bind(render_pass, [player_bind_group]);
+            self.pc.set(render_pass);
+            render_pass.set_vertex_buffer(0, self.buffer.slice(..));
+            render_pass.draw(0..6, 0..self.buffer.len());
+        }
     }
 }
 
