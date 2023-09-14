@@ -158,7 +158,7 @@ impl SkyConfig {
     fn data(&self, stage: Stage) -> SkyUniformData {
         SkyUniformData::new(
             stage.lerp(self.day.intensity, self.night.intensity),
-            stage.lerp(self.sun_intensity, 0.0),
+            stage.lerp(self.sun_intensity, 1.0),
             stage.lerp(self.day.color, self.night.color),
             stage.lerp(self.day.horizon_color, self.night.horizon_color),
         )

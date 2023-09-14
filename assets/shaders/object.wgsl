@@ -55,5 +55,5 @@ var s_object: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_object[pc.tex_index], s_object, in.tex_coords);
-    return color * vec4(vec3(max(sky.sun_intensity, 1.0)), 1.0);
+    return color * vec4(vec3(sky.sun_intensity), 1.0);
 }
