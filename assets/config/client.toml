@@ -27,7 +27,7 @@ brightness = 0.15
 count = 1500
 
 [cloud]
-day_opacity = 0.9915
+day_opacity = 0.99
 night_opacity = 0.85
 speed = 100.0
 
