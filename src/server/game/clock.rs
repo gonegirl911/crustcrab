@@ -79,7 +79,7 @@ impl Default for Time {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Stage {
     Dawn { progress: f32 },
     Day,

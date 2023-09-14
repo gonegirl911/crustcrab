@@ -55,14 +55,11 @@ var s_depth: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = dir(in.screen_coords);
-    let cos_theta = sqrt(1.0 - dir.y * dir.y);
-    let cos_gamma = dot(normalize(dir.xz), normalize(player.forward.xz));
-    let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x);
-    let fog_distance = f32(player.render_distance) * 16.0 * 0.8 / cos_theta * cos_gamma;
-    let factor = pow(saturate(distance / fog_distance), 4.0);
+    let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x) / dot(dir, player.forward) * max(abs(dir.y), sqrt(1.0 - dir.y * dir.y));
+    let fog_distance = f32(player.render_distance + 1u) * 16.0 * 0.8;
+    let fog_factor = pow(saturate(distance / fog_distance), 4.0);
     let color = textureSample(t_input, s_input, in.input_coords);
-    // return mix(color, vec4(sky.horizon_color, 1.0), factor) * f32(color.w != 0.0);
-    return mix(color, vec4(vec3(0.0), 1.0), factor) * f32(color.w != 0.0);
+    return mix(color, vec4(sky.horizon_color, 1.0), fog_factor) * f32(color.w != 0.0);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
@@ -73,8 +70,4 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
 
 fn linearize(depth: f32) -> f32 {
     return 1.0 / mix(depth, 1.0, player.zfar / player.znear);
-}
-
-fn inv_lerp(a: f32, b: f32, v: f32) -> f32 {
-    return (v - a) / (b - a);
 }

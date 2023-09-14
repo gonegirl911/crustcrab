@@ -13,10 +13,7 @@ use crate::{
         renderer::{buffer::MemoryState, uniform::Uniform, Renderer},
         CLIENT_CONFIG,
     },
-    server::{
-        game::clock::{Stage, Time},
-        ServerEvent,
-    },
+    server::{game::clock::Stage, ServerEvent},
     shared::color::{Float3, Rgb},
 };
 use bytemuck::{Pod, Zeroable};
@@ -27,7 +24,7 @@ pub struct Sky {
     stars: StarDome,
     objects: ObjectSet,
     uniform: Uniform<SkyUniformData>,
-    updated_time: Option<Time>,
+    updated_stage: Result<Stage, Stage>,
 }
 
 impl Sky {
@@ -53,7 +50,7 @@ impl Sky {
             stars,
             objects,
             uniform,
-            updated_time: Some(Default::default()),
+            updated_stage: Ok(Default::default()),
         }
     }
 
@@ -106,12 +103,16 @@ impl EventHandler for Sky {
 
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
-                self.updated_time = Some(*time);
+                let curr = time.stage();
+                if self.updated_stage.is_ok() || self.updated_stage.is_err_and(|prev| prev != curr)
+                {
+                    self.updated_stage = Ok(curr);
+                }
             }
             Event::MainEventsCleared => {
-                if let Some(time) = self.updated_time.take() {
-                    self.uniform
-                        .set(renderer, &CLIENT_CONFIG.sky.sky_data(time.stage()));
+                if let Ok(stage) = self.updated_stage {
+                    self.uniform.set(renderer, &CLIENT_CONFIG.sky.data(stage));
+                    self.updated_stage = Err(stage);
                 }
             }
             _ => {}
@@ -147,21 +148,14 @@ impl SkyUniformData {
 #[derive(Deserialize)]
 pub struct SkyConfig {
     sun_intensity: f32,
-    day: PeriodConfig,
-    night: PeriodConfig,
+    day: StageConfig,
+    night: StageConfig,
     object: ObjectConfig,
     star: StarConfig,
 }
 
-#[derive(Deserialize)]
-struct PeriodConfig {
-    intensity: Rgb<f32>,
-    color: Rgb<f32>,
-    horizon_color: Rgb<f32>,
-}
-
 impl SkyConfig {
-    fn sky_data(&self, stage: Stage) -> SkyUniformData {
+    fn data(&self, stage: Stage) -> SkyUniformData {
         SkyUniformData::new(
             stage.lerp(self.day.intensity, self.night.intensity),
             stage.lerp(self.sun_intensity, 0.0),
@@ -169,4 +163,11 @@ impl SkyConfig {
             stage.lerp(self.day.horizon_color, self.night.horizon_color),
         )
     }
+}
+
+#[derive(Deserialize)]
+struct StageConfig {
+    intensity: Rgb<f32>,
+    color: Rgb<f32>,
+    horizon_color: Rgb<f32>,
 }

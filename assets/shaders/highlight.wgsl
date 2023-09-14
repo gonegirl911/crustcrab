@@ -7,6 +7,8 @@ struct PlayerUniform {
     inv_v: mat4x4<f32>,
     inv_p: mat4x4<f32>,
     origin: vec3<f32>,
+    forward: vec3<f32>,
+    render_distance: u32,
     znear: f32,
     zfar: f32,
 }

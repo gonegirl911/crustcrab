@@ -183,6 +183,7 @@ impl EventHandler for Game {
             self.sky.handle(event, renderer);
             self.world.handle(event, renderer);
             self.clouds.handle(event, dt);
+            self.fog.handle(event, renderer);
             self.hover.handle(event, ());
             self.depth.handle(event, renderer);
             self.processor.handle(event, renderer);
