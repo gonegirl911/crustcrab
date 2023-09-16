@@ -11,6 +11,7 @@ struct PlayerUniform {
     inv_v: mat4x4<f32>,
     inv_p: mat4x4<f32>,
     origin: vec3<f32>,
+    forward: vec3<f32>,
     render_distance: u32,
     znear: f32,
     zfar: f32,
@@ -54,10 +55,11 @@ fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {
 }
 
 struct SkyUniform {
-    light_intensity: vec3<f32>,
-    sun_intensity: f32,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
+    sun_dir: vec3<f32>,
+    sun_intensity: f32,
+    light_intensity: vec3<f32>,
 }
 
 @group(1) @binding(0)

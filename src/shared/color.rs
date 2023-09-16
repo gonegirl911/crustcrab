@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
 use serde::Deserialize;
 use std::{
     array,
@@ -98,10 +98,19 @@ pub struct Float3 {
     padding: f32,
 }
 
-impl From<Point3<f32>> for Float3 {
-    fn from(vector: Point3<f32>) -> Self {
+impl From<Vector3<f32>> for Float3 {
+    fn from(vector: Vector3<f32>) -> Self {
         Self {
             data: vector.into(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<Point3<f32>> for Float3 {
+    fn from(point: Point3<f32>) -> Self {
+        Self {
+            data: point.into(),
             ..Default::default()
         }
     }
