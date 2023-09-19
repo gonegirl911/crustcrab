@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Point3, Vector3};
+use nalgebra::Point3;
 use serde::Deserialize;
 use std::{
     array,
@@ -96,15 +96,6 @@ impl<T> IntoIterator for Rgb<T> {
 pub struct Float3 {
     data: [f32; 3],
     padding: f32,
-}
-
-impl From<Vector3<f32>> for Float3 {
-    fn from(vector: Vector3<f32>) -> Self {
-        Self {
-            data: vector.into(),
-            ..Default::default()
-        }
-    }
 }
 
 impl From<Point3<f32>> for Float3 {

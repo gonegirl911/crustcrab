@@ -30,7 +30,6 @@ struct PlayerUniform {
 struct SkyUniform {
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    sun_dir: vec3<f32>,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }
@@ -56,11 +55,13 @@ var s_depth: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = dir(in.screen_coords);
-    let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x) / dot(dir, player.forward) * max(abs(dir.y), sqrt(1.0 - dir.y * dir.y));
-    let fog_distance = f32(player.render_distance + 1u) * 16.0 * 0.8;
-    let fog_factor = pow(saturate(distance / fog_distance), 4.0);
+    let cos_theta = dot(dir, player.forward);
+    let sin_gamma = max(abs(dir.y), sqrt(1.0 - dir.y * dir.y));
+    let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x) / cos_theta * sin_gamma;
+    let fog_start = f32((player.render_distance - 3u) * 16u);
+    let fog_factor = exp2(-pow2(max((distance - fog_start) / 16.0, 0.0)));
     let color = textureSample(t_input, s_input, in.input_coords);
-    return mix(color, vec4(sky.horizon_color, 1.0), fog_factor) * f32(color.w != 0.0);
+    return mix(vec4(sky.horizon_color, 1.0), color, fog_factor) * f32(color.w != 0.0);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
@@ -71,4 +72,8 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
 
 fn linearize(depth: f32) -> f32 {
     return 1.0 / mix(depth, 1.0, player.zfar / player.znear);
+}
+
+fn pow2(n: f32) -> f32 {
+    return n * n;
 }

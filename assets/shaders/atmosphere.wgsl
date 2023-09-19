@@ -29,7 +29,6 @@ struct PlayerUniform {
 struct SkyUniform {
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    sun_dir: vec3<f32>,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }
@@ -44,7 +43,8 @@ var<uniform> sky: SkyUniform;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = dir(in.screen_coords);
     let theta = deg(asin(dir.y));
-    return vec4(mix(sky.horizon_color, sky.color, pow(saturate(inv_lerp(2.0, 10.0, theta)), 2.0)), 1.0);
+    let horizon_factor = exp2(-pow2(max((theta - 4.0) / 3.0, 0.0)));
+    return vec4(mix(sky.color, sky.horizon_color, horizon_factor), 1.0);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
@@ -57,6 +57,6 @@ fn deg(rad: f32) -> f32 {
     return rad * 57.2957795130823208767981548141051703;
 }
 
-fn inv_lerp(a: f32, b: f32, v: f32) -> f32 {
-    return (v - a) / (b - a);
+fn pow2(n: f32) -> f32 {
+    return n * n;
 }

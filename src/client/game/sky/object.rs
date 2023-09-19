@@ -18,7 +18,6 @@ use serde::Deserialize;
 pub struct ObjectSet {
     textures: ImageTextureArray,
     program: Program,
-    pub sun_dir: Vector3<f32>,
     sun_pc: ObjectPushConstants,
     moon_pc: ObjectPushConstants,
 }
@@ -54,11 +53,10 @@ impl ObjectSet {
             None,
             None,
         );
-        let (sun_dir, sun_pc, moon_pc) = Self::data(Default::default());
+        let (sun_pc, moon_pc) = Self::data(Default::default());
         Self {
             textures,
             program,
-            sun_dir,
             sun_pc,
             moon_pc,
         }
@@ -84,11 +82,10 @@ impl ObjectSet {
         render_pass.draw(0..6, 0..1);
     }
 
-    fn data(time: Time) -> (Vector3<f32>, ObjectPushConstants, ObjectPushConstants) {
+    fn data(time: Time) -> (ObjectPushConstants, ObjectPushConstants) {
         let sun_dir = time.sky_rotation() * Vector3::x();
         let is_am = time.is_am();
         (
-            sun_dir,
             ObjectPushConstants::new(sun_dir, 0, is_am),
             ObjectPushConstants::new(-sun_dir, 1, is_am),
         )
@@ -100,7 +97,7 @@ impl EventHandler for ObjectSet {
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
         if let Event::UserEvent(ServerEvent::TimeUpdated(time)) = event {
-            (self.sun_dir, self.sun_pc, self.moon_pc) = Self::data(*time);
+            (self.sun_pc, self.moon_pc) = Self::data(*time);
         }
     }
 }

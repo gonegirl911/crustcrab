@@ -17,7 +17,6 @@ use crate::{
     shared::color::{Float3, Rgb},
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Vector3;
 use serde::Deserialize;
 
 pub struct Sky {
@@ -112,10 +111,7 @@ impl EventHandler for Sky {
             }
             Event::MainEventsCleared => {
                 if let Ok(stage) = self.updated_stage {
-                    self.uniform.set(
-                        renderer,
-                        &CLIENT_CONFIG.sky.data(stage, self.objects.sun_dir),
-                    );
+                    self.uniform.set(renderer, &CLIENT_CONFIG.sky.data(stage));
                     self.updated_stage = Err(stage);
                 }
             }
@@ -128,8 +124,7 @@ impl EventHandler for Sky {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct SkyUniformData {
     color: Float3,
-    horizon_color: Float3,
-    sun_dir: Vector3<f32>,
+    horizon_color: Rgb<f32>,
     sun_intensity: f32,
     light_intensity: Float3,
 }
@@ -138,14 +133,12 @@ impl SkyUniformData {
     fn new(
         color: Rgb<f32>,
         horizon_color: Rgb<f32>,
-        sun_dir: Vector3<f32>,
         sun_intensity: f32,
         light_intensity: Rgb<f32>,
     ) -> Self {
         Self {
             color: color.into(),
-            horizon_color: horizon_color.into(),
-            sun_dir,
+            horizon_color,
             sun_intensity,
             light_intensity: light_intensity.into(),
         }
@@ -162,11 +155,10 @@ pub struct SkyConfig {
 }
 
 impl SkyConfig {
-    fn data(&self, stage: Stage, sun_dir: Vector3<f32>) -> SkyUniformData {
+    fn data(&self, stage: Stage) -> SkyUniformData {
         SkyUniformData::new(
             stage.lerp(self.day.color, self.night.color),
             stage.lerp(self.day.horizon_color, self.night.horizon_color),
-            sun_dir,
             stage.lerp(self.sun_intensity, 1.0),
             stage.lerp(self.day.light_intensity, self.night.light_intensity),
         )
