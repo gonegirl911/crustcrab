@@ -51,7 +51,7 @@ impl StarDome {
             stars,
             buffer,
             program,
-            pc: StarPushConstants::new(Default::default()),
+            pc: Default::default(),
             updated_rotation: Some(Time::default().sky_rotation()),
         }
     }
@@ -152,6 +152,12 @@ impl StarPushConstants {
         Self {
             opacity: stage.lerp(-brightness * 2.0, brightness).max(0.0),
         }
+    }
+}
+
+impl Default for StarPushConstants {
+    fn default() -> Self {
+        Self::new(Default::default())
     }
 }
 
