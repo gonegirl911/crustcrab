@@ -53,7 +53,7 @@ impl ObjectSet {
             None,
             None,
         );
-        let (sun_pc, moon_pc) = Self::data(Default::default());
+        let (sun_pc, moon_pc) = Self::pc(Default::default());
         Self {
             textures,
             program,
@@ -82,7 +82,7 @@ impl ObjectSet {
         render_pass.draw(0..6, 0..1);
     }
 
-    fn data(time: Time) -> (ObjectPushConstants, ObjectPushConstants) {
+    fn pc(time: Time) -> (ObjectPushConstants, ObjectPushConstants) {
         let sun_dir = time.sky_rotation() * Vector3::x();
         let is_am = time.is_am();
         (
@@ -97,7 +97,7 @@ impl EventHandler for ObjectSet {
 
     fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
         if let Event::UserEvent(ServerEvent::TimeUpdated(time)) = event {
-            (self.sun_pc, self.moon_pc) = Self::data(*time);
+            (self.sun_pc, self.moon_pc) = Self::pc(*time);
         }
     }
 }
