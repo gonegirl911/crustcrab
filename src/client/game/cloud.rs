@@ -166,7 +166,7 @@ impl EventHandler for CloudLayer {
             }
             Event::MainEventsCleared => {
                 self.pc.move_forward(dt);
-            },
+            }
             _ => {}
         }
     }
