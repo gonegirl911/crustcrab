@@ -11,7 +11,7 @@ use crate::shared::{
 };
 use nalgebra::{point, Point3, Vector3};
 use std::{
-    array, mem,
+    mem,
     ops::{Index, IndexMut},
 };
 
@@ -22,10 +22,8 @@ pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 impl Chunk {
     pub const DIM: usize = 16;
 
-    fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
-        Self(array::from_fn(|x| {
-            array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
-        }))
+    fn repeat(block: Block) -> Self {
+        Self([[[block; Self::DIM]; Self::DIM]; Self::DIM])
     }
 
     pub fn is_empty(&self) -> bool {
