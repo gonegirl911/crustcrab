@@ -58,6 +58,7 @@ impl World {
             .collect()
     }
 
+    #[rustfmt::skip]
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -65,9 +66,7 @@ impl World {
         server_tx: Sender<ServerEvent>,
         ray: Ray,
     ) {
-        let Ok((load, unload)) = self.chunks.apply(coords, &action) else {
-            return;
-        };
+        let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
         let updates = Self::updates(&load.into_iter().chain(unload).collect(), [coords], false);
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());

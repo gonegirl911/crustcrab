@@ -2,7 +2,6 @@ pub mod area;
 pub mod data;
 
 use self::data::{BlockData, BLOCK_DATA};
-use super::action::BlockAction;
 use crate::shared::color::Rgb;
 use bitfield::bitfield;
 use enum_map::Enum;
@@ -24,46 +23,6 @@ pub enum Block {
 impl Block {
     pub fn data(self) -> &'static BlockData {
         &BLOCK_DATA[self]
-    }
-
-    pub fn apply(&mut self, action: &BlockAction) -> bool {
-        match action {
-            BlockAction::Place(block) => self.place(*block),
-            BlockAction::Destroy => self.destroy(),
-        }
-    }
-
-    pub fn apply_unchecked(&mut self, action: &BlockAction) {
-        match action {
-            BlockAction::Place(block) => self.place_unchecked(*block),
-            BlockAction::Destroy => self.destroy_unchecked(),
-        }
-    }
-
-    fn place(&mut self, block: Block) -> bool {
-        if *self == Self::Air && block != Self::Air {
-            self.place_unchecked(block);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn place_unchecked(&mut self, block: Block) {
-        *self = block;
-    }
-
-    fn destroy(&mut self) -> bool {
-        if *self != Self::Air {
-            self.destroy_unchecked();
-            true
-        } else {
-            false
-        }
-    }
-
-    fn destroy_unchecked(&mut self) {
-        *self = Block::Air;
     }
 }
 

@@ -11,35 +11,67 @@ use crate::shared::{
 };
 use nalgebra::{point, Point3, Vector3};
 use std::{
-    mem,
+    array, mem,
     ops::{Index, IndexMut},
 };
 
 #[repr(align(16))]
 #[derive(Default)]
-pub struct Chunk([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
+pub struct Chunk {
+    blocks: [[[Block; Self::DIM]; Self::DIM]; Self::DIM],
+    count: usize,
+}
 
 impl Chunk {
     pub const DIM: usize = 16;
 
-    fn repeat(block: Block) -> Self {
-        Self([[[block; Self::DIM]; Self::DIM]; Self::DIM])
+    fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
+        let mut count = 0;
+        Self {
+            blocks: array::from_fn(|x| {
+                array::from_fn(|y| {
+                    array::from_fn(|z| {
+                        let block = f(point![x, y, z].cast());
+                        count += (block != Block::Air) as usize;
+                        block
+                    })
+                })
+            }),
+            count,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        let expected = unsafe { mem::transmute([Block::Air; Self::DIM]) };
-        self.0
-            .iter()
-            .flatten()
-            .all(|blocks| *unsafe { mem::transmute::<_, &u128>(blocks) } == expected)
+        self.count == 0
     }
 
     pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
-        self[coords].apply(action)
+        let prev = &mut self[coords];
+        match action {
+            BlockAction::Place(Block::Air) => false,
+            BlockAction::Place(curr) if *prev == Block::Air => {
+                *prev = *curr;
+                self.count += 1;
+                true
+            }
+            BlockAction::Destroy if *prev != Block::Air => {
+                *prev = Block::Air;
+                self.count -= 1;
+                true
+            }
+            _ => false,
+        }
     }
 
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
-        self[coords].apply_unchecked(action);
+        let prev = &mut self[coords];
+        let curr = action.placed_block();
+        match (mem::replace(prev, curr), curr) {
+            (Block::Air, Block::Air) => {}
+            (Block::Air, _) => self.count += 1,
+            (_, Block::Air) => self.count -= 1,
+            _ => {}
+        }
     }
 
     pub fn points() -> impl Iterator<Item = Point3<u8>> {
@@ -64,13 +96,13 @@ impl Index<Point3<u8>> for Chunk {
     type Output = Block;
 
     fn index(&self, coords: Point3<u8>) -> &Self::Output {
-        &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+        &self.blocks[coords.x as usize][coords.y as usize][coords.z as usize]
     }
 }
 
 impl IndexMut<Point3<u8>> for Chunk {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
-        &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+        &mut self.blocks[coords.x as usize][coords.y as usize][coords.z as usize]
     }
 }
 
