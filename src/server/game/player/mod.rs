@@ -8,6 +8,7 @@ use crate::{
     shared::utils,
 };
 use nalgebra::{vector, Point3};
+use rayon::prelude::*;
 use serde::Deserialize;
 use std::ops::Range;
 
@@ -66,6 +67,12 @@ impl WorldArea {
         })
     }
 
+    pub fn par_points(&self) -> impl ParallelIterator<Item = Point3<i32>> + '_ {
+        self.par_cube_points().filter(|point| {
+            utils::magnitude_squared(point.xz() - self.center.xz()) <= self.radius.pow(2)
+        })
+    }
+
     pub fn exclusive_points<'a>(
         &'a self,
         other: &'a WorldArea,
@@ -76,11 +83,33 @@ impl WorldArea {
         })
     }
 
+    pub fn par_exclusive_points<'a>(
+        &'a self,
+        other: &'a WorldArea,
+    ) -> impl ParallelIterator<Item = Point3<i32>> + 'a {
+        self.par_points().filter(|point| {
+            utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
+                || (point.y - other.center.y).unsigned_abs() > other.radius
+        })
+    }
+
     fn cube_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
         let radius = self.radius as i32;
         (-radius..=radius).flat_map(move |dx| {
             (-radius..=radius).flat_map(move |dy| {
                 (-radius..=radius)
+                    .map(move |dz| self.center + vector![dx, dy, dz])
+                    .filter(|point| World::Y_RANGE.contains(&point.y))
+            })
+        })
+    }
+
+    fn par_cube_points(&self) -> impl ParallelIterator<Item = Point3<i32>> + '_ {
+        let radius = self.radius as i32;
+        (-radius..=radius).into_par_iter().flat_map(move |dx| {
+            (-radius..=radius).into_par_iter().flat_map(move |dy| {
+                (-radius..=radius)
+                    .into_par_iter()
                     .map(move |dz| self.center + vector![dx, dy, dz])
                     .filter(|point| World::Y_RANGE.contains(&point.y))
             })

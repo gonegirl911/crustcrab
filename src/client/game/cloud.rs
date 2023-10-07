@@ -18,6 +18,7 @@ use crate::{
         },
         ServerEvent,
     },
+    shared::color::{Float3, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Vector2};
@@ -150,8 +151,8 @@ impl CloudLayer {
 
     fn opacity(stage: Stage) -> f32 {
         stage.lerp(
-            CLIENT_CONFIG.cloud.day_opacity,
-            CLIENT_CONFIG.cloud.night_opacity,
+            CLIENT_CONFIG.cloud.day.color.a,
+            CLIENT_CONFIG.cloud.night.color.a,
         )
     }
 }
@@ -162,10 +163,11 @@ impl EventHandler for CloudLayer {
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
+                self.pc.update_color(time.stage());
                 self.opacity = Self::opacity(time.stage());
             }
             Event::MainEventsCleared => {
-                self.pc.move_forward(dt);
+                self.pc.update_offset(dt);
             }
             _ => {}
         }
@@ -207,25 +209,53 @@ impl Instance for CloudInstance {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Default, Zeroable, Pod)]
+#[derive(Clone, Copy, Zeroable, Pod)]
 struct CloudPushConstants {
+    color: Float3,
     offset: Vector2<f32>,
 }
 
 impl CloudPushConstants {
-    fn move_forward(&mut self, dt: Duration) {
+    fn update_color(&mut self, stage: Stage) {
+        self.color = Self::color(stage);
+    }
+
+    fn update_offset(&mut self, dt: Duration) {
         self.offset -= Vector2::x() * CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
         self.offset = self.offset.map(|c| c % (12.0 * 256.0));
+    }
+
+    fn color(stage: Stage) -> Float3 {
+        stage
+            .lerp(
+                CLIENT_CONFIG.cloud.day.color.rgb,
+                CLIENT_CONFIG.cloud.night.color.rgb,
+            )
+            .into()
+    }
+}
+
+impl Default for CloudPushConstants {
+    fn default() -> Self {
+        Self {
+            color: Self::color(Default::default()),
+            offset: Default::default(),
+        }
     }
 }
 
 impl PushConstants for CloudPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
+    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX_FRAGMENT;
 }
 
 #[derive(Deserialize)]
 pub struct CloudConfig {
-    day_opacity: f32,
-    night_opacity: f32,
     speed: f32,
+    day: StageConfig,
+    night: StageConfig,
+}
+
+#[derive(Deserialize)]
+struct StageConfig {
+    color: Rgba<f32>,
 }

@@ -25,30 +25,45 @@ use crate::{
         },
         ServerEvent, SERVER_CONFIG,
     },
-    shared::{dash::FxDashMap, utils},
+    shared::utils,
 };
-use dashmap::mapref::entry::Entry;
 use enum_map::enum_map;
 use flume::Sender;
 use nalgebra::Point3;
-use rustc_hash::FxHashSet;
+use rayon::prelude::*;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp,
-    ops::{Deref, Range},
+    collections::{hash_map::Entry, LinkedList},
+    ops::Range,
     sync::Arc,
 };
 
 #[derive(Default)]
 pub struct World {
-    chunks: Arc<ChunkStore>,
-    actions: Arc<ActionStore>,
+    chunks: ChunkStore,
+    generator: ChunkGenerator,
+    actions: ActionStore,
     hover: Option<BlockIntersection>,
 }
 
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    fn unload_many<I>(&self, points: I) -> Vec<Point3<i32>>
+    fn par_load_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    where
+        I: IntoParallelIterator<Item = Point3<i32>>,
+    {
+        points
+            .into_par_iter()
+            .map(|coords| (coords, self.gen(coords)))
+            .collect::<LinkedList<_>>()
+            .into_iter()
+            .filter_map(|(coords, chunk)| self.chunks.load(coords, chunk).then_some(coords))
+            .collect()
+    }
+
+    fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -71,11 +86,11 @@ impl World {
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
 
+        self.actions.insert(coords, action);
+
         self.send_unloads(unload, server_tx.clone());
         self.send_loads(load, server_tx.clone(), true);
         self.send_updates(updates, server_tx, true);
-
-        self.actions.insert(coords, action);
     }
 
     fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
@@ -88,6 +103,23 @@ impl World {
                 data: Arc::new(ChunkData::new(&self.chunks, coords)),
                 is_important,
             }),
+            server_tx,
+        );
+    }
+
+    fn par_send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
+    where
+        I: IntoParallelIterator<Item = Point3<i32>>,
+    {
+        self.send_events(
+            points
+                .into_par_iter()
+                .map(|coords| ServerEvent::ChunkLoaded {
+                    coords,
+                    data: Arc::new(ChunkData::new(&self.chunks, coords)),
+                    is_important,
+                })
+                .collect::<LinkedList<_>>(),
             server_tx,
         );
     }
@@ -120,6 +152,33 @@ impl World {
         );
     }
 
+    fn par_send_updates<I: IntoParallelIterator<Item = Point3<i32>>>(
+        &self,
+        points: I,
+        server_tx: Sender<ServerEvent>,
+        is_important: bool,
+    ) {
+        self.send_events(
+            points
+                .into_par_iter()
+                .map(|coords| ServerEvent::ChunkUpdated {
+                    coords,
+                    data: Arc::new(ChunkData::new(&self.chunks, coords)),
+                    is_important,
+                })
+                .collect::<LinkedList<_>>(),
+            server_tx,
+        );
+    }
+
+    fn gen(&self, coords: Point3<i32>) -> Chunk {
+        let mut chunk = self.generator.gen(coords);
+        for (coords, action) in self.actions.actions(coords) {
+            chunk.apply_unchecked(coords, action);
+        }
+        chunk
+    }
+
     fn send_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
     where
         I: IntoIterator<Item = ServerEvent>,
@@ -127,12 +186,6 @@ impl World {
         for event in events {
             server_tx.send(event).unwrap_or_else(|_| unreachable!());
         }
-    }
-
-    fn gen(generator: &ChunkGenerator, actions: &ActionStore, coords: Point3<i32>) -> Chunk {
-        let mut chunk = generator.gen(coords);
-        actions.apply_unchecked(coords, &mut chunk);
-        chunk
     }
 
     fn updates<I: IntoIterator<Item = Point3<i64>>>(
@@ -176,16 +229,36 @@ impl EventHandler<WorldEvent> for World {
 
     fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
         match event {
-            WorldEvent::InitialRenderRequested { area } => {}
-            WorldEvent::WorldAreaChanged { prev, curr, ray } => {
-                let unloads = self.unload_many(prev.exclusive_points(curr));
+            WorldEvent::InitialRenderRequested { area, ray } => {
+                let mut loads = self.par_load_many(area.par_points());
 
                 self.handle(
                     &WorldEvent::BlockHoverRequested { ray: *ray },
                     server_tx.clone(),
                 );
 
-                self.send_unloads(unloads, server_tx.clone());
+                loads.par_sort_unstable_by_key(|coords| {
+                    utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
+                });
+
+                self.par_send_loads(loads, server_tx, false);
+            }
+            WorldEvent::WorldAreaChanged { prev, curr, ray } => {
+                let unloads = self.unload_many(prev.exclusive_points(curr));
+                let loads = self.par_load_many(curr.par_exclusive_points(prev));
+
+                self.handle(
+                    &WorldEvent::BlockHoverRequested { ray: *ray },
+                    server_tx.clone(),
+                );
+
+                self.send_unloads(unloads.iter().copied(), server_tx.clone());
+                self.par_send_loads(loads.par_iter().copied(), server_tx.clone(), false);
+                self.par_send_updates(
+                    Self::updates(&unloads.into_iter().chain(loads).collect(), [], true),
+                    server_tx,
+                    false,
+                );
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
@@ -217,13 +290,12 @@ impl EventHandler<WorldEvent> for World {
                     self.apply(coords, BlockAction::Destroy, server_tx, *ray);
                 }
             }
-            WorldEvent::Tick { ray } => {}
         }
     }
 }
 
 #[derive(Default)]
-pub struct ChunkStore(FxDashMap<Point3<i32>, Chunk>);
+pub struct ChunkStore(FxHashMap<Point3<i32>, Chunk>);
 
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
@@ -247,11 +319,11 @@ impl ChunkStore {
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
     }
 
-    fn get(&self, coords: Point3<i32>) -> Option<impl Deref<Target = Chunk> + '_> {
+    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         self.0.get(&coords)
     }
 
-    fn load(&self, coords: Point3<i32>, chunk: Chunk) -> bool {
+    fn load(&mut self, coords: Point3<i32>, chunk: Chunk) -> bool {
         if !chunk.is_empty() {
             self.0.insert(coords, chunk);
             true
@@ -260,13 +332,13 @@ impl ChunkStore {
         }
     }
 
-    fn unload(&self, coords: Point3<i32>) -> bool {
+    fn unload(&mut self, coords: Point3<i32>) -> bool {
         self.0.remove(&coords).is_some()
     }
 
     #[allow(clippy::type_complexity)]
     fn apply(
-        &self,
+        &mut self,
         coords: Point3<i64>,
         action: &BlockAction,
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
@@ -367,6 +439,7 @@ impl BlockHoverData {
 pub enum WorldEvent {
     InitialRenderRequested {
         area: WorldArea,
+        ray: Ray,
     },
     WorldAreaChanged {
         prev: WorldArea,
@@ -383,9 +456,6 @@ pub enum WorldEvent {
     BlockDestroyed {
         ray: Ray,
     },
-    Tick {
-        ray: Ray,
-    },
 }
 
 impl WorldEvent {
@@ -397,7 +467,10 @@ impl WorldEvent {
     ) -> Option<Self> {
         match event {
             Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
-                Some(Self::InitialRenderRequested { area: *curr })
+                Some(Self::InitialRenderRequested {
+                    area: *curr,
+                    ray: *ray,
+                })
             }
             Event::ClientEvent(ClientEvent::PlayerPositionChanged { .. }) if curr != prev => {
                 Some(Self::WorldAreaChanged {
@@ -419,7 +492,6 @@ impl WorldEvent {
             Event::ClientEvent(ClientEvent::BlockDestroyed) => {
                 Some(Self::BlockDestroyed { ray: *ray })
             }
-            Event::Tick => Some(Self::Tick { ray: *ray }),
             _ => None,
         }
     }

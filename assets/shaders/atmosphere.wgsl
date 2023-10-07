@@ -43,7 +43,7 @@ var<uniform> sky: SkyUniform;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = dir(in.screen_coords);
     let theta = deg(asin(dir.y));
-    let horizon_factor = exp2(-pow2(max((theta - 4.0) / 3.0, 0.0)));
+    let horizon_factor = exp2(-pow2(max((theta - 2.0) / 6.0, 0.0)));
     return vec4(mix(sky.color, sky.horizon_color, horizon_factor), 1.0);
 }
 

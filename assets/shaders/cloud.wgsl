@@ -18,6 +18,7 @@ struct PlayerUniform {
 }
 
 struct PushConstants {
+    color: vec3<f32>,
     offset: vec2<f32>,
 }
 
@@ -74,7 +75,7 @@ var s_clouds: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let is_visible = textureSample(t_clouds, s_clouds, in.offset).w == 1.0;
     if is_visible {
-        return vec4(sky.light_intensity * in.light, 1.0);
+        return vec4(pc.color * in.light, 1.0);
     } else {
         discard;
     }

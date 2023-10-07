@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Point3;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{
     array,
     iter::Sum,
@@ -88,6 +88,24 @@ impl<T> IntoIterator for Rgb<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+pub struct Rgba<T> {
+    pub rgb: Rgb<T>,
+    pub a: T,
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Rgba<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let [r, g, b, a] = <[T; 4]>::deserialize(deserializer)?;
+        Ok(Self {
+            rgb: Rgb::new(r, g, b),
+            a,
+        })
     }
 }
 

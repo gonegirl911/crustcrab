@@ -3,7 +3,7 @@ origin = [0.0, 65.62, 0.0]
 fovy = 90.0
 speed = 25.0
 sensitivity = 0.0025
-render_distance = 36
+render_distance = 16
 
 [sky]
 sun_intensity = 15.0
@@ -15,8 +15,8 @@ light_intensity = [1.0, 1.0, 1.0]
 
 [sky.night]
 color = [0.0, 0.0, 0.0]
-horizon_color = [0.025, 0.025, 0.04]
-light_intensity = [0.15, 0.15, 0.3]
+horizon_color = [0.02, 0.02, 0.03]
+light_intensity = [0.1, 0.1, 0.25]
 
 [sky.object]
 size = 0.1
@@ -27,9 +27,13 @@ brightness = 0.15
 count = 1500
 
 [cloud]
-day_opacity = 0.99
-night_opacity = 0.85
-speed = 100.0
+speed = 1.0
+
+[cloud.day]
+color = [1.0, 1.0, 1.0, 0.99]
+
+[cloud.night]
+color = [0.06, 0.06, 0.1, 0.85]
 
 [gui.crosshair]
 size = 1.0
