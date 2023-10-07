@@ -48,7 +48,7 @@ pub struct World {
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    fn unload_many<I>(&self, points: I) -> Vec<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {

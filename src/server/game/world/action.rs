@@ -27,12 +27,3 @@ pub enum BlockAction {
     Place(Block),
     Destroy,
 }
-
-impl BlockAction {
-    pub fn placed_block(&self) -> Block {
-        match self {
-            Self::Place(block) => *block,
-            Self::Destroy => Block::Air,
-        }
-    }
-}

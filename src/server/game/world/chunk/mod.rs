@@ -15,11 +15,10 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-#[repr(align(16))]
 #[derive(Default)]
 pub struct Chunk {
     blocks: [[[Block; Self::DIM]; Self::DIM]; Self::DIM],
-    non_air_count: usize,
+    non_air_count: u16,
 }
 
 impl Chunk {
@@ -32,7 +31,7 @@ impl Chunk {
                 array::from_fn(|y| {
                     array::from_fn(|z| {
                         let block = f(point![x, y, z].cast());
-                        non_air_count += (block != Block::Air) as usize;
+                        non_air_count += (block != Block::Air) as u16;
                         block
                     })
                 })
@@ -65,7 +64,10 @@ impl Chunk {
 
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
         let prev = &mut self[coords];
-        let curr = action.placed_block();
+        let curr = match action {
+            BlockAction::Place(block) => *block,
+            BlockAction::Destroy => Block::Air,
+        };
         match (mem::replace(prev, curr), curr) {
             (Block::Air, Block::Air) => {}
             (Block::Air, _) => self.non_air_count += 1,
