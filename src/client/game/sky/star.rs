@@ -150,7 +150,7 @@ impl StarPushConstants {
     fn new(stage: Stage) -> Self {
         let brightness = CLIENT_CONFIG.sky.star.brightness;
         Self {
-            opacity: stage.lerp(-brightness * 2.0, brightness).max(0.0),
+            opacity: stage.lerp(-brightness, brightness).max(0.0),
         }
     }
 }
