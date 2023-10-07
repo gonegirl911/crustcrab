@@ -14,6 +14,7 @@ pub struct BlockData {
     pub side_tex_indices: Option<EnumMap<Side, u8>>,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<f32>,
+    pub requires_blending: bool,
 }
 
 impl BlockData {
@@ -88,6 +89,7 @@ impl From<RawBlockData> for BlockData {
             side_tex_indices: data.side_tex_indices(),
             luminance: data.luminance,
             light_filter: data.light_filter,
+            requires_blending: data.requires_blending,
         }
     }
 }
@@ -100,6 +102,8 @@ struct RawBlockData {
     luminance: Rgb<u8>,
     #[serde(default)]
     light_filter: Rgb<f32>,
+    #[serde(default)]
+    requires_blending: bool,
 }
 
 impl RawBlockData {

@@ -152,7 +152,7 @@ impl World {
             coords,
             data.vertices()
                 .filter_map(|(data, vertices)| {
-                    if data.is_transparent() {
+                    if data.requires_blending {
                         transparent_vertices.extend(vertices);
                         None
                     } else {
