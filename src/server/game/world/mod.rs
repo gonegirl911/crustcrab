@@ -82,7 +82,6 @@ impl World {
         ray: Ray,
     ) {
         let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
-        let updates = Self::updates(&load.into_iter().chain(unload).collect(), [coords], false);
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
 
@@ -90,7 +89,29 @@ impl World {
 
         self.send_unloads(unload, server_tx.clone());
         self.send_loads(load, server_tx.clone(), true);
-        self.send_updates(updates, server_tx, true);
+        self.send_updates(
+            self.updates(&load.into_iter().chain(unload).collect(), [coords], false),
+            server_tx,
+            true,
+        );
+    }
+
+    fn updates<I: IntoIterator<Item = Point3<i64>>>(
+        &self,
+        points: &FxHashSet<Point3<i32>>,
+        block_updates: I,
+        include_outline: bool,
+    ) -> FxHashSet<Point3<i32>> {
+        Self::block_area_points(block_updates)
+            .map(utils::chunk_coords)
+            .chain(
+                include_outline
+                    .then_some(Self::chunk_area_points(points.iter().copied()))
+                    .into_iter()
+                    .flatten(),
+            )
+            .filter(|coords| self.chunks.contains(*coords) && !points.contains(coords))
+            .collect()
     }
 
     fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
@@ -188,23 +209,6 @@ impl World {
         }
     }
 
-    fn updates<I: IntoIterator<Item = Point3<i64>>>(
-        points: &FxHashSet<Point3<i32>>,
-        block_updates: I,
-        include_outline: bool,
-    ) -> FxHashSet<Point3<i32>> {
-        Self::block_area_points(block_updates)
-            .map(utils::chunk_coords)
-            .chain(
-                include_outline
-                    .then_some(Self::chunk_area_points(points.iter().copied()))
-                    .into_iter()
-                    .flatten(),
-            )
-            .filter(|coords| !points.contains(coords))
-            .collect()
-    }
-
     fn chunk_area_points<I>(points: I) -> impl Iterator<Item = Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>>,
@@ -255,7 +259,7 @@ impl EventHandler<WorldEvent> for World {
                 self.send_unloads(unloads.iter().copied(), server_tx.clone());
                 self.par_send_loads(loads.par_iter().copied(), server_tx.clone(), false);
                 self.par_send_updates(
-                    Self::updates(&unloads.into_iter().chain(loads).collect(), [], true),
+                    self.updates(&unloads.into_iter().chain(loads).collect(), [], true),
                     server_tx,
                     false,
                 );
@@ -334,6 +338,10 @@ impl ChunkStore {
 
     fn unload(&mut self, coords: Point3<i32>) -> bool {
         self.0.remove(&coords).is_some()
+    }
+
+    fn contains(&self, coords: Point3<i32>) -> bool {
+        self.0.contains_key(&coords)
     }
 
     #[allow(clippy::type_complexity)]
