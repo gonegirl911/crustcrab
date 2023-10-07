@@ -87,5 +87,9 @@ var s_block: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
-    return color * vec4(in.light_factor, 1.0);
+    if color.w == 0.0 {
+        discard;
+    } else {
+        return color * vec4(in.light_factor, 1.0);
+    }    
 }

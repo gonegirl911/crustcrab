@@ -1,5 +1,4 @@
 pub mod cloud;
-pub mod fog;
 pub mod gui;
 pub mod hover;
 pub mod player;
@@ -7,8 +6,7 @@ pub mod sky;
 pub mod world;
 
 use self::{
-    cloud::CloudLayer, fog::Fog, gui::Gui, hover::BlockHover, player::Player, sky::Sky,
-    world::World,
+    cloud::CloudLayer, gui::Gui, hover::BlockHover, player::Player, sky::Sky, world::World,
 };
 use super::{
     event_loop::{Event, EventHandler},
@@ -29,7 +27,6 @@ pub struct Game {
     sky: Sky,
     world: World,
     clouds: CloudLayer,
-    fog: Fog,
     hover: BlockHover,
     aces: Aces,
     textures: BlockTextureArray,
@@ -61,12 +58,6 @@ impl Game {
             sky.bind_group_layout(),
             processor.bind_group_layout(),
         );
-        let fog = Fog::new(
-            renderer,
-            player.bind_group_layout(),
-            sky.bind_group_layout(),
-            depth.bind_group_layout(),
-        );
         let hover = BlockHover::new(
             renderer,
             player.bind_group_layout(),
@@ -83,7 +74,6 @@ impl Game {
             sky,
             world,
             clouds,
-            fog,
             hover,
             aces,
             textures,
@@ -102,7 +92,7 @@ impl Game {
         self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
         self.world.draw(
             renderer,
-            self.fog.view(),
+            self.processor.view(),
             encoder,
             self.player.bind_group(),
             self.sky.bind_group(),
@@ -111,20 +101,13 @@ impl Game {
             &self.player.frustum(),
         );
         self.clouds.draw(
-            self.fog.view(),
+            self.processor.view(),
             encoder,
             self.processor.spare_view(),
             self.player.bind_group(),
             self.sky.bind_group(),
             self.depth.view(),
             self.processor.spare_bind_group(),
-        );
-        self.fog.draw(
-            self.processor.view(),
-            encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
-            self.depth.bind_group(),
         );
         self.hover.draw(
             self.processor.view(),
@@ -183,7 +166,6 @@ impl EventHandler for Game {
             self.sky.handle(event, renderer);
             self.world.handle(event, renderer);
             self.clouds.handle(event, dt);
-            self.fog.handle(event, renderer);
             self.hover.handle(event, ());
             self.depth.handle(event, renderer);
             self.processor.handle(event, renderer);

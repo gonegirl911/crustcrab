@@ -82,7 +82,7 @@ impl World {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(Default::default()),
+                    load: wgpu::LoadOp::Load,
                     store: true,
                 },
             })],

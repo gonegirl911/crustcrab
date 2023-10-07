@@ -96,24 +96,6 @@ impl World {
         );
     }
 
-    fn updates<I: IntoIterator<Item = Point3<i64>>>(
-        &self,
-        points: &FxHashSet<Point3<i32>>,
-        block_updates: I,
-        include_outline: bool,
-    ) -> FxHashSet<Point3<i32>> {
-        Self::block_area_points(block_updates)
-            .map(utils::chunk_coords)
-            .chain(
-                include_outline
-                    .then_some(Self::chunk_area_points(points.iter().copied()))
-                    .into_iter()
-                    .flatten(),
-            )
-            .filter(|coords| self.chunks.contains(*coords) && !points.contains(coords))
-            .collect()
-    }
-
     fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
     where
         I: IntoIterator<Item = Point3<i32>>,
@@ -198,6 +180,24 @@ impl World {
             chunk.apply_unchecked(coords, action);
         }
         chunk
+    }
+
+    fn updates<I: IntoIterator<Item = Point3<i64>>>(
+        &self,
+        points: &FxHashSet<Point3<i32>>,
+        block_updates: I,
+        include_outline: bool,
+    ) -> FxHashSet<Point3<i32>> {
+        Self::block_area_points(block_updates)
+            .map(utils::chunk_coords)
+            .chain(
+                include_outline
+                    .then_some(Self::chunk_area_points(points.iter().copied()))
+                    .into_iter()
+                    .flatten(),
+            )
+            .filter(|coords| self.chunks.contains(*coords) && !points.contains(coords))
+            .collect()
     }
 
     fn send_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
@@ -319,12 +319,9 @@ impl ChunkStore {
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(utils::chunk_coords(coords))
+        self.0
+            .get(&utils::chunk_coords(coords))
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
-    }
-
-    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords)
     }
 
     fn load(&mut self, coords: Point3<i32>, chunk: Chunk) -> bool {
@@ -338,10 +335,6 @@ impl ChunkStore {
 
     fn unload(&mut self, coords: Point3<i32>) -> bool {
         self.0.remove(&coords).is_some()
-    }
-
-    fn contains(&self, coords: Point3<i32>) -> bool {
-        self.0.contains_key(&coords)
     }
 
     #[allow(clippy::type_complexity)]
@@ -384,6 +377,10 @@ impl ChunkStore {
         } else {
             Err(())
         }
+    }
+
+    fn contains(&self, coords: Point3<i32>) -> bool {
+        self.0.contains_key(&coords)
     }
 }
 
