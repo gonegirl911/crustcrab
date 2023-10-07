@@ -97,7 +97,7 @@ impl World {
         let mut transparent_meshes = vec![];
 
         {
-            let mut render_pass = Self::render_pass(view, encoder, depth_view);
+            let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
             self.program.bind(
                 &mut render_pass,
@@ -117,7 +117,7 @@ impl World {
 
         intermediate_action(encoder);
 
-        let mut render_pass = Self::render_pass(view, encoder, depth_view);
+        let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
 
         self.program.bind(
             &mut render_pass,
@@ -185,6 +185,7 @@ impl World {
         view: &'a wgpu::TextureView,
         encoder: &'a mut wgpu::CommandEncoder,
         depth_view: &'a wgpu::TextureView,
+        is_initial: bool,
     ) -> wgpu::RenderPass<'a> {
         encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
@@ -199,7 +200,11 @@ impl World {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: depth_view,
                 depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
+                    load: if is_initial {
+                        wgpu::LoadOp::Clear(1.0)
+                    } else {
+                        wgpu::LoadOp::Load
+                    },
                     store: true,
                 }),
                 stencil_ops: None,
