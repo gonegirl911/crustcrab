@@ -166,7 +166,7 @@ impl Blender {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
+                    load: wgpu::LoadOp::Clear(Default::default()),
                     store: true,
                 },
             })],

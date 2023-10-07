@@ -28,91 +28,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
 
 pub struct World {
-    meshes: ChunkMeshPool,
-    program: Program,
-}
-
-impl World {
-    pub fn new(
-        renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
-        textures_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        let meshes = ChunkMeshPool::new();
-        let program = Program::new(
-            renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
-            &[BlockVertex::desc()],
-            &[
-                player_bind_group_layout,
-                sky_bind_group_layout,
-                textures_bind_group_layout,
-            ],
-            &[BlockPushConstants::range()],
-            PostProcessor::FORMAT,
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-            Some(wgpu::Face::Back),
-            Some(wgpu::DepthStencilState {
-                format: DepthBuffer::FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-        );
-        Self { meshes, program }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw(
-        &mut self,
-        renderer: &Renderer,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
-        textures_bind_group: &wgpu::BindGroup,
-        depth_view: &wgpu::TextureView,
-        frustum: &Frustum,
-    ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: None,
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: true,
-                }),
-                stencil_ops: None,
-            }),
-        });
-        self.program.bind(
-            &mut render_pass,
-            [player_bind_group, sky_bind_group, textures_bind_group],
-        );
-        self.meshes.draw(renderer, &mut render_pass, frustum);
-    }
-}
-
-impl EventHandler for World {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.meshes.handle(event, renderer);
-    }
-}
-
-struct ChunkMeshPool {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
+    program: Program,
     unloaded: FxHashSet<Point3<i32>>,
     priority_workers: ThreadPool<ChunkInput, ChunkOutput>,
     workers: ThreadPool<ChunkInput, ChunkOutput>,
@@ -128,33 +45,84 @@ type ChunkInput = (Point3<i32>, Arc<ChunkData>, Instant);
 
 type ChunkOutput = (Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant);
 
-impl ChunkMeshPool {
-    fn new() -> Self {
+impl World {
+    pub fn new(
+        renderer: &Renderer,
+        player_bind_group_layout: &wgpu::BindGroupLayout,
+        sky_bind_group_layout: &wgpu::BindGroupLayout,
+        textures_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         Self {
             meshes: Default::default(),
+            program: Program::new(
+                renderer,
+                wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
+                &[BlockVertex::desc()],
+                &[
+                    player_bind_group_layout,
+                    sky_bind_group_layout,
+                    textures_bind_group_layout,
+                ],
+                &[BlockPushConstants::range()],
+                PostProcessor::FORMAT,
+                Some(wgpu::BlendState::ALPHA_BLENDING),
+                Some(wgpu::Face::Back),
+                Some(wgpu::DepthStencilState {
+                    format: DepthBuffer::FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+            ),
             unloaded: Default::default(),
             priority_workers: ThreadPool::new(Self::vertices),
             workers: ThreadPool::new(Self::vertices),
         }
     }
 
-    pub fn draw<'a>(
-        &'a mut self,
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw<F: FnOnce(&mut wgpu::CommandEncoder)>(
+        &mut self,
         renderer: &Renderer,
-        render_pass: &mut wgpu::RenderPass<'a>,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        player_bind_group: &wgpu::BindGroup,
+        sky_bind_group: &wgpu::BindGroup,
+        textures_bind_group: &wgpu::BindGroup,
+        depth_view: &wgpu::TextureView,
         frustum: &Frustum,
+        intermediate_action: F,
     ) {
         let mut transparent_meshes = vec![];
 
-        for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
-            if Chunk::bounding_sphere(coords).is_visible(frustum) {
-                if let Some(mesh) = transparent_mesh {
-                    transparent_meshes.push((coords, mesh));
+        {
+            let mut render_pass = Self::render_pass(view, encoder, depth_view);
+
+            self.program.bind(
+                &mut render_pass,
+                [player_bind_group, sky_bind_group, textures_bind_group],
+            );
+
+            for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
+                if Chunk::bounding_sphere(coords).is_visible(frustum) {
+                    if let Some(mesh) = transparent_mesh {
+                        transparent_meshes.push((coords, mesh));
+                    }
+                    BlockPushConstants::new(coords).set(&mut render_pass);
+                    buffer.draw(&mut render_pass);
                 }
-                BlockPushConstants::new(coords).set(render_pass);
-                buffer.draw(render_pass);
             }
         }
+
+        intermediate_action(encoder);
+
+        let mut render_pass = Self::render_pass(view, encoder, depth_view);
+
+        self.program.bind(
+            &mut render_pass,
+            [player_bind_group, sky_bind_group, textures_bind_group],
+        );
 
         transparent_meshes.sort_unstable_by_key(|(coords, _)| {
             Reverse(utils::magnitude_squared(
@@ -163,8 +131,8 @@ impl ChunkMeshPool {
         });
 
         for (coords, mesh) in transparent_meshes {
-            BlockPushConstants::new(coords).set(render_pass);
-            mesh.draw(renderer, render_pass, |coords| {
+            BlockPushConstants::new(coords).set(&mut render_pass);
+            mesh.draw(renderer, &mut render_pass, |coords| {
                 utils::magnitude_squared(coords - utils::coords(frustum.origin))
             });
         }
@@ -212,9 +180,35 @@ impl ChunkMeshPool {
             })
         })
     }
+
+    fn render_pass<'a>(
+        view: &'a wgpu::TextureView,
+        encoder: &'a mut wgpu::CommandEncoder,
+        depth_view: &'a wgpu::TextureView,
+    ) -> wgpu::RenderPass<'a> {
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(Default::default()),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
+        })
+    }
 }
 
-impl EventHandler for ChunkMeshPool {
+impl EventHandler for World {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
