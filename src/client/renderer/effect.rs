@@ -159,6 +159,7 @@ impl Blender {
         encoder: &mut wgpu::CommandEncoder,
         input_bind_group: &wgpu::BindGroup,
         opacity: f32,
+        should_clear: bool,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
@@ -166,7 +167,11 @@ impl Blender {
                 view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(Default::default()),
+                    load: if should_clear {
+                        wgpu::LoadOp::Clear(Default::default())
+                    } else {
+                        wgpu::LoadOp::Load
+                    },
                     store: true,
                 },
             })],

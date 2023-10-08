@@ -130,7 +130,7 @@ impl CloudLayer {
             self.pc.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
-        self.blender.draw(view, encoder, spare_bind_group, self.opacity);
+        self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
     }
 
     fn vertices() -> impl Iterator<Item = CloudVertex> {
