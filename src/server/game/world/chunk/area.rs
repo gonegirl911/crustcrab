@@ -14,7 +14,7 @@ pub struct ChunkArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl ChunkArea {
     const DIM: usize = Chunk::DIM + BlockArea::PADDING * 2;
-    const PADDING: usize = utils::div_ceil(BlockArea::PADDING, Chunk::DIM);
+    const PADDING: usize = BlockArea::PADDING.div_ceil(Chunk::DIM);
     const AXIS_RANGE: Range<i32> = -(Self::PADDING as i32)..1 + Self::PADDING as i32;
     const REM: usize = BlockArea::PADDING % Chunk::DIM;
 

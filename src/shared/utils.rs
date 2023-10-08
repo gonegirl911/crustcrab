@@ -12,16 +12,6 @@ fn div_floor(a: i64, b: i64) -> i64 {
     }
 }
 
-pub const fn div_ceil(a: usize, b: usize) -> usize {
-    let d = a / b;
-    let r = a % b;
-    if r > 0 && b > 0 {
-        d + 1
-    } else {
-        d
-    }
-}
-
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a * (1.0 - t) + b * t
 }
