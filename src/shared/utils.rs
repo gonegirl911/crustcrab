@@ -13,7 +13,7 @@ fn div_floor(a: i64, b: i64) -> i64 {
 }
 
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
-    a * (1.0 - t) + b * t
+    a.lerp(b, t)
 }
 
 pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
@@ -32,9 +32,15 @@ pub fn magnitude_squared<T: MagnitudeSquared>(t: T) -> T::Output {
     t.magnitude_squared()
 }
 
-pub trait Lerp: Mul<f32, Output = Self> + Add<Output = Self> + Sized {}
+pub trait Lerp {
+    fn lerp(self, other: Self, t: f32) -> Self;
+}
 
-impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {}
+impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {
+    fn lerp(self, other: Self, t: f32) -> Self {
+        self * (1.0 - t) + other * t
+    }
+}
 
 pub trait WorldCoords {
     type Point<T: Scalar>;
@@ -77,14 +83,14 @@ impl<const D: usize> WorldCoords for (SVector<i32, D>, SVector<u8, D>) {
 }
 
 impl<const D: usize> WorldCoords for Point<i64, D> {
-    type Point<T: Scalar> = Point<T, D>;
+    type Point<U: Scalar> = Point<U, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
-        self.map(|c| div_floor(c, Chunk::DIM as i64) as i32)
+        self.map(chunk_coords)
     }
 
     fn block_coords(self) -> Self::Point<u8> {
-        self.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
+        self.map(block_coords)
     }
 
     fn coords(self) -> Self::Point<i64> {
@@ -93,18 +99,50 @@ impl<const D: usize> WorldCoords for Point<i64, D> {
 }
 
 impl<const D: usize> WorldCoords for Point<f32, D> {
-    type Point<T: Scalar> = Point<T, D>;
+    type Point<U: Scalar> = Point<U, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
-        self.map(|c| (c / Chunk::DIM as f32).floor() as i32)
+        self.map(chunk_coords)
     }
 
     fn block_coords(self) -> Self::Point<u8> {
-        self.map(|c| c.rem_euclid(Chunk::DIM as f32) as u8)
+        self.map(block_coords)
     }
 
     fn coords(self) -> Self::Point<i64> {
-        self.map(|c| c as i64)
+        self.map(coords)
+    }
+}
+
+impl WorldCoords for i64 {
+    type Point<T: Scalar> = T;
+
+    fn chunk_coords(self) -> Self::Point<i32> {
+        div_floor(self, Chunk::DIM as i64) as i32
+    }
+
+    fn block_coords(self) -> Self::Point<u8> {
+        self.rem_euclid(Chunk::DIM as i64) as u8
+    }
+
+    fn coords(self) -> Self::Point<i64> {
+        self
+    }
+}
+
+impl WorldCoords for f32 {
+    type Point<T: Scalar> = T;
+
+    fn chunk_coords(self) -> Self::Point<i32> {
+        (self / Chunk::DIM as f32).floor() as i32
+    }
+
+    fn block_coords(self) -> Self::Point<u8> {
+        self.rem_euclid(Chunk::DIM as f32) as u8
+    }
+
+    fn coords(self) -> Self::Point<i64> {
+        self as i64
     }
 }
 

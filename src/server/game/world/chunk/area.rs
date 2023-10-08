@@ -33,7 +33,7 @@ impl ChunkArea {
     }
 
     pub fn block_deltas(delta: Vector3<i32>) -> impl Iterator<Item = (Point3<u8>, Vector3<i8>)> {
-        let [dx, dy, dz] = <[_; 3]>::from(delta);
+        let [dx, dy, dz] = delta.into();
         Self::block_axis_range(dx).flat_map(move |x| {
             Self::block_axis_range(dy).flat_map(move |y| {
                 Self::block_axis_range(dz).map(move |z| {

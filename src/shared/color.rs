@@ -101,7 +101,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Rgba<T> {
     where
         D: Deserializer<'de>,
     {
-        let [r, g, b, a] = <[T; 4]>::deserialize(deserializer)?;
+        let [r, g, b, a] = Deserialize::deserialize(deserializer)?;
         Ok(Self {
             rgb: Rgb::new(r, g, b),
             a,

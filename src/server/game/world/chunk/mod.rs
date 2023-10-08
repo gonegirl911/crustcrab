@@ -17,7 +17,7 @@ use std::{
 
 #[derive(Default)]
 pub struct Chunk {
-    blocks: [[[Block; Self::DIM]; Self::DIM]; Self::DIM],
+    blocks: DataStore<Block>,
     non_air_count: u16,
 }
 
@@ -27,14 +27,10 @@ impl Chunk {
     fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
         let mut non_air_count = 0;
         Self {
-            blocks: array::from_fn(|x| {
-                array::from_fn(|y| {
-                    array::from_fn(|z| {
-                        let block = f(point![x, y, z].cast());
-                        non_air_count += (block != Block::Air) as u16;
-                        block
-                    })
-                })
+            blocks: DataStore::from_fn(|coords| {
+                let block = f(coords);
+                non_air_count += (block != Block::Air) as u16;
+                block
             }),
             non_air_count,
         }
@@ -45,7 +41,7 @@ impl Chunk {
     }
 
     pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
-        let prev = &mut self[coords];
+        let prev = &mut self.blocks[coords];
         match action {
             BlockAction::Place(Block::Air) => false,
             BlockAction::Place(curr) if *prev == Block::Air => {
@@ -63,7 +59,7 @@ impl Chunk {
     }
 
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
-        let prev = &mut self[coords];
+        let prev = &mut self.blocks[coords];
         let curr = match action {
             BlockAction::Place(block) => *block,
             BlockAction::Destroy => Block::Air,
@@ -85,7 +81,7 @@ impl Chunk {
     fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
             utils::coords((coords, Default::default())).cast(),
-            Vector3::from_element(Self::DIM).cast(),
+            Vector3::repeat(Self::DIM).cast(),
         )
     }
 
@@ -98,28 +94,64 @@ impl Index<Point3<u8>> for Chunk {
     type Output = Block;
 
     fn index(&self, coords: Point3<u8>) -> &Self::Output {
-        &self.blocks[coords.x as usize][coords.y as usize][coords.z as usize]
-    }
-}
-
-impl IndexMut<Point3<u8>> for Chunk {
-    fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
-        &mut self.blocks[coords.x as usize][coords.y as usize][coords.z as usize]
+        &self.blocks[coords]
     }
 }
 
 #[derive(Default)]
-pub struct ChunkLight([[[BlockLight; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
+pub struct ChunkLight {
+    lights: DataStore<BlockLight>,
+    non_zero_count: u16,
+}
+
+impl ChunkLight {
+    pub fn set(&mut self, coords: Point3<u8>, value: BlockLight) -> bool {
+        let prev = mem::replace(&mut self.lights[coords], value);
+        if prev == value {
+            false
+        } else {
+            if prev == Default::default() {
+                self.non_zero_count += 1;
+            } else if value == Default::default() {
+                self.non_zero_count -= 1;
+            }
+            true
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.non_zero_count == 0
+    }
+}
 
 impl Index<Point3<u8>> for ChunkLight {
     type Output = BlockLight;
+
+    fn index(&self, coords: Point3<u8>) -> &Self::Output {
+        &self.lights[coords]
+    }
+}
+
+#[derive(Default)]
+struct DataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
+
+impl<T> DataStore<T> {
+    fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
+        Self(array::from_fn(|x| {
+            array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
+        }))
+    }
+}
+
+impl<T> Index<Point3<u8>> for DataStore<T> {
+    type Output = T;
 
     fn index(&self, coords: Point3<u8>) -> &Self::Output {
         &self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }
 }
 
-impl IndexMut<Point3<u8>> for ChunkLight {
+impl<T> IndexMut<Point3<u8>> for DataStore<T> {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
         &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }

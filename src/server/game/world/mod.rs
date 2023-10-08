@@ -1,6 +1,7 @@
 pub mod action;
 pub mod block;
 pub mod chunk;
+pub mod light;
 
 use self::{
     action::{ActionStore, BlockAction},
@@ -14,6 +15,7 @@ use self::{
         generator::ChunkGenerator,
         Chunk,
     },
+    light::WorldLight,
 };
 use crate::{
     client::{game::world::BlockVertex, ClientEvent},
@@ -44,6 +46,7 @@ pub struct World {
     chunks: ChunkStore,
     generator: ChunkGenerator,
     actions: ActionStore,
+    light: WorldLight,
     hover: Option<BlockIntersection>,
 }
 
@@ -82,6 +85,7 @@ impl World {
         ray: Ray,
     ) {
         let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
+        let light_updates = self.light.apply(&self.chunks, coords, &action);
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
 
@@ -90,7 +94,11 @@ impl World {
         self.send_unloads(unload, server_tx.clone());
         self.send_loads(load, server_tx.clone(), true);
         self.send_updates(
-            self.updates(&load.into_iter().chain(unload).collect(), [coords], false),
+            self.updates(
+                &load.into_iter().chain(unload).collect(),
+                light_updates.into_iter().chain([coords]),
+                false,
+            ),
             server_tx,
             true,
         );
@@ -103,7 +111,7 @@ impl World {
         self.send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
                 coords,
-                data: Arc::new(ChunkData::new(&self.chunks, coords)),
+                data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
                 is_important,
             }),
             server_tx,
@@ -119,7 +127,7 @@ impl World {
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkLoaded {
                     coords,
-                    data: Arc::new(ChunkData::new(&self.chunks, coords)),
+                    data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
                     is_important,
                 })
                 .collect::<LinkedList<_>>(),
@@ -148,7 +156,7 @@ impl World {
         self.send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
                 coords,
-                data: Arc::new(ChunkData::new(&self.chunks, coords)),
+                data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
                 is_important,
             }),
             server_tx,
@@ -166,7 +174,7 @@ impl World {
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkUpdated {
                     coords,
-                    data: Arc::new(ChunkData::new(&self.chunks, coords)),
+                    data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
                     is_important,
                 })
                 .collect::<LinkedList<_>>(),
@@ -305,9 +313,9 @@ impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
         for delta in ChunkArea::chunk_deltas() {
-            if let Some(light) = self.0.get(&(coords + delta)) {
+            if let Some(chunk) = self.get(coords + delta) {
                 for (coords, delta) in ChunkArea::block_deltas(delta) {
-                    value[delta] = light[coords];
+                    value[delta] = chunk[coords];
                 }
             }
         }
@@ -319,8 +327,7 @@ impl ChunkStore {
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
-        self.0
-            .get(&utils::chunk_coords(coords))
+        self.get(utils::chunk_coords(coords))
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
     }
 
@@ -379,6 +386,10 @@ impl ChunkStore {
         }
     }
 
+    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
+        self.0.get(&coords)
+    }
+
     fn contains(&self, coords: Point3<i32>) -> bool {
         self.0.contains_key(&coords)
     }
@@ -390,10 +401,10 @@ pub struct ChunkData {
 }
 
 impl ChunkData {
-    fn new(chunks: &ChunkStore, coords: Point3<i32>) -> Self {
+    fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Self {
         Self {
             area: chunks.chunk_area(coords),
-            area_light: Default::default(),
+            area_light: light.chunk_area_light(coords),
         }
     }
 
