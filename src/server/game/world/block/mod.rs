@@ -71,7 +71,7 @@ impl BlockLight {
         Rgb::from_fn(|i| self.component(i + Self::SKYLIGHT_RANGE.start))
     }
 
-    fn torchlight(self) -> Rgb<u8> {
+    pub fn torchlight(self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(i + Self::TORCHLIGHT_RANGE.start))
     }
 

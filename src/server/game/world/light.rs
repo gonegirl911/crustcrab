@@ -37,7 +37,34 @@ impl WorldLight {
         coords: Point3<i64>,
         action: &BlockAction,
     ) -> Vec<Point3<i64>> {
-        vec![]
+        match action {
+            BlockAction::Place(block) => {
+                let mut work_area = WorkArea::new(coords, self.luminance(coords, Some(*block)));
+                work_area.populate(chunks, self);
+                work_area.place(coords, *block);
+                work_area.apply(self)
+            }
+            BlockAction::Destroy => {
+                let mut work_area = WorkArea::new(coords, self.luminance(coords, None));
+                work_area.populate(chunks, self);
+                work_area.destroy(coords);
+                work_area.apply(self)
+            }
+        }
+    }
+
+    fn luminance(&self, coords: Point3<i64>, block: Option<Block>) -> u8 {
+        self.block_light(coords)
+            .torchlight()
+            .into_iter()
+            .chain(block.into_iter().flat_map(|block| block.data().luminance))
+            .max()
+            .unwrap_or_else(|| unreachable!())
+    }
+
+    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
+        self.get(utils::chunk_coords(coords))
+            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
@@ -56,6 +83,14 @@ struct WorkArea {
 }
 
 impl WorkArea {
+    fn new(coords: Point3<i64>, luminance: u8) -> Self {
+        let radius = luminance as i64 - 1;
+        let min = coords - Vector3::repeat(radius);
+        let dims = Vector3::repeat(1 + radius * 2);
+        let data = vec![Default::default(); dims.product().max(0) as usize];
+        Self { data, min, dims }
+    }
+
     fn populate(&mut self, chunks: &ChunkStore, light: &WorldLight) {
         for chunk_coords in self.chunk_points() {
             match (chunks.get(chunk_coords), light.get(chunk_coords)) {
@@ -79,6 +114,10 @@ impl WorkArea {
             }
         }
     }
+
+    fn place(&mut self, coords: Point3<i64>, block: Block) {}
+
+    fn destroy(&mut self, coords: Point3<i64>) {}
 
     fn apply(&self, light: &mut WorldLight) -> Vec<Point3<i64>> {
         let mut changes = vec![];
