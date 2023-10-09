@@ -49,13 +49,13 @@ impl WorldLight {
     }
 }
 
-struct Workstation {
+struct WorkArea {
     data: Vec<(Block, BlockLight)>,
     min: Point3<i64>,
     dims: Vector3<i64>,
 }
 
-impl Workstation {
+impl WorkArea {
     fn populate(&mut self, chunks: &ChunkStore, light: &WorldLight) {
         for chunk_coords in self.chunk_points() {
             match (chunks.get(chunk_coords), light.get(chunk_coords)) {
@@ -158,7 +158,7 @@ impl Workstation {
     }
 }
 
-impl Index<Point3<i64>> for Workstation {
+impl Index<Point3<i64>> for WorkArea {
     type Output = (Block, BlockLight);
 
     fn index(&self, coords: Point3<i64>) -> &Self::Output {
@@ -166,7 +166,7 @@ impl Index<Point3<i64>> for Workstation {
     }
 }
 
-impl IndexMut<Point3<i64>> for Workstation {
+impl IndexMut<Point3<i64>> for WorkArea {
     fn index_mut(&mut self, coords: Point3<i64>) -> &mut Self::Output {
         let idx = unsafe { self.index_unchecked(coords) };
         &mut self.data[idx]
