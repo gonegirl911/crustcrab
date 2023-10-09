@@ -41,30 +41,27 @@ impl Chunk {
     }
 
     pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
-        let prev = &mut self.blocks[coords];
-        match action {
-            BlockAction::Place(Block::Air) => false,
-            BlockAction::Place(curr) if *prev == Block::Air => {
-                *prev = *curr;
-                self.non_air_count += 1;
-                true
-            }
-            BlockAction::Destroy if *prev != Block::Air => {
-                *prev = Block::Air;
-                self.non_air_count -= 1;
-                true
-            }
-            _ => false,
+        let block = &mut self.blocks[coords];
+        let prev = *block;
+        if block.apply(action) {
+            let curr = *block;
+            self.adjust_count(prev, curr);
+            true
+        } else {
+            false
         }
     }
 
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
-        let prev = &mut self.blocks[coords];
-        let curr = match action {
-            BlockAction::Place(block) => *block,
-            BlockAction::Destroy => Block::Air,
-        };
-        match (mem::replace(prev, curr), curr) {
+        let block = &mut self.blocks[coords];
+        let prev = *block;
+        block.apply_unchecked(action);
+        let curr = *block;
+        self.adjust_count(prev, curr);
+    }
+
+    fn adjust_count(&mut self, prev: Block, curr: Block) {
+        match (prev, curr) {
             (Block::Air, Block::Air) => {}
             (Block::Air, _) => self.non_air_count += 1,
             (_, Block::Air) => self.non_air_count -= 1,

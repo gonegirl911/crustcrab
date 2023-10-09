@@ -37,7 +37,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp,
     collections::{hash_map::Entry, LinkedList},
-    ops::Range,
+    ops::{Deref, Range},
     sync::Arc,
 };
 
@@ -182,8 +182,8 @@ impl World {
         );
     }
 
-    fn gen(&self, coords: Point3<i32>) -> Chunk {
-        let mut chunk = self.generator.gen(coords);
+    fn gen(&self, coords: Point3<i32>) -> Box<Chunk> {
+        let mut chunk = Box::new(self.generator.gen(coords));
         for (coords, action) in self.actions.actions(coords) {
             chunk.apply_unchecked(coords, action);
         }
@@ -307,7 +307,7 @@ impl EventHandler<WorldEvent> for World {
 }
 
 #[derive(Default)]
-pub struct ChunkStore(FxHashMap<Point3<i32>, Chunk>);
+pub struct ChunkStore(FxHashMap<Point3<i32>, Box<Chunk>>);
 
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
@@ -331,7 +331,7 @@ impl ChunkStore {
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
     }
 
-    fn load(&mut self, coords: Point3<i32>, chunk: Chunk) -> bool {
+    fn load(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) -> bool {
         if !chunk.is_empty() {
             self.0.insert(coords, chunk);
             true
@@ -368,14 +368,10 @@ impl ChunkStore {
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let mut chunk = Chunk::default();
-                    if chunk.apply(block_coords, action) {
-                        if !chunk.is_empty() {
-                            entry.insert(chunk);
-                            Ok((Some(chunk_coords), None))
-                        } else {
-                            unreachable!();
-                        }
+                    if Block::Air.apply(action) {
+                        let chunk = entry.insert(Default::default());
+                        chunk.apply_unchecked(block_coords, action);
+                        Ok((Some(chunk_coords), None))
                     } else {
                         Err(())
                     }
@@ -387,7 +383,7 @@ impl ChunkStore {
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords)
+        self.0.get(&coords).map(Deref::deref)
     }
 
     fn contains(&self, coords: Point3<i32>) -> bool {

@@ -96,15 +96,20 @@ impl Workstation {
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let mut light = ChunkLight::default();
+                    let mut non_zero_lights = vec![];
                     for block_coords in self.block_points(chunk_coords) {
                         let coords = utils::coords((chunk_coords, block_coords));
-                        if light.set(block_coords, self[coords].1) {
-                            changes.push(coords)
+                        let light = self[coords].1;
+                        if light != Default::default() {
+                            non_zero_lights.push((block_coords, light));
+                            changes.push(coords);
                         }
                     }
-                    if !light.is_empty() {
-                        entry.insert(light);
+                    if !non_zero_lights.is_empty() {
+                        let light = entry.insert(Default::default());
+                        for (coords, non_zero_light) in non_zero_lights {
+                            light.set(coords, non_zero_light);
+                        }
                     }
                 }
             }
