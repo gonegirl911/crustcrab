@@ -35,10 +35,10 @@ impl Player {
         let view = View::new(state.origin, Vector3::x());
         let aspect = config.width as f32 / config.height as f32;
         let projection = Projection::new(state.fovy, aspect, 0.1, state.zfar());
-        let controller = Controller::new(state.speed, state.sensitivity);
+        let controller = Controller::new(aspect, state.speed, state.sensitivity);
         let uniform = Uniform::new(
             renderer,
-            MemoryState::Mutable(&Self::data(&view, &projection)),
+            MemoryState::UNINIT,
             wgpu::ShaderStages::VERTEX_FRAGMENT,
         );
         Self {
@@ -67,17 +67,6 @@ impl Player {
             self.projection.aspect,
             self.projection.znear,
             self.projection.zfar,
-        )
-    }
-
-    fn data(view: &View, projection: &Projection) -> PlayerUniformData {
-        PlayerUniformData::new(
-            view.mat(),
-            projection.mat(),
-            view.origin,
-            view.forward,
-            projection.znear,
-            projection.zfar,
         )
     }
 }
@@ -132,8 +121,17 @@ impl EventHandler for Player {
                 }
 
                 if changes.intersects(Changes::MATRIX_CHANGES) {
-                    self.uniform
-                        .set(renderer, &Self::data(&self.view, &self.projection));
+                    self.uniform.set(
+                        renderer,
+                        &PlayerUniformData::new(
+                            self.view.mat(),
+                            self.projection.mat(),
+                            self.view.origin,
+                            self.view.forward,
+                            self.projection.znear,
+                            self.projection.zfar,
+                        ),
+                    );
                 }
             }
             _ => {}

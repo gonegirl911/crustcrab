@@ -39,7 +39,7 @@ impl EventLoop {
 
         self.event_loop.run(move |event, _, control_flow| {
             match event {
-                Event::NewEvents(StartCause::Init) | Event::RedrawEventsCleared => {
+                Event::NewEvents(StartCause::Init | StartCause::Poll) => {
                     for event in self.server_rx.drain() {
                         self.proxy
                             .send_event(event)

@@ -90,8 +90,9 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new(speed: f32, sensitivity: f32) -> Self {
+    pub fn new(aspect: f32, speed: f32, sensitivity: f32) -> Self {
         Self {
+            aspect,
             speed,
             sensitivity,
             ..Default::default()

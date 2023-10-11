@@ -197,14 +197,13 @@ impl<T: ?Sized> Deref for Buffer<T> {
 }
 
 pub enum MemoryState<'a, T: ?Sized, U = ()> {
-    Mutable(&'a T),
     Immutable(&'a T),
     Uninit(U),
 }
 
 impl<T: ?Sized, U> MemoryState<'_, T, U> {
     fn usage(&self, usage: wgpu::BufferUsages) -> wgpu::BufferUsages {
-        if matches!(self, Self::Mutable(_) | Self::Uninit(_)) {
+        if matches!(self, Self::Uninit(_)) {
             usage | wgpu::BufferUsages::COPY_DST
         } else {
             usage
@@ -215,7 +214,7 @@ impl<T: ?Sized, U> MemoryState<'_, T, U> {
 impl<T> MemoryState<'_, [T], usize> {
     fn data(&self) -> Result<&[T], usize> {
         match self {
-            Self::Mutable(data) | Self::Immutable(data) => Ok(data),
+            Self::Immutable(data) => Ok(data),
             Self::Uninit(len) => Err(*len),
         }
     }
@@ -225,7 +224,7 @@ impl<T> MemoryState<'_, T, ()> {
     pub const UNINIT: Self = Self::Uninit(());
 
     fn value(&self) -> Option<&T> {
-        if let Self::Mutable(value) | Self::Immutable(value) = self {
+        if let Self::Immutable(value) = self {
             Some(value)
         } else {
             None

@@ -18,13 +18,18 @@ impl Ticker {
         }
     }
 
-    pub fn wait<T, F: FnOnce() -> T>(&mut self, f: F) -> T {
-        self.sleeper.sleep(self.rem());
+    pub fn wait<F: FnMut()>(&mut self, mut f: F) {
+        self.sleeper.sleep(self.rem(&mut f));
         self.prev = Instant::now();
-        f()
+        f();
     }
 
-    fn rem(&self) -> Duration {
-        self.dt.saturating_sub(self.prev.elapsed())
+    fn rem<F: FnMut()>(&self, mut f: F) -> Duration {
+        let mut rem = self.prev.elapsed();
+        while let Some(r) = rem.checked_sub(self.dt) {
+            rem = r;
+            f();
+        }
+        self.dt - rem
     }
 }
