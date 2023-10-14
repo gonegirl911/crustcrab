@@ -165,12 +165,11 @@ impl WorkArea {
     }
 
     fn block_points(&self, coords: Point3<i32>) -> impl Iterator<Item = Point3<u8>> {
-        let [x, y, z] = coords.into();
         let min = self.min;
         let max = self.max();
-        Self::block_axis_range(x, min.x, max.x).flat_map(move |x| {
-            Self::block_axis_range(y, min.y, max.y).flat_map(move |y| {
-                Self::block_axis_range(z, min.z, max.z).map(move |z| point![x, y, z])
+        Self::block_axis_range(coords.x, min.x, max.x).flat_map(move |x| {
+            Self::block_axis_range(coords.y, min.y, max.y).flat_map(move |y| {
+                Self::block_axis_range(coords.z, min.z, max.z).map(move |z| point![x, y, z])
             })
         })
     }
