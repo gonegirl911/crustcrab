@@ -208,14 +208,14 @@ impl Index<Point3<i64>> for WorkArea {
     type Output = (Block, BlockLight);
 
     fn index(&self, coords: Point3<i64>) -> &Self::Output {
-        assert!(self.is_in_bounds(coords), "index out of bounds");
+        assert!(self.is_in_bounds(coords), "coords out of bounds");
         unsafe { self.data.get_unchecked(self.index_unchecked(coords)) }
     }
 }
 
 impl IndexMut<Point3<i64>> for WorkArea {
     fn index_mut(&mut self, coords: Point3<i64>) -> &mut Self::Output {
-        assert!(self.is_in_bounds(coords), "index out of bounds");
+        assert!(self.is_in_bounds(coords), "coords out of bounds");
         unsafe {
             let idx = self.index_unchecked(coords);
             self.data.get_unchecked_mut(idx)
