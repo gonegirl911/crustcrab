@@ -1,6 +1,6 @@
 use super::{
     action::BlockAction,
-    block::{Block, BlockLight},
+    block::{data::BlockData, Block, BlockLight},
     chunk::{
         area::{ChunkArea, ChunkAreaLight},
         Chunk, ChunkLight,
@@ -41,7 +41,7 @@ impl WorldLight {
             BlockAction::Place(block) => {
                 let mut work_area = WorkArea::new(coords, self.luminance(coords, Some(*block)));
                 work_area.populate(chunks, self);
-                work_area.place(coords, *block);
+                work_area.place(coords, block.data());
                 work_area.apply(self)
             }
             BlockAction::Destroy => {
@@ -115,7 +115,7 @@ impl WorkArea {
         }
     }
 
-    fn place(&mut self, coords: Point3<i64>, block: Block) {}
+    fn place(&mut self, coords: Point3<i64>, data: &BlockData) {}
 
     fn destroy(&mut self, coords: Point3<i64>) {}
 
@@ -179,6 +179,13 @@ impl WorkArea {
         self.min + self.dims - Vector3::repeat(1)
     }
 
+    fn is_in_bounds(&self, coords: Point3<i64>) -> bool {
+        let max = self.max();
+        (self.min.x..=max.x).contains(&coords.x)
+            && (self.min.y..=max.y).contains(&coords.y)
+            && (self.min.z..=max.z).contains(&coords.z)
+    }
+
     unsafe fn index_unchecked(&self, coords: Point3<i64>) -> usize {
         let delta = coords - self.min;
         (delta.x * self.dims.y * self.dims.z + delta.y * self.dims.z + delta.z) as usize
@@ -201,13 +208,17 @@ impl Index<Point3<i64>> for WorkArea {
     type Output = (Block, BlockLight);
 
     fn index(&self, coords: Point3<i64>) -> &Self::Output {
-        &self.data[unsafe { self.index_unchecked(coords) }]
+        assert!(self.is_in_bounds(coords), "index out of bounds");
+        unsafe { self.data.get_unchecked(self.index_unchecked(coords)) }
     }
 }
 
 impl IndexMut<Point3<i64>> for WorkArea {
     fn index_mut(&mut self, coords: Point3<i64>) -> &mut Self::Output {
-        let idx = unsafe { self.index_unchecked(coords) };
-        &mut self.data[idx]
+        assert!(self.is_in_bounds(coords), "index out of bounds");
+        unsafe {
+            let idx = self.index_unchecked(coords);
+            self.data.get_unchecked_mut(idx)
+        }
     }
 }
