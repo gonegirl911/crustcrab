@@ -285,7 +285,7 @@ impl EventHandler<WorldEvent> for World {
                                 BlockHoverData::new(
                                     coords,
                                     self.chunks.block_area(coords),
-                                    &Default::default(),
+                                    &self.light.block_area_light(coords),
                                 )
                             },
                         )))

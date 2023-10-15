@@ -1,6 +1,7 @@
 use super::{
     action::BlockAction,
     block::{
+        area::BlockAreaLight,
         data::{BlockData, SIDE_DELTAS},
         Block, BlockLight,
     },
@@ -35,6 +36,10 @@ impl WorldLight {
         value
     }
 
+    pub fn block_area_light(&self, coords: Point3<i64>) -> BlockAreaLight {
+        BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
+    }
+
     pub fn apply(
         &mut self,
         chunks: &ChunkStore,
@@ -43,20 +48,21 @@ impl WorldLight {
     ) -> Vec<Point3<i64>> {
         match action {
             BlockAction::Place(block) => {
-                let mut work_area = WorkArea::new(coords, self.luminance(coords, *block));
+                let data = block.data();
+                let mut work_area = WorkArea::new(coords, self.luminance(coords, data));
                 work_area.populate(chunks, self);
-                work_area.place(coords, block.data());
+                work_area.place(coords, data);
                 work_area.apply(self)
             }
             BlockAction::Destroy => vec![],
         }
     }
 
-    fn luminance(&self, coords: Point3<i64>, block: Block) -> u8 {
+    fn luminance(&self, coords: Point3<i64>, data: &BlockData) -> u8 {
         self.block_light(coords)
             .torchlight()
             .into_iter()
-            .chain(block.data().luminance)
+            .chain(data.luminance)
             .max()
             .unwrap_or_else(|| unreachable!())
     }
@@ -273,10 +279,6 @@ impl WorkArea {
         }
     }
 
-    fn apply_filter(value: u8, filter: f32) -> u8 {
-        (value as f32 * filter).round() as u8
-    }
-
     fn neighbors(coords: Point3<i64>, value: u8) -> impl Iterator<Item = (Point3<i64>, u8)> {
         let value = value - 1;
         (value != 0)
@@ -287,6 +289,10 @@ impl WorkArea {
             })
             .into_iter()
             .flatten()
+    }
+
+    fn apply_filter(value: u8, filter: f32) -> u8 {
+        (value as f32 * filter).round() as u8
     }
 }
 
