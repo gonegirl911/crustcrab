@@ -38,6 +38,12 @@ impl<T> Rgb<T> {
     }
 }
 
+impl<T: Ord + Copy> Rgb<T> {
+    pub fn sup(self, other: Self) -> Self {
+        self.zip_map(other, T::max)
+    }
+}
+
 impl<T: Mul + Copy> Rgb<T> {
     fn dot<S: Sum<T::Output>>(self, other: Rgb<T>) -> S {
         (self * other).sum()

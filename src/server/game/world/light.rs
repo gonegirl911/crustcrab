@@ -11,7 +11,7 @@ use super::{
     },
     ChunkStore,
 };
-use crate::shared::utils;
+use crate::shared::{color::Rgb, utils};
 use nalgebra::{point, Point3, Vector3};
 use rustc_hash::FxHashMap;
 use std::{
@@ -49,21 +49,34 @@ impl WorldLight {
         match action {
             BlockAction::Place(block) => {
                 let data = block.data();
-                let mut work_area = WorkArea::new(coords, self.luminance(coords, data));
+                let mut work_area = WorkArea::new(coords, self.max(coords, data.luminance));
                 work_area.populate(chunks, self);
                 work_area.place(coords, data);
                 work_area.apply(self)
             }
-            BlockAction::Destroy => vec![],
+            BlockAction::Destroy => {
+                let value = self.brightest_neighbor(coords).map(|c| c.saturating_sub(1));
+                let mut work_area = WorkArea::new(coords, self.max(coords, value));
+                work_area.populate(chunks, self);
+                work_area.destroy(coords, value);
+                work_area.apply(self)
+            }
         }
     }
 
-    fn luminance(&self, coords: Point3<i64>, data: &BlockData) -> u8 {
-        self.block_light(coords)
-            .torchlight()
+    fn max(&self, coords: Point3<i64>, value: Rgb<u8>) -> u8 {
+        [self.block_light(coords).torchlight(), value]
             .into_iter()
-            .chain(data.luminance)
+            .flatten()
             .max()
+            .unwrap_or_else(|| unreachable!())
+    }
+
+    fn brightest_neighbor(&self, coords: Point3<i64>) -> Rgb<u8> {
+        SIDE_DELTAS
+            .into_values()
+            .map(|delta| self.block_light(coords + delta.cast()).torchlight())
+            .reduce(Rgb::sup)
             .unwrap_or_else(|| unreachable!())
     }
 
@@ -130,6 +143,14 @@ impl WorkArea {
         }
     }
 
+    fn destroy(&mut self, coords: Point3<i64>, value: Rgb<u8>) {
+        if self.is_in_bounds(coords) {
+            for i in BlockLight::TORCHLIGHT_RANGE {
+                self.destroy_component(coords, i, value[i % 3]);
+            }
+        }
+    }
+
     fn apply(&self, light: &mut WorldLight) -> Vec<Point3<i64>> {
         let mut changes = vec![];
         for chunk_coords in self.chunk_points() {
@@ -179,11 +200,25 @@ impl WorkArea {
     }
 
     fn place_component(&mut self, coords: Point3<i64>, index: usize, value: u8) {
-        if value != 0 {
-            let (_, light) = &mut self[coords];
-            if light.component(index) < value {
+        let (_, light) = &mut self[coords];
+        if light.component(index) < value {
+            light.set_component(index, value);
+            self.spread_component(coords, index, value);
+        }
+    }
+
+    fn destroy_component(&mut self, coords: Point3<i64>, index: usize, value: u8) {
+        let (_, light) = &mut self[coords];
+        let component = light.component(index);
+        match component.cmp(&value) {
+            Ordering::Less => {
                 light.set_component(index, value);
                 self.spread_component(coords, index, value);
+            }
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                light.set_component(index, 0);
+                self.spread_filter(coords, index, component, 0.0);
             }
         }
     }
@@ -195,16 +230,14 @@ impl WorkArea {
         while let Some((coords, expected)) = deq.pop_front() {
             let (block, ref mut light) = self[coords];
             let component = light.component(index);
-            if component != 0 {
-                let expected = Self::apply_filter(expected, block.data().light_filter[index % 3]);
-                match component.cmp(&expected) {
-                    Ordering::Less => {}
-                    Ordering::Equal => {
-                        light.set_component(index, Self::apply_filter(expected, filter));
-                        deq.extend(Self::neighbors(coords, expected));
-                    }
-                    Ordering::Greater => sources.push((coords, component)),
+            let expected = Self::apply_filter(expected, block.data().light_filter[index % 3]);
+            match component.cmp(&expected) {
+                Ordering::Less => {}
+                Ordering::Equal => {
+                    light.set_component(index, Self::apply_filter(expected, filter));
+                    deq.extend(Self::neighbors(coords, expected));
                 }
+                Ordering::Greater => sources.push((coords, component)),
             }
         }
 
@@ -248,6 +281,11 @@ impl WorkArea {
         self.min + self.dims - Vector3::repeat(1)
     }
 
+    fn get(&self, coords: Point3<i64>) -> Option<&(Block, BlockLight)> {
+        self.is_in_bounds(coords)
+            .then(|| unsafe { self.data.get_unchecked(self.index_unchecked(coords)) })
+    }
+
     fn get_mut(&mut self, coords: Point3<i64>) -> Option<&mut (Block, BlockLight)> {
         self.is_in_bounds(coords).then(|| unsafe {
             let idx = self.index_unchecked(coords);
@@ -280,12 +318,11 @@ impl WorkArea {
     }
 
     fn neighbors(coords: Point3<i64>, value: u8) -> impl Iterator<Item = (Point3<i64>, u8)> {
-        let value = value - 1;
-        (value != 0)
+        (value > 1)
             .then(|| {
                 SIDE_DELTAS
                     .into_values()
-                    .map(move |delta| (coords + delta.cast(), value))
+                    .map(move |delta| (coords + delta.cast(), value - 1))
             })
             .into_iter()
             .flatten()
@@ -300,8 +337,7 @@ impl Index<Point3<i64>> for WorkArea {
     type Output = (Block, BlockLight);
 
     fn index(&self, coords: Point3<i64>) -> &Self::Output {
-        assert!(self.is_in_bounds(coords), "coords out of bounds");
-        unsafe { self.data.get_unchecked(self.index_unchecked(coords)) }
+        self.get(coords).expect("coords out of bounds")
     }
 }
 
