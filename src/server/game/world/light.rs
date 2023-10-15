@@ -1,6 +1,9 @@
 use super::{
     action::BlockAction,
-    block::{data::BlockData, Block, BlockLight},
+    block::{
+        data::{BlockData, SIDE_DELTAS},
+        Block, BlockLight,
+    },
     chunk::{
         area::{ChunkArea, ChunkAreaLight},
         Chunk, ChunkLight,
@@ -11,7 +14,8 @@ use crate::shared::utils;
 use nalgebra::{point, Point3, Vector3};
 use rustc_hash::FxHashMap;
 use std::{
-    collections::hash_map::Entry,
+    cmp::Ordering,
+    collections::{hash_map::Entry, VecDeque},
     ops::{Index, IndexMut, Range},
 };
 
@@ -39,25 +43,20 @@ impl WorldLight {
     ) -> Vec<Point3<i64>> {
         match action {
             BlockAction::Place(block) => {
-                let mut work_area = WorkArea::new(coords, self.luminance(coords, Some(*block)));
+                let mut work_area = WorkArea::new(coords, self.luminance(coords, *block));
                 work_area.populate(chunks, self);
                 work_area.place(coords, block.data());
                 work_area.apply(self)
             }
-            BlockAction::Destroy => {
-                let mut work_area = WorkArea::new(coords, self.luminance(coords, None));
-                work_area.populate(chunks, self);
-                work_area.destroy(coords);
-                work_area.apply(self)
-            }
+            BlockAction::Destroy => vec![],
         }
     }
 
-    fn luminance(&self, coords: Point3<i64>, block: Option<Block>) -> u8 {
+    fn luminance(&self, coords: Point3<i64>, block: Block) -> u8 {
         self.block_light(coords)
             .torchlight()
             .into_iter()
-            .chain(block.into_iter().flat_map(|block| block.data().luminance))
+            .chain(block.data().luminance)
             .max()
             .unwrap_or_else(|| unreachable!())
     }
@@ -115,9 +114,15 @@ impl WorkArea {
         }
     }
 
-    fn place(&mut self, coords: Point3<i64>, data: &BlockData) {}
-
-    fn destroy(&mut self, coords: Point3<i64>) {}
+    fn place(&mut self, coords: Point3<i64>, data: &BlockData) {
+        if self.is_in_bounds(coords) {
+            for i in BlockLight::TORCHLIGHT_RANGE {
+                let value = data.luminance[i % 3];
+                self.place_filter(coords, i, value, data.light_filter[i % 3]);
+                self.place_component(coords, i, value);
+            }
+        }
+    }
 
     fn apply(&self, light: &mut WorldLight) -> Vec<Point3<i64>> {
         let mut changes = vec![];
@@ -156,6 +161,65 @@ impl WorkArea {
         changes
     }
 
+    fn place_filter(&mut self, coords: Point3<i64>, index: usize, value: u8, filter: f32) {
+        if filter != 1.0 {
+            let (_, light) = &mut self[coords];
+            let component = light.component(index);
+            if component > value {
+                light.set_component(index, Self::apply_filter(component, filter));
+                self.spread_filter(coords, index, component, filter);
+            }
+        }
+    }
+
+    fn place_component(&mut self, coords: Point3<i64>, index: usize, value: u8) {
+        if value != 0 {
+            let (_, light) = &mut self[coords];
+            if light.component(index) < value {
+                light.set_component(index, value);
+                self.spread_component(coords, index, value);
+            }
+        }
+    }
+
+    fn spread_filter(&mut self, coords: Point3<i64>, index: usize, expected: u8, filter: f32) {
+        let mut deq = VecDeque::from_iter(Self::neighbors(coords, expected));
+        let mut sources = vec![];
+
+        while let Some((coords, expected)) = deq.pop_front() {
+            let (block, ref mut light) = self[coords];
+            let component = light.component(index);
+            if component != 0 {
+                let expected = Self::apply_filter(expected, block.data().light_filter[index % 3]);
+                match component.cmp(&expected) {
+                    Ordering::Less => {}
+                    Ordering::Equal => {
+                        light.set_component(index, Self::apply_filter(expected, filter));
+                        deq.extend(Self::neighbors(coords, expected));
+                    }
+                    Ordering::Greater => sources.push((coords, component)),
+                }
+            }
+        }
+
+        for (coords, value) in sources {
+            self.spread_component(coords, index, value);
+        }
+    }
+
+    fn spread_component(&mut self, coords: Point3<i64>, index: usize, value: u8) {
+        let mut deq = VecDeque::from_iter(Self::neighbors(coords, value));
+        while let Some((coords, value)) = deq.pop_front() {
+            if let Some((block, light)) = self.get_mut(coords) {
+                let filter = block.data().light_filter[index % 3];
+                if light.component(index) < Self::apply_filter(value, filter) {
+                    light.set_component(index, value);
+                    deq.extend(Self::neighbors(coords, value));
+                }
+            }
+        }
+    }
+
     fn chunk_points(&self) -> impl Iterator<Item = Point3<i32>> {
         let min = utils::chunk_coords(self.min);
         let max = utils::chunk_coords(self.max());
@@ -176,6 +240,13 @@ impl WorkArea {
 
     fn max(&self) -> Point3<i64> {
         self.min + self.dims - Vector3::repeat(1)
+    }
+
+    fn get_mut(&mut self, coords: Point3<i64>) -> Option<&mut (Block, BlockLight)> {
+        self.is_in_bounds(coords).then(|| unsafe {
+            let idx = self.index_unchecked(coords);
+            self.data.get_unchecked_mut(idx)
+        })
     }
 
     fn is_in_bounds(&self, coords: Point3<i64>) -> bool {
@@ -201,6 +272,22 @@ impl WorkArea {
             0..Chunk::DIM as u8
         }
     }
+
+    fn apply_filter(value: u8, filter: f32) -> u8 {
+        (value as f32 * filter).round() as u8
+    }
+
+    fn neighbors(coords: Point3<i64>, value: u8) -> impl Iterator<Item = (Point3<i64>, u8)> {
+        let value = value - 1;
+        (value != 0)
+            .then(|| {
+                SIDE_DELTAS
+                    .into_values()
+                    .map(move |delta| (coords + delta.cast(), value))
+            })
+            .into_iter()
+            .flatten()
+    }
 }
 
 impl Index<Point3<i64>> for WorkArea {
@@ -214,10 +301,6 @@ impl Index<Point3<i64>> for WorkArea {
 
 impl IndexMut<Point3<i64>> for WorkArea {
     fn index_mut(&mut self, coords: Point3<i64>) -> &mut Self::Output {
-        assert!(self.is_in_bounds(coords), "coords out of bounds");
-        unsafe {
-            let idx = self.index_unchecked(coords);
-            self.data.get_unchecked_mut(idx)
-        }
+        self.get_mut(coords).expect("coords out of bounds")
     }
 }
