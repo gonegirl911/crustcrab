@@ -55,7 +55,7 @@ impl WorldLight {
                 work_area.apply(self)
             }
             BlockAction::Destroy => {
-                let value = self.brightest_neighbor(coords).map(|c| c.saturating_sub(1));
+                let value = self.flood(coords);
                 let mut work_area = WorkArea::new(coords, self.max(coords, value));
                 work_area.populate(chunks, self);
                 work_area.destroy(coords, value);
@@ -72,12 +72,12 @@ impl WorldLight {
             .unwrap_or_else(|| unreachable!())
     }
 
-    fn brightest_neighbor(&self, coords: Point3<i64>) -> Rgb<u8> {
-        SIDE_DELTAS
-            .into_values()
-            .map(|delta| self.block_light(coords + delta.cast()).torchlight())
+    fn flood(&self, coords: Point3<i64>) -> Rgb<u8> {
+        WorkArea::neighbor_points(coords)
+            .map(|coords| self.block_light(coords).torchlight())
             .reduce(Rgb::sup)
             .unwrap_or_else(|| unreachable!())
+            .map(|c| c.saturating_sub(1))
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
@@ -325,13 +325,15 @@ impl WorkArea {
 
     fn neighbors(coords: Point3<i64>, value: u8) -> impl Iterator<Item = (Point3<i64>, u8)> {
         (value > 1)
-            .then(|| {
-                SIDE_DELTAS
-                    .into_values()
-                    .map(move |delta| (coords + delta.cast(), value - 1))
-            })
+            .then(|| Self::neighbor_points(coords).map(move |coords| (coords, value - 1)))
             .into_iter()
             .flatten()
+    }
+
+    fn neighbor_points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
+        SIDE_DELTAS
+            .into_values()
+            .map(move |delta| coords + delta.cast())
     }
 }
 
