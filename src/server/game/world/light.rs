@@ -73,7 +73,7 @@ impl WorldLight {
     }
 
     fn flood(&self, coords: Point3<i64>) -> Rgb<u8> {
-        WorkArea::neighbor_points(coords)
+        WorkArea::adjacent_points(coords)
             .map(|coords| self.block_light(coords).torchlight())
             .reduce(Rgb::sup)
             .unwrap_or_else(|| unreachable!())
@@ -325,12 +325,12 @@ impl WorkArea {
 
     fn neighbors(coords: Point3<i64>, value: u8) -> impl Iterator<Item = (Point3<i64>, u8)> {
         (value > 1)
-            .then(|| Self::neighbor_points(coords).map(move |coords| (coords, value - 1)))
+            .then(|| Self::adjacent_points(coords).map(move |coords| (coords, value - 1)))
             .into_iter()
             .flatten()
     }
 
-    fn neighbor_points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
+    fn adjacent_points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
         SIDE_DELTAS
             .into_values()
             .map(move |delta| coords + delta.cast())
