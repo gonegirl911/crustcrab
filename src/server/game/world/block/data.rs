@@ -56,7 +56,7 @@ impl BlockData {
     }
 
     pub fn is_transparent(&self) -> bool {
-        self.light_filter != Default::default()
+        self.light_filter != Default::default() || self.requires_blending
     }
 
     pub fn is_opaque(&self) -> bool {
