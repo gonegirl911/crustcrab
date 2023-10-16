@@ -51,7 +51,7 @@ impl BlockData {
             .flatten()
     }
 
-    pub fn is_glowing(&self) -> bool {
+    fn is_glowing(&self) -> bool {
         self.luminance != Default::default()
     }
 
