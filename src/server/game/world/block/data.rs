@@ -13,7 +13,7 @@ use std::{fs, sync::Arc};
 pub struct BlockData {
     pub side_tex_indices: Option<EnumMap<Side, u8>>,
     pub luminance: Rgb<u8>,
-    pub light_filter: Rgb<f32>,
+    pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
 }
 
@@ -101,7 +101,7 @@ struct RawBlockData {
     #[serde(default)]
     luminance: Rgb<u8>,
     #[serde(default)]
-    light_filter: Rgb<f32>,
+    light_filter: Rgb<u8>,
     #[serde(default)]
     requires_blending: bool,
 }

@@ -188,13 +188,13 @@ impl WorkArea {
         changes
     }
 
-    fn place_filter(&mut self, coords: Point3<i64>, index: usize, value: u8, filter: f32) {
-        if filter != 1.0 {
+    fn place_filter(&mut self, coords: Point3<i64>, index: usize, value: u8, filter: u8) {
+        if filter == 0 {
             let (_, light) = &mut self[coords];
             let component = light.component(index);
             if component > value {
-                light.set_component(index, Self::apply_filter(component, filter));
-                self.spread_filter(coords, index, component, filter);
+                light.set_component(index, 0);
+                self.unspread_component(coords, index, component);
             }
         }
     }
@@ -218,23 +218,29 @@ impl WorkArea {
             Ordering::Equal => {}
             Ordering::Greater => {
                 light.set_component(index, 0);
-                self.spread_filter(coords, index, component, 0.0);
+                self.unspread_component(coords, index, component);
             }
         }
     }
 
-    fn spread_filter(&mut self, coords: Point3<i64>, index: usize, expected: u8, filter: f32) {
+    fn unspread_component(&mut self, coords: Point3<i64>, index: usize, expected: u8) {
         let mut deq = VecDeque::from_iter(Self::neighbors(coords, expected));
         let mut sources = vec![];
 
         while let Some((coords, expected)) = deq.pop_front() {
             let (block, ref mut light) = self[coords];
             let component = light.component(index);
-            let expected = Self::apply_filter(expected, block.data().light_filter[index % 3]);
+            let expected = expected * block.data().light_filter[index % 3];
             match component.cmp(&expected) {
                 Ordering::Less => {}
                 Ordering::Equal => {
-                    light.set_component(index, Self::apply_filter(expected, filter));
+                    let luminance = block.data().luminance[index % 3];
+                    if luminance != 0 {
+                        light.set_component(index, luminance);
+                        sources.push((coords, luminance));
+                    } else {
+                        light.set_component(index, 0);
+                    }
                     deq.extend(Self::neighbors(coords, expected));
                 }
                 Ordering::Greater => sources.push((coords, component)),
@@ -250,8 +256,8 @@ impl WorkArea {
         let mut deq = VecDeque::from_iter(Self::neighbors(coords, value));
         while let Some((coords, value)) = deq.pop_front() {
             if let Some((block, light)) = self.get_mut(coords) {
-                let filter = block.data().light_filter[index % 3];
-                if light.component(index) < Self::apply_filter(value, filter) {
+                let value = value * block.data().light_filter[index % 3];
+                if light.component(index) < value {
                     light.set_component(index, value);
                     deq.extend(Self::neighbors(coords, value));
                 }
@@ -326,10 +332,6 @@ impl WorkArea {
             })
             .into_iter()
             .flatten()
-    }
-
-    fn apply_filter(value: u8, filter: f32) -> u8 {
-        (value as f32 * filter).round() as u8
     }
 }
 
