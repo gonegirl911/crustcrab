@@ -9,14 +9,15 @@ use super::{
         area::{ChunkArea, ChunkAreaLight},
         Chunk, ChunkLight,
     },
-    ChunkStore,
+    ChunkStore, World,
 };
 use crate::shared::{color::Rgb, utils};
-use nalgebra::{point, Point3, Vector3};
+use nalgebra::{point, vector, Point3, Vector3};
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Ordering,
     collections::{hash_map::Entry, VecDeque},
+    iter,
     ops::{Index, IndexMut, Range},
 };
 
@@ -48,15 +49,20 @@ impl WorldLight {
     ) -> Vec<Point3<i64>> {
         match action {
             BlockAction::Place(block) => {
+                let (skylight, height) = self.cast_light_beam(chunks, coords);
                 let data = block.data();
-                let mut work_area = WorkArea::new(coords, self.max(coords, data.luminance));
+                let value = BlockLight::new(skylight, data.luminance);
+                let luminance = self.luminance(coords, value, Some(data));
+                let mut work_area = WorkArea::new(coords, luminance, height);
                 work_area.populate(chunks, self);
                 work_area.place(coords, data);
                 work_area.apply(self)
             }
             BlockAction::Destroy => {
-                let value = self.flood(coords);
-                let mut work_area = WorkArea::new(coords, self.max(coords, value));
+                let (skylight, height) = self.cast_light_beam(chunks, coords);
+                let value = self.flood(coords, skylight);
+                let luminance = self.luminance(coords, value, None);
+                let mut work_area = WorkArea::new(coords, luminance, height);
                 work_area.populate(chunks, self);
                 work_area.destroy(coords, value);
                 work_area.apply(self)
@@ -64,20 +70,72 @@ impl WorldLight {
         }
     }
 
-    fn max(&self, coords: Point3<i64>, value: Rgb<u8>) -> u8 {
-        [self.block_light(coords).torchlight(), value]
-            .into_iter()
-            .flatten()
-            .max()
-            .unwrap_or_else(|| unreachable!())
+    fn luminance(&self, coords: Point3<i64>, value: BlockLight, data: Option<&BlockData>) -> u8 {
+        if let Some(data) = data {
+            iter::zip(self.block_light(coords), value)
+                .enumerate()
+                .map(|(i, (a, b))| {
+                    if BlockLight::TORCHLIGHT_RANGE.contains(&i) {
+                        if data.light_filter[i % 3] == 0 {
+                            a.max(b)
+                        } else if a < b {
+                            b
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                })
+                .max()
+                .unwrap_or_else(|| unreachable!())
+        } else {
+            self.block_light(coords)
+                .zip_map(value, |a, b| match a.cmp(&b) {
+                    Ordering::Less => b,
+                    Ordering::Equal => 0,
+                    Ordering::Greater => a,
+                })
+                .max()
+        }
     }
 
-    fn flood(&self, coords: Point3<i64>) -> Rgb<u8> {
+    fn cast_light_beam(&self, chunks: &ChunkStore, coords: Point3<i64>) -> (Rgb<u8>, u64) {
+        let mut accum = Rgb::splat(BlockLight::COMPONENT_MAX);
+        let mut value = accum;
+        let mut bottom = utils::coords((World::Y_RANGE.start, 0));
+
+        for (y, block) in chunks.column(coords.xz()) {
+            match coords.y.cmp(&y) {
+                Ordering::Less => {
+                    accum *= block.data().light_filter;
+                    value = accum;
+                    if accum == Default::default() {
+                        bottom = coords.y;
+                        break;
+                    }
+                }
+                Ordering::Equal => {}
+                Ordering::Greater => {
+                    accum *= block.data().light_filter;
+                    if accum == Default::default() {
+                        bottom = y + 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        (value, (coords.y - bottom) as u64)
+    }
+
+    fn flood(&self, coords: Point3<i64>, skylight: Rgb<u8>) -> BlockLight {
         WorkArea::adjacent_points(coords)
-            .map(|coords| self.block_light(coords).torchlight())
-            .reduce(Rgb::sup)
+            .map(|coords| self.block_light(coords))
+            .reduce(BlockLight::sup)
             .unwrap_or_else(|| unreachable!())
             .map(|c| c.saturating_sub(1))
+            .sup(BlockLight::new(skylight, Default::default()))
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
@@ -101,10 +159,10 @@ struct WorkArea {
 }
 
 impl WorkArea {
-    fn new(coords: Point3<i64>, luminance: u8) -> Self {
+    fn new(coords: Point3<i64>, luminance: u8, height: u64) -> Self {
         let radius = luminance as i64 - 1;
         let min = coords - Vector3::repeat(radius);
-        let dims = Vector3::repeat(1 + radius * 2);
+        let dims = Vector3::repeat(1 + radius * 2) + vector![0, height as i64, 0];
         let data = vec![Default::default(); dims.product().max(0) as usize];
         Self { data, min, dims }
     }
@@ -143,10 +201,10 @@ impl WorkArea {
         }
     }
 
-    fn destroy(&mut self, coords: Point3<i64>, value: Rgb<u8>) {
+    fn destroy(&mut self, coords: Point3<i64>, value: BlockLight) {
         if self.is_in_bounds(coords) {
             for i in BlockLight::TORCHLIGHT_RANGE {
-                self.destroy_component(coords, i, value[i % 3]);
+                self.destroy_component(coords, i, value.component(i));
             }
         }
     }

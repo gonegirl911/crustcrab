@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer};
 use std::{
     array,
     iter::Sum,
-    ops::{Add, Index, Mul},
+    ops::{Add, Index, Mul, MulAssign},
 };
 
 #[repr(transparent)]
@@ -38,9 +38,9 @@ impl<T> Rgb<T> {
     }
 }
 
-impl<T: Ord + Copy> Rgb<T> {
-    pub fn sup(self, other: Self) -> Self {
-        self.zip_map(other, T::max)
+impl<T: Copy> Rgb<T> {
+    pub fn splat(value: T) -> Self {
+        Self([value; 3])
     }
 }
 
@@ -85,6 +85,15 @@ impl<T: Mul + Copy> Mul<T> for Rgb<T> {
 
     fn mul(self, rhs: T) -> Self::Output {
         self.map(|c| c * rhs)
+    }
+}
+
+impl<T> MulAssign for Rgb<T>
+where
+    Self: Mul<Output = Self> + Copy,
+{
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
     }
 }
 

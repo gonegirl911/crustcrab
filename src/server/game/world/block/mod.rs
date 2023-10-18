@@ -7,7 +7,7 @@ use crate::shared::color::Rgb;
 use bitfield::bitfield;
 use enum_map::Enum;
 use serde::Deserialize;
-use std::ops::Range;
+use std::{array, ops::Range};
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Default, Enum, Deserialize)]
@@ -61,18 +61,53 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
+    pub fn new(skylight: Rgb<u8>, torchlight: Rgb<u8>) -> Self {
+        let mut value = Self::default();
+        value.set_skylight(skylight);
+        value.set_torchlight(torchlight);
+        value
+    }
+
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
             .map(|c| c.clamp(0.0, 1.0))
             .lum()
     }
 
+    pub fn max(self) -> u8 {
+        self.into_iter().max().unwrap_or_else(|| unreachable!())
+    }
+
+    pub fn map<F: FnMut(u8) -> u8>(self, mut f: F) -> Self {
+        array::from_fn(|i| f(self.component(i))).into()
+    }
+
+    pub fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {
+        array::from_fn(|i| f(self.component(i), other.component(i))).into()
+    }
+
+    pub fn sup(self, other: Self) -> Self {
+        self.zip_map(other, Ord::max)
+    }
+
     fn skylight(self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(i + Self::SKYLIGHT_RANGE.start))
     }
 
-    pub fn torchlight(self) -> Rgb<u8> {
+    fn set_skylight(&mut self, value: Rgb<u8>) {
+        for i in Self::SKYLIGHT_RANGE {
+            self.set_component(i, value[i % 3]);
+        }
+    }
+
+    fn torchlight(self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(i + Self::TORCHLIGHT_RANGE.start))
+    }
+
+    fn set_torchlight(&mut self, value: Rgb<u8>) {
+        for i in Self::TORCHLIGHT_RANGE {
+            self.set_component(i, value[i % 3]);
+        }
     }
 
     fn linearize(color: Rgb<u8>) -> Rgb<f32> {
@@ -87,5 +122,14 @@ impl From<[u8; Self::LEN]> for BlockLight {
             value.set_component(i, c);
         }
         value
+    }
+}
+
+impl IntoIterator for BlockLight {
+    type Item = u8;
+    type IntoIter = array::IntoIter<u8, 6>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        array::from_fn(|i| self.component(i)).into_iter()
     }
 }

@@ -31,7 +31,7 @@ use crate::{
 };
 use enum_map::enum_map;
 use flume::Sender;
-use nalgebra::Point3;
+use nalgebra::{point, Point2, Point3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -324,6 +324,26 @@ impl ChunkStore {
 
     fn block_area(&self, coords: Point3<i64>) -> BlockArea {
         BlockArea::from_fn(|delta| self.block(coords + delta.cast()))
+    }
+
+    fn column(&self, coords: Point2<i64>) -> impl Iterator<Item = (i64, Block)> + '_ {
+        let chunk_coords = utils::chunk_coords(coords);
+        let block_coords = utils::block_coords(coords);
+        World::Y_RANGE
+            .rev()
+            .filter_map(move |chunk_y| {
+                let coords = point![chunk_coords.x, chunk_y, chunk_coords.y];
+                Some((chunk_y, self.get(coords)?))
+            })
+            .flat_map(move |(chunk_y, chunk)| {
+                (0..Chunk::DIM as u8)
+                    .rev()
+                    .map(move |block_y| {
+                        let coords = point![block_coords.x, block_y, block_coords.y];
+                        (utils::coords((chunk_y, block_y)), chunk[coords])
+                    })
+                    .filter(|(_, block)| *block != Block::Air)
+            })
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
