@@ -74,10 +74,6 @@ impl BlockLight {
             .lum()
     }
 
-    pub fn max(self) -> u8 {
-        self.into_iter().max().unwrap_or_else(|| unreachable!())
-    }
-
     pub fn map<F: FnMut(u8) -> u8>(self, mut f: F) -> Self {
         array::from_fn(|i| f(self.component(i))).into()
     }

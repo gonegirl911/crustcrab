@@ -84,16 +84,12 @@ impl WorldLight {
                     }
                 })
                 .max()
-                .unwrap_or_else(|| unreachable!())
         } else {
-            self.block_light(coords)
-                .zip_map(value, |a, b| match a.cmp(&b) {
-                    Ordering::Less => b,
-                    Ordering::Equal => 0,
-                    Ordering::Greater => a,
-                })
+            iter::zip(self.block_light(coords), value)
+                .map(|(a, b)| if a != b { a.max(b) } else { 0 })
                 .max()
         }
+        .unwrap_or_else(|| unreachable!())
     }
 
     fn cast_light_beam(&self, chunks: &ChunkStore, coords: Point3<i64>) -> (Rgb<u8>, u64) {
