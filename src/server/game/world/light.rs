@@ -75,14 +75,10 @@ impl WorldLight {
             iter::zip(self.block_light(coords), value)
                 .enumerate()
                 .map(|(i, (a, b))| {
-                    if BlockLight::TORCHLIGHT_RANGE.contains(&i) {
-                        if data.light_filter[i % 3] == 0 {
-                            a.max(b)
-                        } else if a < b {
-                            b
-                        } else {
-                            0
-                        }
+                    if data.light_filter[i % 3] == 0 {
+                        a.max(b)
+                    } else if a < b {
+                        b
                     } else {
                         0
                     }
