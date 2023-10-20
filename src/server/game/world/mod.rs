@@ -37,7 +37,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp,
     collections::{hash_map::Entry, LinkedList},
-    ops::{Deref, Range},
+    ops::Range,
     sync::Arc,
 };
 
@@ -313,7 +313,7 @@ impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
         for delta in ChunkArea::chunk_deltas() {
-            if let Some(chunk) = self.get(coords + delta) {
+            if let Some(chunk) = self.0.get(&(coords + delta)) {
                 for (coords, delta) in ChunkArea::block_deltas(delta) {
                     value[delta] = chunk[coords];
                 }
@@ -333,7 +333,7 @@ impl ChunkStore {
             .rev()
             .filter_map(move |chunk_y| {
                 let coords = point![chunk_coords.x, chunk_y, chunk_coords.y];
-                Some((chunk_y, self.get(coords)?))
+                Some((chunk_y, self.0.get(&coords)?))
             })
             .flat_map(move |(chunk_y, chunk)| {
                 (0..Chunk::DIM as u8)
@@ -347,7 +347,8 @@ impl ChunkStore {
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(utils::chunk_coords(coords))
+        self.0
+            .get(&utils::chunk_coords(coords))
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
     }
 
@@ -400,10 +401,6 @@ impl ChunkStore {
         } else {
             Err(())
         }
-    }
-
-    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords).map(Deref::deref)
     }
 
     fn contains(&self, coords: Point3<i32>) -> bool {

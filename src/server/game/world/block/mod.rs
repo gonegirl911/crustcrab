@@ -61,13 +61,6 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
-    pub fn new(skylight: Rgb<u8>, torchlight: Rgb<u8>) -> Self {
-        let mut value = Self::default();
-        value.set_skylight(skylight);
-        value.set_torchlight(torchlight);
-        value
-    }
-
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
             .map(|c| c.clamp(0.0, 1.0))
@@ -90,20 +83,8 @@ impl BlockLight {
         Rgb::from_fn(|i| self.component(i + Self::SKYLIGHT_RANGE.start))
     }
 
-    fn set_skylight(&mut self, value: Rgb<u8>) {
-        for i in Self::SKYLIGHT_RANGE {
-            self.set_component(i, value[i % 3]);
-        }
-    }
-
     fn torchlight(self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(i + Self::TORCHLIGHT_RANGE.start))
-    }
-
-    fn set_torchlight(&mut self, value: Rgb<u8>) {
-        for i in Self::TORCHLIGHT_RANGE {
-            self.set_component(i, value[i % 3]);
-        }
     }
 
     fn linearize(color: Rgb<u8>) -> Rgb<f32> {
@@ -118,14 +99,5 @@ impl From<[u8; Self::LEN]> for BlockLight {
             value.set_component(i, c);
         }
         value
-    }
-}
-
-impl IntoIterator for BlockLight {
-    type Item = u8;
-    type IntoIter = array::IntoIter<u8, 6>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        array::from_fn(|i| self.component(i)).into_iter()
     }
 }
