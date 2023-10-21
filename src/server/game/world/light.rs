@@ -181,11 +181,13 @@ impl Branch {
         index: usize,
         value: u8,
     ) {
-        let node = Node::new(chunks, light, coords);
-        let block_light = BlockLightRefMut::new(self, &node);
-        if block_light.component(index) < value {
-            block_light.set_component(index, value);
-            self.spread_component(chunks, light, node.with_value(value), index);
+        if value != 0 {
+            let node = Node::new(chunks, light, coords);
+            let block_light = BlockLightRefMut::new(self, &node);
+            if block_light.component(index) < value {
+                block_light.set_component(index, value);
+                self.spread_component(chunks, light, node.with_value(value), index);
+            }
         }
     }
 
