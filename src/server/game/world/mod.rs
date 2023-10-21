@@ -353,7 +353,7 @@ impl ChunkStore {
 
     fn load(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) -> bool {
         if !chunk.is_empty() {
-            self.0.insert(coords, chunk);
+            assert!(self.0.insert(coords, chunk).is_none());
             true
         } else {
             false

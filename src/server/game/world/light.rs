@@ -135,15 +135,15 @@ impl Branch {
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let non_zero_values = values
+                    let mut non_zero_values = values
                         .into_iter()
                         .filter(|(_, value)| *value != Default::default())
-                        .collect::<Vec<_>>();
+                        .peekable();
 
-                    if !non_zero_values.is_empty() {
+                    if non_zero_values.peek().is_some() {
                         let light = entry.insert(Default::default());
                         for (block_coords, value) in non_zero_values {
-                            light.set(block_coords, value);
+                            assert!(light.set(block_coords, value));
                             changes.push(utils::coords((chunk_coords, block_coords)));
                         }
                     }
@@ -233,7 +233,7 @@ impl Branch {
                 let data = node.block().data();
                 let expected = node.value * data.light_filter[index % 3];
                 match component.cmp(&expected) {
-                    Ordering::Less => {}
+                    Ordering::Less => unreachable!(),
                     Ordering::Equal => {
                         let luminance = data.luminance[index % 3];
                         if luminance != 0 {
