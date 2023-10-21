@@ -362,11 +362,11 @@ enum BlockLightRefMut<'a> {
     UninitChunk {
         entry: VacantEntry<'a, Point3<i32>, FxHashMap<Point3<u8>, BlockLight>>,
         coords: Point3<u8>,
-        light: BlockLight,
+        fallback: BlockLight,
     },
     UninitBlock {
         entry: VacantEntry<'a, Point3<u8>, BlockLight>,
-        light: BlockLight,
+        fallback: BlockLight,
     },
 }
 
@@ -377,13 +377,13 @@ impl<'a> BlockLightRefMut<'a> {
                 Entry::Occupied(entry) => Self::Init(entry.into_mut()),
                 Entry::Vacant(entry) => Self::UninitBlock {
                     entry,
-                    light: node.block_light(),
+                    fallback: node.block_light(),
                 },
             },
             Entry::Vacant(entry) => Self::UninitChunk {
                 entry,
                 coords: node.block_coords,
-                light: node.block_light(),
+                fallback: node.block_light(),
             },
         }
     }
@@ -391,8 +391,8 @@ impl<'a> BlockLightRefMut<'a> {
     fn component(&self, index: usize) -> u8 {
         match self {
             Self::Init(light) => light.component(index),
-            Self::UninitChunk { light, .. } | Self::UninitBlock { light, .. } => {
-                light.component(index)
+            Self::UninitChunk { fallback, .. } | Self::UninitBlock { fallback, .. } => {
+                fallback.component(index)
             }
         }
     }
@@ -403,13 +403,13 @@ impl<'a> BlockLightRefMut<'a> {
             Self::UninitChunk {
                 entry,
                 coords,
-                mut light,
+                mut fallback,
             } => {
-                light.set_component(index, value);
-                entry.insert(FxHashMap::from_iter([(coords, light)]));
+                fallback.set_component(index, value);
+                entry.insert(FxHashMap::from_iter([(coords, fallback)]));
             }
-            Self::UninitBlock { entry, light } => {
-                entry.insert(light).set_component(index, value);
+            Self::UninitBlock { entry, fallback } => {
+                entry.insert(fallback).set_component(index, value);
             }
         }
     }
