@@ -31,7 +31,7 @@ use crate::{
 };
 use enum_map::enum_map;
 use flume::Sender;
-use nalgebra::{point, Point2, Point3};
+use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
