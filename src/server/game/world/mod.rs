@@ -326,26 +326,6 @@ impl ChunkStore {
         BlockArea::from_fn(|delta| self.block(coords + delta.cast()))
     }
 
-    fn column(&self, coords: Point2<i64>) -> impl Iterator<Item = (i64, Block)> + '_ {
-        let chunk_coords = utils::chunk_coords(coords);
-        let block_coords = utils::block_coords(coords);
-        World::Y_RANGE
-            .rev()
-            .filter_map(move |chunk_y| {
-                let coords = point![chunk_coords.x, chunk_y, chunk_coords.y];
-                Some((chunk_y, self.get(coords)?))
-            })
-            .flat_map(move |(chunk_y, chunk)| {
-                (0..Chunk::DIM as u8)
-                    .rev()
-                    .map(move |block_y| {
-                        let coords = point![block_coords.x, block_y, block_coords.y];
-                        (utils::coords((chunk_y, block_y)), chunk[coords])
-                    })
-                    .filter(|(_, block)| *block != Block::Air)
-            })
-    }
-
     fn block(&self, coords: Point3<i64>) -> Block {
         self.get(utils::chunk_coords(coords))
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
