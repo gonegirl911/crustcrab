@@ -154,16 +154,16 @@ impl<const N: usize> EventHandler for ScreenTextureArray<N> {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        match event {
+        match *event {
             Event::WindowEvent {
                 event:
                     WindowEvent::Resized(PhysicalSize { width, height })
                     | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: PhysicalSize { width, height },
+                        new_inner_size: &mut PhysicalSize { width, height },
                         ..
                     },
                 ..
-            } if *width != 0 && *height != 0 => {
+            } if width != 0 && height != 0 => {
                 self.is_resized = true;
             }
             Event::MainEventsCleared => {

@@ -252,8 +252,8 @@ impl EventHandler for World {
                         if !vertices.is_empty() || !transparent_vertices.is_empty() {
                             match self.meshes.entry(coords) {
                                 Entry::Occupied(entry) => {
-                                    let (_, _, last_updated_at) = entry.get();
-                                    if *last_updated_at < updated_at {
+                                    let (_, _, last_updated_at) = *entry.get();
+                                    if last_updated_at < updated_at {
                                         *entry.into_mut() = (
                                             VertexBuffer::new(
                                                 renderer,

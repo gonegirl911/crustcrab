@@ -96,8 +96,8 @@ impl EventHandler for ObjectSet {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::UserEvent(ServerEvent::TimeUpdated(time)) = event {
-            (self.sun_pc, self.moon_pc) = Self::pc(*time);
+        if let Event::UserEvent(ServerEvent::TimeUpdated(time)) = *event {
+            (self.sun_pc, self.moon_pc) = Self::pc(time);
         }
     }
 }

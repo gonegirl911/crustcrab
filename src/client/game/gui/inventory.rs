@@ -121,7 +121,7 @@ impl EventHandler for Inventory {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent { event, .. } => match *event {
                 WindowEvent::KeyboardInput {
                     input:
                         KeyboardInput {
@@ -131,15 +131,15 @@ impl EventHandler for Inventory {
                         },
                     ..
                 } => {
-                    if let Some(idx) = self.index(*keycode) {
+                    if let Some(idx) = self.index(keycode) {
                         self.is_updated = mem::replace(&mut self.index, idx) != idx;
                     }
                 }
                 WindowEvent::Resized(PhysicalSize { width, height })
                 | WindowEvent::ScaleFactorChanged {
-                    new_inner_size: PhysicalSize { width, height },
+                    new_inner_size: &mut PhysicalSize { width, height },
                     ..
-                } if *width != 0 && *height != 0 => {
+                } if width != 0 && height != 0 => {
                     self.is_resized = true;
                 }
                 _ => {}

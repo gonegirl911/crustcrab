@@ -70,19 +70,19 @@ impl Renderer {
 impl EventHandler for Renderer {
     type Context<'a> = ();
 
-    fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
-        match event {
+    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
+        match *event {
             Event::WindowEvent {
                 event:
                     WindowEvent::Resized(PhysicalSize { width, height })
                     | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: PhysicalSize { width, height },
+                        new_inner_size: &mut PhysicalSize { width, height },
                         ..
                     },
                 ..
-            } if *width != 0 && *height != 0 => {
-                self.config.width = *width;
-                self.config.height = *height;
+            } if width != 0 && height != 0 => {
+                self.config.width = width;
+                self.config.height = height;
                 self.is_resized = true;
             }
             Event::MainEventsCleared => {

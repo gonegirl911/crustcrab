@@ -33,8 +33,8 @@ impl EventLoop {
     where
         H: for<'a> EventHandler<Context<'a> = (Sender<ClientEvent>, Duration)> + 'static,
     {
+        let mut dt = Default::default();
         let mut stopwatch = Stopwatch::start();
-        let mut dt = Duration::ZERO;
 
         self.event_loop.run(move |event, _, control_flow| {
             match event {

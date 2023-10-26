@@ -79,8 +79,8 @@ impl EventHandler for BlockHover {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::UserEvent(ServerEvent::BlockHovered(data)) = event {
-            self.data = *data;
+        if let Event::UserEvent(ServerEvent::BlockHovered(data)) = *event {
+            self.data = data;
         }
     }
 }

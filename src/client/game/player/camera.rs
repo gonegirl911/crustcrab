@@ -183,16 +183,16 @@ impl Controller {
 impl EventHandler for Controller {
     type Context<'a> = ();
 
-    fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
-            Event::DeviceEvent {
+            &Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta: (dx, dy) },
                 ..
             } => {
-                self.dx += *dx as f32;
-                self.dy += *dy as f32;
+                self.dx += dx as f32;
+                self.dy += dy as f32;
             }
-            Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent { event, .. } => match *event {
                 WindowEvent::KeyboardInput {
                     input:
                         KeyboardInput {
@@ -228,10 +228,10 @@ impl EventHandler for Controller {
                 }
                 WindowEvent::Resized(PhysicalSize { width, height })
                 | WindowEvent::ScaleFactorChanged {
-                    new_inner_size: PhysicalSize { width, height },
+                    new_inner_size: &mut PhysicalSize { width, height },
                     ..
-                } if *width != 0 && *height != 0 => {
-                    self.aspect = *width as f32 / *height as f32;
+                } if width != 0 && height != 0 => {
+                    self.aspect = width as f32 / height as f32;
                 }
                 WindowEvent::MouseInput { button, state, .. } => {
                     let (button, opp) = match button {
