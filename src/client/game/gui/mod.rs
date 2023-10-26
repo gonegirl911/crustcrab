@@ -44,16 +44,15 @@ impl Gui {
     ) {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                ..Default::default()
             });
             self.blit.draw(&mut render_pass, input_bind_group);
             self.crosshair.draw(&mut render_pass, input_bind_group);
@@ -61,23 +60,23 @@ impl Gui {
         {
             self.inventory.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
-                            store: true,
+                            store: wgpu::StoreOp::Store,
                         },
                     })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                         view: depth_view,
                         depth_ops: Some(wgpu::Operations {
                             load: wgpu::LoadOp::Clear(1.0),
-                            store: true,
+                            store: wgpu::StoreOp::Store,
                         }),
                         stencil_ops: None,
                     }),
+                    ..Default::default()
                 }),
                 textures_bind_group,
             );

@@ -45,16 +45,15 @@ impl PostProcessor {
         self.apply_raw(|view, bind_group| {
             effect.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
-                            store: true,
+                            store: wgpu::StoreOp::Store,
                         },
                     })],
-                    depth_stencil_attachment: None,
+                    ..Default::default()
                 }),
                 bind_group,
             );
@@ -72,16 +71,15 @@ impl PostProcessor {
     pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         self.blit.draw(
             &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                ..Default::default()
             }),
             self.bind_group(),
         );
@@ -162,7 +160,6 @@ impl Blender {
         should_clear: bool,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
                 resolve_target: None,
@@ -172,10 +169,10 @@ impl Blender {
                     } else {
                         wgpu::LoadOp::Load
                     },
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            ..Default::default()
         });
         self.0.bind(&mut render_pass, [input_bind_group]);
         BlenderPushConstants::new(opacity).set(&mut render_pass);

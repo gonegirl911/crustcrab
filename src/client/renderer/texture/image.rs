@@ -192,16 +192,15 @@ impl ImageTexture {
                 });
                 blit.draw(
                     &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: None,
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: &views[1],
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: true,
+                                store: wgpu::StoreOp::Store,
                             },
                         })],
-                        depth_stencil_attachment: None,
+                        ..Default::default()
                     }),
                     &bind_group,
                 );

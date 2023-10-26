@@ -49,23 +49,23 @@ impl BlockHover {
         if let Some(BlockHoverData { coords, brightness }) = self.data {
             self.highlight.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: None,
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
-                            store: true,
+                            store: wgpu::StoreOp::Store,
                         },
                     })],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                         view: depth_view,
                         depth_ops: Some(wgpu::Operations {
                             load: wgpu::LoadOp::Load,
-                            store: false,
+                            store: wgpu::StoreOp::Store,
                         }),
                         stencil_ops: None,
                     }),
+                    ..Default::default()
                 }),
                 player_bind_group,
                 sky_bind_group,

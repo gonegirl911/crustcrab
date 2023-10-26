@@ -27,8 +27,8 @@ pollster = "0.3.0"
 rand = "0.8.5"
 rayon = "1.8.0"
 rustc-hash = "1.1.0"
-serde = { version = "1.0.189", features = ["derive", "rc"] }
+serde = { version = "1.0.190", features = ["derive", "rc"] }
 spin_sleep = "1.1.1"
-toml = "0.8.2"
-wgpu = "0.17.1"
+toml = "0.8.4"
+wgpu = "0.18.0"
 winit = "0.28.7"
