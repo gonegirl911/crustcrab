@@ -213,7 +213,9 @@ impl World {
         I: IntoIterator<Item = ServerEvent>,
     {
         for event in events {
-            server_tx.send(event).unwrap_or_else(|_| unreachable!());
+            if server_tx.send(event).is_err() {
+                break;
+            }
         }
     }
 

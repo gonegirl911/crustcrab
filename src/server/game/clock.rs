@@ -18,9 +18,7 @@ pub struct Clock {
 
 impl Clock {
     fn send(self, server_tx: Sender<ServerEvent>) {
-        server_tx
-            .send(ServerEvent::TimeUpdated(self.time()))
-            .unwrap_or_else(|_| unreachable!());
+        _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
     }
 
     fn time(self) -> Time {
