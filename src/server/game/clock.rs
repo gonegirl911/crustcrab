@@ -11,18 +11,19 @@ use nalgebra::{UnitQuaternion, Vector3};
 use serde::Deserialize;
 use std::{f32::consts::TAU, ops::Range};
 
+#[derive(Clone, Copy)]
 pub struct Clock {
     ticks: u16,
 }
 
 impl Clock {
-    fn send(&self, server_tx: Sender<ServerEvent>) {
+    fn send(self, server_tx: Sender<ServerEvent>) {
         server_tx
             .send(ServerEvent::TimeUpdated(self.time()))
             .unwrap_or_else(|_| unreachable!());
     }
 
-    fn time(&self) -> Time {
+    fn time(self) -> Time {
         Time { ticks: self.ticks }
     }
 }
@@ -104,7 +105,7 @@ impl Default for Stage {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 pub struct ClockState {
     ticks_per_day: u16,
     twilight_duration: u16,
@@ -112,7 +113,7 @@ pub struct ClockState {
 }
 
 impl ClockState {
-    fn starting_ticks(&self) -> u16 {
+    fn starting_ticks(self) -> u16 {
         match self.starting_stage {
             StartingStage::Dawn => self.dawn_start(),
             StartingStage::Day => self.day_start(),
@@ -121,7 +122,7 @@ impl ClockState {
         }
     }
 
-    fn stage(&self, ticks: u16) -> Stage {
+    fn stage(self, ticks: u16) -> Stage {
         if self.dawn_range().contains(&ticks) {
             Stage::Dawn {
                 progress: Self::inv_lerp(self.dawn_range(), ticks),
@@ -137,51 +138,51 @@ impl ClockState {
         }
     }
 
-    fn is_am(&self, ticks: u16) -> bool {
+    fn is_am(self, ticks: u16) -> bool {
         !self.is_pm(ticks)
     }
 
-    fn is_pm(&self, ticks: u16) -> bool {
+    fn is_pm(self, ticks: u16) -> bool {
         self.pm_range().contains(&ticks)
     }
 
-    fn dawn_range(&self) -> Range<u16> {
+    fn dawn_range(self) -> Range<u16> {
         self.dawn_start()..self.day_start()
     }
 
-    fn day_range(&self) -> Range<u16> {
+    fn day_range(self) -> Range<u16> {
         self.day_start()..self.dusk_start()
     }
 
-    fn dusk_range(&self) -> Range<u16> {
+    fn dusk_range(self) -> Range<u16> {
         self.dusk_start()..self.night_start()
     }
 
-    fn pm_range(&self) -> Range<u16> {
+    fn pm_range(self) -> Range<u16> {
         self.noon()..self.midnight()
     }
 
-    fn dawn_start(&self) -> u16 {
+    fn dawn_start(self) -> u16 {
         0
     }
 
-    fn day_start(&self) -> u16 {
+    fn day_start(self) -> u16 {
         self.twilight_duration
     }
 
-    fn noon(&self) -> u16 {
+    fn noon(self) -> u16 {
         self.ticks_per_day / 4
     }
 
-    fn dusk_start(&self) -> u16 {
+    fn dusk_start(self) -> u16 {
         self.night_start() - self.twilight_duration
     }
 
-    fn night_start(&self) -> u16 {
+    fn night_start(self) -> u16 {
         self.ticks_per_day / 2
     }
 
-    fn midnight(&self) -> u16 {
+    fn midnight(self) -> u16 {
         self.ticks_per_day / 4 * 3
     }
 
@@ -190,7 +191,7 @@ impl ClockState {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum StartingStage {
     Dawn,

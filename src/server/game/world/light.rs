@@ -46,7 +46,7 @@ impl WorldLight {
         &mut self,
         chunks: &ChunkStore,
         coords: Point3<i64>,
-        action: &BlockAction,
+        action: BlockAction,
     ) -> Vec<Point3<i64>> {
         match action {
             BlockAction::Place(block) => {

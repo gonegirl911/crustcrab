@@ -40,7 +40,7 @@ impl Chunk {
         self.non_air_count == 0
     }
 
-    pub fn apply(&mut self, coords: Point3<u8>, action: &BlockAction) -> bool {
+    pub fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
         let block = &mut self.blocks[coords];
         let prev = *block;
         if block.apply(action) {
@@ -52,7 +52,7 @@ impl Chunk {
         }
     }
 
-    pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: &BlockAction) {
+    pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: BlockAction) {
         let block = &mut self.blocks[coords];
         let prev = *block;
         block.apply_unchecked(action);

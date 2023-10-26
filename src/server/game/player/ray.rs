@@ -8,9 +8,9 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn cast<'a, R>(&'a self, reach: R) -> impl Iterator<Item = BlockIntersection> + 'a
+    pub fn cast<R>(self, reach: R) -> impl Iterator<Item = BlockIntersection>
     where
-        R: RangeBounds<f32> + 'a,
+        R: RangeBounds<f32>,
     {
         let values = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap_or_else(|| unreachable!()) {

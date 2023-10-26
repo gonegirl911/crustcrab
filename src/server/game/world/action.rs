@@ -7,12 +7,15 @@ use rustc_hash::FxHashMap;
 pub struct ActionStore(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 
 impl ActionStore {
-    pub fn actions(&self, coords: Point3<i32>) -> impl Iterator<Item = (Point3<u8>, &BlockAction)> {
+    pub fn actions(
+        &self,
+        coords: Point3<i32>,
+    ) -> impl Iterator<Item = (Point3<u8>, BlockAction)> + '_ {
         self.0
             .get(&coords)
             .into_iter()
             .flatten()
-            .map(|(&coords, action)| (coords, action))
+            .map(|(&coords, &action)| (coords, action))
     }
 
     pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
@@ -23,6 +26,7 @@ impl ActionStore {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum BlockAction {
     Place(Block),
     Destroy,

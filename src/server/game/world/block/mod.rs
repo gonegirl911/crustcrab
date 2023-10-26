@@ -26,11 +26,11 @@ impl Block {
         &BLOCK_DATA[self]
     }
 
-    pub fn apply(&mut self, action: &BlockAction) -> bool {
+    pub fn apply(&mut self, action: BlockAction) -> bool {
         match (*self, action) {
             (Self::Air, BlockAction::Place(Self::Air) | BlockAction::Destroy) => false,
             (Self::Air, BlockAction::Place(block)) => {
-                *self = *block;
+                *self = block;
                 true
             }
             (_, BlockAction::Place(_)) => false,
@@ -41,9 +41,9 @@ impl Block {
         }
     }
 
-    pub fn apply_unchecked(&mut self, action: &BlockAction) {
+    pub fn apply_unchecked(&mut self, action: BlockAction) {
         *self = match action {
-            BlockAction::Place(block) => *block,
+            BlockAction::Place(block) => block,
             BlockAction::Destroy => Block::Air,
         };
     }

@@ -72,7 +72,7 @@ impl World {
     {
         points
             .into_iter()
-            .filter(|coords| self.chunks.unload(*coords))
+            .filter(|&coords| self.chunks.unload(coords))
             .collect()
     }
 
@@ -84,8 +84,8 @@ impl World {
         server_tx: Sender<ServerEvent>,
         ray: Ray,
     ) {
-        let Ok((load, unload)) = self.chunks.apply(coords, &action) else { return };
-        let light_updates = self.light.apply(&self.chunks, coords, &action);
+        let Ok((load, unload)) = self.chunks.apply(coords, action) else { return };
+        let light_updates = self.light.apply(&self.chunks, coords, action);
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
 
@@ -240,14 +240,11 @@ impl EventHandler<WorldEvent> for World {
     type Context<'a> = Sender<ServerEvent>;
 
     fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
-        match event {
+        match *event {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                self.handle(
-                    &WorldEvent::BlockHoverRequested { ray: *ray },
-                    server_tx.clone(),
-                );
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
@@ -259,10 +256,7 @@ impl EventHandler<WorldEvent> for World {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.par_load_many(curr.par_exclusive_points(prev));
 
-                self.handle(
-                    &WorldEvent::BlockHoverRequested { ray: *ray },
-                    server_tx.clone(),
-                );
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
 
                 self.send_unloads(unloads.iter().copied(), server_tx.clone());
                 self.par_send_loads(loads.par_iter().copied(), server_tx.clone(), false);
@@ -294,12 +288,12 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::BlockPlaced { block, ray } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hover {
-                    self.apply(coords + normal, BlockAction::Place(*block), server_tx, *ray);
+                    self.apply(coords + normal, BlockAction::Place(block), server_tx, ray);
                 }
             }
             WorldEvent::BlockDestroyed { ray } => {
                 if let Some(BlockIntersection { coords, .. }) = self.hover {
-                    self.apply(coords, BlockAction::Destroy, server_tx, *ray);
+                    self.apply(coords, BlockAction::Destroy, server_tx, ray);
                 }
             }
         }
@@ -348,7 +342,7 @@ impl ChunkStore {
     fn apply(
         &mut self,
         coords: Point3<i64>,
-        action: &BlockAction,
+        action: BlockAction,
     ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
         let chunk_coords = utils::chunk_coords(coords);
         let block_coords = utils::block_coords(coords);
@@ -473,37 +467,27 @@ pub enum WorldEvent {
 impl WorldEvent {
     pub fn new(
         event: &Event,
-        Player {
+        &Player {
             prev, curr, ray, ..
         }: &Player,
     ) -> Option<Self> {
-        match event {
+        match *event {
             Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
-                Some(Self::InitialRenderRequested {
-                    area: *curr,
-                    ray: *ray,
-                })
+                Some(Self::InitialRenderRequested { area: curr, ray })
             }
             Event::ClientEvent(ClientEvent::PlayerPositionChanged { .. }) if curr != prev => {
-                Some(Self::WorldAreaChanged {
-                    prev: *prev,
-                    curr: *curr,
-                    ray: *ray,
-                })
+                Some(Self::WorldAreaChanged { prev, curr, ray })
             }
             Event::ClientEvent(ClientEvent::PlayerPositionChanged { .. }) => {
-                Some(Self::BlockHoverRequested { ray: *ray })
+                Some(Self::BlockHoverRequested { ray })
             }
             Event::ClientEvent(ClientEvent::PlayerOrientationChanged { .. }) => {
-                Some(Self::BlockHoverRequested { ray: *ray })
+                Some(Self::BlockHoverRequested { ray })
             }
-            Event::ClientEvent(ClientEvent::BlockPlaced { block }) => Some(Self::BlockPlaced {
-                block: *block,
-                ray: *ray,
-            }),
-            Event::ClientEvent(ClientEvent::BlockDestroyed) => {
-                Some(Self::BlockDestroyed { ray: *ray })
+            Event::ClientEvent(ClientEvent::BlockPlaced { block }) => {
+                Some(Self::BlockPlaced { block, ray })
             }
+            Event::ClientEvent(ClientEvent::BlockDestroyed) => Some(Self::BlockDestroyed { ray }),
             _ => None,
         }
     }

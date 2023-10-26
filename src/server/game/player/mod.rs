@@ -26,27 +26,24 @@ impl EventHandler<Event> for Player {
         self.prev = self.curr;
 
         if let Event::ClientEvent(event) = event {
-            match event {
+            match *event {
                 ClientEvent::InitialRenderRequested {
                     origin,
                     dir,
                     render_distance,
                 } => {
                     self.curr = WorldArea {
-                        center: utils::chunk_coords(*origin),
-                        radius: *render_distance,
+                        center: utils::chunk_coords(origin),
+                        radius: render_distance,
                     };
-                    self.ray = Ray {
-                        origin: *origin,
-                        dir: *dir,
-                    };
+                    self.ray = Ray { origin, dir };
                 }
                 ClientEvent::PlayerOrientationChanged { dir } => {
-                    self.ray.dir = *dir;
+                    self.ray.dir = dir;
                 }
                 ClientEvent::PlayerPositionChanged { origin } => {
-                    self.curr.center = utils::chunk_coords(*origin);
-                    self.ray.origin = *origin;
+                    self.curr.center = utils::chunk_coords(origin);
+                    self.ray.origin = origin;
                 }
                 _ => {}
             }
@@ -61,39 +58,36 @@ pub struct WorldArea {
 }
 
 impl WorldArea {
-    pub fn points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
-        self.cube_points().filter(|point| {
+    pub fn points(self) -> impl Iterator<Item = Point3<i32>> {
+        self.cube_points().filter(move |point| {
             utils::magnitude_squared(point.xz() - self.center.xz()) <= self.radius.pow(2)
         })
     }
 
-    pub fn par_points(&self) -> impl ParallelIterator<Item = Point3<i32>> + '_ {
-        self.par_cube_points().filter(|point| {
+    pub fn par_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
+        self.par_cube_points().filter(move |point| {
             utils::magnitude_squared(point.xz() - self.center.xz()) <= self.radius.pow(2)
         })
     }
 
-    pub fn exclusive_points<'a>(
-        &'a self,
-        other: &'a WorldArea,
-    ) -> impl Iterator<Item = Point3<i32>> + 'a {
-        self.points().filter(|point| {
+    pub fn exclusive_points(self, other: WorldArea) -> impl Iterator<Item = Point3<i32>> {
+        self.points().filter(move |point| {
             utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
                 || (point.y - other.center.y).unsigned_abs() > other.radius
         })
     }
 
-    pub fn par_exclusive_points<'a>(
-        &'a self,
-        other: &'a WorldArea,
-    ) -> impl ParallelIterator<Item = Point3<i32>> + 'a {
-        self.par_points().filter(|point| {
+    pub fn par_exclusive_points(
+        self,
+        other: WorldArea,
+    ) -> impl ParallelIterator<Item = Point3<i32>> {
+        self.par_points().filter(move |point| {
             utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
                 || (point.y - other.center.y).unsigned_abs() > other.radius
         })
     }
 
-    fn cube_points(&self) -> impl Iterator<Item = Point3<i32>> + '_ {
+    fn cube_points(self) -> impl Iterator<Item = Point3<i32>> {
         let radius = self.radius as i32;
         (-radius..=radius).flat_map(move |dx| {
             (-radius..=radius).flat_map(move |dy| {
@@ -104,7 +98,7 @@ impl WorldArea {
         })
     }
 
-    fn par_cube_points(&self) -> impl ParallelIterator<Item = Point3<i32>> + '_ {
+    fn par_cube_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
         let radius = self.radius as i32;
         (-radius..=radius).into_par_iter().flat_map(move |dx| {
             (-radius..=radius).into_par_iter().flat_map(move |dy| {
