@@ -10,6 +10,7 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::{fs, sync::Arc};
 
+#[derive(Clone, Copy)]
 pub struct BlockData {
     pub side_tex_indices: Option<EnumMap<Side, u8>>,
     pub luminance: Rgb<u8>,
@@ -19,11 +20,11 @@ pub struct BlockData {
 
 impl BlockData {
     pub fn vertices(
-        &self,
+        self,
         coords: Point3<u8>,
         area: BlockArea,
         area_light: BlockAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> + '_ {
+    ) -> impl Iterator<Item = BlockVertex> {
         self.side_tex_indices
             .map(move |side_tex_indices| {
                 area.visible_sides().flat_map(move |side| {

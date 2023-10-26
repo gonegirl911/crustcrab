@@ -402,7 +402,7 @@ impl ChunkData {
 
     pub fn vertices(
         &self,
-    ) -> impl Iterator<Item = (&'static BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
+    ) -> impl Iterator<Item = (BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
         Chunk::points().map(|coords| {
             let data = self.area.block(coords).data();
             (

@@ -1,5 +1,6 @@
 use nalgebra::{Point3, Vector3};
 
+#[derive(Clone, Copy)]
 pub struct Aabb {
     min: Point3<f32>,
     max: Point3<f32>,
@@ -17,11 +18,11 @@ impl Aabb {
         }
     }
 
-    fn circumcenter(&self) -> Point3<f32> {
+    fn circumcenter(self) -> Point3<f32> {
         self.min + (self.max - self.min) * 0.5
     }
 
-    fn circumradius(&self) -> f32 {
+    fn circumradius(self) -> f32 {
         (self.max - self.min).magnitude() * 0.5
     }
 }
