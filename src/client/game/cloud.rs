@@ -163,8 +163,9 @@ impl EventHandler for CloudLayer {
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
         match event {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
-                self.pc.update_color(time.stage());
-                self.opacity = Self::opacity(time.stage());
+                let stage = time.stage();
+                self.pc.update_color(stage);
+                self.opacity = Self::opacity(stage);
             }
             Event::MainEventsCleared => {
                 self.pc.update_offset(dt);

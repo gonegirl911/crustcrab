@@ -16,7 +16,6 @@ use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::{fs, time::Duration};
-use winit::event_loop::ControlFlow;
 
 pub struct Client {
     event_loop: EventLoop,
@@ -50,10 +49,10 @@ impl Client {
         }
 
         impl EventHandler for MiniClient {
-            type Context<'a> = (&'a mut ControlFlow, Sender<ClientEvent>, Duration);
+            type Context<'a> = (Sender<ClientEvent>, Duration);
 
-            fn handle(&mut self, event: &Event, (control_flow, client_tx, dt): Self::Context<'_>) {
-                self.window.handle(event, control_flow);
+            fn handle(&mut self, event: &Event, (client_tx, dt): Self::Context<'_>) {
+                self.window.handle(event, ());
                 self.renderer.handle(event, ());
                 self.game.handle(event, (client_tx, &self.renderer, dt));
             }

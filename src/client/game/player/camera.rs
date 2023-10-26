@@ -230,7 +230,7 @@ impl EventHandler for Controller {
                 | WindowEvent::ScaleFactorChanged {
                     new_inner_size: PhysicalSize { width, height },
                     ..
-                } if *width != 0 && !height != 0 => {
+                } if *width != 0 && *height != 0 => {
                     self.aspect = *width as f32 / *height as f32;
                 }
                 WindowEvent::MouseInput { button, state, .. } => {

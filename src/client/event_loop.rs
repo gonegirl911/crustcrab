@@ -3,9 +3,9 @@ use crate::server::ServerEvent;
 use flume::{Receiver, Sender};
 use std::{ops::Deref, time::Duration};
 use winit::{
-    event::{Event as RawEvent, StartCause},
+    event::{Event as RawEvent, StartCause, WindowEvent},
     event_loop::{
-        ControlFlow, EventLoop as RawEventLoop, EventLoopBuilder as RawEventLoopBuilder,
+        EventLoop as RawEventLoop, EventLoopBuilder as RawEventLoopBuilder,
         EventLoopProxy as RawEventLoopProxy,
     },
 };
@@ -31,8 +31,7 @@ impl EventLoop {
 
     pub fn run<H>(self, mut handler: H) -> !
     where
-        H: for<'a> EventHandler<Context<'a> = (&'a mut ControlFlow, Sender<ClientEvent>, Duration)>
-            + 'static,
+        H: for<'a> EventHandler<Context<'a> = (Sender<ClientEvent>, Duration)> + 'static,
     {
         let mut stopwatch = Stopwatch::start();
         let mut dt = Duration::ZERO;
@@ -47,9 +46,13 @@ impl EventLoop {
                     }
                 }
                 Event::MainEventsCleared => dt = stopwatch.lap(),
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => control_flow.set_exit(),
                 _ => {}
             }
-            handler.handle(&event, (control_flow, self.client_tx.clone(), dt));
+            handler.handle(&event, (self.client_tx.clone(), dt));
         })
     }
 }

@@ -2,7 +2,7 @@ use super::event_loop::{Event, EventHandler};
 use std::ops::Deref;
 use winit::{
     event::{ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
-    event_loop::{ControlFlow, EventLoop as RawEventLoop},
+    event_loop::EventLoop as RawEventLoop,
     window::{CursorGrabMode, Window as RawWindow, WindowBuilder as RawWindowBuilder},
 };
 
@@ -20,9 +20,9 @@ impl Window {
 }
 
 impl EventHandler for Window {
-    type Context<'a> = &'a mut ControlFlow;
+    type Context<'a> = ();
 
-    fn handle(&mut self, event: &Event, control_flow: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::MouseInput {
@@ -50,7 +50,6 @@ impl EventHandler for Window {
                         .expect("cursor should be unlockable");
                     self.0.set_cursor_visible(true);
                 }
-                WindowEvent::CloseRequested => control_flow.set_exit(),
                 _ => {}
             },
             Event::MainEventsCleared => self.0.request_redraw(),

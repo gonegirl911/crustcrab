@@ -22,7 +22,7 @@ pub struct Player {
 impl EventHandler<Event> for Player {
     type Context<'a> = ();
 
-    fn handle(&mut self, event: &Event, _: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         self.prev = self.curr;
 
         if let Event::ClientEvent(event) = event {
