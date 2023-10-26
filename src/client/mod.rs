@@ -82,6 +82,7 @@ pub enum ClientEvent {
         block: Block,
     },
     BlockDestroyed,
+    CloseRequested,
 }
 
 impl ClientEvent {

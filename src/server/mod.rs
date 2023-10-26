@@ -34,7 +34,7 @@ impl Server {
         }
     }
 
-    pub fn run(self) -> ! {
+    pub fn run(self) {
         struct MiniServer {
             game: Game,
         }
@@ -47,7 +47,7 @@ impl Server {
             }
         }
 
-        self.event_loop.run(MiniServer { game: self.game })
+        self.event_loop.run(MiniServer { game: self.game });
     }
 }
 

@@ -18,15 +18,18 @@ impl EventLoop {
         }
     }
 
-    pub fn run<H>(self, mut handler: H) -> !
+    pub fn run<H>(self, mut handler: H)
     where
         H: for<'a> EventHandler<Event, Context<'a> = Sender<ServerEvent>> + Send,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
 
         handler.handle(&Event::Init, self.server_tx.clone());
-        loop {
+        'outer: loop {
             for event in Self::process_client_events(self.client_rx.drain()) {
+                if let ClientEvent::CloseRequested = event {
+                    break 'outer;
+                }
                 handler.handle(&Event::ClientEvent(event), self.server_tx.clone());
             }
             ticker.wait(|| handler.handle(&Event::Tick, self.server_tx.clone()));
