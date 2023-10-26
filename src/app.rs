@@ -1,9 +1,5 @@
 use crate::{client::Client, server::Server};
-use mimalloc::MiMalloc;
 use std::thread;
-
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
 
 pub struct App {
     client: Client,
