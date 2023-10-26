@@ -45,18 +45,11 @@ impl EventLoop {
                             .unwrap_or_else(|_| unreachable!());
                     }
                 }
-                Event::MainEventsCleared => {
-                    dt = stopwatch.lap();
-                }
+                Event::MainEventsCleared => dt = stopwatch.lap(),
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     ..
-                } => {
-                    self.client_tx
-                        .send(ClientEvent::CloseRequested)
-                        .unwrap_or_else(|_| unreachable!());
-                    control_flow.set_exit();
-                }
+                } => control_flow.set_exit(),
                 _ => {}
             }
             handler.handle(&event, (self.client_tx.clone(), dt));

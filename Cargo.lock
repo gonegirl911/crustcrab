@@ -396,7 +396,6 @@ dependencies = [
  "image",
  "mimalloc",
  "nalgebra",
- "num_cpus",
  "once_cell",
  "pollster",
  "rand",

@@ -18,22 +18,22 @@ impl EventLoop {
         }
     }
 
-    pub fn run<H>(self, mut handler: H)
+    pub fn run<H>(self, mut handler: H) -> !
     where
         H: for<'a> EventHandler<Event, Context<'a> = Sender<ServerEvent>> + Send,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
 
         handler.handle(&Event::Init, self.server_tx.clone());
-        while let Some(events) = Self::process_client_events(self.client_rx.drain()) {
-            for event in events {
+        loop {
+            for event in Self::process_client_events(self.client_rx.drain()) {
                 handler.handle(&Event::ClientEvent(event), self.server_tx.clone());
             }
             ticker.wait(|| handler.handle(&Event::Tick, self.server_tx.clone()));
         }
     }
 
-    fn process_client_events<I>(events: I) -> Option<impl Iterator<Item = ClientEvent>>
+    fn process_client_events<I>(events: I) -> impl Iterator<Item = ClientEvent>
     where
         I: IntoIterator<Item = ClientEvent>,
     {
@@ -41,16 +41,14 @@ impl EventLoop {
         let mut rest = vec![];
 
         for event in events {
-            if let ClientEvent::CloseRequested = event {
-                return None;
-            } else if event.is_mergeable() {
+            if event.is_mergeable() {
                 mergeable.insert(mem::discriminant(&event), event);
             } else {
                 rest.push(event);
             }
         }
 
-        Some(mergeable.into_values().chain(rest))
+        mergeable.into_values().chain(rest)
     }
 }
 
