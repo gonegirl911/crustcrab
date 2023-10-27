@@ -12,7 +12,7 @@ use std::{fs, sync::Arc};
 
 #[derive(Clone, Copy)]
 pub struct BlockData {
-    pub side_tex_indices: Option<EnumMap<Side, u8>>,
+    side_tex_indices: Option<EnumMap<Side, u8>>,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
