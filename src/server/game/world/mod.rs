@@ -81,18 +81,18 @@ impl World {
         &mut self,
         coords: Point3<i64>,
         action: BlockAction,
-        server_tx: Sender<ServerEvent>,
+        server_tx: &Sender<ServerEvent>,
         ray: Ray,
     ) {
         let Ok((load, unload)) = self.chunks.apply(coords, action) else { return };
         let light_updates = self.light.apply(&self.chunks, coords, action);
 
-        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
+        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
         self.actions.insert(coords, action);
 
-        self.send_unloads(unload, server_tx.clone());
-        self.send_loads(load, server_tx.clone(), true);
+        self.send_unloads(unload, server_tx);
+        self.send_loads(load, server_tx, true);
         self.send_updates(
             self.updates(
                 &load.into_iter().chain(unload).collect(),
@@ -104,7 +104,7 @@ impl World {
         );
     }
 
-    fn send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
+    fn send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -118,7 +118,7 @@ impl World {
         );
     }
 
-    fn par_send_loads<I>(&self, points: I, server_tx: Sender<ServerEvent>, is_important: bool)
+    fn par_send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
@@ -135,7 +135,7 @@ impl World {
         );
     }
 
-    fn send_unloads<I>(&self, points: I, server_tx: Sender<ServerEvent>)
+    fn send_unloads<I>(&self, points: I, server_tx: &Sender<ServerEvent>)
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -150,7 +150,7 @@ impl World {
     fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: I,
-        server_tx: Sender<ServerEvent>,
+        server_tx: &Sender<ServerEvent>,
         is_important: bool,
     ) {
         self.send_events(
@@ -166,7 +166,7 @@ impl World {
     fn par_send_updates<I: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
         points: I,
-        server_tx: Sender<ServerEvent>,
+        server_tx: &Sender<ServerEvent>,
         is_important: bool,
     ) {
         self.send_events(
@@ -208,7 +208,7 @@ impl World {
             .collect()
     }
 
-    fn send_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
+    fn send_events<I>(&self, events: I, server_tx: &Sender<ServerEvent>)
     where
         I: IntoIterator<Item = ServerEvent>,
     {
@@ -239,14 +239,14 @@ impl World {
 }
 
 impl EventHandler<WorldEvent> for World {
-    type Context<'a> = Sender<ServerEvent>;
+    type Context<'a> = &'a Sender<ServerEvent>;
 
     fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
         match *event {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
@@ -258,10 +258,10 @@ impl EventHandler<WorldEvent> for World {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.par_load_many(curr.par_exclusive_points(prev));
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx.clone());
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-                self.send_unloads(unloads.iter().copied(), server_tx.clone());
-                self.par_send_loads(loads.par_iter().copied(), server_tx.clone(), false);
+                self.send_unloads(unloads.iter().copied(), server_tx);
+                self.par_send_loads(loads.par_iter().copied(), server_tx, false);
                 self.par_send_updates(
                     self.updates(&unloads.into_iter().chain(loads).collect(), [], true),
                     server_tx,

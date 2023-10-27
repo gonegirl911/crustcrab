@@ -17,7 +17,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    fn send(self, server_tx: Sender<ServerEvent>) {
+    fn send(self, server_tx: &Sender<ServerEvent>) {
         _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
     }
 
@@ -35,7 +35,7 @@ impl Default for Clock {
 }
 
 impl EventHandler<Event> for Clock {
-    type Context<'a> = Sender<ServerEvent>;
+    type Context<'a> = &'a Sender<ServerEvent>;
 
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         match event {

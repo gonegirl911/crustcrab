@@ -164,7 +164,7 @@ impl Game {
 }
 
 impl EventHandler for Game {
-    type Context<'a> = (Sender<ClientEvent>, &'a Renderer, Duration);
+    type Context<'a> = (&'a Sender<ClientEvent>, &'a Renderer, Duration);
 
     #[rustfmt::skip]
     fn handle(

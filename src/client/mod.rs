@@ -49,7 +49,7 @@ impl Client {
         }
 
         impl EventHandler for MiniClient {
-            type Context<'a> = (Sender<ClientEvent>, Duration);
+            type Context<'a> = (&'a Sender<ClientEvent>, Duration);
 
             fn handle(&mut self, event: &Event, (client_tx, dt): Self::Context<'_>) {
                 self.window.handle(event, ());

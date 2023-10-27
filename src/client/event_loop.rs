@@ -31,7 +31,7 @@ impl EventLoop {
 
     pub fn run<H>(self, mut handler: H) -> !
     where
-        H: for<'a> EventHandler<Context<'a> = (Sender<ClientEvent>, Duration)> + 'static,
+        H: for<'a> EventHandler<Context<'a> = (&'a Sender<ClientEvent>, Duration)> + 'static,
     {
         let mut dt = Default::default();
         let mut stopwatch = Stopwatch::start();
@@ -52,7 +52,7 @@ impl EventLoop {
                 } => control_flow.set_exit(),
                 _ => {}
             }
-            handler.handle(&event, (self.client_tx.clone(), dt));
+            handler.handle(&event, (&self.client_tx, dt));
         })
     }
 }

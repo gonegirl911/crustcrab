@@ -29,7 +29,7 @@ impl Default for Game {
 
         thread::spawn(move || {
             for (event, server_tx) in world_rx {
-                world.handle(&event, server_tx);
+                world.handle(&event, &server_tx);
             }
         });
 
@@ -42,15 +42,15 @@ impl Default for Game {
 }
 
 impl EventHandler<Event> for Game {
-    type Context<'a> = Sender<ServerEvent>;
+    type Context<'a> = &'a Sender<ServerEvent>;
 
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, ());
-        self.clock.handle(event, server_tx.clone());
+        self.clock.handle(event, server_tx);
 
         if let Some(event) = WorldEvent::new(event, &self.player) {
             self.world_tx
-                .send((event, server_tx))
+                .send((event, server_tx.clone()))
                 .unwrap_or_else(|_| unreachable!());
         }
     }

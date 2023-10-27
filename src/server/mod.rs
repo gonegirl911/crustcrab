@@ -40,7 +40,7 @@ impl Server {
         }
 
         impl EventHandler<Event> for MiniServer {
-            type Context<'a> = Sender<ServerEvent>;
+            type Context<'a> = &'a Sender<ServerEvent>;
 
             fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
                 self.game.handle(event, server_tx);

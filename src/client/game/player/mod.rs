@@ -72,7 +72,12 @@ impl Player {
 }
 
 impl EventHandler for Player {
-    type Context<'a> = (Sender<ClientEvent>, &'a Renderer, &'a Inventory, Duration);
+    type Context<'a> = (
+        &'a Sender<ClientEvent>,
+        &'a Renderer,
+        &'a Inventory,
+        Duration,
+    );
 
     fn handle(&mut self, event: &Event, (client_tx, renderer, inventory, dt): Self::Context<'_>) {
         self.controller.handle(event, ());
