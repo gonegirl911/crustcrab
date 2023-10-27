@@ -32,7 +32,7 @@ impl StarDome {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let count = CLIENT_CONFIG.sky.star.count;
         let stars = {
-            let mut rng = StdRng::seed_from_u64(808);
+            let mut rng = StdRng::seed_from_u64(6);
             (0..count).map(|_| Star::new(&mut rng)).collect()
         };
         let buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
