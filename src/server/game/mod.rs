@@ -20,19 +20,6 @@ pub struct Game {
     world_tx: Sender<(WorldEvent, Sender<ServerEvent>)>,
 }
 
-impl Game {
-    fn send_world_events<I>(&self, events: I, server_tx: Sender<ServerEvent>)
-    where
-        I: IntoIterator<Item = WorldEvent>,
-    {
-        for event in events {
-            self.world_tx
-                .send((event, server_tx.clone()))
-                .unwrap_or_else(|_| unreachable!());
-        }
-    }
-}
-
 impl Default for Game {
     fn default() -> Self {
         let player = Default::default();
@@ -60,6 +47,11 @@ impl EventHandler<Event> for Game {
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, ());
         self.clock.handle(event, server_tx.clone());
-        self.send_world_events(WorldEvent::new(event, &self.player), server_tx);
+
+        if let Some(event) = WorldEvent::new(event, &self.player) {
+            self.world_tx
+                .send((event, server_tx))
+                .unwrap_or_else(|_| unreachable!());
+        }
     }
 }
