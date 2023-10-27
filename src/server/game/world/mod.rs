@@ -35,7 +35,6 @@ use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
-    cmp,
     collections::{hash_map::Entry, LinkedList},
     ops::{Deref, Range},
     sync::Arc,
@@ -438,9 +437,8 @@ impl BlockHoverData {
         }
         .into_values()
         .flat_map(|corner_lights| corner_lights.into_values())
-        .fold(Default::default(), |accum, light| {
-            cmp::max_by(accum, light, |a, b| a.lum().total_cmp(&b.lum()))
-        })
+        .max_by(|a, b| a.lum().total_cmp(&b.lum()))
+        .unwrap_or_else(|| unreachable!())
     }
 }
 
