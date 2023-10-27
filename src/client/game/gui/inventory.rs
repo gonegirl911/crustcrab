@@ -17,7 +17,7 @@ use crate::{
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Matrix4, Vector3};
+use nalgebra::{Matrix4, Vector3};
 use serde::Deserialize;
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
@@ -100,19 +100,15 @@ impl Inventory {
         }
     }
 
-    fn transform(&self, renderer @ Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
+    fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
         let diagonal = 3.0f32.sqrt();
-        let size = Gui::element_size(renderer, CLIENT_CONFIG.gui.inventory.size * diagonal);
-        let left = config.width as f32 - size * 1.315;
-        let bottom = config.height as f32 - size * 1.315;
-        Gui::viewport(renderer)
-            * Matrix4::new_translation(&vector![left, bottom, 0.0])
-                .prepend_nonuniform_scaling(&Gui::element_scaling(size))
-                .prepend_translation(&Vector3::from_element(0.5))
+        let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size * diagonal);
+        Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.315))
             * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+                .append_translation(&Vector3::repeat(0.5))
             * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
                 .prepend_scaling(1.0 / diagonal)
-                .prepend_translation(&Vector3::from_element(-0.5))
+                .prepend_translation(&Vector3::repeat(-0.5))
     }
 }
 

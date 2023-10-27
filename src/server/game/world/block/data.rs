@@ -52,19 +52,19 @@ impl BlockData {
             .flatten()
     }
 
-    fn is_glowing(&self) -> bool {
+    fn is_glowing(self) -> bool {
         self.luminance != Default::default()
     }
 
-    pub fn is_transparent(&self) -> bool {
+    pub fn is_transparent(self) -> bool {
         self.light_filter != Default::default() || self.requires_blending
     }
 
-    pub fn is_opaque(&self) -> bool {
+    pub fn is_opaque(self) -> bool {
         !self.is_transparent()
     }
 
-    pub fn is_smoothly_lit(&self) -> bool {
+    pub fn is_smoothly_lit(self) -> bool {
         !self.is_glowing() && self.is_opaque()
     }
 

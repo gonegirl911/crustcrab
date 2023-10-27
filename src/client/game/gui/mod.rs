@@ -12,7 +12,7 @@ use crate::client::{
         Renderer,
     },
 };
-use nalgebra::{vector, Matrix4, Vector3};
+use nalgebra::{vector, Matrix4, Vector2};
 use serde::Deserialize;
 
 pub struct Gui {
@@ -83,20 +83,16 @@ impl Gui {
         }
     }
 
-    fn element_size(Renderer { config, .. }: &Renderer, factor: f32) -> f32 {
-        (config.height as f32 * 0.0325).max(13.5) * factor
+    fn scaling(Renderer { config, .. }: &Renderer, factor: f32) -> Vector2<f32> {
+        let size = (config.height as f32 * 0.0325).max(13.5) * factor;
+        vector![size / config.width as f32, size / config.height as f32]
     }
 
-    fn element_scaling(size: f32) -> Vector3<f32> {
-        vector![size, size, 1.0]
-    }
-
-    fn viewport(Renderer { config, .. }: &Renderer) -> Matrix4<f32> {
-        Matrix4::new_translation(&vector![-1.0, -1.0, 0.0]).prepend_nonuniform_scaling(&vector![
-            2.0 / config.width as f32,
-            2.0 / config.height as f32,
-            1.0
-        ])
+    fn transform(scaling: Vector2<f32>, offset: Vector2<f32>) -> Matrix4<f32> {
+        Matrix4::new_translation(&vector![-1.0, -1.0, 0.0])
+            .prepend_nonuniform_scaling(&vector![2.0, 2.0, 1.0])
+            .prepend_translation(&vector![offset.x, offset.y, 0.0])
+            .prepend_nonuniform_scaling(&vector![scaling.x, scaling.y, 1.0])
     }
 }
 

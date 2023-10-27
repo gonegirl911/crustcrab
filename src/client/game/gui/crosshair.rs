@@ -8,7 +8,7 @@ use crate::client::{
     CLIENT_CONFIG,
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Matrix4;
+use nalgebra::{Matrix4, Vector2};
 use serde::Deserialize;
 use std::mem;
 use winit::{dpi::PhysicalSize, event::WindowEvent};
@@ -71,9 +71,10 @@ impl Crosshair {
     }
 
     fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
-        Gui::viewport(renderer).prepend_nonuniform_scaling(&Gui::element_scaling(
-            Gui::element_size(renderer, CLIENT_CONFIG.gui.crosshair.size),
-        ))
+        Gui::transform(
+            Gui::scaling(renderer, CLIENT_CONFIG.gui.crosshair.size),
+            Vector2::repeat(0.5),
+        )
     }
 }
 
