@@ -27,7 +27,7 @@ struct PushConstants {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) color: vec4<f32>,
+    @location(0) opacity: f32,
 }
 
 @group(0) @binding(0)
@@ -55,13 +55,13 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     return VertexOutput(
         player.vp * vec4(pc.coords + vertex.coords, 1.0),
-        vec4(vec3(1.0), 0.1 * luminance(saturate(global_light + local_light))),
+        0.1 * luminance(saturate(global_light + local_light)),
     );
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return in.color;
+    return vec4(vec3(1.0), in.opacity);
 }
 
 fn luminance(color: vec3<f32>) -> f32 {

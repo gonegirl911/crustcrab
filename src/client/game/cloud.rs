@@ -222,8 +222,8 @@ impl CloudPushConstants {
     }
 
     fn update_offset(&mut self, dt: Duration) {
-        self.offset -= Vector2::x() * CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
-        self.offset = self.offset.map(|c| c % (12.0 * 256.0));
+        self.offset.x =
+            (self.offset.x - CLIENT_CONFIG.cloud.speed * dt.as_secs_f32()) % (12.0 * 256.0);
     }
 
     fn color(stage: Stage) -> Float3 {
