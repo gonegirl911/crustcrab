@@ -20,7 +20,7 @@ impl EventLoop {
 
     pub fn run<H>(self, mut handler: H) -> !
     where
-        H: for<'a> EventHandler<Event, Context<'a> = &'a Sender<ServerEvent>> + Send,
+        H: for<'a> EventHandler<Event, Context<'a> = &'a Sender<ServerEvent>>,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
 
