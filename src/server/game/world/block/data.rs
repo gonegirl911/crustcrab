@@ -31,9 +31,9 @@ impl BlockData {
                     let corner_deltas = SIDE_CORNER_DELTAS[side];
                     let tex_idx = tex_indices[side];
                     let face = side.into();
-                    let is_smoothly_lit = self.is_smoothly_lit();
-                    let corner_aos = area.corner_aos(side, is_smoothly_lit);
-                    let corner_lights = area_light.corner_lights(side, area, is_smoothly_lit);
+                    let is_externally_lit = self.is_externally_lit();
+                    let corner_aos = area.corner_aos(side, is_externally_lit);
+                    let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
                     Self::corners(corner_aos, corner_lights)
                         .into_iter()
                         .map(move |corner| {
@@ -64,8 +64,8 @@ impl BlockData {
         !self.is_transparent()
     }
 
-    pub fn is_smoothly_lit(self) -> bool {
-        !self.is_glowing() && self.is_opaque()
+    pub fn is_externally_lit(self) -> bool {
+        !self.is_glowing() && self.light_filter == Default::default()
     }
 
     fn corners(

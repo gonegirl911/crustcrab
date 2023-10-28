@@ -7,4 +7,4 @@ reach = { start = 0.0, end = 4.5 }
 [clock]
 ticks_per_day = 24000
 twilight_duration = 500
-starting_stage = "dawn"
+starting_stage = "night"

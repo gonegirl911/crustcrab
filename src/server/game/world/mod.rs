@@ -269,7 +269,7 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
-                    |BlockIntersection { coords, .. }| self.chunks.block(*coords) != Block::Air,
+                    |&BlockIntersection { coords, .. }| self.chunks.block(coords) != Block::Air,
                 );
 
                 if self.hover != hover {
@@ -431,9 +431,9 @@ impl BlockHoverData {
     }
 
     fn brightness(area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
-        let is_smoothly_lit = area.block().data().is_smoothly_lit();
+        let is_externally_lit = area.block().data().is_externally_lit();
         enum_map! {
-            side => area_light.corner_lights(side, area, is_smoothly_lit),
+            side => area_light.corner_lights(side, area, is_externally_lit),
         }
         .into_values()
         .flat_map(|corner_lights| corner_lights.into_values())
