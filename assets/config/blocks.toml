@@ -2,38 +2,18 @@
 light_filter = [1, 1, 1]
 
 [sand]
-side_tex_paths.front = "sand.png"
-side_tex_paths.right = "sand.png"
-side_tex_paths.back = "sand.png"
-side_tex_paths.left = "sand.png"
-side_tex_paths.up = "sand.png"
-side_tex_paths.down = "sand.png"
+texture = "sand.png"
 
 [glowstone]
-side_tex_paths.front = "glowstone.png"
-side_tex_paths.right = "glowstone.png"
-side_tex_paths.back = "glowstone.png"
-side_tex_paths.left = "glowstone.png"
-side_tex_paths.up = "glowstone.png"
-side_tex_paths.down = "glowstone.png"
+texture = "glowstone.png"
 luminance = [15, 15, 15]
 
 [glass_magenta]
-side_tex_paths.front = "glass_magenta.png"
-side_tex_paths.right = "glass_magenta.png"
-side_tex_paths.back = "glass_magenta.png"
-side_tex_paths.left = "glass_magenta.png"
-side_tex_paths.up = "glass_magenta.png"
-side_tex_paths.down = "glass_magenta.png"
+texture = "glass_magenta.png"
 light_filter = [1, 0, 1]
 requires_blending = true
 
 [glass_cyan]
-side_tex_paths.front = "glass_cyan.png"
-side_tex_paths.right = "glass_cyan.png"
-side_tex_paths.back = "glass_cyan.png"
-side_tex_paths.left = "glass_cyan.png"
-side_tex_paths.up = "glass_cyan.png"
-side_tex_paths.down = "glass_cyan.png"
+texture = "glass_cyan.png"
 light_filter = [0, 1, 1]
 requires_blending = true

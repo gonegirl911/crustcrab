@@ -8,11 +8,11 @@ use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{fs, sync::Arc};
+use std::{fs, iter, ops::Index, sync::Arc};
 
 #[derive(Clone, Copy)]
 pub struct BlockData {
-    side_tex_indices: Option<EnumMap<Side, u8>>,
+    tex_indices: Option<TextureData<u8>>,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
@@ -25,11 +25,11 @@ impl BlockData {
         area: BlockArea,
         area_light: BlockAreaLight,
     ) -> impl Iterator<Item = BlockVertex> {
-        self.side_tex_indices
-            .map(move |side_tex_indices| {
+        self.tex_indices
+            .map(move |tex_indices| {
                 area.visible_sides().flat_map(move |side| {
                     let corner_deltas = SIDE_CORNER_DELTAS[side];
-                    let tex_idx = side_tex_indices[side];
+                    let tex_idx = tex_indices[side];
                     let face = side.into();
                     let is_smoothly_lit = self.is_smoothly_lit();
                     let corner_aos = area.corner_aos(side, is_smoothly_lit);
@@ -87,7 +87,7 @@ impl BlockData {
 impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
-            side_tex_indices: data.side_tex_indices(),
+            tex_indices: data.tex_indices(),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
@@ -97,8 +97,8 @@ impl From<RawBlockData> for BlockData {
 
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
-    #[serde(default)]
-    side_tex_paths: Option<EnumMap<Side, Arc<String>>>,
+    #[serde(flatten, default)]
+    tex_paths: Option<TextureData<Arc<String>>>,
     #[serde(default)]
     luminance: Rgb<u8>,
     #[serde(default)]
@@ -108,10 +108,42 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn side_tex_indices(&self) -> Option<EnumMap<Side, u8>> {
-        self.side_tex_paths
+    fn tex_indices(&self) -> Option<TextureData<u8>> {
+        self.tex_paths
             .clone()
-            .map(|paths| paths.map(|_, path| TEX_INDICES[&path]))
+            .map(|paths| paths.map(|path| TEX_INDICES[&path]))
+    }
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(untagged)]
+enum TextureData<T> {
+    Single { texture: T },
+}
+
+impl<T> TextureData<T> {
+    fn textures(&self) -> impl Iterator<Item = &T> {
+        match self {
+            Self::Single { texture } => iter::once(texture),
+        }
+    }
+
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> TextureData<U> {
+        match self {
+            Self::Single { texture } => TextureData::Single {
+                texture: f(texture),
+            },
+        }
+    }
+}
+
+impl<T> Index<Side> for TextureData<T> {
+    type Output = T;
+
+    fn index(&self, _: Side) -> &Self::Output {
+        match self {
+            Self::Single { texture } => texture,
+        }
     }
 }
 
@@ -178,8 +210,8 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|data| data.side_tex_paths.as_ref())
-        .flat_map(|side_tex_paths| side_tex_paths.values())
+        .filter_map(|data| data.tex_paths.as_ref())
+        .flat_map(TextureData::textures)
         .cloned()
         .for_each(|path| {
             indices.entry(path).or_insert_with(|| {
