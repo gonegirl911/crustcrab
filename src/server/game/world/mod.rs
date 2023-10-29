@@ -433,7 +433,7 @@ impl BlockHoverData {
     fn brightness(area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         let is_externally_lit = area.block().data().is_externally_lit();
         enum_map! {
-            side => area_light.corner_lights(side, area, is_externally_lit),
+            side => area_light.corner_lights(area, side, is_externally_lit),
         }
         .into_values()
         .flat_map(|corner_lights| corner_lights.into_values())

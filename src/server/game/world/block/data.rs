@@ -33,7 +33,7 @@ impl BlockData {
                     let tex_idx = tex_indices[side];
                     let face = side.into();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
-                    let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
+                    let corner_lights = area_light.corner_lights(area, side, is_externally_lit);
                     Self::corners(corner_aos, corner_lights)
                         .into_iter()
                         .map(move |corner| {

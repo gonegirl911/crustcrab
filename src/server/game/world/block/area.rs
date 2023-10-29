@@ -127,8 +127,8 @@ impl BlockAreaLight {
 
     pub fn corner_lights(
         &self,
-        side: Side,
         area: BlockArea,
+        side: Side,
         is_externally_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
         if is_externally_lit {
