@@ -233,7 +233,7 @@ impl Branch {
                 let data = node.block().data();
                 let expected = node.value * data.light_filter[index % 3];
                 match component.cmp(&expected) {
-                    Ordering::Less => unreachable!(),
+                    Ordering::Less => {}
                     Ordering::Equal => {
                         let luminance = data.luminance[index % 3];
                         if luminance != 0 {
