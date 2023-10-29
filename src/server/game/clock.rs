@@ -58,7 +58,7 @@ pub struct Time {
 
 impl Time {
     pub fn sky_rotation(self) -> UnitQuaternion<f32> {
-        let time = self.ticks as f32 / SERVER_CONFIG.clock.ticks_per_day as f32;
+        let time = SERVER_CONFIG.clock.time(self.ticks);
         let theta = TAU * time;
         UnitQuaternion::new(Vector3::z() * theta)
     }
@@ -120,6 +120,10 @@ impl ClockState {
         }
     }
 
+    fn time(self, ticks: u16) -> f32 {
+        (ticks as i16 - self.horizon() as i16) as f32 / self.ticks_per_day as f32
+    }
+
     fn stage(self, ticks: u16) -> Stage {
         if self.dawn_range().contains(&ticks) {
             Stage::Dawn {
@@ -164,24 +168,28 @@ impl ClockState {
         0
     }
 
+    fn horizon(self) -> u16 {
+        self.twilight_duration / 2
+    }
+
     fn day_start(self) -> u16 {
         self.twilight_duration
     }
 
     fn noon(self) -> u16 {
-        self.ticks_per_day / 4
+        self.horizon() + self.ticks_per_day / 4
     }
 
     fn dusk_start(self) -> u16 {
-        self.night_start() - self.twilight_duration
-    }
-
-    fn night_start(self) -> u16 {
         self.ticks_per_day / 2
     }
 
+    fn night_start(self) -> u16 {
+        self.dusk_start() + self.twilight_duration
+    }
+
     fn midnight(self) -> u16 {
-        self.ticks_per_day / 4 * 3
+        self.noon() + self.ticks_per_day / 2
     }
 
     fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
