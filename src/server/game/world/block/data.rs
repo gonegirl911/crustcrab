@@ -27,11 +27,11 @@ impl BlockData {
     ) -> impl Iterator<Item = BlockVertex> {
         self.tex_indices
             .map(move |tex_indices| {
+                let is_externally_lit = self.is_externally_lit();
                 area.visible_sides().flat_map(move |side| {
                     let corner_deltas = SIDE_CORNER_DELTAS[side];
                     let tex_idx = tex_indices[side];
                     let face = side.into();
-                    let is_externally_lit = self.is_externally_lit();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
                     let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
                     Self::corners(corner_aos, corner_lights)
