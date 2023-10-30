@@ -19,6 +19,7 @@ pub struct BlockData {
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
+    pub valid_surface: Option<Block>,
 }
 
 impl BlockData {
@@ -136,6 +137,7 @@ impl From<RawBlockData> for BlockData {
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
+            valid_surface: data.valid_surface,
         }
     }
 }
@@ -150,6 +152,8 @@ struct RawBlockData {
     light_filter: Rgb<u8>,
     #[serde(default)]
     requires_blending: bool,
+    #[serde(default)]
+    valid_surface: Option<Block>,
 }
 
 impl RawBlockData {

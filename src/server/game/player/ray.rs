@@ -19,26 +19,23 @@ impl Ray {
                 Ordering::Greater => (1, if o == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
             }
         });
-        let coords = self.origin.map(|c| c.floor() as i64);
+        let mut coords = self.origin.map(|c| c.floor() as i64);
         let step = values.map(|c| c.0);
-        let tmax = values.map(|c| c.1 * c.2);
-        let tdelta = values.map(|c| c.2);
+        let t_delta = values.map(|c| c.2);
+        let mut t_max = values.map(|c| c.1 * c.2);
         iter::successors(
-            Some((coords, Vector3::zeros(), tmax)),
-            move |(coords, _, tmax)| {
-                let i = tmax.imin();
-                reach.contains(&tmax[i]).then(|| {
-                    let mut coords = *coords;
+            Some(BlockIntersection::new(coords, Vector3::zeros())),
+            move |_| {
+                let i = t_max.imin();
+                reach.contains(&t_max[i]).then(|| {
                     let mut normal = Vector3::zeros();
-                    let mut tmax = *tmax;
                     coords[i] += step[i];
+                    t_max[i] += t_delta[i];
                     normal[i] -= step[i];
-                    tmax[i] += tdelta[i];
-                    (coords, normal, tmax)
+                    BlockIntersection::new(coords, normal)
                 })
             },
         )
-        .map(|(coords, normal, _)| BlockIntersection { coords, normal })
     }
 }
 
@@ -46,6 +43,12 @@ impl Ray {
 pub struct BlockIntersection {
     pub coords: Point3<i64>,
     pub normal: Vector3<i64>,
+}
+
+impl BlockIntersection {
+    fn new(coords: Point3<i64>, normal: Vector3<i64>) -> Self {
+        Self { coords, normal }
+    }
 }
 
 pub trait Hittable {

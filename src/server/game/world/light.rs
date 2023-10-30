@@ -125,12 +125,13 @@ impl Branch {
         for (chunk_coords, values) in self.0 {
             match light.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
+                    let light = entry.get_mut();
                     for (block_coords, value) in values {
-                        if entry.get_mut().set(block_coords, value) {
+                        if light.set(block_coords, value) {
                             changes.push(utils::coords((chunk_coords, block_coords)));
                         }
                     }
-                    if entry.get().is_empty() {
+                    if light.is_empty() {
                         entry.remove();
                     }
                 }

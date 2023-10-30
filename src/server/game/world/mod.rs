@@ -32,7 +32,7 @@ use crate::{
 };
 use enum_map::enum_map;
 use flume::Sender;
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -80,28 +80,26 @@ impl World {
     fn apply(
         &mut self,
         coords: Point3<i64>,
+        normal: Vector3<i64>,
         action: BlockAction,
         server_tx: &Sender<ServerEvent>,
         ray: Ray,
     ) {
-        let Ok((load, unload)) = self.chunks.apply(coords, action) else { return };
+        let Some((loads, unloads)) = self.chunks.apply(coords, normal, action) else { return };
         let light_updates = self.light.apply(&self.chunks, coords, action);
+        let updates = self.updates(
+            &loads.iter().chain(&unloads).copied().collect(),
+            light_updates.into_iter().chain([coords]),
+            false,
+        );
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
         self.actions.insert(coords, action);
 
-        self.send_unloads(unload, server_tx);
-        self.send_loads(load, server_tx, true);
-        self.send_updates(
-            self.updates(
-                &load.into_iter().chain(unload).collect(),
-                light_updates.into_iter().chain([coords]),
-                false,
-            ),
-            server_tx,
-            true,
-        );
+        self.send_unloads(unloads, server_tx);
+        self.send_loads(loads, server_tx, true);
+        self.send_updates(updates, server_tx, true);
     }
 
     fn send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
@@ -292,12 +290,18 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::BlockPlaced { block, ray } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hover {
-                    self.apply(coords + normal, BlockAction::Place(block), server_tx, ray);
+                    self.apply(
+                        coords + normal,
+                        normal,
+                        BlockAction::Place(block),
+                        server_tx,
+                        ray,
+                    );
                 }
             }
             WorldEvent::BlockDestroyed { ray } => {
-                if let Some(BlockIntersection { coords, .. }) = self.hover {
-                    self.apply(coords, BlockAction::Destroy, server_tx, ray);
+                if let Some(BlockIntersection { coords, normal }) = self.hover {
+                    self.apply(coords, normal, BlockAction::Destroy, server_tx, ray);
                 }
             }
         }
@@ -346,46 +350,117 @@ impl ChunkStore {
     fn apply(
         &mut self,
         coords: Point3<i64>,
+        normal: Vector3<i64>,
         action: BlockAction,
-    ) -> Result<(Option<Point3<i32>>, Option<Point3<i32>>), ()> {
-        let chunk_coords = utils::chunk_coords(coords);
-        let block_coords = utils::block_coords(coords);
-        if World::Y_RANGE.contains(&chunk_coords.y) {
-            match self.0.entry(chunk_coords) {
-                Entry::Occupied(mut entry) => {
-                    let chunk = entry.get_mut();
-                    if chunk.apply(block_coords, action) {
-                        if !chunk.is_empty() {
-                            Ok((None, None))
-                        } else {
-                            entry.remove();
-                            Ok((None, Some(chunk_coords)))
-                        }
-                    } else {
-                        Err(())
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    if Block::Air.apply(action) {
-                        let chunk = entry.insert(Default::default());
-                        chunk.apply_unchecked(block_coords, action);
-                        Ok((Some(chunk_coords), None))
-                    } else {
-                        Err(())
-                    }
-                }
-            }
-        } else {
-            Err(())
-        }
+    ) -> Option<(Vec<Point3<i32>>, Vec<Point3<i32>>)> {
+        let mut branch = Branch::default();
+        branch
+            .apply(self, coords, normal, action)
+            .then(|| branch.merge(self))
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         self.0.get(&coords).map(Deref::deref)
     }
 
+    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, Box<Chunk>> {
+        self.0.entry(coords)
+    }
+
     fn contains(&self, coords: Point3<i32>) -> bool {
         self.0.contains_key(&coords)
+    }
+}
+
+#[derive(Default)]
+struct Branch(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
+
+impl Branch {
+    fn apply(
+        &mut self,
+        chunks: &mut ChunkStore,
+        coords: Point3<i64>,
+        normal: Vector3<i64>,
+        action: BlockAction,
+    ) -> bool {
+        if self.is_action_valid(chunks, coords, normal, action) {
+            self.insert(coords, action);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn merge(self, chunks: &mut ChunkStore) -> (Vec<Point3<i32>>, Vec<Point3<i32>>) {
+        let mut loads = vec![];
+        let mut unloads = vec![];
+        for (chunk_coords, actions) in self.0 {
+            match chunks.entry(chunk_coords) {
+                Entry::Occupied(mut entry) => {
+                    let chunk = entry.get_mut();
+                    for (block_coords, action) in actions {
+                        chunk.apply(block_coords, action);
+                    }
+                    if chunk.is_empty() {
+                        entry.remove();
+                        unloads.push(chunk_coords);
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    let mut valid_actions = actions
+                        .into_iter()
+                        .filter(|&(_, action)| Block::Air.is_action_valid(action))
+                        .peekable();
+
+                    if valid_actions.peek().is_some() {
+                        let chunk = entry.insert(Default::default());
+                        for (block_coords, action) in valid_actions {
+                            chunk.apply_unchecked(block_coords, action);
+                        }
+                        loads.push(chunk_coords);
+                    }
+                }
+            }
+        }
+        (loads, unloads)
+    }
+
+    fn is_action_valid(
+        &mut self,
+        chunks: &mut ChunkStore,
+        coords: Point3<i64>,
+        normal: Vector3<i64>,
+        action: BlockAction,
+    ) -> bool {
+        if World::Y_RANGE.contains(&utils::chunk_coords(coords).y) {
+            match action {
+                BlockAction::Place(block) => {
+                    if let Some(surface) = block.data().valid_surface {
+                        normal == Vector3::y() && chunks.block(coords - normal) == surface
+                    } else {
+                        true
+                    }
+                }
+                BlockAction::Destroy => {
+                    let roof = chunks.block(coords + Vector3::y());
+                    if roof.data().valid_surface.is_some() {
+                        self.insert(coords + Vector3::y(), BlockAction::Destroy);
+                    }
+                    true
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
+        self.0
+            .entry(utils::chunk_coords(coords))
+            .or_default()
+            .entry(utils::block_coords(coords))
+            .and_modify(|_| unreachable!())
+            .or_insert(action);
     }
 }
 
@@ -468,12 +543,7 @@ pub enum WorldEvent {
 }
 
 impl WorldEvent {
-    pub fn new(
-        event: &Event,
-        &Player {
-            prev, curr, ray, ..
-        }: &Player,
-    ) -> Option<Self> {
+    pub fn new(event: &Event, &Player { prev, curr, ray }: &Player) -> Option<Self> {
         match *event {
             Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
                 Some(Self::InitialRenderRequested { area: curr, ray })

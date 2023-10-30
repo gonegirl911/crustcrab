@@ -27,18 +27,21 @@ impl Block {
         &BLOCK_DATA[self]
     }
 
-    pub fn apply(&mut self, action: BlockAction) -> bool {
-        match (*self, action) {
+    pub fn is_action_valid(self, action: BlockAction) -> bool {
+        match (self, action) {
             (Self::Air, BlockAction::Place(Self::Air) | BlockAction::Destroy) => false,
-            (Self::Air, BlockAction::Place(block)) => {
-                *self = block;
-                true
-            }
+            (Self::Air, BlockAction::Place(_)) => true,
             (_, BlockAction::Place(_)) => false,
-            (_, BlockAction::Destroy) => {
-                *self = Self::Air;
-                true
-            }
+            (_, BlockAction::Destroy) => true,
+        }
+    }
+
+    pub fn apply(&mut self, action: BlockAction) -> bool {
+        if self.is_action_valid(action) {
+            self.apply_unchecked(action);
+            true
+        } else {
+            false
         }
     }
 
