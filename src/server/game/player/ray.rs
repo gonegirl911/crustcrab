@@ -47,3 +47,7 @@ pub struct BlockIntersection {
     pub coords: Point3<i64>,
     pub normal: Vector3<i64>,
 }
+
+pub trait Hittable {
+    fn hit(&self, ray: Ray) -> bool;
+}

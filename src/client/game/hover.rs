@@ -13,9 +13,10 @@ use crate::{
         game::world::{block::BlockLight, BlockHoverData},
         ServerEvent,
     },
+    shared::bound::Aabb,
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Point3, Vector3};
+use nalgebra::{vector, Matrix4, Point3, Vector3};
 
 pub struct BlockHover {
     highlight: BlockHighlight,
@@ -46,7 +47,7 @@ impl BlockHover {
         sky_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
     ) {
-        if let Some(BlockHoverData { coords, brightness }) = self.data {
+        if let Some(BlockHoverData { hitbox, brightness }) = self.data {
             self.highlight.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -69,7 +70,7 @@ impl BlockHover {
                 }),
                 player_bind_group,
                 sky_bind_group,
-                BlockHighlightPushConstants::new(coords, brightness),
+                &BlockHighlightPushConstants::new(hitbox, brightness),
             );
         }
     }
@@ -135,7 +136,7 @@ impl BlockHighlight {
         render_pass: &mut wgpu::RenderPass<'a>,
         player_bind_group: &'a wgpu::BindGroup,
         sky_bind_group: &'a wgpu::BindGroup,
-        pc: BlockHighlightPushConstants,
+        pc: &BlockHighlightPushConstants,
     ) {
         self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
         pc.set(render_pass);
@@ -162,14 +163,14 @@ impl Vertex for BlockHighlightVertex {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct BlockHighlightPushConstants {
-    coords: Point3<f32>,
+    m: Matrix4<f32>,
     brightness: u32,
 }
 
 impl BlockHighlightPushConstants {
-    fn new(coords: Point3<i64>, brightness: BlockLight) -> Self {
+    fn new(hitbox: Aabb, brightness: BlockLight) -> Self {
         Self {
-            coords: coords.cast(),
+            m: hitbox.to_homogeneous(),
             brightness: brightness.0,
         }
     }

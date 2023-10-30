@@ -107,8 +107,9 @@ impl Inventory {
         Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44))
             * if !self.is_flat {
                 let diagonal = 3.0f32.sqrt();
-                let theta = (1.0 / diagonal).acos() - FRAC_PI_6;
-                Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+                let rot_x = -FRAC_PI_6;
+                let theta = (1.0 / diagonal).acos() + rot_x;
+                Matrix4::new_rotation(Vector3::x() * rot_x)
                     .append_scaling(1.0 / diagonal / theta.cos())
                     .append_translation(&vector![0.5, 0.5, 0.545])
                     * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)

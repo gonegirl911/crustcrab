@@ -17,6 +17,7 @@ use self::{
     },
     light::WorldLight,
 };
+use super::player::ray::Hittable;
 use crate::{
     client::{game::world::BlockVertex, ClientEvent},
     server::{
@@ -27,7 +28,7 @@ use crate::{
         },
         ServerEvent, SERVER_CONFIG,
     },
-    shared::utils,
+    shared::{bound::Aabb, utils},
 };
 use enum_map::enum_map;
 use flume::Sender;
@@ -269,7 +270,9 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
-                    |&BlockIntersection { coords, .. }| self.chunks.block(coords) != Block::Air,
+                    |&BlockIntersection { coords, .. }| {
+                        self.chunks.block(coords).data().hitbox(coords).hit(ray)
+                    },
                 );
 
                 if self.hover != hover {
@@ -418,22 +421,22 @@ impl ChunkData {
 
 #[derive(Clone, Copy)]
 pub struct BlockHoverData {
-    pub coords: Point3<i64>,
+    pub hitbox: Aabb,
     pub brightness: BlockLight,
 }
 
 impl BlockHoverData {
     fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
+        let data = area.block().data();
         Self {
-            coords,
-            brightness: Self::brightness(area, area_light),
+            hitbox: data.hitbox(coords),
+            brightness: Self::brightness(data, area, area_light),
         }
     }
 
-    fn brightness(area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
-        let is_externally_lit = area.block().data().is_externally_lit();
+    fn brightness(data: &BlockData, area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         enum_map! {
-            side => area_light.corner_lights(side, area, is_externally_lit),
+            side => area_light.corner_lights(side, area, data.is_externally_lit()),
         }
         .into_values()
         .flat_map(|corner_lights| corner_lights.into_values())

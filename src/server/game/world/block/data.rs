@@ -2,10 +2,13 @@ use super::{
     area::{BlockArea, BlockAreaLight},
     Block, BlockLight,
 };
-use crate::{client::game::world::BlockVertex, shared::color::Rgb};
+use crate::{
+    client::game::world::BlockVertex,
+    shared::{bound::Aabb, color::Rgb},
+};
 use core::slice;
 use enum_map::{enum_map, Enum, EnumMap};
-use nalgebra::{point, Point2, Point3, Vector3};
+use nalgebra::{point, vector, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
@@ -86,6 +89,12 @@ impl BlockData {
                 })
             })
         })
+    }
+
+    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
+        self.model
+            .as_ref()
+            .map_or_else(Default::default, |model| model.hitbox(coords))
     }
 
     fn is_glowing(&self) -> bool {
@@ -172,7 +181,14 @@ impl<T> Model<T> {
 
     fn internal_deltas(&self) -> Option<(impl Iterator<Item = (Corner, Vector3<u8>)>, &T)> {
         if let Self::Flower { texture } = self {
-            Some((std::iter::empty(), texture))
+            Some((
+                FLOWER_DELTAS.into_iter().flat_map(|corner_deltas| {
+                    CORNERS
+                        .into_iter()
+                        .map(move |corner| (corner, corner_deltas[corner]))
+                }),
+                texture,
+            ))
         } else {
             None
         }
@@ -183,6 +199,17 @@ impl<T> Model<T> {
             Some(texture)
         } else {
             None
+        }
+    }
+
+    fn hitbox(&self, coords: Point3<i64>) -> Aabb {
+        if matches!(self, Self::Flower { .. }) {
+            Aabb::new(
+                coords.cast() + vector![0.1, 0.0, 0.1],
+                vector![0.8, 1.0, 0.8],
+            )
+        } else {
+            Aabb::new(coords.cast(), vector![1.0, 1.0, 1.0])
         }
     }
 
@@ -384,3 +411,32 @@ const FLIPPED_CORNERS: [Corner; 6] = [
     Corner::UpperRight,
     Corner::UpperLeft,
 ];
+
+static FLOWER_DELTAS: Lazy<[EnumMap<Corner, Vector3<u8>>; 4]> = Lazy::new(|| {
+    [
+        enum_map! {
+            Corner::LowerLeft => vector![0, 0, 0],
+            Corner::LowerRight => vector![1, 0, 1],
+            Corner::UpperRight => vector![1, 1, 1],
+            Corner::UpperLeft => vector![0, 1, 0],
+        },
+        enum_map! {
+            Corner::LowerLeft => vector![1, 0, 1],
+            Corner::LowerRight => vector![0, 0, 0],
+            Corner::UpperRight => vector![0, 1, 0],
+            Corner::UpperLeft => vector![1, 1, 1],
+        },
+        enum_map! {
+            Corner::LowerLeft => vector![0, 0, 1],
+            Corner::LowerRight => vector![1, 0, 0],
+            Corner::UpperRight => vector![1, 1, 0],
+            Corner::UpperLeft => vector![0, 1, 1],
+        },
+        enum_map! {
+            Corner::LowerLeft => vector![1, 0, 0],
+            Corner::LowerRight => vector![0, 0, 1],
+            Corner::UpperRight => vector![0, 1, 1],
+            Corner::UpperLeft => vector![1, 1, 0],
+        },
+    ]
+});

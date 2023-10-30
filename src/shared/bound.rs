@@ -1,6 +1,7 @@
-use nalgebra::{Point3, Vector3};
+use crate::server::game::player::ray::{Hittable, Ray};
+use nalgebra::{Matrix4, Point3, Vector3};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Aabb {
     min: Point3<f32>,
     max: Point3<f32>,
@@ -17,11 +18,30 @@ impl Aabb {
     }
 
     fn circumcenter(self) -> Point3<f32> {
-        self.min + (self.max - self.min) * 0.5
+        self.min + self.diagonal() * 0.5
     }
 
     fn circumradius(self) -> f32 {
-        (self.max - self.min).magnitude() * 0.5
+        self.diagonal().magnitude() * 0.5
+    }
+
+    pub fn to_homogeneous(self) -> Matrix4<f32> {
+        Matrix4::new_translation(&self.min.coords).prepend_nonuniform_scaling(&self.diagonal())
+    }
+
+    fn diagonal(self) -> Vector3<f32> {
+        self.max - self.min
+    }
+}
+
+impl Hittable for Aabb {
+    fn hit(&self, ray: Ray) -> bool {
+        let (t_min, t_max) = (0..3).fold((f32::MIN, f32::MAX), |(t_min, t_max), i| {
+            let t0 = (self.min[i] - ray.origin[i]) / ray.dir[i];
+            let t1 = (self.max[i] - ray.origin[i]) / ray.dir[i];
+            (t_min.max(t0.min(t1)), t_max.min(t0.max(t1)))
+        });
+        t_min <= t_max
     }
 }
 
