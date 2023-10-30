@@ -40,4 +40,4 @@ size = 1.0
 
 [gui.inventory]
 content = ["glowstone", "glass_magenta", "glass_cyan", "dead_bush"]
-size = 3.9
+size = 3.6

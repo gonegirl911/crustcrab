@@ -23,8 +23,8 @@ pub enum Block {
 }
 
 impl Block {
-    pub fn data(self) -> BlockData {
-        BLOCK_DATA[self]
+    pub fn data(self) -> &'static BlockData {
+        &BLOCK_DATA[self]
     }
 
     pub fn apply(&mut self, action: BlockAction) -> bool {

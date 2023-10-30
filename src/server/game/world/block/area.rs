@@ -25,12 +25,12 @@ impl BlockArea {
         }))
     }
 
-    pub fn is_side_visible(self, side: Side) -> bool {
+    pub fn is_side_visible(&self, side: Side) -> bool {
         let neighbor = self[SIDE_DELTAS[side]];
         neighbor != self.block() && neighbor.data().is_transparent()
     }
 
-    pub fn corner_aos(self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {
+    pub fn corner_aos(&self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {
         if is_externally_lit {
             enum_map! { corner => self.ao(side, corner) }
         } else {
@@ -38,11 +38,11 @@ impl BlockArea {
         }
     }
 
-    pub fn internal_ao(self) -> u8 {
+    pub fn internal_ao(&self) -> u8 {
         3
     }
 
-    pub fn block(self) -> Block {
+    pub fn block(&self) -> Block {
         self[Default::default()]
     }
 
@@ -50,7 +50,7 @@ impl BlockArea {
         &mut self[Default::default()]
     }
 
-    fn ao(self, side: Side, corner: Corner) -> u8 {
+    fn ao(&self, side: Side, corner: Corner) -> u8 {
         let components = self.components(side, corner);
 
         let [edge1, edge2, corner] = [
@@ -66,7 +66,7 @@ impl BlockArea {
         }
     }
 
-    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
+    fn components(&self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self[delta].data().is_opaque())
     }
 
@@ -111,7 +111,7 @@ impl IndexMut<Vector3<i8>> for BlockArea {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {
@@ -126,7 +126,7 @@ impl BlockAreaLight {
     pub fn corner_lights(
         &self,
         side: Side,
-        area: BlockArea,
+        area: &BlockArea,
         is_externally_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
         if is_externally_lit {

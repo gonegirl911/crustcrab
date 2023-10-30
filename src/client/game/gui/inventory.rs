@@ -17,7 +17,7 @@ use crate::{
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::{vector, Matrix4, Vector3};
 use serde::Deserialize;
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
@@ -104,16 +104,18 @@ impl Inventory {
 
     fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
         let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
-        if self.is_flat {
-            Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.315))
-        } else {
-            Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.315))
-                * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
-                    .append_scaling(1.0 / 3.0f32.sqrt() / 15.0f32.to_radians().cos())
-                    .append_translation(&Vector3::repeat(0.5))
-                * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
-                    .prepend_translation(&Vector3::repeat(-0.5))
-        }
+        Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44))
+            * if !self.is_flat {
+                let diagonal = 3.0f32.sqrt();
+                let theta = (1.0 / diagonal).acos() - FRAC_PI_6;
+                Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+                    .append_scaling(1.0 / diagonal / theta.cos())
+                    .append_translation(&vector![0.5, 0.5, 0.545])
+                    * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
+                        .prepend_translation(&Vector3::repeat(-0.5))
+            } else {
+                Matrix4::identity()
+            }
     }
 }
 

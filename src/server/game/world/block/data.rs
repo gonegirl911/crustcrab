@@ -11,7 +11,6 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::{fs, sync::Arc};
 
-#[derive(Clone, Copy)]
 pub struct BlockData {
     model: Option<Model<u8>>,
     pub luminance: Rgb<u8>,
@@ -21,22 +20,20 @@ pub struct BlockData {
 
 impl BlockData {
     pub fn vertices(
-        self,
+        &self,
         coords: Point3<u8>,
         area: BlockArea,
         area_light: BlockAreaLight,
-    ) -> Option<impl Iterator<Item = BlockVertex>> {
-        self.model.map(move |model| {
+    ) -> Option<impl Iterator<Item = BlockVertex> + '_> {
+        self.model.as_ref().map(move |model| {
             let is_externally_lit = self.is_externally_lit();
-            let ao = area.internal_ao();
-            let light = area_light.internal_light();
             model
                 .side_corner_deltas()
                 .filter(move |&(side, _, _)| area.is_side_visible(side))
-                .flat_map(move |(side, corner_deltas, tex_idx)| {
+                .flat_map(move |(side, corner_deltas, &tex_idx)| {
                     let face = side.into();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
-                    let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
+                    let corner_lights = area_light.corner_lights(side, &area, is_externally_lit);
                     Self::corners(corner_aos, corner_lights)
                         .into_iter()
                         .map(move |corner| {
@@ -53,7 +50,9 @@ impl BlockData {
                 .chain(
                     model
                         .internal_deltas()
-                        .map(move |(deltas, tex_idx)| {
+                        .map(move |(deltas, &tex_idx)| {
+                            let ao = area.internal_ao();
+                            let light = area_light.internal_light();
                             deltas.map(move |(corner, delta)| {
                                 BlockVertex::new(
                                     coords + delta,
@@ -71,9 +70,9 @@ impl BlockData {
         })
     }
 
-    pub fn flat_icon(self) -> Option<impl Iterator<Item = BlockVertex>> {
-        self.model.and_then(|model| {
-            model.flat_icon().map(|tex_idx| {
+    pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex> + '_> {
+        self.model.as_ref().and_then(|model| {
+            model.flat_icon().map(|&tex_idx| {
                 let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
                 CORNERS.into_iter().map(move |corner| {
                     BlockVertex::new(
@@ -89,19 +88,19 @@ impl BlockData {
         })
     }
 
-    fn is_glowing(self) -> bool {
+    fn is_glowing(&self) -> bool {
         self.luminance != Default::default()
     }
 
-    pub fn is_transparent(self) -> bool {
+    pub fn is_transparent(&self) -> bool {
         self.light_filter != Default::default() || self.requires_blending
     }
 
-    pub fn is_opaque(self) -> bool {
+    pub fn is_opaque(&self) -> bool {
         !self.is_transparent()
     }
 
-    pub fn is_externally_lit(self) -> bool {
+    pub fn is_externally_lit(&self) -> bool {
         !self.is_glowing() && self.light_filter == Default::default()
     }
 
@@ -152,8 +151,7 @@ impl RawBlockData {
     }
 }
 
-#[repr(u8)]
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(untagged)]
 enum Model<T> {
     Block { textures: EnumMap<Side, T> },
@@ -161,6 +159,33 @@ enum Model<T> {
 }
 
 impl<T> Model<T> {
+    fn side_corner_deltas(&self) -> impl Iterator<Item = (Side, EnumMap<Corner, Vector3<u8>>, &T)> {
+        if let Self::Block { textures } = self {
+            Some(enum_map! { side => (SIDE_CORNER_DELTAS[side], &textures[side]) })
+        } else {
+            None
+        }
+        .into_iter()
+        .flatten()
+        .map(|(side, (corner_deltas, tex_idx))| (side, corner_deltas, tex_idx))
+    }
+
+    fn internal_deltas(&self) -> Option<(impl Iterator<Item = (Corner, Vector3<u8>)>, &T)> {
+        if let Self::Flower { texture } = self {
+            Some((std::iter::empty(), texture))
+        } else {
+            None
+        }
+    }
+
+    fn flat_icon(&self) -> Option<&T> {
+        if let Self::Flower { texture } = self {
+            Some(texture)
+        } else {
+            None
+        }
+    }
+
     fn textures(&self) -> impl Iterator<Item = &T> {
         match self {
             Self::Block { textures } => textures.as_slice(),
@@ -177,35 +202,6 @@ impl<T> Model<T> {
             Self::Flower { texture } => Model::Flower {
                 texture: f(texture),
             },
-        }
-    }
-}
-
-impl Model<u8> {
-    fn side_corner_deltas(self) -> impl Iterator<Item = (Side, EnumMap<Corner, Vector3<u8>>, u8)> {
-        if let Self::Block { textures } = self {
-            Some(enum_map! { side => (SIDE_CORNER_DELTAS[side], textures[side]) })
-        } else {
-            None
-        }
-        .into_iter()
-        .flatten()
-        .map(|(side, (corner_deltas, tex_idx))| (side, corner_deltas, tex_idx))
-    }
-
-    fn internal_deltas(self) -> Option<(impl Iterator<Item = (Corner, Vector3<u8>)>, u8)> {
-        if let Self::Flower { texture } = self {
-            Some((std::iter::empty(), texture))
-        } else {
-            None
-        }
-    }
-
-    fn flat_icon(self) -> Option<u8> {
-        if let Self::Flower { texture } = self {
-            Some(texture)
-        } else {
-            None
         }
     }
 }

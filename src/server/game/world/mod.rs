@@ -279,7 +279,7 @@ impl EventHandler<WorldEvent> for World {
                             |BlockIntersection { coords, .. }| {
                                 BlockHoverData::new(
                                     coords,
-                                    self.chunks.block_area(coords),
+                                    &self.chunks.block_area(coords),
                                     &self.light.block_area_light(coords),
                                 )
                             },
@@ -401,7 +401,7 @@ impl ChunkData {
 
     pub fn vertices(
         &self,
-    ) -> impl Iterator<Item = (BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
+    ) -> impl Iterator<Item = (&'static BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
         Chunk::points().filter_map(|coords| {
             let data = self.area.block(coords).data();
             Some((
@@ -423,14 +423,14 @@ pub struct BlockHoverData {
 }
 
 impl BlockHoverData {
-    fn new(coords: Point3<i64>, area: BlockArea, area_light: &BlockAreaLight) -> Self {
+    fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
         Self {
             coords,
             brightness: Self::brightness(area, area_light),
         }
     }
 
-    fn brightness(area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
+    fn brightness(area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         let is_externally_lit = area.block().data().is_externally_lit();
         enum_map! {
             side => area_light.corner_lights(side, area, is_externally_lit),

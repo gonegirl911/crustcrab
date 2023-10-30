@@ -99,7 +99,7 @@ impl Branch {
         chunks: &ChunkStore,
         light: &WorldLight,
         coords: Point3<i64>,
-        data: BlockData,
+        data: &BlockData,
     ) {
         for i in BlockLight::TORCHLIGHT_RANGE {
             let value = data.luminance[i % 3];
