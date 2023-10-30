@@ -2,23 +2,42 @@
 light_filter = [1, 1, 1]
 
 [sand]
-texture = "sand.png"
+textures.front = "sand.png"
+textures.right = "sand.png"
+textures.back = "sand.png"
+textures.left = "sand.png"
+textures.up = "sand.png"
+textures.down = "sand.png"
 
 [glowstone]
-texture = "glowstone.png"
+textures.front = "glowstone.png"
+textures.right = "glowstone.png"
+textures.back = "glowstone.png"
+textures.left = "glowstone.png"
+textures.up = "glowstone.png"
+textures.down = "glowstone.png"
 luminance = [15, 15, 15]
 
 [glass_magenta]
-texture = "glass_magenta.png"
+textures.front = "glass_magenta.png"
+textures.right = "glass_magenta.png"
+textures.back = "glass_magenta.png"
+textures.left = "glass_magenta.png"
+textures.up = "glass_magenta.png"
+textures.down = "glass_magenta.png"
 light_filter = [1, 0, 1]
 requires_blending = true
 
 [glass_cyan]
-texture = "glass_cyan.png"
+textures.front = "glass_cyan.png"
+textures.right = "glass_cyan.png"
+textures.back = "glass_cyan.png"
+textures.left = "glass_cyan.png"
+textures.up = "glass_cyan.png"
+textures.down = "glass_cyan.png"
 light_filter = [0, 1, 1]
 requires_blending = true
 
 [dead_bush]
-model = "flower"
 texture = "dead_bush.png"
 light_filter = [1, 1, 1]

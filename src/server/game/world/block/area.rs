@@ -25,8 +25,9 @@ impl BlockArea {
         }))
     }
 
-    pub fn is_side_visible(self, delta: Vector3<i8>) -> bool {
-        self[delta] != self.block() && self[delta].data().is_transparent()
+    pub fn is_side_visible(self, side: Side) -> bool {
+        let neighbor = self[SIDE_DELTAS[side]];
+        neighbor != self.block() && neighbor.data().is_transparent()
     }
 
     pub fn corner_aos(self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {

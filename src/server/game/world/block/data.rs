@@ -3,17 +3,17 @@ use super::{
     Block, BlockLight,
 };
 use crate::{client::game::world::BlockVertex, shared::color::Rgb};
+use core::slice;
 use enum_map::{enum_map, Enum, EnumMap};
-use nalgebra::{Point2, Point3, Vector3};
+use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{fs, iter, ops::Index, sync::Arc};
+use std::{fs, sync::Arc};
 
 #[derive(Clone, Copy)]
 pub struct BlockData {
-    model: Model,
-    tex_indices: Option<TextureData<u8>>,
+    model: Option<Model<u8>>,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
@@ -25,59 +25,68 @@ impl BlockData {
         coords: Point3<u8>,
         area: BlockArea,
         area_light: BlockAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> {
-        self.tex_indices
-            .map(move |tex_indices| {
-                let is_externally_lit = self.is_externally_lit();
-                let ao = area.internal_ao();
-                let light = area_light.internal_light();
-                self.model
-                    .side_corner_deltas()
-                    .into_iter()
-                    .filter_map(move |(side, corner_deltas)| {
-                        area.is_side_visible(SIDE_DELTAS[side])
-                            .then_some((side, corner_deltas?))
-                    })
-                    .flat_map(move |(side, corner_deltas)| {
-                        let tex_idx = tex_indices[side];
-                        let face = side.into();
-                        let corner_aos = area.corner_aos(side, is_externally_lit);
-                        let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
-                        Self::corners(corner_aos, corner_lights)
-                            .into_iter()
-                            .map(move |corner| {
+    ) -> Option<impl Iterator<Item = BlockVertex>> {
+        self.model.map(move |model| {
+            let is_externally_lit = self.is_externally_lit();
+            let ao = area.internal_ao();
+            let light = area_light.internal_light();
+            model
+                .side_corner_deltas()
+                .filter(move |&(side, _, _)| area.is_side_visible(side))
+                .flat_map(move |(side, corner_deltas, tex_idx)| {
+                    let face = side.into();
+                    let corner_aos = area.corner_aos(side, is_externally_lit);
+                    let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
+                    Self::corners(corner_aos, corner_lights)
+                        .into_iter()
+                        .map(move |corner| {
+                            BlockVertex::new(
+                                coords + corner_deltas[corner],
+                                tex_idx,
+                                CORNER_TEX_COORDS[corner],
+                                face,
+                                corner_aos[corner],
+                                corner_lights[corner],
+                            )
+                        })
+                })
+                .chain(
+                    model
+                        .internal_deltas()
+                        .map(move |(deltas, tex_idx)| {
+                            deltas.map(move |(corner, delta)| {
                                 BlockVertex::new(
-                                    coords + corner_deltas[corner],
+                                    coords + delta,
                                     tex_idx,
                                     CORNER_TEX_COORDS[corner],
-                                    face,
-                                    corner_aos[corner],
-                                    corner_lights[corner],
+                                    Default::default(),
+                                    ao,
+                                    light,
                                 )
                             })
-                    })
-                    .chain(
-                        self.model
-                            .internal_deltas()
-                            .map(move |deltas| {
-                                let tex_idx = *tex_indices.internal_texture();
-                                deltas.map(move |(corner, delta)| {
-                                    BlockVertex::new(
-                                        coords + delta,
-                                        tex_idx,
-                                        CORNER_TEX_COORDS[corner],
-                                        Face::YPos,
-                                        ao,
-                                        light,
-                                    )
-                                })
-                            })
-                            .into_iter()
-                            .flatten(),
+                        })
+                        .into_iter()
+                        .flatten(),
+                )
+        })
+    }
+
+    pub fn flat_icon(self) -> Option<impl Iterator<Item = BlockVertex>> {
+        self.model.and_then(|model| {
+            model.flat_icon().map(|tex_idx| {
+                let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
+                CORNERS.into_iter().map(move |corner| {
+                    BlockVertex::new(
+                        corner_deltas[corner].into(),
+                        tex_idx,
+                        CORNER_TEX_COORDS[corner],
+                        Default::default(),
+                        Default::default(),
+                        Default::default(),
                     )
+                })
             })
-            .into_iter()
-            .flatten()
+        })
     }
 
     fn is_glowing(self) -> bool {
@@ -115,8 +124,7 @@ impl BlockData {
 impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
-            model: data.model,
-            tex_indices: data.tex_indices(),
+            model: data.model(),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
@@ -126,10 +134,8 @@ impl From<RawBlockData> for BlockData {
 
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
-    #[serde(default)]
-    model: Model,
     #[serde(flatten, default)]
-    tex_paths: Option<TextureData<Arc<String>>>,
+    model: Option<Model<Arc<String>>>,
     #[serde(default)]
     luminance: Rgb<u8>,
     #[serde(default)]
@@ -139,78 +145,76 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn tex_indices(&self) -> Option<TextureData<u8>> {
-        self.tex_paths
+    fn model(&self) -> Option<Model<u8>> {
+        self.model
             .clone()
             .map(|paths| paths.map(|path| TEX_INDICES[&path]))
     }
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Default, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum Model {
-    #[default]
-    Block,
-    Flower,
-}
-
-impl Model {
-    fn side_corner_deltas(self) -> EnumMap<Side, Option<EnumMap<Corner, Vector3<u8>>>> {
-        if self == Model::Block {
-            enum_map! { side => Some(SIDE_CORNER_DELTAS[side]) }
-        } else {
-            enum_map! { _ => None }
-        }
-    }
-
-    fn internal_deltas(self) -> Option<impl Iterator<Item = (Corner, Vector3<u8>)>> {
-        (self == Model::Flower).then(std::iter::empty)
-    }
-}
-
 #[derive(Clone, Copy, Deserialize)]
 #[serde(untagged)]
-enum TextureData<T> {
-    Single { texture: T },
+enum Model<T> {
+    Block { textures: EnumMap<Side, T> },
+    Flower { texture: T },
 }
 
-impl<T> TextureData<T> {
+impl<T> Model<T> {
     fn textures(&self) -> impl Iterator<Item = &T> {
         match self {
-            Self::Single { texture } => iter::once(texture),
+            Self::Block { textures } => textures.as_slice(),
+            Self::Flower { texture } => slice::from_ref(texture),
         }
+        .iter()
     }
 
-    fn internal_texture(&self) -> &T {
+    fn map<U, F: FnMut(T) -> U>(self, mut f: F) -> Model<U> {
         match self {
-            Self::Single { texture } => texture,
-        }
-    }
-
-    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> TextureData<U> {
-        match self {
-            Self::Single { texture } => TextureData::Single {
+            Self::Block { textures } => Model::Block {
+                textures: textures.map(|_, texture| f(texture)),
+            },
+            Self::Flower { texture } => Model::Flower {
                 texture: f(texture),
             },
         }
     }
 }
 
-impl<T> Index<Side> for TextureData<T> {
-    type Output = T;
+impl Model<u8> {
+    fn side_corner_deltas(self) -> impl Iterator<Item = (Side, EnumMap<Corner, Vector3<u8>>, u8)> {
+        if let Self::Block { textures } = self {
+            Some(enum_map! { side => (SIDE_CORNER_DELTAS[side], textures[side]) })
+        } else {
+            None
+        }
+        .into_iter()
+        .flatten()
+        .map(|(side, (corner_deltas, tex_idx))| (side, corner_deltas, tex_idx))
+    }
 
-    fn index(&self, _: Side) -> &Self::Output {
-        match self {
-            Self::Single { texture } => texture,
+    fn internal_deltas(self) -> Option<(impl Iterator<Item = (Corner, Vector3<u8>)>, u8)> {
+        if let Self::Flower { texture } = self {
+            Some((std::iter::empty(), texture))
+        } else {
+            None
+        }
+    }
+
+    fn flat_icon(self) -> Option<u8> {
+        if let Self::Flower { texture } = self {
+            Some(texture)
+        } else {
+            None
         }
     }
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub enum Face {
     X = 0,
+    #[default]
     YPos = 1,
     YNeg = 2,
     Z = 3,
@@ -270,8 +274,8 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|data| data.tex_paths.as_ref())
-        .flat_map(TextureData::textures)
+        .filter_map(|data| data.model.as_ref())
+        .flat_map(Model::textures)
         .cloned()
         .for_each(|path| {
             indices.entry(path).or_insert_with(|| {
@@ -365,7 +369,7 @@ pub static SIDE_CORNER_COMPONENT_DELTAS: Lazy<
 });
 
 static CORNER_TEX_COORDS: Lazy<EnumMap<Corner, Point2<u8>>> =
-    Lazy::new(|| SIDE_CORNER_DELTAS[Side::Front].map(|_, delta| delta.xy().into()));
+    Lazy::new(|| SIDE_CORNER_DELTAS[Side::Front].map(|_, delta| point![delta.x, 1 - delta.y]));
 
 const CORNERS: [Corner; 6] = [
     Corner::LowerLeft,

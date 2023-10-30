@@ -137,6 +137,7 @@ impl CloudLayer {
         Block::Sand
             .data()
             .vertices(Default::default(), Block::Sand.into(), Default::default())
+            .unwrap_or_else(|| unreachable!())
             .map(Into::into)
     }
 

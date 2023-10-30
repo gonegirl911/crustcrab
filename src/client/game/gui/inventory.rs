@@ -33,6 +33,7 @@ pub struct Inventory {
     uniform: Uniform<InventoryUniformData>,
     program: Program,
     index: usize,
+    is_flat: bool,
     is_updated: bool,
     is_resized: bool,
 }
@@ -62,6 +63,7 @@ impl Inventory {
             uniform,
             program,
             index: 0,
+            is_flat: false,
             is_updated: true,
             is_resized: true,
         }
@@ -101,14 +103,17 @@ impl Inventory {
     }
 
     fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
-        let diagonal = 3.0f32.sqrt();
-        let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size * diagonal);
-        Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.315))
-            * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
-                .append_translation(&Vector3::repeat(0.5))
-            * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
-                .prepend_scaling(1.0 / diagonal)
-                .prepend_translation(&Vector3::repeat(-0.5))
+        let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
+        if self.is_flat {
+            Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.315))
+        } else {
+            Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.315))
+                * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+                    .append_scaling(1.0 / 3.0f32.sqrt() / 15.0f32.to_radians().cos())
+                    .append_translation(&Vector3::repeat(0.5))
+                * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
+                    .prepend_translation(&Vector3::repeat(-0.5))
+        }
     }
 }
 
@@ -142,17 +147,25 @@ impl EventHandler for Inventory {
             },
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_updated) {
-                    self.buffer = self.selected_block().map(|block| {
-                        VertexBuffer::new(
+                    let mut is_flat = false;
+
+                    self.buffer = self.selected_block().and_then(|block| {
+                        let data = block.data();
+                        Some(VertexBuffer::new(
                             renderer,
-                            MemoryState::Immutable(
-                                &block
-                                    .data()
-                                    .vertices(Default::default(), block.into(), Default::default())
-                                    .collect::<Vec<_>>(),
-                            ),
-                        )
+                            MemoryState::Immutable(&if let Some(vertices) = data.flat_icon() {
+                                is_flat = true;
+                                vertices.collect::<Vec<_>>()
+                            } else {
+                                data.vertices(Default::default(), block.into(), Default::default())?
+                                    .collect()
+                            }),
+                        ))
                     });
+
+                    if mem::replace(&mut self.is_flat, is_flat) != is_flat {
+                        self.is_resized = true;
+                    }
                 }
 
                 if mem::take(&mut self.is_resized) {
