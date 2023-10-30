@@ -25,19 +25,20 @@ impl BlockArea {
         }))
     }
 
-    pub fn visible_sides(self) -> impl Iterator<Item = Side> {
-        SIDE_DELTAS
-            .into_iter()
-            .filter(move |&(_, delta)| self.is_side_visible(delta))
-            .map(|(side, _)| side)
+    pub fn is_side_visible(self, delta: Vector3<i8>) -> bool {
+        self[delta] != self.block() && self[delta].data().is_transparent()
     }
 
     pub fn corner_aos(self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {
         if is_externally_lit {
             enum_map! { corner => self.ao(side, corner) }
         } else {
-            enum_map! { _ => 3 }
+            enum_map! { _ => self.internal_ao() }
         }
+    }
+
+    pub fn internal_ao(self) -> u8 {
+        3
     }
 
     pub fn block(self) -> Block {
@@ -46,10 +47,6 @@ impl BlockArea {
 
     fn block_mut(&mut self) -> &mut Block {
         &mut self[Default::default()]
-    }
-
-    fn is_side_visible(self, delta: Vector3<i8>) -> bool {
-        self[delta] != self.block() && self[delta].data().is_transparent()
     }
 
     fn ao(self, side: Side, corner: Corner) -> u8 {
@@ -144,8 +141,12 @@ impl BlockAreaLight {
                 sum.map(|c| c / count.max(1)).into()
             })
         } else {
-            enum_map! { _ => self.block_light() }
+            enum_map! { _ => self.internal_light() }
         }
+    }
+
+    pub fn internal_light(&self) -> BlockLight {
+        self.block_light()
     }
 
     fn block_light(&self) -> BlockLight {

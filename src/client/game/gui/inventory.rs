@@ -159,7 +159,7 @@ impl EventHandler for Inventory {
                     self.uniform.set(
                         renderer,
                         &InventoryUniformData::new(self.transform(renderer)),
-                    )
+                    );
                 }
             }
             _ => {}

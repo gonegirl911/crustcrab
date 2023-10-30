@@ -19,6 +19,7 @@ pub enum Block {
     Glowstone,
     GlassMagenta,
     GlassCyan,
+    DeadBush,
 }
 
 impl Block {

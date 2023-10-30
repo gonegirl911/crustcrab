@@ -17,3 +17,8 @@ requires_blending = true
 texture = "glass_cyan.png"
 light_filter = [0, 1, 1]
 requires_blending = true
+
+[dead_bush]
+model = "flower"
+texture = "dead_bush.png"
+light_filter = [1, 1, 1]
