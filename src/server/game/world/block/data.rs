@@ -258,7 +258,6 @@ impl From<Side> for Face {
     }
 }
 
-#[repr(u8)]
 #[derive(Clone, Copy, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
@@ -270,7 +269,6 @@ pub enum Side {
     Down,
 }
 
-#[repr(u8)]
 #[derive(Clone, Copy, Enum)]
 pub enum Corner {
     LowerLeft,
@@ -279,8 +277,7 @@ pub enum Corner {
     UpperLeft,
 }
 
-#[repr(u8)]
-#[derive(Clone, Copy, Enum)]
+#[derive(Enum)]
 pub enum Component {
     Edge1,
     Edge2,
