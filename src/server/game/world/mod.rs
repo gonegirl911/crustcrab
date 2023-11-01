@@ -7,7 +7,7 @@ use self::{
     action::{ActionStore, BlockAction},
     block::{
         area::{BlockArea, BlockAreaLight},
-        data::BlockData,
+        data::{BlockData, Side},
         Block, BlockLight,
     },
     chunk::{
@@ -30,7 +30,6 @@ use crate::{
     },
     shared::{bound::Aabb, utils},
 };
-use enum_map::enum_map;
 use flume::Sender;
 use nalgebra::{Point3, Vector3};
 use rayon::prelude::*;
@@ -40,6 +39,7 @@ use std::{
     ops::{Deref, Range},
     sync::Arc,
 };
+use strum::IntoEnumIterator;
 
 #[derive(Default)]
 pub struct World {
@@ -280,7 +280,7 @@ impl EventHandler<WorldEvent> for World {
                             |BlockIntersection { coords, .. }| {
                                 BlockHoverData::new(
                                     coords,
-                                    &self.chunks.block_area(coords),
+                                    self.chunks.block_area(coords),
                                     &self.light.block_area_light(coords),
                                 )
                             },
@@ -508,7 +508,7 @@ pub struct BlockHoverData {
 }
 
 impl BlockHoverData {
-    fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
+    fn new(coords: Point3<i64>, area: BlockArea, area_light: &BlockAreaLight) -> Self {
         let data = area.block().data();
         Self {
             hitbox: data.hitbox(coords),
@@ -516,14 +516,18 @@ impl BlockHoverData {
         }
     }
 
-    fn brightness(data: &BlockData, area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
-        enum_map! {
-            side => area_light.corner_lights(side, area, data.is_externally_lit()),
-        }
-        .into_values()
-        .flat_map(|corner_lights| corner_lights.into_values())
-        .max_by(|a, b| a.lum().total_cmp(&b.lum()))
-        .unwrap_or_else(|| unreachable!())
+    fn brightness(data: &BlockData, area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
+        let is_externally_lit = data.is_externally_lit();
+        Side::iter()
+            .map(Some)
+            .chain([None])
+            .flat_map(|side| {
+                area_light
+                    .corner_lights(side, area, is_externally_lit)
+                    .into_values()
+            })
+            .max_by(|a, b| a.lum().total_cmp(&b.lum()))
+            .unwrap_or_else(|| unreachable!())
     }
 }
 

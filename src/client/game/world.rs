@@ -173,14 +173,7 @@ impl World {
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
         (!vertices.is_empty()).then(|| {
             TransparentMesh::new(renderer, vertices, |v| {
-                utils::coords((
-                    coords,
-                    v.iter()
-                        .copied()
-                        .map(BlockVertex::coords)
-                        .fold(Point3::default(), |acc, c| acc + c.coords)
-                        / v.len() as u8,
-                ))
+                utils::coords((coords, Self::block_coords(v)))
             })
         })
     }
@@ -214,6 +207,14 @@ impl World {
             }),
             ..Default::default()
         })
+    }
+
+    fn block_coords(vertices: &[BlockVertex]) -> Point3<u8> {
+        let mut sum = Point3::default();
+        for v in vertices {
+            sum += v.coords().coords;
+        }
+        sum / vertices.len() as u8
     }
 }
 

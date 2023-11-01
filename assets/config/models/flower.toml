@@ -1,0 +1,26 @@
+diagonal = [0.8, 1.0, 0.8]
+has_flat_icon = true
+
+[[internal_corner_deltas]]
+lower_left = [0, 0, 0]
+lower_right = [1, 0, 1]
+upper_right = [1, 1, 1]
+upper_left = [0, 1, 0]
+
+[[internal_corner_deltas]]
+lower_left = [1, 0, 1]
+lower_right = [0, 0, 0]
+upper_right = [0, 1, 0]
+upper_left = [1, 1, 1]
+
+[[internal_corner_deltas]]
+lower_left = [0, 0, 1]
+lower_right = [1, 0, 0]
+upper_right = [1, 1, 0]
+upper_left = [0, 1, 1]
+
+[[internal_corner_deltas]]
+lower_left = [1, 0, 0]
+lower_right = [0, 0, 1]
+upper_right = [0, 1, 1]
+upper_left = [1, 1, 0]

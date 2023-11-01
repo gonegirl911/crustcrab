@@ -12,7 +12,8 @@ use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{fs, sync::Arc};
+use std::{fs, iter, sync::Arc};
+use strum::EnumIter;
 
 pub struct BlockData {
     model: Option<Model<u8>>,
@@ -32,21 +33,11 @@ impl BlockData {
         self.model.as_ref().map(move |model| {
             let is_externally_lit = self.is_externally_lit();
             area.visible_sides()
-                .flat_map(|side| {
-                    model
-                        .corner_deltas(Some(side))
-                        .map(move |(corner_deltas, &tex_idx)| (Some(side), corner_deltas, tex_idx))
-                })
-                .chain(
-                    model
-                        .corner_deltas(None)
-                        .map(|(corner_deltas, &tex_idx)| (None, corner_deltas, tex_idx)),
-                )
-                .flat_map(move |(side, corner_deltas, tex_idx)| {
-                    let side = side.unwrap_or_default();
+                .flat_map(|side| model.corner_deltas(side).zip(iter::repeat(side)))
+                .flat_map(move |((corner_deltas, &tex_idx), side)| {
                     let face = side.into();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
-                    let corner_lights = area_light.corner_lights(side, &area, is_externally_lit);
+                    let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
                     Self::corners(corner_aos, corner_lights)
                         .into_iter()
                         .map(move |corner| {
@@ -61,6 +52,12 @@ impl BlockData {
                         })
                 })
         })
+    }
+
+    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
+        self.model
+            .as_ref()
+            .map_or_else(Default::default, |model| model.hitbox(coords))
     }
 
     pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex> + '_> {
@@ -79,12 +76,6 @@ impl BlockData {
                 })
             })
         })
-    }
-
-    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
-        self.model
-            .as_ref()
-            .map_or_else(Default::default, |model| model.hitbox(coords))
     }
 
     fn is_glowing(&self) -> bool {
@@ -164,34 +155,34 @@ pub enum Face {
 
 impl Default for Face {
     fn default() -> Self {
-        Side::default().into()
+        None::<Side>.into()
     }
 }
 
-impl From<Side> for Face {
-    fn from(side: Side) -> Self {
+impl From<Option<Side>> for Face {
+    fn from(side: Option<Side>) -> Self {
         match side {
-            Side::Left | Side::Right => Face::X,
-            Side::Up => Face::YPos,
-            Side::Down => Face::YNeg,
-            Side::Front | Side::Back => Face::Z,
+            Some(Side::Left | Side::Right) => Face::X,
+            Some(Side::Up) | None => Face::YPos,
+            Some(Side::Down) => Face::YNeg,
+            Some(Side::Front | Side::Back) => Face::Z,
         }
     }
 }
 
-#[derive(Clone, Copy, Default, Enum, Deserialize)]
+#[derive(Clone, Copy, EnumIter, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Front,
     Right,
     Back,
     Left,
-    #[default]
     Up,
     Down,
 }
 
-#[derive(Clone, Copy, Enum)]
+#[derive(Clone, Copy, Enum, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Corner {
     LowerLeft,
     LowerRight,

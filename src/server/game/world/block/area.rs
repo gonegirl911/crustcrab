@@ -25,15 +25,16 @@ impl BlockArea {
         }))
     }
 
-    pub fn visible_sides(self) -> impl Iterator<Item = Side> {
+    pub fn visible_sides(self) -> impl Iterator<Item = Option<Side>> {
         SIDE_DELTAS
             .into_iter()
             .filter(move |&(_, delta)| self.is_side_visible(delta))
-            .map(|(side, _)| side)
+            .map(|(side, _)| Some(side))
+            .chain([None])
     }
 
-    pub fn corner_aos(self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {
-        if is_externally_lit {
+    pub fn corner_aos(self, side: Option<Side>, is_externally_lit: bool) -> EnumMap<Corner, u8> {
+        if let Some(side) = side.filter(|_| is_externally_lit) {
             enum_map! { corner => self.ao(side, corner) }
         } else {
             enum_map! { _ => 3 }
@@ -127,11 +128,11 @@ impl BlockAreaLight {
 
     pub fn corner_lights(
         &self,
-        side: Side,
-        area: &BlockArea,
+        side: Option<Side>,
+        area: BlockArea,
         is_externally_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
-        if is_externally_lit {
+        if let Some(side) = side.filter(|_| is_externally_lit) {
             SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
                 let (count, sum) = component_deltas
                     .into_values()
