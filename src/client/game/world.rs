@@ -169,13 +169,17 @@ impl World {
     fn transparent_mesh(
         renderer: &Renderer,
         coords: Point3<i32>,
-        vertices: Vec<BlockVertex>,
+        vertices: &[BlockVertex],
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
         (!vertices.is_empty()).then(|| {
-            TransparentMesh::new(renderer, &vertices, |[v1, v2, v3]| {
+            TransparentMesh::new(renderer, vertices, |v| {
                 utils::coords((
                     coords,
-                    (v1.coords() + v2.coords().coords + v3.coords().coords) / 3,
+                    v.iter()
+                        .copied()
+                        .map(BlockVertex::coords)
+                        .fold(Point3::default(), |acc, c| acc + c.coords)
+                        / v.len() as u8,
                 ))
             })
         })
@@ -262,7 +266,7 @@ impl EventHandler for World {
                                             Self::transparent_mesh(
                                                 renderer,
                                                 coords,
-                                                transparent_vertices,
+                                                &transparent_vertices,
                                             ),
                                             updated_at,
                                         );
@@ -277,7 +281,7 @@ impl EventHandler for World {
                                         Self::transparent_mesh(
                                             renderer,
                                             coords,
-                                            transparent_vertices,
+                                            &transparent_vertices,
                                         ),
                                         updated_at,
                                     ));

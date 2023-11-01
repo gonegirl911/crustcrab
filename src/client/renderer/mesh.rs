@@ -6,23 +6,22 @@ use bytemuck::Pod;
 use std::cmp::Reverse;
 
 pub struct TransparentMesh<C, V> {
-    vertices: Vec<(C, [V; 3])>,
+    data: Vec<(C, [V; 6])>,
+    vertices: Vec<V>,
     buffer: VertexBuffer<V>,
 }
 
 impl<C, V: Pod> TransparentMesh<C, V> {
     pub fn new<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
     where
-        F: FnMut([V; 3]) -> C,
+        F: FnMut(&[V]) -> C,
     {
         Self {
-            vertices: vertices
-                .chunks_exact(3)
-                .map(|v| {
-                    let v = v.try_into().unwrap_or_else(|_| unreachable!());
-                    (coords(v), v)
-                })
+            data: vertices
+                .chunks_exact(6)
+                .map(|v| (coords(v), v.try_into().unwrap_or_else(|_| unreachable!())))
                 .collect(),
+            vertices: Vec::with_capacity(vertices.len()),
             buffer: VertexBuffer::new(renderer, MemoryState::Uninit(vertices.len())),
         }
     }
@@ -36,16 +35,10 @@ impl<C, V: Pod> TransparentMesh<C, V> {
         D: Ord,
         F: FnMut(&C) -> D,
     {
-        self.vertices.sort_by_key(|(c, _)| Reverse(dist(c)));
-        self.buffer.write(
-            renderer,
-            &self
-                .vertices
-                .iter()
-                .flat_map(|(_, v)| v)
-                .copied()
-                .collect::<Vec<_>>(),
-        );
+        self.data.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
+        self.vertices.clear();
+        self.vertices.extend(self.data.iter().flat_map(|&(_, v)| v));
+        self.buffer.write(renderer, &self.vertices);
         self.buffer.draw(render_pass);
     }
 }

@@ -1,14 +1,14 @@
 use super::{
     area::{BlockArea, BlockAreaLight},
+    model::Model,
     Block, BlockLight,
 };
 use crate::{
     client::game::world::BlockVertex,
     shared::{bound::Aabb, color::Rgb},
 };
-use core::slice;
 use enum_map::{enum_map, Enum, EnumMap};
-use nalgebra::{point, vector, Point2, Point3, Vector3};
+use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
@@ -31,10 +31,19 @@ impl BlockData {
     ) -> Option<impl Iterator<Item = BlockVertex> + '_> {
         self.model.as_ref().map(move |model| {
             let is_externally_lit = self.is_externally_lit();
-            model
-                .side_corner_deltas()
-                .filter(move |&(side, _, _)| area.is_side_visible(side))
-                .flat_map(move |(side, corner_deltas, &tex_idx)| {
+            area.visible_sides()
+                .flat_map(|side| {
+                    model
+                        .corner_deltas(Some(side))
+                        .map(move |(corner_deltas, &tex_idx)| (Some(side), corner_deltas, tex_idx))
+                })
+                .chain(
+                    model
+                        .corner_deltas(None)
+                        .map(|(corner_deltas, &tex_idx)| (None, corner_deltas, tex_idx)),
+                )
+                .flat_map(move |(side, corner_deltas, tex_idx)| {
+                    let side = side.unwrap_or_default();
                     let face = side.into();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
                     let corner_lights = area_light.corner_lights(side, &area, is_externally_lit);
@@ -51,26 +60,6 @@ impl BlockData {
                             )
                         })
                 })
-                .chain(
-                    model
-                        .internal_deltas()
-                        .map(move |(deltas, &tex_idx)| {
-                            let ao = area.internal_ao();
-                            let light = area_light.internal_light();
-                            deltas.map(move |(corner, delta)| {
-                                BlockVertex::new(
-                                    coords + delta,
-                                    tex_idx,
-                                    CORNER_TEX_COORDS[corner],
-                                    Default::default(),
-                                    ao,
-                                    light,
-                                )
-                            })
-                        })
-                        .into_iter()
-                        .flatten(),
-                )
         })
     }
 
@@ -164,87 +153,19 @@ impl RawBlockData {
     }
 }
 
-#[derive(Clone, Deserialize)]
-#[serde(untagged)]
-enum Model<T> {
-    Block { textures: EnumMap<Side, T> },
-    Flower { texture: T },
-}
-
-impl<T> Model<T> {
-    fn side_corner_deltas(&self) -> impl Iterator<Item = (Side, EnumMap<Corner, Vector3<u8>>, &T)> {
-        if let Self::Block { textures } = self {
-            Some(enum_map! { side => (SIDE_CORNER_DELTAS[side], &textures[side]) })
-        } else {
-            None
-        }
-        .into_iter()
-        .flatten()
-        .map(|(side, (corner_deltas, tex_idx))| (side, corner_deltas, tex_idx))
-    }
-
-    fn internal_deltas(&self) -> Option<(impl Iterator<Item = (Corner, Vector3<u8>)>, &T)> {
-        if let Self::Flower { texture } = self {
-            Some((
-                FLOWER_DELTAS.into_iter().flat_map(|corner_deltas| {
-                    CORNERS
-                        .into_iter()
-                        .map(move |corner| (corner, corner_deltas[corner]))
-                }),
-                texture,
-            ))
-        } else {
-            None
-        }
-    }
-
-    fn flat_icon(&self) -> Option<&T> {
-        if let Self::Flower { texture } = self {
-            Some(texture)
-        } else {
-            None
-        }
-    }
-
-    fn hitbox(&self, coords: Point3<i64>) -> Aabb {
-        if matches!(self, Self::Flower { .. }) {
-            Aabb::new(
-                coords.cast() + vector![0.1, 0.0, 0.1],
-                vector![0.8, 1.0, 0.8],
-            )
-        } else {
-            Aabb::new(coords.cast(), vector![1.0, 1.0, 1.0])
-        }
-    }
-
-    fn textures(&self) -> impl Iterator<Item = &T> {
-        match self {
-            Self::Block { textures } => textures.as_slice(),
-            Self::Flower { texture } => slice::from_ref(texture),
-        }
-        .iter()
-    }
-
-    fn map<U, F: FnMut(T) -> U>(self, mut f: F) -> Model<U> {
-        match self {
-            Self::Block { textures } => Model::Block {
-                textures: textures.map(|_, texture| f(texture)),
-            },
-            Self::Flower { texture } => Model::Flower {
-                texture: f(texture),
-            },
-        }
-    }
-}
-
 #[repr(u8)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub enum Face {
     X = 0,
-    #[default]
     YPos = 1,
     YNeg = 2,
     Z = 3,
+}
+
+impl Default for Face {
+    fn default() -> Self {
+        Side::default().into()
+    }
 }
 
 impl From<Side> for Face {
@@ -258,13 +179,14 @@ impl From<Side> for Face {
     }
 }
 
-#[derive(Clone, Copy, Enum, Deserialize)]
+#[derive(Clone, Copy, Default, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Front,
     Right,
     Back,
     Left,
+    #[default]
     Up,
     Down,
 }
@@ -412,32 +334,3 @@ const FLIPPED_CORNERS: [Corner; 6] = [
     Corner::UpperRight,
     Corner::UpperLeft,
 ];
-
-static FLOWER_DELTAS: Lazy<[EnumMap<Corner, Vector3<u8>>; 4]> = Lazy::new(|| {
-    [
-        enum_map! {
-            Corner::LowerLeft => vector![0, 0, 0],
-            Corner::LowerRight => vector![1, 0, 1],
-            Corner::UpperRight => vector![1, 1, 1],
-            Corner::UpperLeft => vector![0, 1, 0],
-        },
-        enum_map! {
-            Corner::LowerLeft => vector![1, 0, 1],
-            Corner::LowerRight => vector![0, 0, 0],
-            Corner::UpperRight => vector![0, 1, 0],
-            Corner::UpperLeft => vector![1, 1, 1],
-        },
-        enum_map! {
-            Corner::LowerLeft => vector![0, 0, 1],
-            Corner::LowerRight => vector![1, 0, 0],
-            Corner::UpperRight => vector![1, 1, 0],
-            Corner::UpperLeft => vector![0, 1, 1],
-        },
-        enum_map! {
-            Corner::LowerLeft => vector![1, 0, 0],
-            Corner::LowerRight => vector![0, 0, 1],
-            Corner::UpperRight => vector![0, 1, 1],
-            Corner::UpperLeft => vector![1, 1, 0],
-        },
-    ]
-});

@@ -1,5 +1,6 @@
 pub mod area;
 pub mod data;
+pub mod model;
 
 use self::data::{BlockData, BLOCK_DATA};
 use super::action::BlockAction;

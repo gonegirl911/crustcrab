@@ -25,24 +25,22 @@ impl BlockArea {
         }))
     }
 
-    pub fn is_side_visible(&self, side: Side) -> bool {
-        let neighbor = self[SIDE_DELTAS[side]];
-        neighbor != self.block() && neighbor.data().is_transparent()
+    pub fn visible_sides(self) -> impl Iterator<Item = Side> {
+        SIDE_DELTAS
+            .into_iter()
+            .filter(move |&(_, delta)| self.is_side_visible(delta))
+            .map(|(side, _)| side)
     }
 
-    pub fn corner_aos(&self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {
+    pub fn corner_aos(self, side: Side, is_externally_lit: bool) -> EnumMap<Corner, u8> {
         if is_externally_lit {
             enum_map! { corner => self.ao(side, corner) }
         } else {
-            enum_map! { _ => self.internal_ao() }
+            enum_map! { _ => 3 }
         }
     }
 
-    pub fn internal_ao(&self) -> u8 {
-        3
-    }
-
-    pub fn block(&self) -> Block {
+    pub fn block(self) -> Block {
         self[Default::default()]
     }
 
@@ -50,7 +48,11 @@ impl BlockArea {
         &mut self[Default::default()]
     }
 
-    fn ao(&self, side: Side, corner: Corner) -> u8 {
+    fn is_side_visible(self, delta: Vector3<i8>) -> bool {
+        self[delta] != self.block() && self[delta].data().is_transparent()
+    }
+
+    fn ao(self, side: Side, corner: Corner) -> u8 {
         let components = self.components(side, corner);
 
         let [edge1, edge2, corner] = [
@@ -66,7 +68,7 @@ impl BlockArea {
         }
     }
 
-    fn components(&self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
+    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self[delta].data().is_opaque())
     }
 
@@ -111,7 +113,7 @@ impl IndexMut<Vector3<i8>> for BlockArea {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Default)]
 pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockAreaLight {
@@ -142,12 +144,8 @@ impl BlockAreaLight {
                 sum.map(|c| c / count.max(1)).into()
             })
         } else {
-            enum_map! { _ => self.internal_light() }
+            enum_map! { _ => self.block_light() }
         }
-    }
-
-    pub fn internal_light(&self) -> BlockLight {
-        self.block_light()
     }
 
     fn block_light(&self) -> BlockLight {
