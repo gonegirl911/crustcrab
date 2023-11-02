@@ -4,9 +4,8 @@ pub mod model;
 
 use self::data::{BlockData, BLOCK_DATA};
 use super::action::BlockAction;
-use crate::shared::color::Rgb;
+use crate::shared::{color::Rgb, enum_map::Enum};
 use bitfield::bitfield;
-use enum_map::Enum;
 use serde::Deserialize;
 use std::{array, ops::Range};
 
@@ -28,15 +27,6 @@ impl Block {
         &BLOCK_DATA[self]
     }
 
-    pub fn is_action_valid(self, action: BlockAction) -> bool {
-        match (self, action) {
-            (Self::Air, BlockAction::Place(Self::Air) | BlockAction::Destroy) => false,
-            (Self::Air, BlockAction::Place(_)) => true,
-            (_, BlockAction::Place(_)) => false,
-            (_, BlockAction::Destroy) => true,
-        }
-    }
-
     pub fn apply(&mut self, action: BlockAction) -> bool {
         if self.is_action_valid(action) {
             self.apply_unchecked(action);
@@ -51,6 +41,15 @@ impl Block {
             BlockAction::Place(block) => block,
             BlockAction::Destroy => Block::Air,
         };
+    }
+
+    pub fn is_action_valid(self, action: BlockAction) -> bool {
+        match (self, action) {
+            (Self::Air, BlockAction::Place(Self::Air) | BlockAction::Destroy) => false,
+            (Self::Air, BlockAction::Place(_)) => true,
+            (_, BlockAction::Place(_)) => false,
+            (_, BlockAction::Destroy) => true,
+        }
     }
 }
 

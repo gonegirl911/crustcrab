@@ -97,10 +97,7 @@ pub struct Rgba<T> {
 }
 
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Rgba<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let [r, g, b, a] = Deserialize::deserialize(deserializer)?;
         Ok(Self {
             rgb: Rgb::new(r, g, b),

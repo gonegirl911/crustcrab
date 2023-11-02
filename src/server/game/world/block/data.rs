@@ -5,15 +5,18 @@ use super::{
 };
 use crate::{
     client::game::world::BlockVertex,
-    shared::{bound::Aabb, color::Rgb},
+    enum_map,
+    shared::{
+        bound::Aabb,
+        color::Rgb,
+        enum_map::{Enum, EnumMap},
+    },
 };
-use enum_map::{enum_map, Enum, EnumMap};
 use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::{fs, iter, sync::Arc};
-use strum::EnumIter;
 
 pub struct BlockData {
     model: Option<Model<u8>>,
@@ -170,7 +173,7 @@ impl From<Option<Side>> for Face {
     }
 }
 
-#[derive(Clone, Copy, EnumIter, Enum, Deserialize)]
+#[derive(Clone, Copy, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Front,
@@ -190,7 +193,7 @@ pub enum Corner {
     UpperLeft,
 }
 
-#[derive(Enum)]
+#[derive(Clone, Copy, Enum)]
 pub enum Component {
     Edge1,
     Edge2,

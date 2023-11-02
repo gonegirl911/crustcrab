@@ -1,11 +1,15 @@
 use super::data::{Corner, Side};
-use crate::shared::bound::Aabb;
-use enum_map::{enum_map, Enum, EnumMap};
+use crate::{
+    enum_map,
+    shared::{
+        bound::Aabb,
+        enum_map::{Display, Enum, EnumMap},
+    },
+};
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::{fs, iter, ops::Index};
-use strum::Display;
 
 #[derive(Clone, Deserialize)]
 pub struct Model<T> {
@@ -49,8 +53,8 @@ impl<T> Model<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Default, Display, Enum, Deserialize)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Clone, Copy, PartialEq, Default, Enum, Display, Deserialize)]
+#[display(format = "snake_case")]
 #[serde(rename_all = "snake_case")]
 enum Variant {
     #[default]
@@ -116,8 +120,10 @@ impl ModelData {
     }
 
     fn hitbox(&self, coords: Point3<i64>) -> Aabb {
-        let offset = self.diagonal.map(|c| (1.0 - c) / 2.0);
-        Aabb::new(coords.cast() + offset, self.diagonal)
+        Aabb::new(
+            coords.cast() + self.diagonal.map(|c| (1.0 - c) / 2.0),
+            self.diagonal,
+        )
     }
 }
 
@@ -125,7 +131,7 @@ static MODEL_DATA: Lazy<EnumMap<Variant, ModelData>> = Lazy::new(|| {
     enum_map! {
         variant => {
             let path = format!("assets/config/models/{variant}.toml");
-            toml::from_str(&fs::read_to_string(&path).expect("file should exist"))
+            toml::from_str(&fs::read_to_string(path).expect("file should exist"))
                 .expect("file should be valid")
         }
     }

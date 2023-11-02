@@ -2,7 +2,7 @@ use super::{
     data::{Component, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS},
     Block, BlockLight,
 };
-use enum_map::{enum_map, EnumMap};
+use crate::{enum_map, shared::enum_map::EnumMap};
 use nalgebra::{point, vector, Point3, Vector3};
 use std::{
     array,

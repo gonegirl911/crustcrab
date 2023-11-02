@@ -28,7 +28,7 @@ use crate::{
         },
         ServerEvent, SERVER_CONFIG,
     },
-    shared::{bound::Aabb, utils},
+    shared::{bound::Aabb, enum_map::Enum, utils},
 };
 use flume::Sender;
 use nalgebra::{Point3, Vector3};
@@ -39,7 +39,6 @@ use std::{
     ops::{Deref, Range},
     sync::Arc,
 };
-use strum::IntoEnumIterator;
 
 #[derive(Default)]
 pub struct World {
@@ -518,9 +517,7 @@ impl BlockHoverData {
 
     fn brightness(data: &BlockData, area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         let is_externally_lit = data.is_externally_lit();
-        Side::iter()
-            .map(Some)
-            .chain([None])
+        Option::<Side>::variants()
             .flat_map(|side| {
                 area_light
                     .corner_lights(side, area, is_externally_lit)
