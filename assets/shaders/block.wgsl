@@ -91,5 +91,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     } else {
         return color * vec4(in.light_factor, 1.0);
-    }    
+    }
 }
