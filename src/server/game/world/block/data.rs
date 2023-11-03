@@ -16,7 +16,7 @@ use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{fs, iter, sync::Arc};
+use std::{fs, sync::Arc};
 
 pub struct BlockData {
     model: Option<Model<u8>>,
@@ -36,14 +36,15 @@ impl BlockData {
         self.model.as_ref().map(move |model| {
             let is_externally_lit = self.is_externally_lit();
             area.visible_sides()
-                .flat_map(|side| model.corner_deltas(side).zip(iter::repeat(side)))
-                .flat_map(move |((corner_deltas, &tex_idx), side)| {
+                .filter_map(|side| Some((side, model.corner_deltas(side)?)))
+                .flat_map(move |(side, corner_deltas)| {
+                    let tex_idx = *model.texture(side);
                     let face = side.into();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
                     let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
-                    Self::corners(corner_aos, corner_lights)
-                        .into_iter()
-                        .map(move |corner| {
+                    let corners = Self::corners(corner_aos, corner_lights);
+                    corner_deltas.iter().flat_map(move |corner_deltas| {
+                        corners.into_iter().map(move |corner| {
                             BlockVertex::new(
                                 coords + corner_deltas[corner],
                                 tex_idx,
@@ -53,6 +54,7 @@ impl BlockData {
                                 corner_lights[corner],
                             )
                         })
+                    })
                 })
         })
     }
@@ -116,11 +118,11 @@ impl BlockData {
 impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
-            model: data.model(),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface,
+            model: data.model(),
         }
     }
 }
@@ -140,10 +142,12 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn model(&self) -> Option<Model<u8>> {
-        self.model
-            .clone()
-            .map(|paths| paths.map(|path| TEX_INDICES[&path]))
+    fn textures(&self) -> Option<impl Iterator<Item = Arc<String>> + '_> {
+        self.model.as_ref().map(|model| model.textures().cloned())
+    }
+
+    fn model(self) -> Option<Model<u8>> {
+        self.model.map(|paths| paths.map(|path| TEX_INDICES[&path]))
     }
 }
 
@@ -204,9 +208,14 @@ pub static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
     Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
 
 pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
-    let mut v = TEX_INDICES.iter().collect::<Vec<_>>();
-    v.sort_unstable_by_key(|(_, idx)| *idx);
-    v.into_iter().map(|(path, _)| path).cloned().collect()
+    let mut paths = Vec::<Arc<String>>::with_capacity(TEX_INDICES.len());
+    unsafe {
+        for (path, &i) in &*TEX_INDICES {
+            paths.as_mut_ptr().add(i as usize).write(path.clone());
+        }
+        paths.set_len(TEX_INDICES.len());
+    }
+    paths
 });
 
 static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
@@ -214,9 +223,8 @@ static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|data| data.model.as_ref())
-        .flat_map(Model::textures)
-        .cloned()
+        .filter_map(|data| data.textures())
+        .flatten()
         .for_each(|path| {
             indices.entry(path).or_insert_with(|| {
                 let i = idx;

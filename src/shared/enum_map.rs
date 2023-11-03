@@ -67,6 +67,23 @@ impl<E: Enum, T> EnumMap<E, MaybeUninit<T>> {
     }
 }
 
+impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
+    fn from_iter<I: IntoIterator<Item = (E, T)>>(iter: I) -> Self {
+        let mut uninit = EnumMap::uninit();
+        let mut guard = Guard::new(&mut uninit);
+
+        for (variant, value) in iter {
+            guard.write(variant, value);
+        }
+
+        if guard.finish() {
+            unsafe { uninit.assume_init() }
+        } else {
+            panic!("missing variants");
+        }
+    }
+}
+
 impl<E: Enum, T: Clone> Clone for EnumMap<E, T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -167,7 +184,7 @@ where
                 let mut guard = Guard::new(&mut uninit);
 
                 while let Some((variant, value)) = access.next_entry()? {
-                    if !guard.init(variant, value) {
+                    if guard.init(variant, value).is_err() {
                         return Err(M::Error::custom("duplicate variant"));
                     }
                 }
@@ -199,13 +216,19 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
         }
     }
 
-    fn init(&mut self, variant: E, value: T) -> bool {
+    fn init(&mut self, variant: E, value: T) -> Result<(), T> {
         if !mem::replace(&mut self.is_init[variant], true) {
             self.uninit[variant].write(value);
             self.count += 1;
-            true
+            Ok(())
         } else {
-            false
+            Err(value)
+        }
+    }
+
+    fn write(&mut self, variant: E, value: T) {
+        if let Err(value) = self.init(variant, value) {
+            *unsafe { self.uninit[variant].assume_init_mut() } = value;
         }
     }
 

@@ -12,8 +12,7 @@ macro_rules! error {
 
 #[proc_macro_derive(Enum)]
 pub fn derive_enum(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    expand_enum_input(&input)
+    expand_enum_input(&parse_macro_input!(input))
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
@@ -65,8 +64,7 @@ fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
 
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    expand_display_input(&input)
+    expand_display_input(&parse_macro_input!(input))
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
