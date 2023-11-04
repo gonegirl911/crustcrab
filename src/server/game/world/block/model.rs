@@ -57,7 +57,7 @@ impl<T> Model<T> {
 #[serde(rename_all = "snake_case")]
 enum Variant {
     #[default]
-    Block,
+    Cube,
     Flower,
 }
 
