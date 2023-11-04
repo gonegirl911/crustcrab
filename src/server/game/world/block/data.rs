@@ -34,11 +34,11 @@ impl BlockData {
         area_light: BlockAreaLight,
     ) -> Option<impl Iterator<Item = BlockVertex> + '_> {
         self.model.as_ref().map(move |model| {
+            let tex_idx = *model.texture();
             let is_externally_lit = self.is_externally_lit();
             area.visible_sides()
                 .filter_map(|side| Some((side, model.corner_deltas(side)?)))
                 .flat_map(move |(side, corner_deltas)| {
-                    let tex_idx = *model.texture(side);
                     let face = side.into();
                     let corner_aos = area.corner_aos(side, is_externally_lit);
                     let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
@@ -142,12 +142,12 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn textures(&self) -> Option<impl Iterator<Item = Arc<String>> + '_> {
-        self.model.as_ref().map(|model| model.textures().cloned())
+    fn tex_path(&self) -> Option<Arc<String>> {
+        self.model.as_ref().map(Model::texture).cloned()
     }
 
     fn model(self) -> Option<Model<u8>> {
-        self.model.map(|paths| paths.map(|path| TEX_INDICES[&path]))
+        self.model.map(|model| model.map(|path| TEX_INDICES[&path]))
     }
 }
 
@@ -213,24 +213,19 @@ pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
         for (path, &i) in &*TEX_INDICES {
             paths.as_mut_ptr().add(i as usize).write(path.clone());
         }
-        paths.set_len(TEX_INDICES.len());
+        paths.set_len(paths.capacity());
     }
     paths
 });
 
 static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
     let mut indices = FxHashMap::default();
-    let mut idx = 0;
     RAW_BLOCK_DATA
         .values()
-        .filter_map(|data| data.textures())
-        .flatten()
-        .for_each(|path| {
-            indices.entry(path).or_insert_with(|| {
-                let i = idx;
-                idx += 1;
-                i
-            });
+        .filter_map(RawBlockData::tex_path)
+        .zip(0..)
+        .for_each(|(path, i)| {
+            assert!(indices.insert(path, i).is_none());
         });
     indices
 });

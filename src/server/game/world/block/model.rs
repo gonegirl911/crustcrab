@@ -9,23 +9,22 @@ use crate::{
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
-use std::{fs, iter, ops::Index};
+use std::fs;
 
 #[derive(Clone, Deserialize)]
 pub struct Model<T> {
     #[serde(rename = "model", default)]
     variant: Variant,
-    #[serde(flatten)]
-    textures: TextureData<T>,
+    texture: T,
 }
 
 impl<T> Model<T> {
-    pub fn corner_deltas(&self, side: Option<Side>) -> Option<&'static [CornerDeltas]> {
-        self.data().corner_deltas(side)
+    pub fn texture(&self) -> &T {
+        &self.texture
     }
 
-    pub fn texture(&self, side: Option<Side>) -> &T {
-        &self.textures[side]
+    pub fn corner_deltas(&self, side: Option<Side>) -> Option<&'static [CornerDeltas]> {
+        self.data().corner_deltas(side)
     }
 
     pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
@@ -33,17 +32,13 @@ impl<T> Model<T> {
     }
 
     pub fn flat_icon(&self) -> Option<&T> {
-        self.data().has_flat_icon.then(|| &self.textures[None])
-    }
-
-    pub fn textures(&self) -> impl Iterator<Item = &T> {
-        self.textures.textures()
+        self.data().has_flat_icon.then_some(&self.texture)
     }
 
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Model<U> {
         Model {
             variant: self.variant,
-            textures: self.textures.map(f),
+            texture: f(self.texture),
         }
     }
 
@@ -59,38 +54,6 @@ enum Variant {
     #[default]
     Cube,
     Flower,
-}
-
-#[derive(Clone, Deserialize)]
-#[serde(untagged)]
-enum TextureData<T> {
-    Single { texture: T },
-}
-
-impl<T> TextureData<T> {
-    fn textures(&self) -> impl Iterator<Item = &T> {
-        match self {
-            Self::Single { texture } => iter::once(texture),
-        }
-    }
-
-    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> TextureData<U> {
-        match self {
-            Self::Single { texture } => TextureData::Single {
-                texture: f(texture),
-            },
-        }
-    }
-}
-
-impl<T> Index<Option<Side>> for TextureData<T> {
-    type Output = T;
-
-    fn index(&self, _: Option<Side>) -> &Self::Output {
-        match self {
-            Self::Single { texture } => texture,
-        }
-    }
 }
 
 #[derive(Deserialize)]
@@ -138,7 +101,7 @@ where
                     self.side_corner_deltas
                         .into_values()
                         .chain([self.internal_corner_deltas])
-                        .map(|deltas| Some(deltas).filter(|deltas| !deltas.is_empty())),
+                        .map(|deltas| (!deltas.is_empty()).then_some(deltas)),
                 )
                 .collect()
         }
