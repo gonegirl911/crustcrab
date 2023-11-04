@@ -20,7 +20,7 @@ pub struct Model<T> {
 }
 
 impl<T> Model<T> {
-    pub fn corner_deltas(&self, side: Option<Side>) -> Option<&[CornerDeltas]> {
+    pub fn corner_deltas(&self, side: Option<Side>) -> Option<&'static [CornerDeltas]> {
         self.data().corner_deltas(side)
     }
 
@@ -47,7 +47,7 @@ impl<T> Model<T> {
         }
     }
 
-    fn data(&self) -> &ModelData {
+    fn data(&self) -> &'static ModelData {
         &MODEL_DATA[self.variant]
     }
 }
