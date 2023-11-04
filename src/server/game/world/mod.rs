@@ -83,22 +83,24 @@ impl World {
         server_tx: &Sender<ServerEvent>,
         ray: Ray,
     ) {
-        if let Some((loads, unloads, block_updates)) = self.chunks.apply(coords, normal, action) {
-            let light_updates = self.light.apply(&self.chunks, coords, action);
-            let updates = self.updates(
-                &loads.iter().chain(&unloads).copied().collect(),
-                block_updates.into_iter().chain(light_updates),
-                false,
-            );
+        let Some((loads, unloads, block_updates)) = self.chunks.apply(coords, normal, action)
+        else {
+            return;
+        };
+        let light_updates = self.light.apply(&self.chunks, coords, action);
+        let updates = self.updates(
+            &loads.iter().chain(&unloads).copied().collect(),
+            block_updates.into_iter().chain(light_updates),
+            false,
+        );
 
-            self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-            self.actions.insert(coords, action);
+        self.actions.insert(coords, action);
 
-            self.send_unloads(unloads, server_tx);
-            self.send_loads(loads, server_tx, true);
-            self.send_updates(updates, server_tx, true);
-        }
+        self.send_unloads(unloads, server_tx);
+        self.send_loads(loads, server_tx, true);
+        self.send_updates(updates, server_tx, true);
     }
 
     fn send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
