@@ -1,11 +1,11 @@
 use heck::ToSnakeCase;
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields, LitStr, Variant};
+use syn::{parse_macro_input, Attribute, Data, DataEnum, DeriveInput, Fields, LitStr, Variant};
 
 macro_rules! error {
-    ($span:expr, $msg:expr) => {
+    ($span:expr, $msg:expr $(,)?) => {
         ::syn::Error::new_spanned($span, $msg)
     };
 }
@@ -19,11 +19,17 @@ pub fn derive_enum(input: TokenStream) -> TokenStream {
 
 fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
     let Data::Enum(DataEnum { variants, .. }) = &input.data else {
-        return Err(error!(&input, "derive(Enum) only supports enums"));
+        return Err(syn::Error::new(
+            Span::call_site(),
+            "derive macro only supports enums",
+        ));
     };
 
     if let Some(variant) = invalid_variant(variants) {
-        return Err(error!(&variant, "derive(Enum) only supports unit variants"));
+        return Err(error!(
+            &variant,
+            "#[derive(Enum)] only supports unit enum variants",
+        ));
     }
 
     let ident = &input.ident;
@@ -71,22 +77,25 @@ pub fn derive_display(input: TokenStream) -> TokenStream {
 
 fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
     let Data::Enum(DataEnum { variants, .. }) = &input.data else {
-        return Err(error!(&input, "derive(Display) only supports enums"));
+        return Err(syn::Error::new(
+            Span::call_site(),
+            "derive macro only supports enums",
+        ));
     };
 
     if let Some(variant) = invalid_variant(variants) {
         return Err(error!(
             &variant,
-            "derive(Display) only supports unit variants"
+            "#[derive(Display)] only supports unit enum variants",
         ));
     }
 
-    let format = parse_display_attrs(input)?;
+    let format = parse_display_attrs(&input.attrs)?;
 
     if format.value() != "snake_case" {
         return Err(error!(
             &format,
-            "unknown display format, expected one of \"snake_case\""
+            "unknown display format, expected one of \"snake_case\"",
         ));
     }
 
@@ -111,9 +120,9 @@ fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error>
     })
 }
 
-fn parse_display_attrs(input: &DeriveInput) -> Result<LitStr, syn::Error> {
+fn parse_display_attrs(attrs: &[Attribute]) -> Result<LitStr, syn::Error> {
     let mut format = None;
-    for attr in &input.attrs {
+    for attr in attrs {
         if attr.path().is_ident("display") {
             attr.parse_nested_meta(|meta| {
                 if meta.path.require_ident()? == "format" {
@@ -129,7 +138,7 @@ fn parse_display_attrs(input: &DeriveInput) -> Result<LitStr, syn::Error> {
             })?;
         }
     }
-    format.ok_or_else(|| error!(&input, "expected #[display(format = \"\")"))
+    format.ok_or_else(|| syn::Error::new(Span::call_site(), "expected #[display(format = \"...\")"))
 }
 
 fn invalid_variant<'a, I>(variants: I) -> Option<&'a Variant>
