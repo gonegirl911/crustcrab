@@ -262,13 +262,13 @@ pub unsafe trait Enum: Copy {
 
     const LEN: usize = Self::Length::USIZE;
 
-    unsafe fn from_index_unchecked(index: usize) -> Self;
-
-    fn to_index(self) -> usize;
-
     fn from_index(index: usize) -> Option<Self> {
         (index < Self::LEN).then(|| unsafe { Self::from_index_unchecked(index) })
     }
+
+    unsafe fn from_index_unchecked(index: usize) -> Self;
+
+    fn to_index(self) -> usize;
 
     fn variants() -> Variants<Self> {
         Variants {
@@ -311,8 +311,6 @@ impl<E: Enum> Iterator for Variants<E> {
     type Item = E;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let value = E::from_index(self.index)?;
-        self.index += 1;
-        Some(value)
+        (self.index < E::LEN).then(|| unsafe { self.next_unchecked() })
     }
 }
