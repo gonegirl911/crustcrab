@@ -274,6 +274,7 @@ impl EventHandler<WorldEvent> for World {
                         self.chunks.block(coords).data().hitbox(coords).hit(ray)
                     },
                 );
+
                 if mem::replace(&mut self.hover, hover) != hover {
                     server_tx
                         .send(ServerEvent::BlockHovered(hover.map(
@@ -399,6 +400,7 @@ impl Branch {
         let mut loads = vec![];
         let mut unloads = vec![];
         let mut block_updates = vec![];
+
         for (chunk_coords, actions) in self.0 {
             match chunks.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
@@ -429,6 +431,7 @@ impl Branch {
                 }
             }
         }
+
         (loads, unloads, block_updates)
     }
 
