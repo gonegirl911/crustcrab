@@ -21,7 +21,6 @@ impl EventLoop {
         H: for<'a> EventHandler<Event, Context<'a> = &'a Sender<ServerEvent>>,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
-
         handler.handle(&Event::Init, &self.server_tx);
         loop {
             handler.handle(
