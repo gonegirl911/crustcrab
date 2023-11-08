@@ -35,6 +35,13 @@ impl<T> Model<T> {
         self.data().has_flat_icon.then_some(&self.texture)
     }
 
+    pub fn as_ref(&self) -> Model<&T> {
+        Model {
+            variant: self.variant,
+            texture: &self.texture,
+        }
+    }
+
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Model<U> {
         Model {
             variant: self.variant,
@@ -94,20 +101,21 @@ where
         internal_corner_deltas: Vec<CornerDeltas>,
     }
 
-    impl RawSideCornerDeltas {
-        fn into_side_corner_deltas(self) -> SideCornerDeltas {
+    impl From<RawSideCornerDeltas> for SideCornerDeltas {
+        fn from(deltas: RawSideCornerDeltas) -> SideCornerDeltas {
             Option::<Side>::variants()
                 .zip(
-                    self.side_corner_deltas
+                    deltas
+                        .side_corner_deltas
                         .into_values()
-                        .chain([self.internal_corner_deltas])
+                        .chain([deltas.internal_corner_deltas])
                         .map(|deltas| (!deltas.is_empty()).then_some(deltas)),
                 )
                 .collect()
         }
     }
 
-    Ok(RawSideCornerDeltas::deserialize(deserializer)?.into_side_corner_deltas())
+    Ok(RawSideCornerDeltas::deserialize(deserializer)?.into())
 }
 
 static MODEL_DATA: Lazy<EnumMap<Variant, ModelData>> = Lazy::new(|| {

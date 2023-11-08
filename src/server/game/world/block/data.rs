@@ -118,11 +118,11 @@ impl BlockData {
 impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
+            model: data.model(),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface,
-            model: data.model(),
         }
     }
 }
@@ -146,8 +146,10 @@ impl RawBlockData {
         self.model.as_ref().map(Model::texture).cloned()
     }
 
-    fn model(self) -> Option<Model<u8>> {
-        self.model.map(|model| model.map(|path| TEX_INDICES[&path]))
+    fn model(&self) -> Option<Model<u8>> {
+        self.model
+            .as_ref()
+            .map(|model| model.as_ref().map(|path| TEX_INDICES[path]))
     }
 }
 
