@@ -38,7 +38,6 @@ use std::{
     collections::{hash_map::Entry, LinkedList},
     mem,
     ops::Range,
-    sync::Arc,
 };
 
 #[derive(Default)]
@@ -111,7 +110,7 @@ impl World {
         self.send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
                 coords,
-                data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                 is_important,
             }),
             server_tx,
@@ -127,7 +126,7 @@ impl World {
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkLoaded {
                     coords,
-                    data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
+                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                     is_important,
                 })
                 .collect::<LinkedList<_>>(),
