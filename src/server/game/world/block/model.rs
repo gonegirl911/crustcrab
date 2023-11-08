@@ -95,7 +95,7 @@ where
     }
 
     impl RawSideCornerDeltas {
-        fn side_corner_deltas(self) -> SideCornerDeltas {
+        fn into_side_corner_deltas(self) -> SideCornerDeltas {
             Option::<Side>::variants()
                 .zip(
                     self.side_corner_deltas
@@ -107,7 +107,7 @@ where
         }
     }
 
-    Ok(RawSideCornerDeltas::deserialize(deserializer)?.side_corner_deltas())
+    Ok(RawSideCornerDeltas::deserialize(deserializer)?.into_side_corner_deltas())
 }
 
 static MODEL_DATA: Lazy<EnumMap<Variant, ModelData>> = Lazy::new(|| {
