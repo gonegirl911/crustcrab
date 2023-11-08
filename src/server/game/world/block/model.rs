@@ -11,18 +11,15 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
 use std::fs;
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 pub struct Model<T> {
     #[serde(rename = "model", default)]
-    variant: Variant,
-    texture: T,
+    variant: Option<Variant>,
+    #[serde(default)]
+    pub texture: T,
 }
 
 impl<T> Model<T> {
-    pub fn texture(&self) -> &T {
-        &self.texture
-    }
-
     pub fn corner_deltas(&self, side: Option<Side>) -> Option<&'static [CornerDeltas]> {
         self.data().corner_deltas(side)
     }
@@ -33,13 +30,6 @@ impl<T> Model<T> {
 
     pub fn flat_icon(&self) -> Option<&T> {
         self.data().has_flat_icon.then_some(&self.texture)
-    }
-
-    pub fn as_ref(&self) -> Model<&T> {
-        Model {
-            variant: self.variant,
-            texture: &self.texture,
-        }
     }
 
     pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Model<U> {
@@ -54,16 +44,15 @@ impl<T> Model<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Default, Enum, Display, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Enum, Display, Deserialize)]
 #[display(format = "snake_case")]
 #[serde(rename_all = "snake_case")]
 enum Variant {
-    #[default]
     Cube,
     Flower,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 struct ModelData {
     diagonal: Vector3<f32>,
     #[serde(default)]
@@ -118,12 +107,13 @@ where
     Ok(RawSideCornerDeltas::deserialize(deserializer)?.into())
 }
 
-static MODEL_DATA: Lazy<EnumMap<Variant, ModelData>> = Lazy::new(|| {
+static MODEL_DATA: Lazy<EnumMap<Option<Variant>, ModelData>> = Lazy::new(|| {
     enum_map! {
-        variant => {
+        Some(variant) => {
             let path = format!("assets/config/models/{variant}.toml");
             toml::from_str(&fs::read_to_string(path).expect("file should exist"))
                 .expect("file should be valid")
         }
+        None => Default::default(),
     }
 });

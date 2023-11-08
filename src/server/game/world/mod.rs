@@ -36,7 +36,8 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{hash_map::Entry, LinkedList},
-    ops::{Deref, Range},
+    mem,
+    ops::Range,
     sync::Arc,
 };
 
@@ -155,7 +156,7 @@ impl World {
         self.send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
                 coords,
-                data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                 is_important,
             }),
             server_tx,
@@ -173,7 +174,7 @@ impl World {
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkUpdated {
                     coords,
-                    data: Arc::new(ChunkData::new(&self.chunks, &self.light, coords)),
+                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                     is_important,
                 })
                 .collect::<LinkedList<_>>(),
@@ -273,9 +274,7 @@ impl EventHandler<WorldEvent> for World {
                         self.chunks.block(coords).data().hitbox(coords).hit(ray)
                     },
                 );
-
-                if self.hover != hover {
-                    self.hover = hover;
+                if mem::replace(&mut self.hover, hover) != hover {
                     server_tx
                         .send(ServerEvent::BlockHovered(hover.map(
                             |BlockIntersection { coords, .. }| {
@@ -361,7 +360,7 @@ impl ChunkStore {
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords).map(Deref::deref)
+        Some(self.0.get(&coords)?)
     }
 
     fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, Box<Chunk>> {
@@ -487,17 +486,17 @@ impl ChunkData {
 
     pub fn vertices(
         &self,
-    ) -> impl Iterator<Item = (&'static BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
-        Chunk::points().filter_map(|coords| {
+    ) -> impl Iterator<Item = (BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
+        Chunk::points().map(|coords| {
             let data = self.area.block(coords).data();
-            Some((
+            (
                 data,
                 data.vertices(
                     coords,
                     self.area.block_area(coords),
                     self.area_light.block_area_light(coords),
-                )?,
-            ))
+                ),
+            )
         })
     }
 }
@@ -517,7 +516,7 @@ impl BlockHoverData {
         }
     }
 
-    fn brightness(data: &BlockData, area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
+    fn brightness(data: BlockData, area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         let is_externally_lit = data.is_externally_lit();
         Option::<Side>::variants()
             .flat_map(|side| {

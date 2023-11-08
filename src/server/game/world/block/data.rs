@@ -18,8 +18,9 @@ use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::{fs, sync::Arc};
 
+#[derive(Clone, Copy)]
 pub struct BlockData {
-    model: Option<Model<u8>>,
+    model: Model<u8>,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
@@ -28,74 +29,66 @@ pub struct BlockData {
 
 impl BlockData {
     pub fn vertices(
-        &self,
+        self,
         coords: Point3<u8>,
         area: BlockArea,
         area_light: BlockAreaLight,
-    ) -> Option<impl Iterator<Item = BlockVertex> + '_> {
-        self.model.as_ref().map(move |model| {
-            let tex_idx = *model.texture();
-            let is_externally_lit = self.is_externally_lit();
-            area.visible_sides()
-                .filter_map(|side| Some((side, model.corner_deltas(side)?)))
-                .flat_map(move |(side, corner_deltas)| {
-                    let face = side.into();
-                    let corner_aos = area.corner_aos(side, is_externally_lit);
-                    let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
-                    let corners = Self::corners(corner_aos, corner_lights);
-                    corner_deltas.iter().flat_map(move |corner_deltas| {
-                        corners.into_iter().map(move |corner| {
-                            BlockVertex::new(
-                                coords + corner_deltas[corner],
-                                tex_idx,
-                                CORNER_TEX_COORDS[corner],
-                                face,
-                                corner_aos[corner],
-                                corner_lights[corner],
-                            )
-                        })
+    ) -> impl Iterator<Item = BlockVertex> {
+        let is_externally_lit = self.is_externally_lit();
+        area.visible_sides()
+            .filter_map(move |side| Some((side, self.model.corner_deltas(side)?)))
+            .flat_map(move |(side, corner_deltas)| {
+                let face = side.into();
+                let corner_aos = area.corner_aos(side, is_externally_lit);
+                let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
+                let corners = Self::corners(corner_aos, corner_lights);
+                corner_deltas.iter().flat_map(move |corner_deltas| {
+                    corners.into_iter().map(move |corner| {
+                        BlockVertex::new(
+                            coords + corner_deltas[corner],
+                            self.model.texture,
+                            CORNER_TEX_COORDS[corner],
+                            face,
+                            corner_aos[corner],
+                            corner_lights[corner],
+                        )
                     })
                 })
-        })
-    }
-
-    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
-        self.model
-            .as_ref()
-            .map_or_else(Default::default, |model| model.hitbox(coords))
-    }
-
-    pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex> + '_> {
-        self.model.as_ref().and_then(|model| {
-            model.flat_icon().map(|&tex_idx| {
-                let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
-                CORNERS.into_iter().map(move |corner| {
-                    BlockVertex::new(
-                        corner_deltas[corner].into(),
-                        tex_idx,
-                        CORNER_TEX_COORDS[corner],
-                        Default::default(),
-                        Default::default(),
-                        Default::default(),
-                    )
-                })
             })
-        })
     }
 
-    fn is_glowing(&self) -> bool {
+    pub fn hitbox(self, coords: Point3<i64>) -> Aabb {
+        self.model.hitbox(coords)
+    }
+
+    pub fn flat_icon(self) -> Option<impl Iterator<Item = BlockVertex>> {
+        let tex_idx = *self.model.flat_icon()?;
+        let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
+        Some(CORNERS.into_iter().map(move |corner| {
+            BlockVertex::new(
+                corner_deltas[corner].into(),
+                tex_idx,
+                CORNER_TEX_COORDS[corner],
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            )
+        }))
+    }
+
+    fn is_glowing(self) -> bool {
         self.luminance != Default::default()
     }
 
-    pub fn is_transparent(&self) -> bool {
+    pub fn is_transparent(self) -> bool {
         self.light_filter != Default::default() || self.requires_blending
     }
 
-    pub fn is_opaque(&self) -> bool {
+    pub fn is_opaque(self) -> bool {
         !self.is_transparent()
     }
 
-    pub fn is_externally_lit(&self) -> bool {
+    pub fn is_externally_lit(self) -> bool {
         !self.is_glowing() && self.light_filter == Default::default()
     }
 
@@ -129,8 +122,8 @@ impl From<RawBlockData> for BlockData {
 
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
-    #[serde(flatten, default)]
-    model: Option<Model<Arc<String>>>,
+    #[serde(flatten)]
+    model: Model<Option<Arc<str>>>,
     #[serde(default)]
     luminance: Rgb<u8>,
     #[serde(default)]
@@ -142,14 +135,12 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn tex_path(&self) -> Option<Arc<String>> {
-        self.model.as_ref().map(Model::texture).cloned()
+    fn tex_path(&self) -> Option<Arc<str>> {
+        self.model.texture.clone()
     }
 
-    fn model(&self) -> Option<Model<u8>> {
-        self.model
-            .as_ref()
-            .map(|model| model.as_ref().map(|path| TEX_INDICES[path]))
+    fn model(&self) -> Model<u8> {
+        self.model.clone().map(|path| TEX_INDICES[&path])
     }
 }
 
@@ -209,22 +200,25 @@ pub enum Component {
 pub static BLOCK_DATA: Lazy<EnumMap<Block, BlockData>> =
     Lazy::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
 
-pub static TEX_PATHS: Lazy<Vec<Arc<String>>> = Lazy::new(|| {
-    let mut paths = Vec::<Arc<String>>::with_capacity(TEX_INDICES.len());
+pub static TEX_PATHS: Lazy<Vec<Arc<str>>> = Lazy::new(|| {
+    let mut paths = Vec::<Arc<str>>::with_capacity(TEX_INDICES.len());
     unsafe {
         for (path, &i) in &*TEX_INDICES {
-            paths.as_mut_ptr().add(i as usize).write(path.clone());
+            paths
+                .as_mut_ptr()
+                .add(i as usize)
+                .write(path.clone().unwrap_or_else(|| "missing_texture.png".into()));
         }
         paths.set_len(paths.capacity());
     }
     paths
 });
 
-static TEX_INDICES: Lazy<FxHashMap<Arc<String>, u8>> = Lazy::new(|| {
+static TEX_INDICES: Lazy<FxHashMap<Option<Arc<str>>, u8>> = Lazy::new(|| {
     let mut indices = FxHashMap::default();
     RAW_BLOCK_DATA
         .values()
-        .filter_map(RawBlockData::tex_path)
+        .map(RawBlockData::tex_path)
         .zip(0..)
         .for_each(|(path, i)| {
             assert!(indices.insert(path, i).is_none());
