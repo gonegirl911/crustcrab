@@ -13,7 +13,7 @@ impl Stopwatch {
 
     pub fn lap(&mut self) -> Duration {
         let now = Instant::now();
-        let dt = now.duration_since(self.prev);
+        let dt = now - self.prev;
         self.prev = now;
         dt
     }

@@ -1,35 +1,30 @@
-use spin_sleep::SpinSleeper;
+use flume::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 pub struct Ticker {
-    sleeper: SpinSleeper,
     dt: Duration,
-    prev: Instant,
+    next: Instant,
 }
 
 impl Ticker {
-    const NATIVE_ACCURACY: Duration = Duration::from_millis(5);
-
     pub fn start(ticks_per_second: u32) -> Self {
-        Self {
-            sleeper: SpinSleeper::new(Self::NATIVE_ACCURACY.as_nanos() as u32),
-            dt: Duration::from_secs(1) / ticks_per_second,
-            prev: Instant::now(),
+        let now = Instant::now();
+        let dt = Duration::from_secs(1) / ticks_per_second;
+        let next = now + dt;
+        Self { dt, next }
+    }
+
+    pub fn recv_deadline<T>(&mut self, tx: &Receiver<T>) -> Result<T, RecvTimeoutError> {
+        match self.deadline().map(|deadline| tx.recv_deadline(deadline)) {
+            Some(Err(RecvTimeoutError::Timeout)) | None => {
+                self.next += self.dt;
+                Err(RecvTimeoutError::Timeout)
+            }
+            Some(value) => value,
         }
     }
 
-    pub fn wait<F: FnMut()>(&mut self, mut f: F) {
-        self.sleeper.sleep(self.rem(&mut f));
-        self.prev = Instant::now();
-        f();
-    }
-
-    fn rem<F: FnMut()>(&self, mut f: F) -> Duration {
-        let mut rem = self.prev.elapsed();
-        while let Some(r) = rem.checked_sub(self.dt) {
-            rem = r;
-            f();
-        }
-        self.dt - rem
+    fn deadline(&self) -> Option<Instant> {
+        (Instant::now() < self.next).then_some(self.next)
     }
 }

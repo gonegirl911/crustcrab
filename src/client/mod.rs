@@ -84,15 +84,6 @@ pub enum ClientEvent {
     BlockDestroyed,
 }
 
-impl ClientEvent {
-    pub fn is_mergeable(&self) -> bool {
-        matches!(
-            self,
-            Self::PlayerPositionChanged { .. } | Self::PlayerOrientationChanged { .. },
-        )
-    }
-}
-
 #[derive(Deserialize)]
 struct ClientConfig {
     player: PlayerConfig,
