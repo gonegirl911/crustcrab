@@ -256,7 +256,7 @@ impl<E: Enum, T> Drop for Guard<'_, E, T> {
 
 /// # Safety
 ///
-/// `to_index` must return an index in the range `0..Self::LEN`.
+/// `to_index` must return an index in the range `[0, Self::LEN)`.
 pub unsafe trait Enum: Copy {
     type Length: ArrayLength;
 
