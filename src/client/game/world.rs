@@ -106,11 +106,12 @@ impl World {
 
             for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
                 if Chunk::bounding_sphere(coords).is_visible(frustum) {
+                    BlockPushConstants::new(coords).set(&mut render_pass);
+                    buffer.draw(&mut render_pass);
+
                     if let Some(mesh) = transparent_mesh {
                         transparent_meshes.push((coords, mesh));
                     }
-                    BlockPushConstants::new(coords).set(&mut render_pass);
-                    buffer.draw(&mut render_pass);
                 }
             }
         }
@@ -171,17 +172,15 @@ impl World {
         coords: Point3<i32>,
         vertices: &[BlockVertex],
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
-        (!vertices.is_empty()).then(|| {
-            TransparentMesh::new(renderer, vertices, |v| {
-                utils::coords((
-                    coords,
-                    v.iter()
-                        .copied()
-                        .map(BlockVertex::coords)
-                        .fold(Point3::default(), |accum, c| accum + c.coords)
-                        / v.len() as u8,
-                ))
-            })
+        TransparentMesh::new_occupied(renderer, vertices, |v| {
+            utils::coords((
+                coords,
+                v.iter()
+                    .copied()
+                    .map(BlockVertex::coords)
+                    .fold(Point3::default(), |accum, c| accum + c.coords)
+                    / v.len() as u8,
+            ))
         })
     }
 

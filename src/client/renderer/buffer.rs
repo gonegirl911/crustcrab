@@ -40,6 +40,10 @@ impl<V: Pod> VertexBuffer<V> {
             state.usage(wgpu::BufferUsages::VERTEX),
         ))
     }
+
+    pub fn new_occupied(renderer: &Renderer, state: MemoryState<[V], usize>) -> Option<Self> {
+        (!state.is_empty()).then(|| Self::new(renderer, state))
+    }
 }
 
 impl<V> Deref for VertexBuffer<V> {
@@ -213,9 +217,16 @@ impl<T: ?Sized, U> MemoryState<'_, T, U> {
 
 impl<T> MemoryState<'_, [T], usize> {
     fn data(&self) -> Result<&[T], usize> {
-        match self {
+        match *self {
             Self::Immutable(data) => Ok(data),
-            Self::Uninit(len) => Err(*len),
+            Self::Uninit(len) => Err(len),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match *self {
+            Self::Immutable(data) => data.is_empty(),
+            Self::Uninit(len) => len == 0,
         }
     }
 }

@@ -12,18 +12,18 @@ pub struct TransparentMesh<C, V> {
 }
 
 impl<C, V: Pod> TransparentMesh<C, V> {
-    pub fn new<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Self
+    pub fn new_occupied<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Option<Self>
     where
         F: FnMut(&[V]) -> C,
     {
-        Self {
+        Some(Self {
+            buffer: VertexBuffer::new_occupied(renderer, MemoryState::Uninit(vertices.len()))?,
             data: vertices
                 .chunks_exact(6)
                 .map(|v| (coords(v), v.try_into().unwrap_or_else(|_| unreachable!())))
                 .collect(),
             vertices: Vec::with_capacity(vertices.len()),
-            buffer: VertexBuffer::new(renderer, MemoryState::Uninit(vertices.len())),
-        }
+        })
     }
 
     pub fn draw<'a, D, F>(

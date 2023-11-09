@@ -152,9 +152,9 @@ impl EventHandler for Inventory {
                 if mem::take(&mut self.is_updated) {
                     let mut is_flat = false;
 
-                    self.buffer = self.selected_block().map(|block| {
+                    self.buffer = self.selected_block().and_then(|block| {
                         let data = block.data();
-                        VertexBuffer::new(
+                        VertexBuffer::new_occupied(
                             renderer,
                             MemoryState::Immutable(&if let Some(vertices) = data.flat_icon() {
                                 is_flat = true;
