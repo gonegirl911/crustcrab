@@ -216,13 +216,14 @@ pub static TEX_PATHS: Lazy<Vec<Arc<str>>> = Lazy::new(|| {
 
 static TEX_INDICES: Lazy<FxHashMap<Option<Arc<str>>, u8>> = Lazy::new(|| {
     let mut indices = FxHashMap::default();
-    RAW_BLOCK_DATA
-        .values()
-        .map(RawBlockData::tex_path)
-        .zip(0..)
-        .for_each(|(path, i)| {
-            assert!(indices.insert(path, i).is_none());
+    let mut idx = 0;
+    for data in RAW_BLOCK_DATA.values() {
+        indices.entry(data.tex_path()).or_insert_with(|| {
+            let i = idx;
+            idx += 1;
+            i
         });
+    }
     indices
 });
 
