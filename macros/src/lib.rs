@@ -1,4 +1,4 @@
-use heck::ToSnakeCase;
+use heck::ToSnekCase;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
@@ -92,10 +92,10 @@ fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error>
 
     let format = parse_display_attrs(&input.attrs)?;
 
-    if format.value() != "snake_case" {
+    if format.value() != "snek_case" {
         return Err(error!(
             &format,
-            "unknown display format, expected one of \"snake_case\"",
+            "unknown display format, expected one of \"snek_case\"",
         ));
     }
 
@@ -105,7 +105,7 @@ fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error>
 
     let arms = variants.iter().map(|variant| {
         let ident = &variant.ident;
-        let output = ident.to_string().to_snake_case();
+        let output = ident.to_string().to_snek_case();
         quote! { Self::#ident => #output.fmt(f) }
     });
 

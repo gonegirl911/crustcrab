@@ -84,11 +84,11 @@ impl BlockLight {
     }
 
     fn skylight(self) -> Rgb<u8> {
-        Rgb::from_fn(|i| self.component(i + Self::SKYLIGHT_RANGE.start))
+        Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
     }
 
     fn torchlight(self) -> Rgb<u8> {
-        Rgb::from_fn(|i| self.component(i + Self::TORCHLIGHT_RANGE.start))
+        Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
     }
 
     fn linearize(color: Rgb<u8>) -> Rgb<f32> {

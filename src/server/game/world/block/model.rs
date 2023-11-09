@@ -45,7 +45,7 @@ impl<T> Model<T> {
 }
 
 #[derive(Clone, Copy, PartialEq, Enum, Display, Deserialize)]
-#[display(format = "snake_case")]
+#[display(format = "snek_case")]
 #[serde(rename_all = "snake_case")]
 enum Variant {
     Cube,
