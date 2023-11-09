@@ -172,7 +172,7 @@ impl World {
         coords: Point3<i32>,
         vertices: &[BlockVertex],
     ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
-        TransparentMesh::new_occupied(renderer, vertices, |v| {
+        TransparentMesh::new_non_empty(renderer, vertices, |v| {
             utils::coords((
                 coords,
                 v.iter()

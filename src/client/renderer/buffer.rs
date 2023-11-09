@@ -41,7 +41,7 @@ impl<V: Pod> VertexBuffer<V> {
         ))
     }
 
-    pub fn new_occupied(renderer: &Renderer, state: MemoryState<[V], usize>) -> Option<Self> {
+    pub fn new_non_empty(renderer: &Renderer, state: MemoryState<[V], usize>) -> Option<Self> {
         (!state.is_empty()).then(|| Self::new(renderer, state))
     }
 }

@@ -12,12 +12,12 @@ pub struct TransparentMesh<C, V> {
 }
 
 impl<C, V: Pod> TransparentMesh<C, V> {
-    pub fn new_occupied<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Option<Self>
+    pub fn new_non_empty<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Option<Self>
     where
         F: FnMut(&[V]) -> C,
     {
         Some(Self {
-            buffer: VertexBuffer::new_occupied(renderer, MemoryState::Uninit(vertices.len()))?,
+            buffer: VertexBuffer::new_non_empty(renderer, MemoryState::Uninit(vertices.len()))?,
             data: vertices
                 .chunks_exact(6)
                 .map(|v| (coords(v), v.try_into().unwrap_or_else(|_| unreachable!())))
