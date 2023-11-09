@@ -489,8 +489,8 @@ impl ChunkData {
     pub fn vertices(
         &self,
     ) -> impl Iterator<Item = (BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
-        Chunk::points().map(|coords| {
-            let data = self.area.block(coords).data();
+        self.blocks().map(|(coords, block)| {
+            let data = block.data();
             (
                 data,
                 data.vertices(
@@ -500,6 +500,12 @@ impl ChunkData {
                 ),
             )
         })
+    }
+
+    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
+        Chunk::points()
+            .map(|coords| (coords, self.area.block(coords)))
+            .filter(|(_, block)| *block != Block::Air)
     }
 }
 
