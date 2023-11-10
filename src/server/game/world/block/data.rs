@@ -1,6 +1,6 @@
 use super::{
     area::{BlockArea, BlockAreaLight},
-    model::Model,
+    model::{Model, RawModel},
     Block, BlockLight,
 };
 use crate::{
@@ -20,7 +20,7 @@ use std::{fs, sync::Arc};
 
 #[derive(Clone, Copy)]
 pub struct BlockData {
-    model: Model<u8>,
+    model: Model,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<u8>,
     pub requires_blending: bool,
@@ -35,8 +35,9 @@ impl BlockData {
         area_light: BlockAreaLight,
     ) -> impl Iterator<Item = BlockVertex> {
         let is_externally_lit = self.is_externally_lit();
-        area.visible_sides()
-            .filter_map(move |side| Some((side, self.model.corner_deltas(side)?)))
+        self.model
+            .side_corner_deltas()
+            .filter(move |&(side, _)| area.is_side_visible(side))
             .flat_map(move |(side, corner_deltas)| {
                 let face = side.into();
                 let corner_aos = area.corner_aos(side, is_externally_lit);
@@ -46,7 +47,7 @@ impl BlockData {
                     corners.into_iter().map(move |corner| {
                         BlockVertex::new(
                             coords + corner_deltas[corner],
-                            self.model.texture,
+                            self.model.tex_index,
                             CORNER_TEX_COORDS[corner],
                             face,
                             corner_aos[corner],
@@ -62,7 +63,7 @@ impl BlockData {
     }
 
     pub fn flat_icon(self) -> Option<impl Iterator<Item = BlockVertex>> {
-        let tex_idx = *self.model.flat_icon()?;
+        let tex_idx = self.model.flat_icon()?;
         let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
         Some(CORNERS.into_iter().map(move |corner| {
             BlockVertex::new(
@@ -111,7 +112,7 @@ impl BlockData {
 impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
-            model: data.model(),
+            model: data.model.map_or_else(Default::default, Into::into),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
@@ -122,8 +123,8 @@ impl From<RawBlockData> for BlockData {
 
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
-    #[serde(flatten)]
-    model: Model<Option<Arc<str>>>,
+    #[serde(flatten, default)]
+    model: Option<RawModel>,
     #[serde(default)]
     luminance: Rgb<u8>,
     #[serde(default)]
@@ -136,11 +137,7 @@ struct RawBlockData {
 
 impl RawBlockData {
     fn tex_path(&self) -> Option<Arc<str>> {
-        self.model.texture.clone()
-    }
-
-    fn model(&self) -> Model<u8> {
-        self.model.clone().map(|path| TEX_INDICES[&path])
+        Some(self.model.as_ref()?.tex_path.clone())
     }
 }
 
@@ -214,7 +211,7 @@ pub static TEX_PATHS: Lazy<Vec<Arc<str>>> = Lazy::new(|| {
     paths
 });
 
-static TEX_INDICES: Lazy<FxHashMap<Option<Arc<str>>, u8>> = Lazy::new(|| {
+pub static TEX_INDICES: Lazy<FxHashMap<Option<Arc<str>>, u8>> = Lazy::new(|| {
     let mut indices = FxHashMap::default();
     let mut idx = 0;
     for data in RAW_BLOCK_DATA.values() {

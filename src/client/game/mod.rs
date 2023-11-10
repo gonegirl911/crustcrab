@@ -195,7 +195,7 @@ impl EventHandler for Game {
             }
         } else {
             self.gui.handle(event, renderer);
-            self.player.handle(event, (client_tx, renderer, &self.gui.inventory, dt));
+            self.player.handle(event, (client_tx, renderer, &self.gui, dt));
             self.sky.handle(event, renderer);
             self.world.handle(event, renderer);
             self.clouds.handle(event, dt);

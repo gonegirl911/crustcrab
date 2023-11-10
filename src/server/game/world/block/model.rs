@@ -1,4 +1,4 @@
-use super::data::{Corner, Side};
+use super::data::{Corner, Side, TEX_INDICES};
 use crate::{
     enum_map,
     shared::{
@@ -6,68 +6,83 @@ use crate::{
         enum_map::{Display, Enum, EnumMap},
     },
 };
+use arrayvec::ArrayVec;
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
-use std::fs;
+use std::{fs, ops::Deref, sync::Arc};
 
-#[derive(Clone, Copy, Deserialize)]
-pub struct Model<T> {
-    #[serde(rename = "model", default)]
-    variant: Option<Variant>,
-    #[serde(default)]
-    pub texture: T,
+#[derive(Clone, Copy)]
+pub struct Model {
+    data: &'static ModelData,
+    pub tex_index: u8,
 }
 
-impl<T> Model<T> {
-    pub fn corner_deltas(&self, side: Option<Side>) -> Option<&'static [CornerDeltas]> {
-        self.data().corner_deltas(side)
+impl Model {
+    pub fn side_corner_deltas(self) -> impl Iterator<Item = (Option<Side>, &'static CornerDeltas)> {
+        self.data.side_corner_deltas()
     }
 
-    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
-        self.data().hitbox(coords)
+    pub fn hitbox(self, coords: Point3<i64>) -> Aabb {
+        self.data.hitbox(coords)
     }
 
-    pub fn flat_icon(&self) -> Option<&T> {
-        self.data().has_flat_icon.then_some(&self.texture)
+    pub fn flat_icon(self) -> Option<u8> {
+        self.data.has_flat_icon.then_some(self.tex_index)
     }
+}
 
-    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Model<U> {
-        Model {
-            variant: self.variant,
-            texture: f(self.texture),
+impl Default for Model {
+    fn default() -> Self {
+        Self {
+            data: &MODEL_DATA[None],
+            tex_index: TEX_INDICES[&None],
         }
     }
+}
 
-    fn data(&self) -> &'static ModelData {
-        &MODEL_DATA[self.variant]
+impl From<RawModel> for Model {
+    fn from(model: RawModel) -> Self {
+        Self {
+            data: &MODEL_DATA[Some(model.variant)],
+            tex_index: TEX_INDICES[&Some(model.tex_path)],
+        }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Enum, Display, Deserialize)]
+#[derive(Clone, Deserialize)]
+pub struct RawModel {
+    #[serde(rename = "model", default)]
+    variant: Variant,
+    #[serde(rename = "texture")]
+    pub tex_path: Arc<str>,
+}
+
+#[derive(Clone, Copy, Default, Enum, Display, Deserialize)]
 #[display(format = "snek_case")]
 #[serde(rename_all = "snake_case")]
 enum Variant {
+    #[default]
     Cube,
     Flower,
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Default)]
 struct ModelData {
     diagonal: Vector3<f32>,
-    #[serde(default)]
     has_flat_icon: bool,
-    #[serde(deserialize_with = "deserialize_side_corner_deltas", flatten)]
     side_corner_deltas: SideCornerDeltas,
 }
 
-type SideCornerDeltas = EnumMap<Option<Side>, Option<Vec<CornerDeltas>>>;
+type SideCornerDeltas = ArrayVec<(Option<Side>, Box<CornerDeltas>), { Option::<Side>::LEN }>;
 
-type CornerDeltas = EnumMap<Corner, Vector3<u8>>;
+type CornerDeltas = [EnumMap<Corner, Vector3<u8>>];
 
 impl ModelData {
-    fn corner_deltas(&self, side: Option<Side>) -> Option<&[CornerDeltas]> {
-        self.side_corner_deltas[side].as_deref()
+    fn side_corner_deltas(&self) -> impl Iterator<Item = (Option<Side>, &CornerDeltas)> {
+        self.side_corner_deltas
+            .iter()
+            .map(|(side, corner_deltas)| (*side, corner_deltas.deref()))
     }
 
     fn hitbox(&self, coords: Point3<i64>) -> Aabb {
@@ -78,33 +93,44 @@ impl ModelData {
     }
 }
 
-fn deserialize_side_corner_deltas<'de, D>(deserializer: D) -> Result<SideCornerDeltas, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct RawSideCornerDeltas {
-        #[serde(default)]
-        side_corner_deltas: EnumMap<Side, Vec<CornerDeltas>>,
-        #[serde(default)]
-        internal_corner_deltas: Vec<CornerDeltas>,
-    }
-
-    impl From<RawSideCornerDeltas> for SideCornerDeltas {
-        fn from(deltas: RawSideCornerDeltas) -> SideCornerDeltas {
-            Option::<Side>::variants()
-                .zip(
-                    deltas
-                        .side_corner_deltas
-                        .into_values()
-                        .chain([deltas.internal_corner_deltas])
-                        .map(|deltas| (!deltas.is_empty()).then_some(deltas)),
-                )
-                .collect()
+impl<'de> Deserialize<'de> for ModelData {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct RawModelData {
+            diagonal: Vector3<f32>,
+            #[serde(default)]
+            has_flat_icon: bool,
+            #[serde(default)]
+            side_corner_deltas: EnumMap<Side, Box<CornerDeltas>>,
+            #[serde(default)]
+            internal_corner_deltas: Box<CornerDeltas>,
         }
-    }
 
-    Ok(RawSideCornerDeltas::deserialize(deserializer)?.into())
+        impl RawModelData {
+            fn into_side_corner_deltas(self) -> SideCornerDeltas {
+                Option::variants()
+                    .zip(
+                        self.side_corner_deltas
+                            .into_values()
+                            .chain([self.internal_corner_deltas]),
+                    )
+                    .filter(|(_, corner_deltas)| !corner_deltas.is_empty())
+                    .collect()
+            }
+        }
+
+        impl From<RawModelData> for ModelData {
+            fn from(data: RawModelData) -> Self {
+                Self {
+                    diagonal: data.diagonal,
+                    has_flat_icon: data.has_flat_icon,
+                    side_corner_deltas: data.into_side_corner_deltas(),
+                }
+            }
+        }
+
+        Ok(RawModelData::deserialize(deserializer)?.into())
+    }
 }
 
 static MODEL_DATA: Lazy<EnumMap<Option<Variant>, ModelData>> = Lazy::new(|| {

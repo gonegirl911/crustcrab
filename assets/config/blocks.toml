@@ -2,22 +2,18 @@
 light_filter = [1, 1, 1]
 
 [sand]
-model = "cube"
 texture = "sand.png"
 
 [glowstone]
-model = "cube"
 texture = "glowstone.png"
 luminance = [15, 15, 15]
 
 [glass_magenta]
-model = "cube"
 texture = "glass_magenta.png"
 light_filter = [1, 0, 1]
 requires_blending = true
 
 [glass_cyan]
-model = "cube"
 texture = "glass_cyan.png"
 light_filter = [0, 1, 1]
 requires_blending = true

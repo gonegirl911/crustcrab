@@ -5,12 +5,15 @@ use self::{
     crosshair::{Crosshair, CrosshairConfig},
     inventory::{Inventory, InventoryConfig},
 };
-use crate::client::{
-    event_loop::{Event, EventHandler},
-    renderer::{
-        effect::{Blit, Effect, PostProcessor},
-        Renderer,
+use crate::{
+    client::{
+        event_loop::{Event, EventHandler},
+        renderer::{
+            effect::{Blit, Effect, PostProcessor},
+            Renderer,
+        },
     },
+    server::game::world::block::Block,
 };
 use nalgebra::{vector, Matrix4, Vector2};
 use serde::Deserialize;
@@ -18,7 +21,7 @@ use serde::Deserialize;
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
-    pub inventory: Inventory,
+    inventory: Inventory,
 }
 
 impl Gui {
@@ -32,6 +35,10 @@ impl Gui {
             crosshair: Crosshair::new(renderer, input_bind_group_layout),
             inventory: Inventory::new(renderer, textures_bind_group_layout),
         }
+    }
+
+    pub fn selected_block(&self) -> Option<Block> {
+        self.inventory.selected_block()
     }
 
     pub fn draw(

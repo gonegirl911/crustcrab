@@ -5,7 +5,7 @@ use self::{
     camera::{Changes, Controller, Projection, View},
     frustum::Frustum,
 };
-use super::gui::inventory::Inventory;
+use super::gui::Gui;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
@@ -72,14 +72,9 @@ impl Player {
 }
 
 impl EventHandler for Player {
-    type Context<'a> = (
-        &'a Sender<ClientEvent>,
-        &'a Renderer,
-        &'a Inventory,
-        Duration,
-    );
+    type Context<'a> = (&'a Sender<ClientEvent>, &'a Renderer, &'a Gui, Duration);
 
-    fn handle(&mut self, event: &Event, (client_tx, renderer, inventory, dt): Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, (client_tx, renderer, gui, dt): Self::Context<'_>) {
         self.controller.handle(event, ());
 
         match event {
@@ -114,7 +109,7 @@ impl EventHandler for Player {
                 }
 
                 if changes.contains(Changes::BLOCK_PLACED) {
-                    if let Some(block) = inventory.selected_block() {
+                    if let Some(block) = gui.selected_block() {
                         client_tx
                             .send(ClientEvent::BlockPlaced { block })
                             .unwrap_or_else(|_| unreachable!());

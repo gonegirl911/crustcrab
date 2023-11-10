@@ -69,6 +69,10 @@ impl Inventory {
         }
     }
 
+    pub fn selected_block(&self) -> Option<Block> {
+        CLIENT_CONFIG.gui.inventory.content.get(self.index).copied()
+    }
+
     pub fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
@@ -81,10 +85,6 @@ impl Inventory {
             );
             buffer.draw(render_pass);
         }
-    }
-
-    pub fn selected_block(&self) -> Option<Block> {
-        CLIENT_CONFIG.gui.inventory.content.get(self.index).copied()
     }
 
     fn index(&self, keycode: VirtualKeyCode) -> Option<usize> {
