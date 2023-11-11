@@ -7,7 +7,7 @@ use self::{
     action::{ActionStore, BlockAction},
     block::{
         area::{BlockArea, BlockAreaLight},
-        data::{BlockData, Side},
+        data::BlockData,
         Block, BlockLight,
     },
     chunk::{
@@ -526,7 +526,7 @@ impl BlockHoverData {
 
     fn brightness(data: BlockData, area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         let is_externally_lit = data.is_externally_lit();
-        Option::<Side>::variants()
+        Option::variants()
             .flat_map(|side| {
                 area_light
                     .corner_lights(side, area, is_externally_lit)
