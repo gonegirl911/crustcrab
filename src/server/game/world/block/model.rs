@@ -10,7 +10,7 @@ use arrayvec::ArrayVec;
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
-use std::{fs, ops::Deref, sync::Arc};
+use std::{fs, sync::Arc};
 
 #[derive(Clone, Copy)]
 pub struct Model {
@@ -82,7 +82,7 @@ impl ModelData {
     fn side_corner_deltas(&self) -> impl Iterator<Item = (Option<Side>, &CornerDeltas)> {
         self.side_corner_deltas
             .iter()
-            .map(|(side, corner_deltas)| (*side, corner_deltas.deref()))
+            .map(|(side, corner_deltas)| (*side, &**corner_deltas))
     }
 
     fn hitbox(&self, coords: Point3<i64>) -> Aabb {
