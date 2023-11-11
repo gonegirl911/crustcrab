@@ -136,14 +136,14 @@ impl Branch {
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let mut non_zero_values = values
+                    let mut values = values
                         .into_iter()
                         .filter(|(_, value)| *value != Default::default())
                         .peekable();
 
-                    if non_zero_values.peek().is_some() {
+                    if values.peek().is_some() {
                         let light = entry.insert(Default::default());
-                        for (block_coords, value) in non_zero_values {
+                        for (block_coords, value) in values {
                             assert!(light.set(block_coords, value));
                             changes.push(utils::coords((chunk_coords, block_coords)));
                         }

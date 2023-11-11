@@ -36,7 +36,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{hash_map::Entry, LinkedList},
-    mem,
+    iter, mem,
     ops::Range,
 };
 
@@ -83,24 +83,21 @@ impl World {
         server_tx: &Sender<ServerEvent>,
         ray: Ray,
     ) {
-        let Some((loads, unloads, block_updates)) = self.chunks.apply(coords, normal, action)
-        else {
-            return;
-        };
-        let light_updates = self.light.apply(&self.chunks, coords, action);
-        let updates = self.updates(
-            &loads.iter().chain(&unloads).copied().collect(),
-            block_updates.into_iter().chain(light_updates),
-            false,
-        );
+        let mut branch = Branch::default();
+        if branch.apply(&self.chunks, coords, normal, action) {
+            let (loads, unloads, block_updates) = branch.merge(self);
+            let updates = self.updates(
+                &loads.iter().chain(&unloads).copied().collect(),
+                block_updates,
+                false,
+            );
 
-        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+            self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-        self.actions.insert(coords, action);
-
-        self.send_unloads(unloads, server_tx);
-        self.send_loads(loads, server_tx, true);
-        self.send_updates(updates, server_tx, true);
+            self.send_unloads(unloads, server_tx);
+            self.send_loads(loads, server_tx, true);
+            self.send_updates(updates, server_tx, true);
+        }
     }
 
     fn send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
@@ -262,7 +259,7 @@ impl EventHandler<WorldEvent> for World {
                 self.send_unloads(unloads.iter().copied(), server_tx);
                 self.par_send_loads(loads.par_iter().copied(), server_tx, false);
                 self.par_send_updates(
-                    self.updates(&unloads.into_iter().chain(loads).collect(), [], true),
+                    self.updates(&loads.into_iter().chain(unloads).collect(), [], true),
                     server_tx,
                     false,
                 );
@@ -346,19 +343,6 @@ impl ChunkStore {
         self.0.remove(&coords).is_some()
     }
 
-    #[allow(clippy::type_complexity)]
-    fn apply(
-        &mut self,
-        coords: Point3<i64>,
-        normal: Vector3<i64>,
-        action: BlockAction,
-    ) -> Option<(Vec<Point3<i32>>, Vec<Point3<i32>>, Vec<Point3<i64>>)> {
-        let mut branch = Branch::default();
-        branch
-            .apply(self, coords, normal, action)
-            .then(|| branch.merge(self))
-    }
-
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         Some(self.0.get(&coords)?)
     }
@@ -378,7 +362,7 @@ struct Branch(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 impl Branch {
     fn apply(
         &mut self,
-        chunks: &mut ChunkStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
@@ -394,11 +378,16 @@ impl Branch {
     #[allow(clippy::type_complexity)]
     fn merge(
         self,
-        chunks: &mut ChunkStore,
+        World {
+            chunks,
+            light,
+            actions,
+            ..
+        }: &mut World,
     ) -> (Vec<Point3<i32>>, Vec<Point3<i32>>, Vec<Point3<i64>>) {
+        let mut hits = vec![];
         let mut loads = vec![];
         let mut unloads = vec![];
-        let mut block_updates = vec![];
 
         for (chunk_coords, actions) in self.0 {
             match chunks.entry(chunk_coords) {
@@ -406,7 +395,7 @@ impl Branch {
                     let chunk = entry.get_mut();
                     for (block_coords, action) in actions {
                         if chunk.apply(block_coords, action) {
-                            block_updates.push(utils::coords((chunk_coords, block_coords)));
+                            hits.push((utils::coords((chunk_coords, block_coords)), action));
                         }
                     }
                     if chunk.is_empty() {
@@ -415,15 +404,16 @@ impl Branch {
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let mut valid_actions = actions
+                    let mut actions = actions
                         .into_iter()
                         .filter(|&(_, action)| Block::Air.is_action_valid(action))
                         .peekable();
 
-                    if valid_actions.peek().is_some() {
+                    if actions.peek().is_some() {
                         let chunk = entry.insert(Default::default());
-                        for (block_coords, action) in valid_actions {
+                        for (block_coords, action) in actions {
                             chunk.apply_unchecked(block_coords, action);
+                            hits.push((utils::coords((chunk_coords, block_coords)), action));
                         }
                         loads.push(chunk_coords);
                     }
@@ -431,12 +421,21 @@ impl Branch {
             }
         }
 
-        (loads, unloads, block_updates)
+        (
+            loads,
+            unloads,
+            hits.into_iter()
+                .inspect(|&(coords, action)| actions.insert(coords, action))
+                .flat_map(|(coords, action)| {
+                    iter::once(coords).chain(light.apply(chunks, coords, action))
+                })
+                .collect(),
+        )
     }
 
     fn is_action_valid(
         &mut self,
-        chunks: &mut ChunkStore,
+        chunks: &ChunkStore,
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
