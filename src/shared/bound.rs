@@ -13,8 +13,10 @@ impl Aabb {
     }
 
     fn from_corners(a: Point3<f32>, b: Point3<f32>) -> Self {
-        let (min, max) = a.inf_sup(&b);
-        Self { min, max }
+        Self {
+            min: a.inf(&b),
+            max: a.sup(&b),
+        }
     }
 
     fn circumcenter(self) -> Point3<f32> {
