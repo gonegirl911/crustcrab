@@ -450,9 +450,9 @@ impl Branch {
                     }
                 }
                 BlockAction::Destroy => {
-                    let roof = chunks.block(coords + Vector3::y());
-                    if roof.data().valid_surface.is_some() {
-                        self.insert(coords + Vector3::y(), BlockAction::Destroy);
+                    let up = coords + Vector3::y();
+                    if chunks.block(up).data().valid_surface.is_some() {
+                        self.insert(up, BlockAction::Destroy);
                     }
                     true
                 }
