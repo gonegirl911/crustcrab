@@ -160,8 +160,8 @@ impl From<Option<Side>> for Face {
     fn from(side: Option<Side>) -> Self {
         match side {
             Some(Side::Left | Side::Right) => Face::X,
-            Some(Side::Up) | None => Face::YPos,
-            Some(Side::Down) => Face::YNeg,
+            Some(Side::Top) | None => Face::YPos,
+            Some(Side::Bottom) => Face::YNeg,
             Some(Side::Front | Side::Back) => Face::Z,
         }
     }
@@ -174,8 +174,8 @@ pub enum Side {
     Right,
     Back,
     Left,
-    Up,
-    Down,
+    Top,
+    Bottom,
 }
 
 #[derive(Clone, Copy, Enum, Deserialize)]
@@ -232,36 +232,36 @@ static RAW_BLOCK_DATA: Lazy<EnumMap<Block, RawBlockData>> = Lazy::new(|| {
 static SIDE_CORNER_SIDES: Lazy<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> = Lazy::new(|| {
     enum_map! {
         Side::Front => enum_map! {
-            Corner::LowerLeft => [Side::Left, Side::Down],
-            Corner::LowerRight => [Side::Right, Side::Down],
-            Corner::UpperRight => [Side::Right, Side::Up],
-            Corner::UpperLeft => [Side::Left, Side::Up],
+            Corner::LowerLeft => [Side::Left, Side::Bottom],
+            Corner::LowerRight => [Side::Right, Side::Bottom],
+            Corner::UpperRight => [Side::Right, Side::Top],
+            Corner::UpperLeft => [Side::Left, Side::Top],
         },
         Side::Right => enum_map! {
-            Corner::LowerLeft => [Side::Front, Side::Down],
-            Corner::LowerRight => [Side::Back, Side::Down],
-            Corner::UpperRight => [Side::Back, Side::Up],
-            Corner::UpperLeft => [Side::Front, Side::Up],
+            Corner::LowerLeft => [Side::Front, Side::Bottom],
+            Corner::LowerRight => [Side::Back, Side::Bottom],
+            Corner::UpperRight => [Side::Back, Side::Top],
+            Corner::UpperLeft => [Side::Front, Side::Top],
         },
         Side::Back => enum_map! {
-            Corner::LowerLeft => [Side::Right, Side::Down],
-            Corner::LowerRight => [Side::Left, Side::Down],
-            Corner::UpperRight => [Side::Left, Side::Up],
-            Corner::UpperLeft => [Side::Right, Side::Up],
+            Corner::LowerLeft => [Side::Right, Side::Bottom],
+            Corner::LowerRight => [Side::Left, Side::Bottom],
+            Corner::UpperRight => [Side::Left, Side::Top],
+            Corner::UpperLeft => [Side::Right, Side::Top],
         },
         Side::Left => enum_map! {
-            Corner::LowerLeft => [Side::Back, Side::Down],
-            Corner::LowerRight => [Side::Front, Side::Down],
-            Corner::UpperRight => [Side::Front, Side::Up],
-            Corner::UpperLeft => [Side::Back, Side::Up],
+            Corner::LowerLeft => [Side::Back, Side::Bottom],
+            Corner::LowerRight => [Side::Front, Side::Bottom],
+            Corner::UpperRight => [Side::Front, Side::Top],
+            Corner::UpperLeft => [Side::Back, Side::Top],
         },
-        Side::Up => enum_map! {
+        Side::Top => enum_map! {
             Corner::LowerLeft => [Side::Left, Side::Front],
             Corner::LowerRight => [Side::Right, Side::Front],
             Corner::UpperRight => [Side::Right, Side::Back],
             Corner::UpperLeft => [Side::Left, Side::Back],
         },
-        Side::Down => enum_map! {
+        Side::Bottom => enum_map! {
             Corner::LowerLeft => [Side::Left, Side::Back],
             Corner::LowerRight => [Side::Right, Side::Back],
             Corner::UpperRight => [Side::Right, Side::Front],
@@ -276,8 +276,8 @@ pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
         Side::Right => Vector3::x(),
         Side::Back => Vector3::z(),
         Side::Left => -Vector3::x(),
-        Side::Up => Vector3::y(),
-        Side::Down => -Vector3::y(),
+        Side::Top => Vector3::y(),
+        Side::Bottom => -Vector3::y(),
     }
 });
 
