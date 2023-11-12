@@ -39,7 +39,7 @@ impl BlockData {
             .side_corner_deltas()
             .filter(move |&(side, _)| area.is_side_visible(side))
             .flat_map(move |(side, corner_deltas)| {
-                let face = side.into();
+                let direction = side.into();
                 let corner_aos = area.corner_aos(side, is_externally_lit);
                 let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
                 let corners = Self::corners(corner_aos, corner_lights);
@@ -49,7 +49,7 @@ impl BlockData {
                             coords + corner_deltas[corner],
                             self.model.tex_index,
                             CORNER_TEX_COORDS[corner],
-                            face,
+                            direction,
                             corner_aos[corner],
                             corner_lights[corner],
                         )
@@ -145,8 +145,8 @@ impl RawBlockData {
 #[derive(Clone, Copy)]
 pub enum Face {
     X = 0,
-    PosY = 1,
-    NegY = 2,
+    Top = 1,
+    Bottom = 2,
     Z = 3,
 }
 
@@ -159,10 +159,10 @@ impl Default for Face {
 impl From<Option<Side>> for Face {
     fn from(side: Option<Side>) -> Self {
         match side {
-            Some(Side::Left | Side::Right) => Face::X,
-            Some(Side::Top) | None => Face::PosY,
-            Some(Side::Bottom) => Face::NegY,
-            Some(Side::Front | Side::Back) => Face::Z,
+            Some(Side::Front | Side::Back) => Self::X,
+            Some(Side::Top) | None => Self::Top,
+            Some(Side::Bottom) => Self::Bottom,
+            Some(Side::Left | Side::Right) => Self::Z,
         }
     }
 }
