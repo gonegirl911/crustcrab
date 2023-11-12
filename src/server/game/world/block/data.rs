@@ -39,7 +39,7 @@ impl BlockData {
             .side_corner_deltas()
             .filter(move |&(side, _)| area.is_side_visible(side))
             .flat_map(move |(side, corner_deltas)| {
-                let direction = side.into();
+                let face = side.into();
                 let corner_aos = area.corner_aos(side, is_externally_lit);
                 let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
                 let corners = Self::corners(corner_aos, corner_lights);
@@ -49,7 +49,7 @@ impl BlockData {
                             coords + corner_deltas[corner],
                             self.model.tex_index,
                             CORNER_TEX_COORDS[corner],
-                            direction,
+                            face,
                             corner_aos[corner],
                             corner_lights[corner],
                         )
