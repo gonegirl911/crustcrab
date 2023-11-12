@@ -145,8 +145,8 @@ impl RawBlockData {
 #[derive(Clone, Copy)]
 pub enum Face {
     X = 0,
-    YPos = 1,
-    YNeg = 2,
+    PosY = 1,
+    NegY = 2,
     Z = 3,
 }
 
@@ -160,8 +160,8 @@ impl From<Option<Side>> for Face {
     fn from(side: Option<Side>) -> Self {
         match side {
             Some(Side::Left | Side::Right) => Face::X,
-            Some(Side::Top) | None => Face::YPos,
-            Some(Side::Bottom) => Face::YNeg,
+            Some(Side::Top) | None => Face::PosY,
+            Some(Side::Bottom) => Face::NegY,
             Some(Side::Front | Side::Back) => Face::Z,
         }
     }
