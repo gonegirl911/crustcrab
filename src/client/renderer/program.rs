@@ -57,7 +57,7 @@ impl Program {
         I: IntoIterator<Item = &'a wgpu::BindGroup>,
     {
         render_pass.set_pipeline(&self.0);
-        for (bind_group, i) in bind_groups.into_iter().zip(0..) {
+        for (i, bind_group) in (0..).zip(bind_groups) {
             render_pass.set_bind_group(i, bind_group, &[]);
         }
     }

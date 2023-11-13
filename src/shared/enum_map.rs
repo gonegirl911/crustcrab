@@ -45,6 +45,10 @@ impl<E: Enum, T> EnumMap<E, T> {
         self.0.iter()
     }
 
+    fn values_mut(&mut self) -> slice::IterMut<T> {
+        self.0.iter_mut()
+    }
+
     pub fn into_values(self) -> GenericArrayIter<T, E::Length> {
         self.0.into_iter()
     }
@@ -221,19 +225,17 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
 
 impl<E: Enum, T> Drop for Guard<'_, E, T> {
     fn drop(&mut self) {
-        for (variant, &is_init) in &self.is_init {
+        for (uninit, &is_init) in self.uninit.values_mut().zip(self.is_init.values()) {
             if is_init {
                 unsafe {
-                    self.uninit[variant].assume_init_drop();
+                    uninit.assume_init_drop();
                 }
             }
         }
     }
 }
 
-/// # Safety
-///
-/// `to_index` must return an index in the range `[0, Self::LEN)`.
+#[allow(clippy::missing_safety_doc)]
 pub unsafe trait Enum: Copy {
     type Length: ArrayLength;
 

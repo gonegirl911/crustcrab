@@ -69,13 +69,6 @@ impl Crosshair {
         );
         render_pass.draw(0..6, 0..1);
     }
-
-    fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
-        Gui::transform(
-            Gui::scaling(renderer, CLIENT_CONFIG.gui.crosshair.size),
-            Vector2::repeat(0.5),
-        )
-    }
 }
 
 impl EventHandler for Crosshair {
@@ -96,10 +89,8 @@ impl EventHandler for Crosshair {
             }
             Event::MainEventsCleared => {
                 if mem::take(&mut self.is_resized) {
-                    self.uniform.set(
-                        renderer,
-                        &CrosshairUniformData::new(self.transform(renderer)),
-                    );
+                    self.uniform
+                        .set(renderer, &CrosshairUniformData::new(renderer));
                 }
             }
             _ => {}
@@ -114,8 +105,13 @@ struct CrosshairUniformData {
 }
 
 impl CrosshairUniformData {
-    fn new(transform: Matrix4<f32>) -> Self {
-        Self { transform }
+    fn new(renderer: &Renderer) -> Self {
+        Self {
+            transform: Gui::transform(
+                Gui::scaling(renderer, CLIENT_CONFIG.gui.crosshair.size),
+                Vector2::repeat(0.5),
+            ),
+        }
     }
 }
 

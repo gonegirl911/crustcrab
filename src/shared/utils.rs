@@ -2,16 +2,6 @@ use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
 use std::ops::{Add, Mul};
 
-fn div_floor(a: i64, b: i64) -> i64 {
-    let d = a / b;
-    let r = a % b;
-    if (r > 0 && b < 0) || (r < 0 && b > 0) {
-        d - 1
-    } else {
-        d
-    }
-}
-
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a.lerp(b, t)
 }
@@ -172,7 +162,7 @@ impl<const D: usize> MagnitudeSquared for SVector<i32, D> {
     type Output = u32;
 
     fn magnitude_squared(self) -> Self::Output {
-        self.map(|c| c.pow(2)).sum() as u32
+        self.map(|c| c.pow(2) as u32).sum()
     }
 }
 
@@ -180,6 +170,16 @@ impl<const D: usize> MagnitudeSquared for SVector<i64, D> {
     type Output = u64;
 
     fn magnitude_squared(self) -> Self::Output {
-        self.map(|c| c.pow(2)).sum() as u64
+        self.map(|c| c.pow(2) as u64).sum()
+    }
+}
+
+fn div_floor(a: i64, b: i64) -> i64 {
+    let d = a / b;
+    let r = a % b;
+    if (r > 0 && b < 0) || (r < 0 && b > 0) {
+        d - 1
+    } else {
+        d
     }
 }
