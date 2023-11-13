@@ -68,6 +68,15 @@ impl StarDome {
             render_pass.draw(0..6, 0..self.buffer.len());
         }
     }
+
+    fn instances(&self) -> Option<impl Iterator<Item = StarInstance> + '_> {
+        self.updated_rotation.map(|rotation| {
+            self.stars
+                .iter()
+                .copied()
+                .map(move |star| StarInstance::new(star, rotation))
+        })
+    }
 }
 
 impl EventHandler for StarDome {
@@ -80,16 +89,8 @@ impl EventHandler for StarDome {
                 self.updated_rotation = Some(time.sky_rotation());
             }
             Event::MainEventsCleared => {
-                if let Some(rotation) = self.updated_rotation {
-                    self.buffer.write(
-                        renderer,
-                        &self
-                            .stars
-                            .iter()
-                            .copied()
-                            .map(|star| StarInstance::new(star, rotation))
-                            .collect::<Vec<_>>(),
-                    );
+                if let Some(instances) = self.instances() {
+                    self.buffer.write(renderer, &instances.collect::<Vec<_>>());
                 }
             }
             _ => {}

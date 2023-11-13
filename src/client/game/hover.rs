@@ -101,9 +101,7 @@ impl BlockHighlight {
         Self {
             vertex_buffer: VertexBuffer::new(
                 renderer,
-                MemoryState::Immutable(
-                    &DELTAS.map(|delta| BlockHighlightVertex::new(delta.into())),
-                ),
+                MemoryState::Immutable(&DELTAS.map(BlockHighlightVertex::new)),
             ),
             index_buffer: IndexBuffer::new(renderer, MemoryState::Immutable(&INDICES)),
             program: Program::new(
@@ -151,8 +149,10 @@ struct BlockHighlightVertex {
 }
 
 impl BlockHighlightVertex {
-    fn new(coords: Point3<f32>) -> Self {
-        Self { coords }
+    fn new(delta: Vector3<f32>) -> Self {
+        Self {
+            coords: delta.into(),
+        }
     }
 }
 
