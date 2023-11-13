@@ -159,10 +159,10 @@ impl Default for Face {
 impl From<Option<Side>> for Face {
     fn from(side: Option<Side>) -> Self {
         match side {
-            Some(Side::Front | Side::Back) => Self::X,
+            Some(Side::Left | Side::Right) => Self::X,
             Some(Side::Top) | None => Self::Top,
             Some(Side::Bottom) => Self::Bottom,
-            Some(Side::Left | Side::Right) => Self::Z,
+            Some(Side::Front | Side::Back) => Self::Z,
         }
     }
 }
