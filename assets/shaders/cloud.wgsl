@@ -18,6 +18,8 @@ struct PlayerUniform {
 }
 
 struct PushConstants {
+    dims: vec2<f32>,
+    size: vec2<f32>,
     color: vec3<f32>,
     offset: vec2<f32>,
 }
@@ -35,17 +37,17 @@ var<push_constant> pc: PushConstants;
 
 @vertex
 fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
-    let coords = vec3(12.0, 4.0, 12.0) * vec3(
+    let coords = vec3(pc.size, pc.size.x) * vec3(
         f32(extractBits(vertex.data, 0u, 5u)),
         f32(extractBits(vertex.data, 5u, 5u)),
         f32(extractBits(vertex.data, 10u, 5u)),
     );
     let face = extractBits(vertex.data, 25u, 2u);
-    let offset = player.origin.xz + instance.offset - rem_euclid(player.origin.xz - pc.offset, 12.0);
+    let offset = player.origin.xz + instance.offset - rem_euclid(player.origin.xz - pc.offset, pc.size.x);
     let light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     return VertexOutput(
         player.vp * vec4(coords + vec3(offset.x, 192.0, offset.y), 1.0),
-        (player.origin.xz + instance.offset - pc.offset) / 12.0 / 256.0,
+        (player.origin.xz + instance.offset - pc.offset) / pc.size.x / pc.dims,
         light,
     );
 }

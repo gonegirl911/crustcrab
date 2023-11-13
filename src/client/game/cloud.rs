@@ -12,16 +12,14 @@ use crate::{
         CLIENT_CONFIG,
     },
     server::{
-        game::{
-            clock::Stage,
-            world::{block::Block, chunk::Chunk},
-        },
+        game::{clock::Stage, world::block::Block},
         ServerEvent,
     },
     shared::color::{Float3, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Vector2};
+use image::io::Reader as ImageReader;
+use nalgebra::{point, vector, Point2, Vector2};
 use serde::Deserialize;
 use std::time::Duration;
 
@@ -52,7 +50,7 @@ impl CloudLayer {
         );
         let texture = ImageTexture::new(
             renderer,
-            "assets/textures/clouds.png",
+            TEX_PATH,
             false,
             true,
             1,
@@ -141,7 +139,7 @@ impl CloudLayer {
     }
 
     fn instances() -> impl Iterator<Item = CloudInstance> {
-        let radius = (CLIENT_CONFIG.player.render_distance * Chunk::DIM as u32 / 12) as i32;
+        let radius = (CLIENT_CONFIG.player.render_distance() / CLIENT_CONFIG.cloud.size.x) as i32;
         (-radius..=radius).flat_map(move |dx| {
             (-radius..=radius)
                 .filter(move |dz| dx.pow(2) + dz.pow(2) <= radius.pow(2))
@@ -200,7 +198,7 @@ struct CloudInstance {
 impl CloudInstance {
     fn new(offset: Vector2<i32>) -> Self {
         Self {
-            offset: (offset * 12).cast(),
+            offset: (offset.cast() * CLIENT_CONFIG.cloud.size.x as i64).cast(),
         }
     }
 }
@@ -212,8 +210,11 @@ impl Instance for CloudInstance {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct CloudPushConstants {
+    dims: Point2<f32>,
+    size: Point2<f32>,
     color: Float3,
     offset: Vector2<f32>,
+    padding: [f32; 2],
 }
 
 impl CloudPushConstants {
@@ -222,8 +223,8 @@ impl CloudPushConstants {
     }
 
     fn update_offset(&mut self, dt: Duration) {
-        self.offset.x =
-            (self.offset.x - CLIENT_CONFIG.cloud.speed * dt.as_secs_f32()) % (12.0 * 256.0);
+        self.offset.x -= CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
+        self.offset.x %= self.size.x * self.dims.x;
     }
 
     fn color(stage: Stage) -> Float3 {
@@ -234,13 +235,24 @@ impl CloudPushConstants {
             )
             .into()
     }
+
+    fn dims() -> Point2<u32> {
+        ImageReader::open(TEX_PATH)
+            .expect("file should exist")
+            .into_dimensions()
+            .map(|(width, height)| point![width, height])
+            .expect("format should be valid")
+    }
 }
 
 impl Default for CloudPushConstants {
     fn default() -> Self {
         Self {
+            dims: Self::dims().cast(),
+            size: CLIENT_CONFIG.cloud.size.cast(),
             color: Self::color(Default::default()),
             offset: Default::default(),
+            padding: Default::default(),
         }
     }
 }
@@ -251,6 +263,7 @@ impl PushConstants for CloudPushConstants {
 
 #[derive(Deserialize)]
 pub struct CloudConfig {
+    size: Point2<u64>,
     speed: f32,
     day: StageConfig,
     night: StageConfig,
@@ -260,3 +273,5 @@ pub struct CloudConfig {
 struct StageConfig {
     color: Rgba<f32>,
 }
+
+const TEX_PATH: &str = "assets/textures/clouds.png";

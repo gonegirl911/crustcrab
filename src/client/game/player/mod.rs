@@ -182,11 +182,15 @@ pub struct PlayerConfig {
     fovy: f32,
     speed: f32,
     sensitivity: f32,
-    pub render_distance: u32,
+    render_distance: u32,
 }
 
 impl PlayerConfig {
+    pub fn render_distance(&self) -> u64 {
+        self.render_distance as u64 * Chunk::DIM as u64
+    }
+
     fn zfar(&self) -> f32 {
-        1000.0 + SQRT_2 * (self.render_distance + 1) as f32 * Chunk::DIM as f32
+        1000.0 + SQRT_2 * ((self.render_distance + 1) as u64 * Chunk::DIM as u64) as f32
     }
 }

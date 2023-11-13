@@ -106,7 +106,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Rgba<T> {
     }
 }
 
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Clone, Copy, Default, Zeroable, Pod)]
 pub struct Float3 {
     data: [f32; 3],

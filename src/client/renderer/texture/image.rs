@@ -21,8 +21,7 @@ impl ImageTexture {
     ) -> Self {
         let view = Self::create_view(renderer, path, is_srgb, mip_level_count);
         let sampler = Self::create_sampler(renderer, is_pixelated, mip_level_count, address_mode);
-        let bind_group_layout =
-            ImageTextureArray::create_bind_group_layout(renderer, None, is_pixelated);
+        let bind_group_layout = Self::create_bind_group_layout(renderer, None, is_pixelated);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -209,6 +208,40 @@ impl ImageTexture {
         queue.submit([encoder.finish()]);
     }
 
+    fn create_bind_group_layout(
+        Renderer { device, .. }: &Renderer,
+        count: Option<NonZeroU32>,
+        is_pixelated: bool,
+    ) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float {
+                            filterable: !is_pixelated,
+                        },
+                    },
+                    count,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(if is_pixelated {
+                        wgpu::SamplerBindingType::NonFiltering
+                    } else {
+                        wgpu::SamplerBindingType::Filtering
+                    }),
+                    count: None,
+                },
+            ],
+        })
+    }
+
     fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
         ImageReader::open(path)
             .expect("file should exist")
@@ -238,7 +271,7 @@ impl ImageTextureArray {
             mip_level_count,
             Default::default(),
         );
-        let bind_group_layout = Self::create_bind_group_layout(
+        let bind_group_layout = ImageTexture::create_bind_group_layout(
             renderer,
             NonZeroU32::new(views.len() as u32),
             is_pixelated,
@@ -282,40 +315,6 @@ impl ImageTextureArray {
         paths
             .into_iter()
             .map(|path| ImageTexture::create_view(renderer, path, is_srgb, mip_level_count))
-            .collect::<Vec<_>>()
-    }
-
-    fn create_bind_group_layout(
-        Renderer { device, .. }: &Renderer,
-        count: Option<NonZeroU32>,
-        is_pixelated: bool,
-    ) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float {
-                            filterable: !is_pixelated,
-                        },
-                    },
-                    count,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(if is_pixelated {
-                        wgpu::SamplerBindingType::NonFiltering
-                    } else {
-                        wgpu::SamplerBindingType::Filtering
-                    }),
-                    count: None,
-                },
-            ],
-        })
+            .collect()
     }
 }
