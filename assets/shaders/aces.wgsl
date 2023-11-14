@@ -22,7 +22,7 @@ var s_input: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let v = INPUT * textureSample(t_input, s_input, in.input_coords).xyz;
+    let v = INPUT * textureSample(t_input, s_input, in.input_coords).rgb;
     let a = v * (v + 0.0245786) - 0.000090537;
     let b = v * (0.983729 * v + 0.4329510) + 0.238081;
     return vec4(OUTPUT * (a / b), 1.0);

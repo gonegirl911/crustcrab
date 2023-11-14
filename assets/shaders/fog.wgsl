@@ -61,7 +61,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let fog_start = f32((player.render_distance - 3u) * 16u);
     let fog_factor = exp2(-pow2(max((distance - fog_start) / 16.0, 0.0)));
     let color = textureSample(t_input, s_input, in.input_coords);
-    return mix(vec4(sky.horizon_color, 1.0), color, fog_factor) * f32(color.w != 0.0);
+    return mix(vec4(sky.horizon_color, 1.0), color, fog_factor) * f32(color.a != 0.0);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {

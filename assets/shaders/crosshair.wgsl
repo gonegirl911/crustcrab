@@ -38,7 +38,7 @@ var s_input: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(
-        1.0 - textureSample(t_input, s_input, in.input_coords).xyz,
-        textureSample(t_crosshair, s_crosshair, in.tex_coords).w,
+        1.0 - textureSample(t_input, s_input, in.input_coords).rgb,
+        textureSample(t_crosshair, s_crosshair, in.tex_coords).a,
     );
 }

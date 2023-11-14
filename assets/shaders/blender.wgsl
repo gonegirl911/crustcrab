@@ -29,5 +29,5 @@ var<push_constant> pc: PushConstants;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_input, s_input, in.input_coords);
-    return vec4(color.xyz, color.a * pc.opacity);
+    return vec4(color.rgb, color.a * pc.opacity);
 }
