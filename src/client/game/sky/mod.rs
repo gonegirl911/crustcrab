@@ -13,10 +13,7 @@ use crate::{
         renderer::{buffer::MemoryState, uniform::Uniform, Renderer},
         CLIENT_CONFIG,
     },
-    server::{
-        game::clock::{Stage, Time},
-        ServerEvent,
-    },
+    server::{game::clock::Time, ServerEvent},
     shared::{
         color::{Float3, Rgb},
         utils,
@@ -163,33 +160,24 @@ struct Glow {
 }
 
 impl Glow {
-    fn new(stage: Stage, day: GlowConfig, night: GlowConfig) -> Self {
+    fn new(color: Rgb<f32>, progress: f32) -> Self {
         Self {
-            color: stage.lerp(day.color, night.color),
-            opacity: Self::opacity(stage),
-            angle: Self::angle(stage, day.angle, night.angle),
+            color,
+            opacity: Self::opacity(progress),
+            angle: Self::angle(progress, 14.0, 10.0),
         }
     }
 
-    fn opacity(stage: Stage) -> f32 {
-        if let Stage::Dawn { progress } | Stage::Dusk { progress } = stage {
-            Self::decelerate(1.0 - (progress * 2.0 - 1.0).abs())
-        } else {
-            0.0
-        }
+    fn opacity(progress: f32) -> f32 {
+        Self::decelerate(1.0 - (progress * 2.0 - 1.0).abs())
     }
 
-    fn angle(stage: Stage, day: f32, night: f32) -> f32 {
-        match stage {
-            Stage::Dawn { progress } => -utils::lerp(night, day, Self::progress(progress)),
-            Stage::Day => 0.0,
-            Stage::Dusk { progress } => utils::lerp(day, night, Self::progress(progress)),
-            Stage::Night => 0.0,
-        }
-    }
-
-    fn progress(progress: f32) -> f32 {
-        1.0 - (1.0 - (progress * 3.0 - 1.0).max(0.0)).abs()
+    fn angle(progress: f32, day: f32, night: f32) -> f32 {
+        utils::lerp(
+            day,
+            night,
+            1.0 - (1.0 - (progress * 3.0 - 1.0).max(0.0)).abs(),
+        )
     }
 
     fn decelerate(input: f32) -> f32 {
@@ -202,20 +190,25 @@ pub struct SkyConfig {
     sun_intensity: f32,
     day: StageConfig,
     night: StageConfig,
+    glow: GlowConfig,
     object: ObjectConfig,
     star: StarConfig,
 }
 
 impl SkyConfig {
     fn data(&self, time: Time) -> SkyUniformData {
-        let stage = time.stage();
+        let progress = time.stage().progress();
         SkyUniformData::new(
             time.sky_rotation() * Vector3::x(),
-            stage.lerp(self.day.color, self.night.color),
-            stage.lerp(self.day.horizon_color, self.night.horizon_color),
-            Glow::new(stage, self.day.glow, self.night.glow),
-            stage.lerp(self.sun_intensity, 1.0),
-            stage.lerp(self.day.light_intensity, self.night.light_intensity),
+            utils::lerp(self.day.color, self.night.color, progress),
+            utils::lerp(self.day.horizon_color, self.night.horizon_color, progress),
+            Glow::new(self.glow.color(progress), progress),
+            utils::lerp(self.sun_intensity, 1.0, progress),
+            utils::lerp(
+                self.day.light_intensity,
+                self.night.light_intensity,
+                progress,
+            ),
         )
     }
 }
@@ -224,12 +217,16 @@ impl SkyConfig {
 struct StageConfig {
     color: Rgb<f32>,
     horizon_color: Rgb<f32>,
-    glow: GlowConfig,
     light_intensity: Rgb<f32>,
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Deserialize)]
 struct GlowConfig {
-    color: Rgb<f32>,
-    angle: f32,
+    colors: [Rgb<f32>; 2],
+}
+
+impl GlowConfig {
+    fn color(&self, progress: f32) -> Rgb<f32> {
+        utils::lerp(self.colors[0], self.colors[1], progress)
+    }
 }

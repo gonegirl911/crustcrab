@@ -88,11 +88,15 @@ pub enum Stage {
 
 impl Stage {
     pub fn lerp<T: Lerp>(self, day: T, night: T) -> T {
+        utils::lerp(day, night, self.progress())
+    }
+
+    pub fn progress(self) -> f32 {
         match self {
-            Stage::Dawn { progress } => utils::lerp(night, day, progress),
-            Stage::Day => day,
-            Stage::Dusk { progress } => utils::lerp(day, night, progress),
-            Stage::Night => night,
+            Stage::Dawn { progress } => 1.0 - progress,
+            Stage::Day => 0.0,
+            Stage::Dusk { progress } => progress,
+            Stage::Night => 1.0,
         }
     }
 }
