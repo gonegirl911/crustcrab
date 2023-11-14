@@ -27,8 +27,11 @@ struct PlayerUniform {
 }
 
 struct SkyUniform {
+    sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
+    glow_color: vec4<f32>,
+    glow_angle: f32,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }
@@ -42,9 +45,10 @@ var<uniform> sky: SkyUniform;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = dir(in.screen_coords);
-    let theta = deg(asin(dir.y));
-    let horizon_factor = exp2(-pow2(max((theta - 2.0) / 6.0, 0.0)));
-    return vec4(mix(sky.color, sky.horizon_color, horizon_factor), 1.0);
+    let horizon_factor = factor(deg(asin(dir.y)) - 2.0);
+    let horizon_glow_factor = max(mix(1.0, -1.0, acos(dot(player.forward, sky.sun_dir)) * FRAC_1_PI), 0.0) * horizon_factor;
+    let glow_factor = max(factor(deg(asin(rotate(dir, rad(sky.glow_angle)).y)) + 8.0), horizon_glow_factor) * sky.glow_color.a;
+    return vec4(mix(mix(sky.color, sky.horizon_color, horizon_factor), sky.glow_color.rgb, glow_factor), 1.0);
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
@@ -53,10 +57,31 @@ fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
     return normalize(dir.xyz);
 }
 
+fn factor(theta: f32) -> f32 {
+    return exp2(-pow2(max(theta / 6.0, 0.0)));
+}
+
+fn rotate(dir: vec3<f32>, theta: f32) -> vec3<f32> {
+    let sin_theta = sin(theta);
+    let cos_theta = cos(theta);
+    return vec3(
+        dir.x * cos_theta - dir.y * sin_theta,
+        dir.x * sin_theta + dir.y * cos_theta,
+        dir.z,
+    );
+}
+
 fn deg(rad: f32) -> f32 {
-    return rad * 57.2957795130823208767981548141051703;
+    return rad * RAD_TO_DEG;
+}
+
+fn rad(deg: f32) -> f32 {
+    return deg / RAD_TO_DEG;
 }
 
 fn pow2(n: f32) -> f32 {
     return n * n;
 }
+
+const FRAC_1_PI = 0.318309886183790671537767526745028724;
+const RAD_TO_DEG = 57.2957795130823208767981548141051703;

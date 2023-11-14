@@ -94,9 +94,9 @@ impl World {
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
+            self.send_updates(updates, server_tx, true);
             self.send_unloads(unloads, server_tx);
             self.send_loads(loads, server_tx, true);
-            self.send_updates(updates, server_tx, true);
         }
     }
 

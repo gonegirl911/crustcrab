@@ -37,8 +37,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 }
 
 struct SkyUniform {
+    sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
+    glow_color: vec4<f32>,
+    glow_angle: f32,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }

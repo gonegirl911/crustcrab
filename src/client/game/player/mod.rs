@@ -171,7 +171,7 @@ impl PlayerUniformData {
             render_distance: CLIENT_CONFIG.player.render_distance,
             znear,
             zfar,
-            padding: [0.0; 2],
+            padding: Default::default(),
         }
     }
 }

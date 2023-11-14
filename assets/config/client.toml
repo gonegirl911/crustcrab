@@ -11,11 +11,15 @@ sun_intensity = 15.0
 [sky.day]
 color = [0.22, 0.5, 1.0]
 horizon_color = [0.37, 0.62, 1.0]
+glow.color = [1.0, 0.35, 0.0]
+glow.angle = 14.0
 light_intensity = [1.0, 1.0, 1.0]
 
 [sky.night]
 color = [0.0, 0.0, 0.0]
 horizon_color = [0.02, 0.02, 0.03]
+glow.color = [1.0, 0.0, 0.0]
+glow.angle = 10.0
 light_intensity = [0.1, 0.1, 0.25]
 
 [sky.object]

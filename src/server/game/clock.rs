@@ -78,7 +78,7 @@ impl Default for Time {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 pub enum Stage {
     Dawn { progress: f32 },
     Day,
@@ -87,12 +87,12 @@ pub enum Stage {
 }
 
 impl Stage {
-    pub fn lerp<T: Lerp>(self, day_value: T, night_value: T) -> T {
+    pub fn lerp<T: Lerp>(self, day: T, night: T) -> T {
         match self {
-            Stage::Dawn { progress } => utils::lerp(night_value, day_value, progress),
-            Stage::Day => day_value,
-            Stage::Dusk { progress } => utils::lerp(day_value, night_value, progress),
-            Stage::Night => night_value,
+            Stage::Dawn { progress } => utils::lerp(night, day, progress),
+            Stage::Day => day,
+            Stage::Dusk { progress } => utils::lerp(day, night, progress),
+            Stage::Night => night,
         }
     }
 }

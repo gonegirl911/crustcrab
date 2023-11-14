@@ -24,7 +24,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data, 5u, 5u)),
         f32(extractBits(vertex.data, 10u, 5u)),
     );
-    let tex_index = extractBits(vertex.data, 15u, 8u);
+    let tex_idx = extractBits(vertex.data, 15u, 8u);
     let tex_coords = vec2(
         f32(extractBits(vertex.data, 23u, 1u)),
         f32(extractBits(vertex.data, 24u, 1u)),
@@ -33,7 +33,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let light_factor = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     return VertexOutput(
         inventory.transform * vec4(coords, 1.0),
-        tex_index,
+        tex_idx,
         tex_coords,
         light_factor,
     );
