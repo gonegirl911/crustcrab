@@ -325,7 +325,7 @@ impl<'a> Node<'a> {
         chunks: &'a ChunkStore,
         light: &'a WorldLight,
         visits: &'b mut FxHashSet<Point3<i64>>,
-    ) -> impl Iterator<Item = Node<'a>> + 'b {
+    ) -> impl Iterator<Item = Self> + 'b {
         (self.value > 1)
             .then(|| {
                 WorldLight::adjacent_points(self.coords)
