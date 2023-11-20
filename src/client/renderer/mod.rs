@@ -92,8 +92,7 @@ impl EventHandler for Renderer {
 
         if let Event::WindowEvent { event, .. } = event {
             match event {
-                WindowEvent::Resized(PhysicalSize { .. })
-                | WindowEvent::ScaleFactorChanged { .. } => {
+                WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                     self.should_resize = true;
                 }
                 WindowEvent::RedrawRequested => {
