@@ -26,6 +26,7 @@ use bytemuck::{Pod, Zeroable};
 use nalgebra::{point, Point2, Point3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
+use winit::event::WindowEvent;
 
 pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
@@ -247,7 +248,10 @@ impl EventHandler for World {
                 }
                 _ => {}
             },
-            Event::MainEventsCleared => {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
                 for (coords, vertices, transparent_vertices, updated_at) in
                     self.priority_workers.drain().chain(self.workers.drain())
                 {

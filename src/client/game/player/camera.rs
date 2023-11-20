@@ -6,8 +6,8 @@ use std::{
     time::Duration,
 };
 use winit::{
-    dpi::PhysicalSize,
-    event::{DeviceEvent, ElementState, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent},
+    event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
 };
 
 pub struct View {
@@ -83,7 +83,6 @@ pub struct Controller {
     dy: f32,
     relevant_keys: Keys,
     key_history: Keys,
-    aspect: f32,
     relevant_buttons: MouseButtons,
     button_history: MouseButtons,
     speed: f32,
@@ -91,21 +90,15 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new(aspect: f32, speed: f32, sensitivity: f32) -> Self {
+    pub fn new(speed: f32, sensitivity: f32) -> Self {
         Self {
-            aspect,
             speed,
             sensitivity,
             ..Default::default()
         }
     }
 
-    pub fn apply_updates(
-        &mut self,
-        view: &mut View,
-        projection: &mut Projection,
-        dt: Duration,
-    ) -> Changes {
+    pub fn apply_updates(&mut self, view: &mut View, dt: Duration) -> Changes {
         let mut changes = Changes::empty();
 
         if self.dx != 0.0 || self.dy != 0.0 {
@@ -118,12 +111,6 @@ impl Controller {
         if !self.relevant_keys.is_empty() {
             self.apply_movement(view, dt);
             changes.insert(Changes::MOVED);
-        }
-
-        if self.aspect != 0.0 {
-            projection.aspect = self.aspect;
-            self.aspect = 0.0;
-            changes.insert(Changes::RESIZED);
         }
 
         if self.relevant_buttons.contains(MouseButtons::LEFT) {
@@ -193,23 +180,23 @@ impl EventHandler for Controller {
                 self.dx += dx as f32;
                 self.dy += dy as f32;
             }
-            Event::WindowEvent { event, .. } => match *event {
+            Event::WindowEvent { event, .. } => match event {
                 WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(keycode),
+                    event:
+                        KeyEvent {
+                            physical_key: PhysicalKey::Code(keycode),
                             state,
                             ..
                         },
                     ..
                 } => {
                     let (key, opp) = match keycode {
-                        VirtualKeyCode::W => (Keys::W, Keys::S),
-                        VirtualKeyCode::A => (Keys::A, Keys::D),
-                        VirtualKeyCode::S => (Keys::S, Keys::W),
-                        VirtualKeyCode::D => (Keys::D, Keys::A),
-                        VirtualKeyCode::Space => (Keys::SPACE, Keys::LSHIFT),
-                        VirtualKeyCode::LShift => (Keys::LSHIFT, Keys::SPACE),
+                        KeyCode::KeyW => (Keys::W, Keys::S),
+                        KeyCode::KeyA => (Keys::A, Keys::D),
+                        KeyCode::KeyS => (Keys::S, Keys::W),
+                        KeyCode::KeyD => (Keys::D, Keys::A),
+                        KeyCode::Space => (Keys::SPACE, Keys::LSHIFT),
+                        KeyCode::ShiftLeft => (Keys::LSHIFT, Keys::SPACE),
                         _ => return,
                     };
                     match state {
@@ -226,13 +213,6 @@ impl EventHandler for Controller {
                             self.key_history.remove(key);
                         }
                     }
-                }
-                WindowEvent::Resized(PhysicalSize { width, height })
-                | WindowEvent::ScaleFactorChanged {
-                    new_inner_size: &mut PhysicalSize { width, height },
-                    ..
-                } if width != 0 && height != 0 => {
-                    self.aspect = width as f32 / height as f32;
                 }
                 WindowEvent::MouseInput { button, state, .. } => {
                     let (button, opp) = match button {
@@ -266,10 +246,9 @@ bitflags! {
     pub struct Changes: u8 {
         const MOVED = 1 << 0;
         const ROTATED = 1 << 1;
-        const RESIZED = 1 << 2;
-        const BLOCK_PLACED = 1 << 3;
-        const BLOCK_DESTROYED = 1 << 4;
-        const MATRIX_CHANGES = Self::MOVED.bits() | Self::ROTATED.bits() | Self::RESIZED.bits();
+        const BLOCK_PLACED = 1 << 2;
+        const BLOCK_DESTROYED = 1 << 3;
+        const VIEW = Self::MOVED.bits() | Self::ROTATED.bits();
     }
 
     #[derive(Clone, Copy, Default)]

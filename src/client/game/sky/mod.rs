@@ -22,6 +22,7 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;
 use serde::Deserialize;
+use winit::event::WindowEvent;
 
 pub struct Sky {
     atmosphere: Atmosphere,
@@ -108,7 +109,10 @@ impl EventHandler for Sky {
             Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
                 self.updated_time = Some(time);
             }
-            Event::MainEventsCleared => {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
                 if let Some(time) = self.updated_time.take() {
                     self.uniform.set(renderer, &CLIENT_CONFIG.sky.data(time));
                 }

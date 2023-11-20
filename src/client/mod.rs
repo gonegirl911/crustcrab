@@ -1,7 +1,6 @@
 pub mod event_loop;
 pub mod game;
 pub mod renderer;
-pub mod stopwatch;
 pub mod window;
 
 use self::{
@@ -15,7 +14,7 @@ use flume::{Receiver, Sender};
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::{fs, time::Duration};
+use std::fs;
 
 pub struct Client {
     event_loop: EventLoop,
@@ -41,7 +40,7 @@ impl Client {
         }
     }
 
-    pub fn run(self) -> ! {
+    pub fn run(self) {
         struct MiniClient {
             window: Window,
             renderer: Renderer,
@@ -49,12 +48,13 @@ impl Client {
         }
 
         impl EventHandler for MiniClient {
-            type Context<'a> = (&'a Sender<ClientEvent>, Duration);
+            type Context<'a> = &'a Sender<ClientEvent>;
 
-            fn handle(&mut self, event: &Event, (client_tx, dt): Self::Context<'_>) {
+            #[rustfmt::skip]
+            fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
                 self.window.handle(event, ());
-                self.renderer.handle(event, ());
-                self.game.handle(event, (client_tx, &self.renderer, dt));
+                self.renderer.handle(event, &self.window);
+                self.game.handle(event, (client_tx, &self.window, &self.renderer));
             }
         }
 
@@ -62,7 +62,7 @@ impl Client {
             window: self.window,
             renderer: self.renderer,
             game: self.game,
-        })
+        });
     }
 }
 

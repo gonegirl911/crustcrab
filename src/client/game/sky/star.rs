@@ -19,6 +19,7 @@ use nalgebra::{point, vector, Matrix4, Point3, UnitQuaternion, Vector3};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::Deserialize;
 use std::f32::consts::{FRAC_PI_2, PI};
+use winit::event::WindowEvent;
 
 pub struct StarDome {
     stars: Vec<Star>,
@@ -88,7 +89,10 @@ impl EventHandler for StarDome {
                 self.pc = StarPushConstants::new(time.stage());
                 self.updated_rotation = Some(time.sky_rotation());
             }
-            Event::MainEventsCleared => {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
                 if let Some(instances) = self.instances() {
                     self.buffer.write(renderer, &instances.collect::<Vec<_>>());
                 }

@@ -22,6 +22,7 @@ use image::io::Reader as ImageReader;
 use nalgebra::{point, vector, Point2, Vector2};
 use serde::Deserialize;
 use std::time::Duration;
+use winit::event::WindowEvent;
 
 pub struct CloudLayer {
     vertex_buffer: VertexBuffer<CloudVertex>,
@@ -165,7 +166,10 @@ impl EventHandler for CloudLayer {
                 self.pc.update_color(stage);
                 self.opacity = Self::opacity(stage);
             }
-            Event::MainEventsCleared => {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
                 self.pc.update_offset(dt);
             }
             _ => {}

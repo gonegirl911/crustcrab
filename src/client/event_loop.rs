@@ -1,59 +1,63 @@
-use super::{stopwatch::Stopwatch, ClientEvent};
+use super::ClientEvent;
 use crate::server::ServerEvent;
 use flume::{Receiver, Sender};
-use std::{ops::Deref, time::Duration};
+use std::{ops::Deref, thread};
 use winit::{
-    event::{Event as RawEvent, StartCause, WindowEvent},
-    event_loop::{
-        EventLoop as RawEventLoop, EventLoopBuilder as RawEventLoopBuilder,
-        EventLoopProxy as RawEventLoopProxy,
-    },
+    event::{Event as RawEvent, WindowEvent},
+    event_loop::{ControlFlow, EventLoop as RawEventLoop, EventLoopBuilder as RawEventLoopBuilder},
 };
 
 pub struct EventLoop {
     event_loop: RawEventLoop<ServerEvent>,
-    proxy: RawEventLoopProxy<ServerEvent>,
     client_tx: Sender<ClientEvent>,
-    server_rx: Receiver<ServerEvent>,
 }
 
 impl EventLoop {
     pub fn new(client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) -> Self {
-        let event_loop = RawEventLoopBuilder::with_user_event().build();
+        let event_loop = Self::event_loop();
         let proxy = event_loop.create_proxy();
+
+        thread::spawn(move || {
+            for event in server_rx {
+                if proxy.send_event(event).is_err() {
+                    break;
+                }
+            }
+        });
+
         Self {
             event_loop,
-            proxy,
             client_tx,
-            server_rx,
         }
     }
 
-    pub fn run<H>(self, mut handler: H) -> !
+    pub fn run<H>(self, mut handler: H)
     where
-        H: for<'a> EventHandler<Context<'a> = (&'a Sender<ClientEvent>, Duration)> + 'static,
+        H: for<'a> EventHandler<Context<'a> = &'a Sender<ClientEvent>> + 'static,
     {
-        let mut stopwatch = Stopwatch::start();
-        let mut dt = Default::default();
+        self.event_loop
+            .run(move |event, elwt| {
+                handler.handle(&event, &self.client_tx);
 
-        self.event_loop.run(move |event, _, control_flow| {
-            match event {
-                Event::NewEvents(StartCause::Init | StartCause::Poll) => {
-                    for event in self.server_rx.drain() {
-                        self.proxy
-                            .send_event(event)
-                            .unwrap_or_else(|_| unreachable!());
-                    }
-                }
-                Event::MainEventsCleared => dt = stopwatch.lap(),
-                Event::WindowEvent {
+                if let Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
                     ..
-                } => control_flow.set_exit(),
-                _ => {}
-            }
-            handler.handle(&event, (&self.client_tx, dt));
-        })
+                } = event
+                {
+                    elwt.exit();
+                }
+            })
+            .expect("event loop should be runnable");
+    }
+
+    fn event_loop() -> RawEventLoop<ServerEvent> {
+        let event_loop = RawEventLoopBuilder::with_user_event()
+            .build()
+            .expect("event loop should be buildable");
+
+        event_loop.set_control_flow(ControlFlow::Poll);
+
+        event_loop
     }
 }
 
@@ -71,4 +75,4 @@ pub trait EventHandler {
     fn handle(&mut self, event: &Event, cx: Self::Context<'_>);
 }
 
-pub type Event<'a> = RawEvent<'a, ServerEvent>;
+pub type Event = RawEvent<ServerEvent>;

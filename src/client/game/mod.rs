@@ -4,11 +4,12 @@ pub mod gui;
 pub mod hover;
 pub mod player;
 pub mod sky;
+pub mod stopwatch;
 pub mod world;
 
 use self::{
     cloud::CloudLayer, fog::Fog, gui::Gui, hover::BlockHover, player::Player, sky::Sky,
-    world::World,
+    stopwatch::Stopwatch, world::World,
 };
 use super::{
     event_loop::{Event, EventHandler},
@@ -21,46 +22,43 @@ use super::{
 };
 use crate::server::game::world::block::data::TEX_PATHS;
 use flume::Sender;
-use std::{ops::Deref, time::Duration};
+use std::ops::Deref;
+use winit::{event::WindowEvent, window::Window as RawWindow};
 
 pub struct Game {
-    gui: Gui,
-    player: Player,
     sky: Sky,
     world: World,
     clouds: CloudLayer,
     fog: Fog,
     hover: BlockHover,
     aces: Aces,
+    gui: Gui,
+    player: Player,
     textures: BlockTextureArray,
     depth: DepthBuffer,
     processor: PostProcessor,
+    stopwatch: Stopwatch,
 }
 
 impl Game {
     pub fn new(renderer: &Renderer) -> Self {
-        let textures = BlockTextureArray::new(renderer);
-        let depth = DepthBuffer::new(renderer);
-        let processor = PostProcessor::new(renderer);
-        let gui = Gui::new(
-            renderer,
-            processor.bind_group_layout(),
-            textures.bind_group_layout(),
-        );
         let player = Player::new(renderer);
         let sky = Sky::new(renderer, player.bind_group_layout());
+        let textures = BlockTextureArray::new(renderer);
         let world = World::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
             textures.bind_group_layout(),
         );
+        let processor = PostProcessor::new(renderer);
         let clouds = CloudLayer::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
             processor.bind_group_layout(),
         );
+        let depth = DepthBuffer::new(renderer);
         let fog = Fog::new(
             renderer,
             player.bind_group_layout(),
@@ -77,18 +75,25 @@ impl Game {
             processor.bind_group_layout(),
             PostProcessor::FORMAT,
         );
+        let gui = Gui::new(
+            renderer,
+            processor.bind_group_layout(),
+            textures.bind_group_layout(),
+        );
+        let stopwatch = Stopwatch::start();
         Self {
-            gui,
-            player,
             sky,
             world,
             clouds,
             fog,
             hover,
             aces,
+            gui,
+            player,
             textures,
             depth,
             processor,
+            stopwatch,
         }
     }
 
@@ -164,7 +169,7 @@ impl Game {
 }
 
 impl EventHandler for Game {
-    type Context<'a> = (&'a Sender<ClientEvent>, &'a Renderer, Duration);
+    type Context<'a> = (&'a Sender<ClientEvent>, &'a RawWindow, &'a Renderer);
 
     #[rustfmt::skip]
     fn handle(
@@ -172,37 +177,43 @@ impl EventHandler for Game {
         event: &Event,
         (
             client_tx,
+            window,
             renderer @ Renderer {
                 surface,
                 device,
                 queue,
                 ..
             },
-            dt,
         ): Self::Context<'_>,
     ) {
-        if let Event::RedrawRequested(_) = event {
+        self.sky.handle(event, renderer);
+        self.world.handle(event, renderer);
+        self.stopwatch.handle(event, ());
+        self.clouds.handle(event, self.stopwatch.dt);
+        self.fog.handle(event, renderer);
+        self.hover.handle(event, ());
+        self.gui.handle(event, renderer);
+        self.player.handle(event, (client_tx, renderer, &self.gui, self.stopwatch.dt));
+        self.depth.handle(event, renderer);
+        self.processor.handle(event, renderer);
+
+        if let Event::WindowEvent {
+            event: WindowEvent::RedrawRequested,
+            ..
+        } = event
+        {
             match surface.get_current_texture() {
                 Ok(surface) => {
                     let view = surface.texture.create_view(&Default::default());
                     let mut encoder = device.create_command_encoder(&Default::default());
                     self.draw(renderer, &view, &mut encoder);
                     queue.submit([encoder.finish()]);
+                    window.pre_present_notify();
                     surface.present();
                 }
                 Err(wgpu::SurfaceError::Lost) => renderer.recreate_surface(),
                 Err(_) => {}
             }
-        } else {
-            self.gui.handle(event, renderer);
-            self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-            self.sky.handle(event, renderer);
-            self.world.handle(event, renderer);
-            self.clouds.handle(event, dt);
-            self.fog.handle(event, renderer);
-            self.hover.handle(event, ());
-            self.depth.handle(event, renderer);
-            self.processor.handle(event, renderer);
         }
     }
 }

@@ -3,10 +3,9 @@ use crate::client::{
     renderer::Renderer,
 };
 use std::{
-    array, mem,
+    array,
     ops::{Deref, DerefMut},
 };
-use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct ScreenTexture(ScreenTextureArray<1>);
 
@@ -42,7 +41,6 @@ pub struct ScreenTextureArray<const N: usize> {
     bind_group_layout: wgpu::BindGroupLayout,
     bind_groups: [wgpu::BindGroup; N],
     format: wgpu::TextureFormat,
-    is_resized: bool,
 }
 
 impl<const N: usize> ScreenTextureArray<N> {
@@ -77,7 +75,6 @@ impl<const N: usize> ScreenTextureArray<N> {
             bind_group_layout,
             bind_groups,
             format,
-            is_resized: false,
         }
     }
 
@@ -153,31 +150,15 @@ impl ScreenTextureArray<2> {
 impl<const N: usize> EventHandler for ScreenTextureArray<N> {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        match *event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::Resized(PhysicalSize { width, height })
-                    | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: &mut PhysicalSize { width, height },
-                        ..
-                    },
-                ..
-            } if width != 0 && height != 0 => {
-                self.is_resized = true;
-            }
-            Event::MainEventsCleared => {
-                if mem::take(&mut self.is_resized) {
-                    self.views = Self::create_views(renderer, self.format);
-                    self.bind_groups = Self::create_bind_groups(
-                        renderer,
-                        &self.views,
-                        &self.sampler,
-                        &self.bind_group_layout,
-                    );
-                }
-            }
-            _ => {}
+    fn handle(&mut self, _: &Event, renderer: Self::Context<'_>) {
+        if renderer.is_resized {
+            self.views = Self::create_views(renderer, self.format);
+            self.bind_groups = Self::create_bind_groups(
+                renderer,
+                &self.views,
+                &self.sampler,
+                &self.bind_group_layout,
+            );
         }
     }
 }

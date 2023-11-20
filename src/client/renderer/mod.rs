@@ -14,7 +14,8 @@ pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
-    is_resized: bool,
+    should_resize: bool,
+    pub is_resized: bool,
 }
 
 impl Renderer {
@@ -58,39 +59,50 @@ impl Renderer {
             device,
             queue,
             config,
-            is_resized: true,
+            should_resize: true,
+            is_resized: false,
         }
     }
 
     pub fn recreate_surface(&self) {
         self.surface.configure(&self.device, &self.config);
     }
+
+    pub fn aspect(&self) -> f32 {
+        self.config.width as f32 / self.config.height as f32
+    }
+
+    fn resize(&mut self, PhysicalSize { width, height }: PhysicalSize<u32>) -> bool {
+        if width != 0 && height != 0 {
+            self.config.width = width;
+            self.config.height = height;
+            self.recreate_surface();
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl EventHandler for Renderer {
-    type Context<'a> = ();
+    type Context<'a> = &'a RawWindow;
 
-    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        match *event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::Resized(PhysicalSize { width, height })
-                    | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: &mut PhysicalSize { width, height },
-                        ..
-                    },
-                ..
-            } if width != 0 && height != 0 => {
-                self.config.width = width;
-                self.config.height = height;
-                self.is_resized = true;
-            }
-            Event::MainEventsCleared => {
-                if mem::take(&mut self.is_resized) {
-                    self.recreate_surface();
+    fn handle(&mut self, event: &Event, window: Self::Context<'_>) {
+        self.is_resized = false;
+
+        if let Event::WindowEvent { event, .. } = event {
+            match event {
+                WindowEvent::Resized(PhysicalSize { .. })
+                | WindowEvent::ScaleFactorChanged { .. } => {
+                    self.should_resize = true;
                 }
+                WindowEvent::RedrawRequested => {
+                    if mem::take(&mut self.should_resize) {
+                        self.is_resized = self.resize(window.inner_size());
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 }

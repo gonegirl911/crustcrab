@@ -16,8 +16,8 @@ impl App {
         }
     }
 
-    pub fn run(self) -> ! {
+    pub fn run(self) {
         thread::spawn(move || self.server.run());
-        self.client.run()
+        self.client.run();
     }
 }

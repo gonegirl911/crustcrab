@@ -24,8 +24,8 @@ use std::{
     mem,
 };
 use winit::{
-    dpi::PhysicalSize,
-    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{ElementState, KeyEvent, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
 };
 
 pub struct Inventory {
@@ -35,7 +35,6 @@ pub struct Inventory {
     index: usize,
     is_flat: bool,
     is_updated: bool,
-    is_resized: bool,
 }
 
 impl Inventory {
@@ -65,7 +64,6 @@ impl Inventory {
             index: 0,
             is_flat: false,
             is_updated: true,
-            is_resized: true,
         }
     }
 
@@ -87,17 +85,17 @@ impl Inventory {
         }
     }
 
-    fn index(&self, keycode: VirtualKeyCode) -> Option<usize> {
+    fn index(&self, keycode: KeyCode) -> Option<usize> {
         match keycode {
-            VirtualKeyCode::Key1 => Some(0),
-            VirtualKeyCode::Key2 => Some(1),
-            VirtualKeyCode::Key3 => Some(2),
-            VirtualKeyCode::Key4 => Some(3),
-            VirtualKeyCode::Key5 => Some(4),
-            VirtualKeyCode::Key6 => Some(5),
-            VirtualKeyCode::Key7 => Some(6),
-            VirtualKeyCode::Key8 => Some(7),
-            VirtualKeyCode::Key9 => Some(8),
+            KeyCode::Digit1 => Some(0),
+            KeyCode::Digit2 => Some(1),
+            KeyCode::Digit3 => Some(2),
+            KeyCode::Digit4 => Some(3),
+            KeyCode::Digit5 => Some(4),
+            KeyCode::Digit6 => Some(5),
+            KeyCode::Digit7 => Some(6),
+            KeyCode::Digit8 => Some(7),
+            KeyCode::Digit9 => Some(8),
             _ => None,
         }
     }
@@ -124,12 +122,12 @@ impl EventHandler for Inventory {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        match event {
-            Event::WindowEvent { event, .. } => match *event {
+        if let Event::WindowEvent { event, .. } = event {
+            match *event {
                 WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(keycode),
+                    event:
+                        KeyEvent {
+                            physical_key: PhysicalKey::Code(keycode),
                             state: ElementState::Pressed,
                             ..
                         },
@@ -139,46 +137,44 @@ impl EventHandler for Inventory {
                         self.is_updated = mem::replace(&mut self.index, idx) != idx;
                     }
                 }
-                WindowEvent::Resized(PhysicalSize { width, height })
-                | WindowEvent::ScaleFactorChanged {
-                    new_inner_size: &mut PhysicalSize { width, height },
-                    ..
-                } if width != 0 && height != 0 => {
-                    self.is_resized = true;
-                }
-                _ => {}
-            },
-            Event::MainEventsCleared => {
-                if mem::take(&mut self.is_updated) {
-                    let mut is_flat = false;
+                WindowEvent::RedrawRequested => {
+                    let mut is_resized = renderer.is_resized;
 
-                    self.buffer = self.selected_block().and_then(|block| {
-                        let data = block.data();
-                        VertexBuffer::new_non_empty(
-                            renderer,
-                            MemoryState::Immutable(&if let Some(vertices) = data.flat_icon() {
-                                is_flat = true;
-                                vertices.collect::<Vec<_>>()
-                            } else {
-                                data.vertices(Default::default(), block.into(), Default::default())
+                    if mem::take(&mut self.is_updated) {
+                        let mut is_flat = false;
+
+                        self.buffer = self.selected_block().and_then(|block| {
+                            let data = block.data();
+                            VertexBuffer::new_non_empty(
+                                renderer,
+                                MemoryState::Immutable(&if let Some(vertices) = data.flat_icon() {
+                                    is_flat = true;
+                                    vertices.collect::<Vec<_>>()
+                                } else {
+                                    data.vertices(
+                                        Default::default(),
+                                        block.into(),
+                                        Default::default(),
+                                    )
                                     .collect()
-                            }),
-                        )
-                    });
+                                }),
+                            )
+                        });
 
-                    if mem::replace(&mut self.is_flat, is_flat) != is_flat {
-                        self.is_resized = true;
+                        if mem::replace(&mut self.is_flat, is_flat) != is_flat {
+                            is_resized = true;
+                        }
+                    }
+
+                    if is_resized {
+                        self.uniform.set(
+                            renderer,
+                            &InventoryUniformData::new(self.transform(renderer)),
+                        );
                     }
                 }
-
-                if mem::take(&mut self.is_resized) {
-                    self.uniform.set(
-                        renderer,
-                        &InventoryUniformData::new(self.transform(renderer)),
-                    );
-                }
+                _ => {}
             }
-            _ => {}
         }
     }
 }

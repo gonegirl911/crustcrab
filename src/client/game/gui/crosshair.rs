@@ -10,14 +10,11 @@ use crate::client::{
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector2};
 use serde::Deserialize;
-use std::mem;
-use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Crosshair {
     uniform: Uniform<CrosshairUniformData>,
     texture: ImageTexture,
     program: Program,
-    is_resized: bool,
 }
 
 impl Crosshair {
@@ -50,7 +47,6 @@ impl Crosshair {
             uniform,
             texture,
             program,
-            is_resized: true,
         }
     }
 
@@ -74,26 +70,10 @@ impl Crosshair {
 impl EventHandler for Crosshair {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        match *event {
-            Event::WindowEvent {
-                event:
-                    WindowEvent::Resized(PhysicalSize { width, height })
-                    | WindowEvent::ScaleFactorChanged {
-                        new_inner_size: &mut PhysicalSize { width, height },
-                        ..
-                    },
-                ..
-            } if width != 0 && height != 0 => {
-                self.is_resized = true;
-            }
-            Event::MainEventsCleared => {
-                if mem::take(&mut self.is_resized) {
-                    self.uniform
-                        .set(renderer, &CrosshairUniformData::new(renderer));
-                }
-            }
-            _ => {}
+    fn handle(&mut self, _: &Event, renderer: Self::Context<'_>) {
+        if renderer.is_resized {
+            self.uniform
+                .set(renderer, &CrosshairUniformData::new(renderer));
         }
     }
 }

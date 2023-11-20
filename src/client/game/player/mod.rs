@@ -20,7 +20,7 @@ use flume::Sender;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
 use std::{f32::consts::SQRT_2, time::Duration};
-use winit::event::StartCause;
+use winit::event::{StartCause, WindowEvent};
 
 pub struct Player {
     view: View,
@@ -30,12 +30,11 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
+    pub fn new(renderer: &Renderer) -> Self {
         let state = &CLIENT_CONFIG.player;
         let view = View::new(state.origin, Vector3::x());
-        let aspect = config.width as f32 / config.height as f32;
-        let projection = Projection::new(state.fovy, aspect, 0.1, state.zfar());
-        let controller = Controller::new(aspect, state.speed, state.sensitivity);
+        let projection = Projection::new(state.fovy, 0.0, 0.1, state.zfar());
+        let controller = Controller::new(state.speed, state.sensitivity);
         let uniform = Uniform::new(
             renderer,
             MemoryState::UNINIT,
@@ -87,10 +86,11 @@ impl EventHandler for Player {
                     })
                     .unwrap_or_else(|_| unreachable!());
             }
-            Event::MainEventsCleared => {
-                let changes =
-                    self.controller
-                        .apply_updates(&mut self.view, &mut self.projection, dt);
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
+                let changes = self.controller.apply_updates(&mut self.view, dt);
 
                 if changes.contains(Changes::MOVED) {
                     client_tx
@@ -108,6 +108,10 @@ impl EventHandler for Player {
                         .unwrap_or_else(|_| unreachable!());
                 }
 
+                if renderer.is_resized {
+                    self.projection.aspect = renderer.aspect();
+                }
+
                 if changes.contains(Changes::BLOCK_PLACED) {
                     if let Some(block) = gui.selected_block() {
                         client_tx
@@ -120,7 +124,7 @@ impl EventHandler for Player {
                         .unwrap_or_else(|_| unreachable!());
                 }
 
-                if changes.intersects(Changes::MATRIX_CHANGES) {
+                if changes.intersects(Changes::VIEW) || renderer.is_resized {
                     self.uniform.set(
                         renderer,
                         &PlayerUniformData::new(
