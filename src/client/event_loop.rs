@@ -1,10 +1,13 @@
 use super::ClientEvent;
 use crate::server::ServerEvent;
-use flume::{Receiver, Sender};
-use std::{ops::Deref, thread};
+use flume::Sender;
+use std::ops::Deref;
 use winit::{
     event::{Event as RawEvent, WindowEvent},
-    event_loop::{ControlFlow, EventLoop as RawEventLoop, EventLoopBuilder as RawEventLoopBuilder},
+    event_loop::{
+        ControlFlow, EventLoop as RawEventLoop, EventLoopBuilder as RawEventLoopBuilder,
+        EventLoopProxy as RawEventLoopProxy,
+    },
 };
 
 pub struct EventLoop {
@@ -13,20 +16,9 @@ pub struct EventLoop {
 }
 
 impl EventLoop {
-    pub fn new(client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) -> Self {
-        let event_loop = Self::event_loop();
-        let proxy = event_loop.create_proxy();
-
-        thread::spawn(move || {
-            for event in server_rx {
-                if proxy.send_event(event).is_err() {
-                    break;
-                }
-            }
-        });
-
+    pub fn new(client_tx: Sender<ClientEvent>) -> Self {
         Self {
-            event_loop,
+            event_loop: Self::event_loop(),
             client_tx,
         }
     }
@@ -76,3 +68,5 @@ pub trait EventHandler {
 }
 
 pub type Event = RawEvent<ServerEvent>;
+
+pub type EventLoopProxy = RawEventLoopProxy<ServerEvent>;

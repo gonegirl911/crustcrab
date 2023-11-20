@@ -19,7 +19,7 @@ use self::{
 };
 use super::player::ray::Hittable;
 use crate::{
-    client::{game::world::BlockVertex, ClientEvent},
+    client::{event_loop::EventLoopProxy, game::world::BlockVertex, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
         game::player::{
@@ -30,7 +30,6 @@ use crate::{
     },
     shared::{bound::Aabb, enum_map::Enum, utils},
 };
-use flume::Sender;
 use nalgebra::{Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -80,7 +79,7 @@ impl World {
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
-        server_tx: &Sender<ServerEvent>,
+        proxy: &EventLoopProxy,
         ray: Ray,
     ) {
         let mut branch = Branch::default();
@@ -92,15 +91,15 @@ impl World {
                 false,
             );
 
-            self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+            self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-            self.send_updates(updates, server_tx, true);
-            self.send_unloads(unloads, server_tx);
-            self.send_loads(loads, server_tx, true);
+            self.send_updates(updates, proxy, true);
+            self.send_unloads(unloads, proxy);
+            self.send_loads(loads, proxy, true);
         }
     }
 
-    fn send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
+    fn send_loads<I>(&self, points: I, proxy: &EventLoopProxy, is_important: bool)
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -110,11 +109,11 @@ impl World {
                 data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                 is_important,
             }),
-            server_tx,
+            proxy,
         );
     }
 
-    fn par_send_loads<I>(&self, points: I, server_tx: &Sender<ServerEvent>, is_important: bool)
+    fn par_send_loads<I>(&self, points: I, proxy: &EventLoopProxy, is_important: bool)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
@@ -127,11 +126,11 @@ impl World {
                     is_important,
                 })
                 .collect::<LinkedList<_>>(),
-            server_tx,
+            proxy,
         );
     }
 
-    fn send_unloads<I>(&self, points: I, server_tx: &Sender<ServerEvent>)
+    fn send_unloads<I>(&self, points: I, proxy: &EventLoopProxy)
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -139,14 +138,14 @@ impl World {
             points
                 .into_iter()
                 .map(|coords| ServerEvent::ChunkUnloaded { coords }),
-            server_tx,
+            proxy,
         );
     }
 
     fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: I,
-        server_tx: &Sender<ServerEvent>,
+        proxy: &EventLoopProxy,
         is_important: bool,
     ) {
         self.send_events(
@@ -155,14 +154,14 @@ impl World {
                 data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                 is_important,
             }),
-            server_tx,
+            proxy,
         );
     }
 
     fn par_send_updates<I: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
         points: I,
-        server_tx: &Sender<ServerEvent>,
+        proxy: &EventLoopProxy,
         is_important: bool,
     ) {
         self.send_events(
@@ -174,7 +173,7 @@ impl World {
                     is_important,
                 })
                 .collect::<LinkedList<_>>(),
-            server_tx,
+            proxy,
         );
     }
 
@@ -204,12 +203,12 @@ impl World {
             .collect()
     }
 
-    fn send_events<I>(&self, events: I, server_tx: &Sender<ServerEvent>)
+    fn send_events<I>(&self, events: I, proxy: &EventLoopProxy)
     where
         I: IntoIterator<Item = ServerEvent>,
     {
         for event in events {
-            if server_tx.send(event).is_err() {
+            if proxy.send_event(event).is_err() {
                 break;
             }
         }
@@ -235,32 +234,32 @@ impl World {
 }
 
 impl EventHandler<WorldEvent> for World {
-    type Context<'a> = &'a Sender<ServerEvent>;
+    type Context<'a> = &'a EventLoopProxy;
 
-    fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &WorldEvent, proxy: Self::Context<'_>) {
         match *event {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
                 });
 
-                self.par_send_loads(loads, server_tx, false);
+                self.par_send_loads(loads, proxy, false);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.par_load_many(curr.par_exclusive_points(prev));
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                self.send_unloads(unloads.iter().copied(), server_tx);
-                self.par_send_loads(loads.par_iter().copied(), server_tx, false);
+                self.send_unloads(unloads.iter().copied(), proxy);
+                self.par_send_loads(loads.par_iter().copied(), proxy, false);
                 self.par_send_updates(
                     self.updates(&loads.into_iter().chain(unloads).collect(), [], true),
-                    server_tx,
+                    proxy,
                     false,
                 );
             }
@@ -272,17 +271,15 @@ impl EventHandler<WorldEvent> for World {
                 );
 
                 if mem::replace(&mut self.hover, hover) != hover {
-                    server_tx
-                        .send(ServerEvent::BlockHovered(hover.map(
-                            |BlockIntersection { coords, .. }| {
-                                BlockHoverData::new(
-                                    coords,
-                                    self.chunks.block_area(coords),
-                                    &self.light.block_area_light(coords),
-                                )
-                            },
-                        )))
-                        .unwrap_or_else(|_| unreachable!());
+                    let _ = proxy.send_event(ServerEvent::BlockHovered(hover.map(
+                        |BlockIntersection { coords, .. }| {
+                            BlockHoverData::new(
+                                coords,
+                                self.chunks.block_area(coords),
+                                &self.light.block_area_light(coords),
+                            )
+                        },
+                    )));
                 }
             }
             WorldEvent::BlockPlaced { block, ray } => {
@@ -291,14 +288,14 @@ impl EventHandler<WorldEvent> for World {
                         coords + normal,
                         normal,
                         BlockAction::Place(block),
-                        server_tx,
+                        proxy,
                         ray,
                     );
                 }
             }
             WorldEvent::BlockDestroyed { ray } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hover {
-                    self.apply(coords, normal, BlockAction::Destroy, server_tx, ray);
+                    self.apply(coords, normal, BlockAction::Destroy, proxy, ray);
                 }
             }
         }

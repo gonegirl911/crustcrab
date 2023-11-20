@@ -4,13 +4,13 @@ pub mod renderer;
 pub mod window;
 
 use self::{
-    event_loop::{Event, EventHandler, EventLoop},
+    event_loop::{Event, EventHandler, EventLoop, EventLoopProxy},
     game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig, Game},
     renderer::Renderer,
     window::Window,
 };
-use crate::server::{game::world::block::Block, ServerEvent};
-use flume::{Receiver, Sender};
+use crate::server::game::world::block::Block;
+use flume::Sender;
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -24,10 +24,10 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new(client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) -> Self {
+    pub async fn new(client_tx: Sender<ClientEvent>) -> Self {
         env_logger::init();
 
-        let event_loop = EventLoop::new(client_tx, server_rx);
+        let event_loop = EventLoop::new(client_tx);
         let window = Window::new(&event_loop);
         let renderer = Renderer::new(&window).await;
         let game = Game::new(&renderer);
@@ -38,6 +38,10 @@ impl Client {
             renderer,
             game,
         }
+    }
+
+    pub fn create_proxy(&self) -> EventLoopProxy {
+        self.event_loop.create_proxy()
     }
 
     pub fn run(self) {

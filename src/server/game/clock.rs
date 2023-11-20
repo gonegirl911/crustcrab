@@ -1,12 +1,11 @@
 use crate::{
-    client::ClientEvent,
+    client::{event_loop::EventLoopProxy, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
         ServerEvent, SERVER_CONFIG,
     },
     shared::utils::{self, Lerp},
 };
-use flume::Sender;
 use nalgebra::{UnitQuaternion, Vector3};
 use serde::Deserialize;
 use std::{f32::consts::TAU, ops::Range};
@@ -17,8 +16,8 @@ pub struct Clock {
 }
 
 impl Clock {
-    fn send(self, server_tx: &Sender<ServerEvent>) {
-        _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
+    fn send(self, proxy: &EventLoopProxy) {
+        _ = proxy.send_event(ServerEvent::TimeUpdated(self.time()));
     }
 
     fn time(self) -> Time {
@@ -35,16 +34,16 @@ impl Default for Clock {
 }
 
 impl EventHandler<Event> for Clock {
-    type Context<'a> = &'a Sender<ServerEvent>;
+    type Context<'a> = &'a EventLoopProxy;
 
-    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
         match event {
             Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
-                self.send(server_tx);
+                self.send(proxy);
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
-                self.send(server_tx);
+                self.send(proxy);
             }
             _ => {}
         }

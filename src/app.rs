@@ -9,11 +9,9 @@ pub struct App {
 impl App {
     pub async fn new() -> Self {
         let (client_tx, client_rx) = flume::unbounded();
-        let (server_tx, server_rx) = flume::unbounded();
-        Self {
-            client: Client::new(client_tx, server_rx).await,
-            server: Server::new(server_tx, client_rx),
-        }
+        let client = Client::new(client_tx).await;
+        let server = Server::new(client.create_proxy(), client_rx);
+        Self { client, server }
     }
 
     pub fn run(self) {

@@ -1,27 +1,24 @@
-use super::{ticker::Ticker, ServerEvent, SERVER_CONFIG};
-use crate::client::ClientEvent;
-use flume::{Receiver, RecvTimeoutError, Sender};
+use super::{ticker::Ticker, SERVER_CONFIG};
+use crate::client::{event_loop::EventLoopProxy, ClientEvent};
+use flume::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
 
 pub struct EventLoop {
-    server_tx: Sender<ServerEvent>,
+    proxy: EventLoopProxy,
     client_rx: Receiver<ClientEvent>,
 }
 
 impl EventLoop {
-    pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
-        Self {
-            server_tx,
-            client_rx,
-        }
+    pub fn new(proxy: EventLoopProxy, client_rx: Receiver<ClientEvent>) -> Self {
+        Self { proxy, client_rx }
     }
 
     pub fn run<H>(self, mut handler: H)
     where
-        H: for<'a> EventHandler<Event, Context<'a> = &'a Sender<ServerEvent>>,
+        H: for<'a> EventHandler<Event, Context<'a> = &'a EventLoopProxy>,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
-        handler.handle(&Event::Init, &self.server_tx);
+        handler.handle(&Event::Init, &self.proxy);
         loop {
             handler.handle(
                 &match ticker.recv_deadline(&self.client_rx) {
@@ -29,7 +26,7 @@ impl EventLoop {
                     Err(RecvTimeoutError::Timeout) => Event::Tick,
                     Err(RecvTimeoutError::Disconnected) => break,
                 },
-                &self.server_tx,
+                &self.proxy,
             );
         }
     }

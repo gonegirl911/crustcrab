@@ -12,10 +12,10 @@ use self::{
     },
 };
 use crate::{
-    client::ClientEvent,
+    client::{event_loop::EventLoopProxy, ClientEvent},
     server::event_loop::{Event, EventHandler},
 };
-use flume::{Receiver, Sender};
+use flume::Receiver;
 use nalgebra::Point3;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -27,9 +27,9 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(server_tx: Sender<ServerEvent>, client_rx: Receiver<ClientEvent>) -> Self {
+    pub fn new(proxy: EventLoopProxy, client_rx: Receiver<ClientEvent>) -> Self {
         Self {
-            event_loop: EventLoop::new(server_tx, client_rx),
+            event_loop: EventLoop::new(proxy, client_rx),
             game: Default::default(),
         }
     }
@@ -40,10 +40,10 @@ impl Server {
         }
 
         impl EventHandler<Event> for MiniServer {
-            type Context<'a> = &'a Sender<ServerEvent>;
+            type Context<'a> = &'a EventLoopProxy;
 
-            fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
-                self.game.handle(event, server_tx);
+            fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
+                self.game.handle(event, proxy);
             }
         }
 

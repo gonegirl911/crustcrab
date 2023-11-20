@@ -7,29 +7,27 @@ use self::{
     player::Player,
     world::{World, WorldEvent},
 };
-use super::{
-    event_loop::{Event, EventHandler},
-    ServerEvent,
-};
+use super::event_loop::{Event, EventHandler};
+use crate::client::event_loop::EventLoopProxy;
 use flume::Sender;
 use std::thread;
 
 pub struct Game {
     player: Player,
     clock: Clock,
-    world_tx: Sender<(WorldEvent, Sender<ServerEvent>)>,
+    world_tx: Sender<(WorldEvent, EventLoopProxy)>,
 }
 
 impl Default for Game {
     fn default() -> Self {
         let player = Default::default();
         let clock = Default::default();
-        let mut world = World::default();
         let (world_tx, world_rx) = flume::unbounded();
 
         thread::spawn(move || {
-            for (event, server_tx) in world_rx {
-                world.handle(&event, &server_tx);
+            let mut world = World::default();
+            for (event, proxy) in world_rx {
+                world.handle(&event, &proxy);
             }
         });
 
@@ -42,15 +40,15 @@ impl Default for Game {
 }
 
 impl EventHandler<Event> for Game {
-    type Context<'a> = &'a Sender<ServerEvent>;
+    type Context<'a> = &'a EventLoopProxy;
 
-    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
         self.player.handle(event, ());
-        self.clock.handle(event, server_tx);
+        self.clock.handle(event, proxy);
 
         if let Some(event) = WorldEvent::new(event, &self.player) {
             self.world_tx
-                .send((event, server_tx.clone()))
+                .send((event, proxy.clone()))
                 .unwrap_or_else(|_| unreachable!());
         }
     }
