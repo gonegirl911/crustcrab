@@ -336,7 +336,7 @@ impl BlockVertex {
         point![
             self.data.bit_range(4, 0),
             self.data.bit_range(9, 5),
-            self.data.bit_range(14, 10)
+            self.data.bit_range(14, 10),
         ]
     }
 }
