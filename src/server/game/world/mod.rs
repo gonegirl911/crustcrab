@@ -271,7 +271,7 @@ impl EventHandler<WorldEvent> for World {
                 );
 
                 if mem::replace(&mut self.hover, hover) != hover {
-                    let _ = proxy.send_event(ServerEvent::BlockHovered(hover.map(
+                    _ = proxy.send_event(ServerEvent::BlockHovered(hover.map(
                         |BlockIntersection { coords, .. }| {
                             BlockHoverData::new(
                                 coords,
