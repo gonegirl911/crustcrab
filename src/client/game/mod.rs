@@ -4,12 +4,11 @@ pub mod gui;
 pub mod hover;
 pub mod player;
 pub mod sky;
-pub mod stopwatch;
 pub mod world;
 
 use self::{
     cloud::CloudLayer, fog::Fog, gui::Gui, hover::BlockHover, player::Player, sky::Sky,
-    stopwatch::Stopwatch, world::World,
+    world::World,
 };
 use super::{
     event_loop::{Event, EventHandler},
@@ -22,7 +21,7 @@ use super::{
 };
 use crate::server::game::world::block::data::TEX_PATHS;
 use flume::Sender;
-use std::ops::Deref;
+use std::{ops::Deref, time::Duration};
 use winit::{event::WindowEvent, window::Window as RawWindow};
 
 pub struct Game {
@@ -37,7 +36,6 @@ pub struct Game {
     textures: BlockTextureArray,
     depth: DepthBuffer,
     processor: PostProcessor,
-    stopwatch: Stopwatch,
 }
 
 impl Game {
@@ -80,7 +78,6 @@ impl Game {
             processor.bind_group_layout(),
             textures.bind_group_layout(),
         );
-        let stopwatch = Stopwatch::start();
         Self {
             sky,
             world,
@@ -93,7 +90,6 @@ impl Game {
             textures,
             depth,
             processor,
-            stopwatch,
         }
     }
 
@@ -169,7 +165,12 @@ impl Game {
 }
 
 impl EventHandler for Game {
-    type Context<'a> = (&'a Sender<ClientEvent>, &'a RawWindow, &'a Renderer);
+    type Context<'a> = (
+        &'a Sender<ClientEvent>,
+        &'a RawWindow,
+        &'a Renderer,
+        Duration,
+    );
 
     #[rustfmt::skip]
     fn handle(
@@ -184,16 +185,16 @@ impl EventHandler for Game {
                 queue,
                 ..
             },
+            dt,
         ): Self::Context<'_>,
     ) {
         self.sky.handle(event, renderer);
         self.world.handle(event, renderer);
-        self.stopwatch.handle(event, ());
-        self.clouds.handle(event, self.stopwatch.dt);
+        self.clouds.handle(event, dt);
         self.fog.handle(event, renderer);
         self.hover.handle(event, ());
         self.gui.handle(event, renderer);
-        self.player.handle(event, (client_tx, renderer, &self.gui, self.stopwatch.dt));
+        self.player.handle(event, (client_tx, renderer, &self.gui, dt));
         self.depth.handle(event, renderer);
         self.processor.handle(event, renderer);
 

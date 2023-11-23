@@ -1,6 +1,7 @@
 pub mod event_loop;
 pub mod game;
 pub mod renderer;
+pub mod stopwatch;
 pub mod window;
 
 use self::{
@@ -9,7 +10,7 @@ use self::{
     renderer::Renderer,
     window::Window,
 };
-use crate::server::game::world::block::Block;
+use crate::{client::stopwatch::Stopwatch, server::game::world::block::Block};
 use flume::Sender;
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
@@ -46,6 +47,7 @@ impl Client {
 
     pub fn run(self) {
         struct MiniClient {
+            stopwatch: Stopwatch,
             window: Window,
             renderer: Renderer,
             game: Game,
@@ -54,15 +56,19 @@ impl Client {
         impl EventHandler for MiniClient {
             type Context<'a> = &'a Sender<ClientEvent>;
 
-            #[rustfmt::skip]
             fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
+                self.stopwatch.handle(event, ());
                 self.window.handle(event, ());
                 self.renderer.handle(event, &self.window);
-                self.game.handle(event, (client_tx, &self.window, &self.renderer));
+                self.game.handle(
+                    event,
+                    (client_tx, &self.window, &self.renderer, self.stopwatch.dt),
+                );
             }
         }
 
         self.event_loop.run(MiniClient {
+            stopwatch: Stopwatch::start(),
             window: self.window,
             renderer: self.renderer,
             game: self.game,
