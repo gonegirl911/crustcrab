@@ -71,16 +71,21 @@ impl BlockLight {
             .lum()
     }
 
-    pub fn map<F: FnMut(u8) -> u8>(self, mut f: F) -> Self {
-        array::from_fn(|i| f(self.component(i))).into()
-    }
-
-    pub fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {
-        array::from_fn(|i| f(self.component(i), other.component(i))).into()
+    pub fn with_component(mut self, index: usize, value: u8) -> Self {
+        self.set_component(index, value);
+        self
     }
 
     pub fn sup(self, other: Self) -> Self {
         self.zip_map(other, Ord::max)
+    }
+
+    pub fn map<F: FnMut(u8) -> u8>(self, mut f: F) -> Self {
+        array::from_fn(|i| f(self.component(i))).into()
+    }
+
+    fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {
+        array::from_fn(|i| f(self.component(i), other.component(i))).into()
     }
 
     fn skylight(self) -> Rgb<u8> {

@@ -121,14 +121,14 @@ impl Branch {
     }
 
     fn merge(self, light: &mut WorldLight) -> Vec<Point3<i64>> {
-        let mut changes = vec![];
+        let mut hits = vec![];
         for (chunk_coords, values) in self.0 {
             match light.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let light = entry.get_mut();
                     for (block_coords, value) in values {
                         if light.set(block_coords, value) {
-                            changes.push(utils::coords((chunk_coords, block_coords)));
+                            hits.push(utils::coords((chunk_coords, block_coords)));
                         }
                     }
                     if light.is_empty() {
@@ -145,13 +145,13 @@ impl Branch {
                         let light = entry.insert(Default::default());
                         for (block_coords, value) in values {
                             assert!(light.set(block_coords, value));
-                            changes.push(utils::coords((chunk_coords, block_coords)));
+                            hits.push(utils::coords((chunk_coords, block_coords)));
                         }
                     }
                 }
             }
         }
-        changes
+        hits
     }
 
     fn place_filter(
@@ -224,7 +224,7 @@ impl Branch {
         index: usize,
     ) {
         let mut visits = FxHashSet::from_iter([node.coords]);
-        let mut deq = VecDeque::from_iter([node]);
+        let mut deq = VecDeque::from([node]);
         let mut sources = vec![];
 
         while let Some(node) = deq.pop_front() {
@@ -236,12 +236,10 @@ impl Branch {
                 match component.cmp(&expected) {
                     Ordering::Less => {}
                     Ordering::Equal => {
-                        let luminance = data.luminance[index % 3];
-                        if luminance != 0 {
-                            block_light.set_component(index, luminance);
-                            sources.push(node.with_value(luminance));
-                        } else {
-                            block_light.set_component(index, 0);
+                        let value = data.luminance[index % 3];
+                        block_light.set_component(index, value);
+                        if value != 0 {
+                            sources.push(node.with_value(value));
                         }
                         deq.push_back(node.with_value(expected));
                     }
@@ -263,7 +261,7 @@ impl Branch {
         index: usize,
     ) {
         let mut visits = FxHashSet::from_iter([node.coords]);
-        let mut deq = VecDeque::from_iter([node]);
+        let mut deq = VecDeque::from([node]);
         while let Some(node) = deq.pop_front() {
             for node in node.unvisited_neighbors(chunks, light, &mut visits) {
                 let block_light = BlockLightRefMut::new(self, &node);
@@ -391,23 +389,26 @@ impl<'a> BlockLightRefMut<'a> {
 
     fn component(&self, index: usize) -> u8 {
         match self {
-            Self::Init(light) => light.component(index),
-            Self::UninitChunk { fallback, .. } | Self::UninitBlock { fallback, .. } => {
-                fallback.component(index)
-            }
+            Self::Init(light) => light,
+            Self::UninitChunk { fallback, .. } | Self::UninitBlock { fallback, .. } => fallback,
         }
+        .component(index)
     }
 
     fn set_component(self, index: usize, value: u8) {
         match self {
-            Self::Init(light) => light.set_component(index, value),
+            Self::Init(light) => {
+                light.set_component(index, value);
+            }
             Self::UninitChunk {
                 entry,
                 coords,
-                mut fallback,
+                fallback,
             } => {
-                fallback.set_component(index, value);
-                entry.insert(FxHashMap::from_iter([(coords, fallback)]));
+                entry.insert(FxHashMap::from_iter([(
+                    coords,
+                    fallback.with_component(index, value),
+                )]));
             }
             Self::UninitBlock { entry, fallback } => {
                 entry.insert(fallback).set_component(index, value);
