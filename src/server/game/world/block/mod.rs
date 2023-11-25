@@ -80,8 +80,8 @@ impl BlockLight {
         self.zip_map(other, Ord::max)
     }
 
-    pub fn map<F: FnMut(u8) -> u8>(self, mut f: F) -> Self {
-        array::from_fn(|i| f(self.component(i))).into()
+    pub fn imap<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
+        array::from_fn(|i| f(i, self.component(i))).into()
     }
 
     fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {

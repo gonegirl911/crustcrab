@@ -2,7 +2,7 @@ use super::{
     action::BlockAction,
     block::{
         area::BlockAreaLight,
-        data::{BlockData, SIDE_DELTAS},
+        data::{BlockData, Side, SIDE_DELTAS},
         Block, BlockLight,
     },
     chunk::{
@@ -64,10 +64,12 @@ impl WorldLight {
 
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
-            .map(|coords| self.block_light(coords))
+            .map(move |(side, coords)| {
+                self.block_light(coords)
+                    .imap(|i, c| c.saturating_sub(Self::absorption(i, side, c)))
+            })
             .reduce(BlockLight::sup)
             .unwrap_or_else(|| unreachable!())
-            .map(|c| c.saturating_sub(1))
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
@@ -83,10 +85,20 @@ impl WorldLight {
         self.0.entry(coords)
     }
 
-    fn adjacent_points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
+    fn adjacent_points(coords: Point3<i64>) -> impl Iterator<Item = (Side, Point3<i64>)> {
         SIDE_DELTAS
-            .into_values()
-            .map(move |delta| coords + delta.cast())
+            .into_iter()
+            .map(move |(side, delta)| (side, coords + delta.cast()))
+    }
+
+    fn absorption(index: usize, side: Side, value: u8) -> u8 {
+        !Self::is_exposed(index, side, value) as u8
+    }
+
+    fn is_exposed(index: usize, side: Side, value: u8) -> bool {
+        BlockLight::SKYLIGHT_RANGE.contains(&index)
+            && (side == Side::Top || side == Side::Bottom)
+            && value == BlockLight::COMPONENT_MAX
     }
 }
 
@@ -101,6 +113,10 @@ impl Branch {
         coords: Point3<i64>,
         data: BlockData,
     ) {
+        for i in BlockLight::SKYLIGHT_RANGE {
+            self.place_filter(chunks, light, coords, i, 0, data.light_filter[i % 3]);
+        }
+
         for i in BlockLight::TORCHLIGHT_RANGE {
             let value = data.luminance[i % 3];
             self.place_filter(chunks, light, coords, i, value, data.light_filter[i % 3]);
@@ -115,6 +131,10 @@ impl Branch {
         coords: Point3<i64>,
         value: BlockLight,
     ) {
+        for i in BlockLight::SKYLIGHT_RANGE {
+            self.place_component(chunks, light, coords, i, value.component(i));
+        }
+
         for i in BlockLight::TORCHLIGHT_RANGE {
             self.destroy_component(chunks, light, coords, i, value.component(i));
         }
@@ -228,7 +248,7 @@ impl Branch {
         let mut sources = vec![];
 
         while let Some(node) = deq.pop_front() {
-            for node in node.unvisited_neighbors(chunks, light, &mut visits) {
+            for node in node.unvisited_neighbors(chunks, light, index, &mut visits) {
                 let block_light = BlockLightRefMut::new(self, &node);
                 let component = block_light.component(index);
                 let data = node.block().data();
@@ -263,7 +283,7 @@ impl Branch {
         let mut visits = FxHashSet::from_iter([node.coords]);
         let mut deq = VecDeque::from([node]);
         while let Some(node) = deq.pop_front() {
-            for node in node.unvisited_neighbors(chunks, light, &mut visits) {
+            for node in node.unvisited_neighbors(chunks, light, index, &mut visits) {
                 let block_light = BlockLightRefMut::new(self, &node);
                 let value = node.value * node.block().data().light_filter[index % 3];
                 if block_light.component(index) < value {
@@ -322,25 +342,33 @@ impl<'a> Node<'a> {
         &'b self,
         chunks: &'a ChunkStore,
         light: &'a WorldLight,
+        index: usize,
         visits: &'b mut FxHashSet<Point3<i64>>,
     ) -> impl Iterator<Item = Self> + 'b {
         (self.value > 1)
             .then(|| {
                 WorldLight::adjacent_points(self.coords)
-                    .filter(|&coords| visits.insert(coords))
-                    .map(|coords| self.neighbor(chunks, light, coords))
+                    .filter(|&(_, coords)| visits.insert(coords))
+                    .map(move |(side, coords)| self.neighbor(chunks, light, coords, index, side))
             })
             .into_iter()
             .flatten()
     }
 
-    fn neighbor(&self, chunks: &'a ChunkStore, light: &'a WorldLight, coords: Point3<i64>) -> Self {
+    fn neighbor(
+        &self,
+        chunks: &'a ChunkStore,
+        light: &'a WorldLight,
+        coords: Point3<i64>,
+        index: usize,
+        side: Side,
+    ) -> Self {
         let chunk_coords = utils::chunk_coords(coords);
         if self.chunk_coords == chunk_coords {
             Self {
                 block_coords: utils::block_coords(coords),
                 coords,
-                value: self.value - 1,
+                value: self.value(index, side),
                 ..*self
             }
         } else {
@@ -350,9 +378,13 @@ impl<'a> Node<'a> {
                 chunk_coords,
                 block_coords: utils::block_coords(coords),
                 coords,
-                value: self.value - 1,
+                value: self.value(index, side),
             }
         }
+    }
+
+    fn value(&self, index: usize, side: Side) -> u8 {
+        self.value - WorldLight::absorption(index, side, self.value)
     }
 }
 

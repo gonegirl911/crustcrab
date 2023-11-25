@@ -43,12 +43,11 @@ var<push_constant> pc: PushConstants;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-    // let skylight = vec3(
-    //     f32(extractBits(pc.brightness, 0u, 4u)),
-    //     f32(extractBits(pc.brightness, 4u, 4u)),
-    //     f32(extractBits(pc.brightness, 8u, 4u)),
-    // );
-    let skylight = vec3(15.0);
+    let skylight = vec3(
+        f32(extractBits(pc.brightness, 0u, 4u)),
+        f32(extractBits(pc.brightness, 4u, 4u)),
+        f32(extractBits(pc.brightness, 8u, 4u)),
+    );
     let torchlight = vec3(
         f32(extractBits(pc.brightness, 12u, 4u)),
         f32(extractBits(pc.brightness, 16u, 4u)),
