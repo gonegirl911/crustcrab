@@ -64,7 +64,7 @@ impl WorldLight {
 
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
-            .map(move |(side, coords)| {
+            .map(|(side, coords)| {
                 self.block_light(coords)
                     .imap(|i, c| c.saturating_sub(Self::absorption(i, side, c)))
             })
