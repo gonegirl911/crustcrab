@@ -65,9 +65,13 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
+    fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
+        array::from_fn(f).into()
+    }
+
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
-            .map(|c| c.clamp(0.0, 1.0))
+            .saturate()
             .lum()
     }
 
@@ -80,12 +84,12 @@ impl BlockLight {
         self.zip_map(other, Ord::max)
     }
 
-    pub fn imap<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
-        array::from_fn(|i| f(i, self.component(i))).into()
+    pub fn map<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
+        Self::from_fn(|i| f(i, self.component(i)))
     }
 
     fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {
-        array::from_fn(|i| f(self.component(i), other.component(i))).into()
+        Self::from_fn(|i| f(self.component(i), other.component(i)))
     }
 
     fn skylight(self) -> Rgb<u8> {

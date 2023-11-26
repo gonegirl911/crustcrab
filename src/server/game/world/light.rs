@@ -64,10 +64,7 @@ impl WorldLight {
 
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
-            .map(|(side, coords)| {
-                self.block_light(coords)
-                    .imap(|i, c| c.saturating_sub(Self::absorption(i, side, c)))
-            })
+            .map(|(side, coords)| self.block_light(coords).map(|i, c| Self::value(i, side, c)))
             .reduce(BlockLight::sup)
             .unwrap_or_else(|| unreachable!())
     }
@@ -89,6 +86,10 @@ impl WorldLight {
         SIDE_DELTAS
             .into_iter()
             .map(move |(side, delta)| (side, coords + delta.cast()))
+    }
+
+    fn value(index: usize, side: Side, value: u8) -> u8 {
+        value.saturating_sub(Self::absorption(index, side, value))
     }
 
     fn absorption(index: usize, side: Side, value: u8) -> u8 {

@@ -48,6 +48,10 @@ impl Rgb<f32> {
     pub fn lum(self) -> f32 {
         self.dot(Rgb::new(0.2126, 0.7152, 0.0722))
     }
+
+    pub fn saturate(self) -> Self {
+        self.map(|c| c.clamp(0.0, 1.0))
+    }
 }
 
 impl<T> Index<usize> for Rgb<T> {
