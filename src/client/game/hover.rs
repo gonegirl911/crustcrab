@@ -119,8 +119,8 @@ impl BlockHighlight {
                     depth_compare: wgpu::CompareFunction::LessEqual,
                     stencil: Default::default(),
                     bias: wgpu::DepthBiasState {
-                        constant: -15,
-                        slope_scale: -1.5,
+                        constant: -18,
+                        slope_scale: -6.0,
                         ..Default::default()
                     },
                 }),

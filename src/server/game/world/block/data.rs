@@ -22,7 +22,7 @@ use std::{fs, sync::Arc};
 pub struct BlockData {
     model: Model,
     pub luminance: Rgb<u8>,
-    pub light_filter: Rgb<u8>,
+    pub light_filter: Rgb<bool>,
     pub requires_blending: bool,
     pub valid_surface: Option<Block>,
 }
@@ -114,7 +114,7 @@ impl From<RawBlockData> for BlockData {
         Self {
             model: data.model.map_or_else(Default::default, Into::into),
             luminance: data.luminance,
-            light_filter: data.light_filter,
+            light_filter: data.light_filter.map(|c| c != 0),
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface,
         }

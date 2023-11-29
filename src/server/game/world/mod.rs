@@ -177,6 +177,17 @@ impl World {
         );
     }
 
+    fn light_up<L, U>(&mut self, loads: L, unloads: U) -> impl Iterator<Item = Point3<i64>>
+    where
+        L: IntoIterator<Item = Point3<i32>>,
+        U: IntoIterator<Item = Point3<i32>>,
+    {
+        self.light
+            .unload_many(&self.chunks, unloads)
+            .into_iter()
+            .chain(self.light.load_many(&self.chunks, loads))
+    }
+
     fn gen(&self, coords: Point3<i32>) -> Box<Chunk> {
         let mut chunk = Box::new(self.generator.gen(coords));
         for (coords, action) in self.actions.actions(coords) {
@@ -241,27 +252,31 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
+                self.light.load_many(&self.chunks, loads.iter().copied());
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
                 });
+
+                self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
                 self.par_send_loads(loads, proxy, false);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.par_load_many(curr.par_exclusive_points(prev));
+                let light_updates = self.light_up(loads.iter().copied(), unloads.iter().copied());
+                let updates = self.updates(
+                    &loads.iter().chain(&unloads).copied().collect(),
+                    light_updates,
+                    true,
+                );
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                self.send_unloads(unloads.iter().copied(), proxy);
-                self.par_send_loads(loads.par_iter().copied(), proxy, false);
-                self.par_send_updates(
-                    self.updates(&loads.into_iter().chain(unloads).collect(), [], true),
-                    proxy,
-                    false,
-                );
+                self.send_unloads(unloads, proxy);
+                self.par_send_loads(loads, proxy, false);
+                self.par_send_updates(updates, proxy, false);
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
