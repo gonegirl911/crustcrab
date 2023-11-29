@@ -417,7 +417,7 @@ impl<'a> Node<'a> {
             Self {
                 block_coords: utils::block_coords(coords),
                 coords,
-                value: self.value(index, coords, side),
+                value: self.value(index, side),
                 ..*self
             }
         } else {
@@ -427,13 +427,13 @@ impl<'a> Node<'a> {
                 chunk_coords,
                 block_coords: utils::block_coords(coords),
                 coords,
-                value: self.value(index, coords, side),
+                value: self.value(index, side),
             }
         }
     }
 
-    fn value(&self, index: usize, coords: Point3<i64>, side: Side) -> u8 {
-        self.value - WorldLight::absorption(index, coords, side, Side::Bottom, self.value)
+    fn value(&self, index: usize, side: Side) -> u8 {
+        self.value - WorldLight::absorption(index, self.coords, side, Side::Bottom, self.value)
     }
 }
 
