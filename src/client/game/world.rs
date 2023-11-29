@@ -140,14 +140,6 @@ impl World {
         }
     }
 
-    fn workers(&self, is_important: bool) -> &ThreadPool<ChunkInput, ChunkOutput> {
-        if is_important {
-            &self.priority_workers
-        } else {
-            &self.workers
-        }
-    }
-
     fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
         let mut transparent_vertices = vec![];
         (
@@ -166,6 +158,14 @@ impl World {
             transparent_vertices,
             updated_at,
         )
+    }
+
+    fn workers(&self, is_important: bool) -> &ThreadPool<ChunkInput, ChunkOutput> {
+        if is_important {
+            &self.priority_workers
+        } else {
+            &self.workers
+        }
     }
 
     fn transparent_mesh(
