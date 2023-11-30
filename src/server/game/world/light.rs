@@ -46,35 +46,6 @@ impl WorldLight {
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        points
-            .into_iter()
-            .map(|coords| coords.xz())
-            .collect::<FxHashSet<_>>()
-            .into_iter()
-            .for_each(|coords| {
-                self.0
-                    .entry(nalgebra::point![coords.x, 4, coords.y])
-                    .or_insert_with(|| {
-                        let value = ChunkLight::default();
-                        for x in 0..Chunk::DIM as u8 {
-                            for y in 0..=1 {
-                                for z in 0..Chunk::DIM as u8 {
-                                    #[allow(mutable_transmutes)]
-                                    let value = unsafe {
-                                        std::mem::transmute::<_, &mut BlockLight>(
-                                            &value[nalgebra::point![x, y, z]],
-                                        )
-                                    };
-                                    value.set_component(0, 15);
-                                    value.set_component(1, 15);
-                                    value.set_component(2, 15);
-                                }
-                            }
-                        }
-                        value
-                    });
-            });
-
         vec![]
     }
 
