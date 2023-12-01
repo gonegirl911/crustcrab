@@ -80,7 +80,7 @@ impl WorldLight {
         Self::adjacent_points(coords)
             .map(|(side, coords)| {
                 self.block_light(coords)
-                    .map(|i, c| Self::value(i, coords, side, c))
+                    .imap(|i, c| Self::value(i, coords, side, c))
             })
             .reduce(BlockLight::sup)
             .unwrap_or_else(|| unreachable!())
@@ -106,17 +106,16 @@ impl WorldLight {
     }
 
     fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
-        value.saturating_sub(Self::absorption(index, coords, side, Side::Top, value))
+        value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
     }
 
-    fn absorption(index: usize, coords: Point3<i64>, side: Side, target: Side, value: u8) -> u8 {
-        !Self::is_exposed(index, coords, side, target, value) as u8
+    fn absorption(index: usize, coords: Point3<i64>, value: u8, side: Side, target: Side) -> u8 {
+        !(Self::is_exposed(index, coords, value) && side == target) as u8
     }
 
-    fn is_exposed(index: usize, coords: Point3<i64>, side: Side, target: Side, value: u8) -> bool {
+    fn is_exposed(index: usize, coords: Point3<i64>, value: u8) -> bool {
         BlockLight::SKYLIGHT_RANGE.contains(&index)
-            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64 - 1
-            && side == target
+            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
             && value == BlockLight::COMPONENT_MAX
     }
 }
@@ -404,7 +403,7 @@ impl<'a> Node<'a> {
     }
 
     fn value(&self, index: usize, side: Side) -> u8 {
-        self.value - WorldLight::absorption(index, self.coords, side, Side::Bottom, self.value)
+        self.value - WorldLight::absorption(index, self.coords, self.value, side, Side::Bottom)
     }
 }
 
