@@ -93,7 +93,7 @@ impl WorldLight {
         Self::adjacent_points(coords)
             .map(|(side, coords)| {
                 self.block_light(coords)
-                    .imap(|i, c| Self::value(i, coords, side, c))
+                    .map(|i, c| Self::value(i, coords, side, c))
             })
             .reduce(BlockLight::sup)
             .unwrap_or_else(|| unreachable!())

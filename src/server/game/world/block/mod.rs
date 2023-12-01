@@ -84,7 +84,7 @@ impl BlockLight {
         self.zip_map(other, Ord::max)
     }
 
-    pub fn imap<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
+    pub fn map<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
         Self::from_fn(|i| f(i, self.component(i)))
     }
 
