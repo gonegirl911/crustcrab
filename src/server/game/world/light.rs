@@ -76,6 +76,19 @@ impl WorldLight {
         }
     }
 
+    fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
+        self.0.get(&coords)
+    }
+
+    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
+        self.0.entry(coords)
+    }
+
+    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
+        self.get(utils::chunk_coords(coords))
+            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
+    }
+
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
             .map(|(side, coords)| {
@@ -86,27 +99,10 @@ impl WorldLight {
             .unwrap_or_else(|| unreachable!())
     }
 
-    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
-        self.get(utils::chunk_coords(coords))
-            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
-    }
-
-    fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
-        self.0.get(&coords)
-    }
-
-    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
-        self.0.entry(coords)
-    }
-
     fn adjacent_points(coords: Point3<i64>) -> impl Iterator<Item = (Side, Point3<i64>)> {
         SIDE_DELTAS
             .into_iter()
             .map(move |(side, delta)| (side, coords + delta.cast()))
-    }
-
-    fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
-        value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
     }
 
     fn absorption(index: usize, coords: Point3<i64>, value: u8, side: Side, target: Side) -> u8 {
@@ -117,6 +113,10 @@ impl WorldLight {
         BlockLight::SKYLIGHT_RANGE.contains(&index)
             && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
             && value == BlockLight::COMPONENT_MAX
+    }
+
+    fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
+        value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
     }
 }
 
@@ -343,20 +343,6 @@ impl<'a> Node<'a> {
         }
     }
 
-    fn with_value(&self, value: u8) -> Self {
-        Self { value, ..*self }
-    }
-
-    fn block(&self) -> Block {
-        self.chunk
-            .map_or(Block::Air, |chunk| chunk[self.block_coords])
-    }
-
-    fn block_light(&self) -> BlockLight {
-        self.light
-            .map_or_else(Default::default, |light| light[self.block_coords])
-    }
-
     fn unvisited_neighbors<'b>(
         &'b self,
         chunks: &'a ChunkStore,
@@ -372,6 +358,20 @@ impl<'a> Node<'a> {
             })
             .into_iter()
             .flatten()
+    }
+
+    fn block(&self) -> Block {
+        self.chunk
+            .map_or(Block::Air, |chunk| chunk[self.block_coords])
+    }
+
+    fn block_light(&self) -> BlockLight {
+        self.light
+            .map_or_else(Default::default, |light| light[self.block_coords])
+    }
+
+    fn with_value(&self, value: u8) -> Self {
+        Self { value, ..*self }
     }
 
     fn neighbor(

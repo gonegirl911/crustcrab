@@ -170,12 +170,12 @@ impl From<Option<Side>> for Face {
 #[derive(Clone, Copy, PartialEq, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
+    Bottom,
     Front,
     Right,
     Back,
     Left,
     Top,
-    Bottom,
 }
 
 #[derive(Clone, Copy, Enum, Deserialize)]
