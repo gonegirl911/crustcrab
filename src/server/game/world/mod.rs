@@ -36,7 +36,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{hash_map::Entry, LinkedList},
     iter, mem,
-    ops::Range,
+    ops::{Index, Range},
 };
 
 #[derive(Default)]
@@ -177,15 +177,15 @@ impl World {
         );
     }
 
-    fn light_up<L, U>(&mut self, loads: L, unloads: U) -> impl Iterator<Item = Point3<i64>>
-    where
-        L: IntoIterator<Item = Point3<i32>>,
-        U: IntoIterator<Item = Point3<i32>>,
-    {
+    fn par_light_up(
+        &mut self,
+        loads: &[Point3<i32>],
+        unloads: &FxHashSet<Point3<i32>>,
+    ) -> impl Iterator<Item = Point3<i64>> {
         self.light
-            .unload_many(&self.chunks, unloads)
+            .par_unload_many(&self.chunks, unloads)
             .into_iter()
-            .chain(self.light.load_many(&self.chunks, loads))
+            .chain(self.light.par_load_many(&self.chunks, loads))
     }
 
     fn gen(&self, coords: Point3<i32>) -> Box<Chunk> {
@@ -252,7 +252,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                self.light.load_many(&self.chunks, loads.iter().copied());
+                self.light.par_load_many(&self.chunks, &loads);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
@@ -265,7 +265,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.par_load_many(curr.par_exclusive_points(prev));
-                let light_updates = self.light_up(loads.iter().copied(), unloads.iter().copied());
+                let light_updates = self.par_light_up(&loads, &unloads.iter().copied().collect());
                 let updates = self.updates(
                     &loads.iter().chain(&unloads).copied().collect(),
                     light_updates,
@@ -481,6 +481,14 @@ impl Branch {
             .entry(utils::block_coords(coords))
             .and_modify(|_| unreachable!())
             .or_insert(action);
+    }
+}
+
+impl Index<Point3<i32>> for ChunkStore {
+    type Output = Chunk;
+
+    fn index(&self, coords: Point3<i32>) -> &Self::Output {
+        &self.0[&coords]
     }
 }
 

@@ -77,7 +77,7 @@ impl BlockData {
         }))
     }
 
-    fn is_glowing(self) -> bool {
+    pub fn is_glowing(self) -> bool {
         self.luminance != Default::default()
     }
 

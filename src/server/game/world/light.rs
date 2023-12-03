@@ -13,6 +13,7 @@ use super::{
 };
 use crate::shared::utils;
 use nalgebra::Point3;
+use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp::Ordering,
@@ -42,18 +43,58 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn load_many<I>(&mut self, chunks: &ChunkStore, points: I) -> Vec<Point3<i64>>
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        vec![]
+    pub fn par_load_many(
+        &mut self,
+        chunks: &ChunkStore,
+        points: &[Point3<i32>],
+    ) -> Vec<Point3<i64>> {
+        for coords in points {
+            self.0.remove(coords);
+        }
+
+        points
+            .par_iter()
+            .fold(Branch::default, |mut branch, &coords| {
+                let chunk = &chunks[coords];
+
+                for (side, delta) in *SIDE_DELTAS {
+                    if let Some(light) = self.get(coords + delta.cast()) {
+                        todo!();
+                    }
+                }
+
+                if chunk.is_glowing() {
+                    for (coords, block) in chunk.blocks(coords) {
+                        let value = block.data().luminance;
+                        for i in BlockLight::TORCHLIGHT_RANGE {
+                            branch.place_component(chunks, self, coords, i, value[i % 3]);
+                        }
+                    }
+                }
+
+                branch
+            })
+            .reduce(Default::default, Branch::sup)
+            .merge(self)
     }
 
-    pub fn unload_many<I>(&mut self, chunks: &ChunkStore, points: I) -> Vec<Point3<i64>>
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        vec![]
+    pub fn par_unload_many(
+        &mut self,
+        chunks: &ChunkStore,
+        points: &FxHashSet<Point3<i32>>,
+    ) -> Vec<Point3<i64>> {
+        let points = World::chunk_area_points(points.iter().copied())
+            .filter(|coords| {
+                if !points.contains(coords) && chunks.contains(*coords) {
+                    true
+                } else {
+                    self.0.remove(coords);
+                    false
+                }
+            })
+            .collect::<Vec<_>>();
+
+        self.par_load_many(chunks, &points)
     }
 
     pub fn apply(
@@ -156,6 +197,26 @@ impl Branch {
         for i in BlockLight::TORCHLIGHT_RANGE {
             self.destroy_component(chunks, light, coords, i, value.component(i));
         }
+    }
+
+    fn sup(mut self, other: Self) -> Self {
+        for (chunk_coords, values) in other.0 {
+            match self.entry(chunk_coords) {
+                Entry::Occupied(mut entry) => {
+                    for (block_coords, value) in values {
+                        entry
+                            .get_mut()
+                            .entry(block_coords)
+                            .and_modify(|light| *light = light.sup(value))
+                            .or_insert(value);
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(values);
+                }
+            }
+        }
+        self
     }
 
     fn merge(self, light: &mut WorldLight) -> Vec<Point3<i64>> {

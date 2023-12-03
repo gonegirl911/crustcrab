@@ -19,6 +19,7 @@ use std::{
 pub struct Chunk {
     blocks: DataStore<Block>,
     non_air_count: u16,
+    glowing_count: u16,
 }
 
 impl Chunk {
@@ -26,18 +27,29 @@ impl Chunk {
 
     fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
         let mut non_air_count = 0;
+        let mut glowing_count = 0;
         Self {
             blocks: DataStore::from_fn(|coords| {
                 let block = f(coords);
                 non_air_count += (block != Block::Air) as u16;
+                glowing_count += block.data().is_glowing() as u16;
                 block
             }),
             non_air_count,
+            glowing_count,
         }
+    }
+
+    pub fn blocks(&self, coords: Point3<i32>) -> impl Iterator<Item = (Point3<i64>, &Block)> {
+        self.blocks.values(coords)
     }
 
     pub fn is_empty(&self) -> bool {
         self.non_air_count == 0
+    }
+
+    pub fn is_glowing(&self) -> bool {
+        self.glowing_count != 0
     }
 
     pub fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
@@ -45,7 +57,7 @@ impl Chunk {
         let prev = *block;
         if block.apply(action) {
             let curr = *block;
-            self.adjust_count(prev, curr);
+            self.adjust_counts(prev, curr);
             true
         } else {
             false
@@ -57,16 +69,14 @@ impl Chunk {
         let prev = *block;
         block.apply_unchecked(action);
         let curr = *block;
-        self.adjust_count(prev, curr);
+        self.adjust_counts(prev, curr);
     }
 
-    fn adjust_count(&mut self, prev: Block, curr: Block) {
-        match (prev, curr) {
-            (Block::Air, Block::Air) => {}
-            (Block::Air, _) => self.non_air_count += 1,
-            (_, Block::Air) => self.non_air_count -= 1,
-            _ => {}
-        }
+    fn adjust_counts(&mut self, prev: Block, curr: Block) {
+        self.non_air_count -= (prev != Block::Air) as u16;
+        self.non_air_count += (curr != Block::Air) as u16;
+        self.glowing_count -= prev.data().is_glowing() as u16;
+        self.glowing_count += curr.data().is_glowing() as u16;
     }
 
     pub fn points() -> impl Iterator<Item = Point3<u8>> {
@@ -137,6 +147,19 @@ impl<T> DataStore<T> {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
+    }
+}
+
+impl<T: Sync> DataStore<T> {
+    fn values(&self, coords: Point3<i32>) -> impl Iterator<Item = (Point3<i64>, &T)> {
+        self.0.iter().enumerate().flat_map(move |(x, values)| {
+            values.iter().enumerate().flat_map(move |(y, values)| {
+                values
+                    .iter()
+                    .enumerate()
+                    .map(move |(z, value)| (utils::coords((coords, point![x, y, z].cast())), value))
+            })
+        })
     }
 }
 
