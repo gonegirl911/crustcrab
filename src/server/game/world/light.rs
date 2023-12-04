@@ -54,20 +54,32 @@ impl WorldLight {
 
         points
             .par_iter()
-            .fold(Branch::default, |mut branch, &coords| {
-                let chunk = &chunks[coords];
+            .fold(Branch::default, |mut branch, &chunk_coords| {
+                let chunk = &chunks[chunk_coords];
+                let light = self.get(chunk_coords);
 
-                for (side, delta) in *SIDE_DELTAS {
-                    if let Some(light) = self.get(coords + delta.cast()) {
-                        todo!();
+                if chunk.is_glowing() {
+                    for (block_coords, block) in chunk.blocks() {
+                        let node = Self::node(chunk, light, chunk_coords, block_coords);
+                        for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
+                            if c != 0 {
+                                branch.place_node(chunks, self, node.with_value(c), i);
+                            }
+                        }
                     }
                 }
 
-                if chunk.is_glowing() {
-                    for (coords, block) in chunk.blocks(coords) {
-                        let value = block.data().luminance;
-                        for i in BlockLight::TORCHLIGHT_RANGE {
-                            branch.place_component(chunks, self, coords, i, value[i % 3]);
+                for (side, delta) in *SIDE_DELTAS {
+                    if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
+                        for (block_coords, opp) in side.points() {
+                            let node = Self::node(chunk, light, chunk_coords, block_coords);
+                            let value = neighbor[opp].torchlight();
+                            let filter = chunk[block_coords].data().light_filter;
+                            for ((i, c), f) in BlockLight::TORCHLIGHT_RANGE.zip(value).zip(filter) {
+                                if c > 1 && f {
+                                    branch.place_node(chunks, self, node.with_value(c - 1), i);
+                                }
+                            }
                         }
                     }
                 }
@@ -156,6 +168,22 @@ impl WorldLight {
             && value == BlockLight::COMPONENT_MAX
     }
 
+    fn node<'a>(
+        chunk: &'a Chunk,
+        light: Option<&'a ChunkLight>,
+        chunk_coords: Point3<i32>,
+        block_coords: Point3<u8>,
+    ) -> Node<'a> {
+        Node {
+            chunk: Some(chunk),
+            light,
+            chunk_coords,
+            block_coords,
+            coords: utils::coords((chunk_coords, block_coords)),
+            value: 0,
+        }
+    }
+
     fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
         value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
     }
@@ -172,14 +200,13 @@ impl Branch {
         coords: Point3<i64>,
         data: BlockData,
     ) {
-        for i in BlockLight::SKYLIGHT_RANGE {
-            self.place_filter(chunks, light, coords, i, 0, data.light_filter[i % 3]);
+        for (i, f) in BlockLight::TORCHLIGHT_RANGE.zip(data.light_filter) {
+            self.place_filter(chunks, light, coords, i, 0, f);
         }
 
-        for i in BlockLight::TORCHLIGHT_RANGE {
-            let value = data.luminance[i % 3];
-            self.place_filter(chunks, light, coords, i, value, data.light_filter[i % 3]);
-            self.place_component(chunks, light, coords, i, value);
+        for (i, (c, f)) in BlockLight::TORCHLIGHT_RANGE.zip(data) {
+            self.place_filter(chunks, light, coords, i, c, f);
+            self.place_component(chunks, light, coords, i, c);
         }
     }
 
@@ -256,7 +283,7 @@ impl Branch {
         filter: bool,
     ) {
         if !filter {
-            let node = Node::new(chunks, light, coords);
+            let node = Node::new(chunks, light, coords, 0);
             let block_light = BlockLightRefMut::new(self, &node);
             let component = block_light.component(index);
             if component > value {
@@ -266,6 +293,7 @@ impl Branch {
         }
     }
 
+    #[rustfmt::skip]
     fn place_component(
         &mut self,
         chunks: &ChunkStore,
@@ -275,12 +303,7 @@ impl Branch {
         value: u8,
     ) {
         if value != 0 {
-            let node = Node::new(chunks, light, coords);
-            let block_light = BlockLightRefMut::new(self, &node);
-            if block_light.component(index) < value {
-                block_light.set_component(index, value);
-                self.spread_component(chunks, light, node.with_value(value), index);
-            }
+            self.place_node(chunks, light, Node::new(chunks, light, coords, value), index);
         }
     }
 
@@ -292,19 +315,27 @@ impl Branch {
         index: usize,
         value: u8,
     ) {
-        let node = Node::new(chunks, light, coords);
+        let node = Node::new(chunks, light, coords, value);
         let block_light = BlockLightRefMut::new(self, &node);
         let component = block_light.component(index);
         match component.cmp(&value) {
             Ordering::Less => {
                 block_light.set_component(index, value);
-                self.spread_component(chunks, light, node.with_value(value), index);
+                self.spread_component(chunks, light, node, index);
             }
             Ordering::Equal => {}
             Ordering::Greater => {
                 block_light.set_component(index, 0);
                 self.unspread_component(chunks, light, node.with_value(component), index);
             }
+        }
+    }
+
+    fn place_node(&mut self, chunks: &ChunkStore, light: &WorldLight, node: Node, index: usize) {
+        let block_light = BlockLightRefMut::new(self, &node);
+        if block_light.component(index) < node.value {
+            block_light.set_component(index, node.value);
+            self.spread_component(chunks, light, node, index);
         }
     }
 
@@ -392,7 +423,7 @@ struct Node<'a> {
 }
 
 impl<'a> Node<'a> {
-    fn new(chunks: &'a ChunkStore, light: &'a WorldLight, coords: Point3<i64>) -> Self {
+    fn new(chunks: &'a ChunkStore, light: &'a WorldLight, coords: Point3<i64>, value: u8) -> Self {
         let chunk_coords = utils::chunk_coords(coords);
         Self {
             chunk: chunks.get(chunk_coords),
@@ -400,7 +431,7 @@ impl<'a> Node<'a> {
             chunk_coords,
             block_coords: utils::block_coords(coords),
             coords,
-            value: 0,
+            value,
         }
     }
 

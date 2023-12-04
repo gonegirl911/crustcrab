@@ -6,6 +6,7 @@ use super::{
 use crate::{
     client::game::world::BlockVertex,
     enum_map,
+    server::game::world::chunk::Chunk,
     shared::{
         bound::Aabb,
         color::Rgb,
@@ -16,7 +17,11 @@ use nalgebra::{point, Point2, Point3, Vector3};
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::{fs, sync::Arc};
+use std::{
+    fs,
+    iter::{self, Zip},
+    sync::Arc,
+};
 
 #[derive(Clone, Copy)]
 pub struct BlockData {
@@ -121,6 +126,15 @@ impl From<RawBlockData> for BlockData {
     }
 }
 
+impl IntoIterator for BlockData {
+    type Item = (u8, bool);
+    type IntoIter = Zip<<Rgb<u8> as IntoIterator>::IntoIter, <Rgb<bool> as IntoIterator>::IntoIter>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        iter::zip(self.luminance, self.light_filter)
+    }
+}
+
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
     #[serde(flatten, default)]
@@ -176,6 +190,21 @@ pub enum Side {
     Back,
     Left,
     Top,
+}
+
+impl Side {
+    pub fn points(self) -> impl Iterator<Item = (Point3<u8>, Point3<u8>)> {
+        let masks = SIDE_MASKS[self];
+        (0..Chunk::DIM as u8).flat_map(move |x| {
+            (0..Chunk::DIM as u8).map(move |y| {
+                let components = [0, Chunk::DIM as u8 - 1, x, y];
+                (
+                    masks.map(|(i, _)| components[i]),
+                    masks.map(|(_, i)| components[i]),
+                )
+            })
+        })
+    }
 }
 
 #[derive(Clone, Copy, Enum, Deserialize)]
@@ -281,10 +310,25 @@ pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
     }
 });
 
+static SIDE_MASKS: Lazy<EnumMap<Side, Point3<(usize, usize)>>> = Lazy::new(|| {
+    SIDE_DELTAS.map(|_, delta| {
+        let mut i = 1;
+        delta
+            .map(|c| {
+                i += (c == 0) as usize;
+                (
+                    i * (c == 0) as usize + (c == 1) as usize,
+                    i * (c == 0) as usize + (c == -1) as usize,
+                )
+            })
+            .into()
+    })
+});
+
 static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> = Lazy::new(|| {
     SIDE_CORNER_SIDES.map(|s1, corner_sides| {
         corner_sides.map(|_, [s2, s3]| {
-            (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| (c + 1) as u8 / 2)
+            (SIDE_DELTAS[s1] + SIDE_DELTAS[s2] + SIDE_DELTAS[s3]).map(|c| c.max(0) as u8)
         })
     })
 });

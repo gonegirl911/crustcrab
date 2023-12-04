@@ -40,8 +40,8 @@ impl Chunk {
         }
     }
 
-    pub fn blocks(&self, coords: Point3<i32>) -> impl Iterator<Item = (Point3<i64>, &Block)> {
-        self.blocks.values(coords)
+    pub fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
+        self.blocks.values()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -151,13 +151,13 @@ impl<T> DataStore<T> {
 }
 
 impl<T: Sync> DataStore<T> {
-    fn values(&self, coords: Point3<i32>) -> impl Iterator<Item = (Point3<i64>, &T)> {
+    fn values(&self) -> impl Iterator<Item = (Point3<u8>, &T)> {
         self.0.iter().enumerate().flat_map(move |(x, values)| {
             values.iter().enumerate().flat_map(move |(y, values)| {
                 values
                     .iter()
                     .enumerate()
-                    .map(move |(z, value)| (utils::coords((coords, point![x, y, z].cast())), value))
+                    .map(move |(z, value)| (point![x, y, z].cast(), value))
             })
         })
     }

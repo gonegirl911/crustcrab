@@ -69,6 +69,14 @@ impl BlockLight {
         array::from_fn(f).into()
     }
 
+    fn skylight(self) -> Rgb<u8> {
+        Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
+    }
+
+    pub fn torchlight(self) -> Rgb<u8> {
+        Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
+    }
+
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
             .saturate()
@@ -90,14 +98,6 @@ impl BlockLight {
 
     fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {
         Self::from_fn(|i| f(self.component(i), other.component(i)))
-    }
-
-    fn skylight(self) -> Rgb<u8> {
-        Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
-    }
-
-    fn torchlight(self) -> Rgb<u8> {
-        Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
     }
 
     fn linearize(color: Rgb<u8>) -> Rgb<f32> {
