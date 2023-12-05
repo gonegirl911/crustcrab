@@ -72,9 +72,9 @@ impl WorldLight {
                 for (side, delta) in *SIDE_DELTAS {
                     if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
                         for (block_coords, opp) in side.points() {
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
                             let value = neighbor[opp].torchlight();
                             let filter = chunk[block_coords].data().light_filter;
+                            let node = Self::node(chunk, light, chunk_coords, block_coords);
                             for ((i, c), f) in BlockLight::TORCHLIGHT_RANGE.zip(value).zip(filter) {
                                 if c > 1 && f {
                                     branch.place_node(chunks, self, node.with_value(c - 1), i);
