@@ -12,7 +12,7 @@ use super::{
     ChunkStore, World,
 };
 use crate::shared::utils;
-use nalgebra::Point3;
+use nalgebra::{point, Point2, Point3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -48,46 +48,7 @@ impl WorldLight {
         chunks: &ChunkStore,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
-        for coords in points {
-            self.0.remove(coords);
-        }
-
-        points
-            .par_iter()
-            .fold(Branch::default, |mut branch, &chunk_coords| {
-                let chunk = &chunks[chunk_coords];
-                let light = self.get(chunk_coords);
-
-                if chunk.is_glowing() {
-                    for (block_coords, block) in chunk.blocks() {
-                        let node = Self::node(chunk, light, chunk_coords, block_coords);
-                        for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
-                            if c != 0 {
-                                branch.place_node(chunks, self, node.with_value(c), i);
-                            }
-                        }
-                    }
-                }
-
-                for (side, delta) in *SIDE_DELTAS {
-                    if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
-                        for (block_coords, opp) in side.points() {
-                            let value = neighbor[opp].torchlight();
-                            let filter = chunk[block_coords].data().light_filter;
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            for ((i, c), f) in BlockLight::TORCHLIGHT_RANGE.zip(value).zip(filter) {
-                                if c > 1 && f {
-                                    branch.place_node(chunks, self, node.with_value(c - 1), i);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                branch
-            })
-            .reduce(Default::default, Branch::sup)
-            .merge(self)
+        self.par_load_exact_many(chunks, World::chunk_area_points(points).collect())
     }
 
     pub fn par_unload_many(
@@ -95,18 +56,18 @@ impl WorldLight {
         chunks: &ChunkStore,
         points: &FxHashSet<Point3<i32>>,
     ) -> Vec<Point3<i64>> {
-        let points = World::chunk_area_points(points.iter().copied())
+        let points = World::chunk_area_points(points)
             .filter(|coords| {
-                if !points.contains(coords) && chunks.contains(*coords) {
+                if !points.contains(coords) {
                     true
                 } else {
-                    self.0.remove(coords);
+                    self.unload(*coords);
                     false
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        self.par_load_many(chunks, &points)
+        self.par_load_exact_many(chunks, points)
     }
 
     pub fn apply(
@@ -142,6 +103,65 @@ impl WorldLight {
             .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
     }
 
+    fn par_load_exact_many(
+        &mut self,
+        chunks: &ChunkStore,
+        points: FxHashSet<Point3<i32>>,
+    ) -> Vec<Point3<i64>> {
+        Self::loads(points)
+            .filter(|&coords| self.unload(coords))
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .fold(Branch::default, |mut branch, chunk_coords| {
+                let chunk = chunks.get(chunk_coords);
+                let light = self.get(chunk_coords);
+
+                if let Some(chunk) = chunk.filter(|chunk| chunk.is_glowing()) {
+                    for (block_coords, block) in chunk.blocks() {
+                        let node = Self::node(Some(chunk), light, chunk_coords, block_coords);
+                        for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
+                            if c != 0 {
+                                branch.place_node(chunks, self, node.with_value(c), i);
+                            }
+                        }
+                    }
+                }
+
+                for (side, delta) in *SIDE_DELTAS {
+                    if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
+                        for (block_coords, opp) in side.points() {
+                            let coords = utils::coords((chunk_coords, opp));
+                            let value = neighbor[opp].map(|i, c| Self::value(i, coords, side, c));
+                            let node = Self::node(chunk, light, chunk_coords, block_coords);
+                            let filter = node.block().data().light_filter;
+                            for (i, c) in value.into_iter().enumerate() {
+                                if c != 0 && filter[i % 3] {
+                                    branch.place_node(chunks, self, node.with_value(c), i);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                branch
+            })
+            .reduce(Default::default, Branch::sup)
+            .merge(self)
+    }
+
+    fn unload(&mut self, coords: Point3<i32>) -> bool {
+        if let Entry::Occupied(entry) = self.entry(coords) {
+            if !entry.get().is_placeholder {
+                entry.remove();
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        }
+    }
+
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
             .map(|(side, coords)| {
@@ -168,14 +188,20 @@ impl WorldLight {
             && value == BlockLight::COMPONENT_MAX
     }
 
+    fn loads<I: IntoIterator<Item = Point3<i32>>>(points: I) -> impl Iterator<Item = Point3<i32>> {
+        Self::columns(points)
+            .into_iter()
+            .flat_map(|(xz, y)| (World::Y_RANGE.start..=y).map(move |y| point![xz.x, y, xz.y]))
+    }
+
     fn node<'a>(
-        chunk: &'a Chunk,
+        chunk: Option<&'a Chunk>,
         light: Option<&'a ChunkLight>,
         chunk_coords: Point3<i32>,
         block_coords: Point3<u8>,
     ) -> Node<'a> {
         Node {
-            chunk: Some(chunk),
+            chunk,
             light,
             chunk_coords,
             block_coords,
@@ -186,6 +212,17 @@ impl WorldLight {
 
     fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
         value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
+    }
+
+    fn columns<I: IntoIterator<Item = Point3<i32>>>(points: I) -> FxHashMap<Point2<i32>, i32> {
+        let mut columns = FxHashMap::<_, i32>::default();
+        for coords in points {
+            columns
+                .entry(coords.xz())
+                .and_modify(|y| *y = (*y).max(coords.y))
+                .or_insert(coords.y);
+        }
+        columns
     }
 }
 

@@ -36,7 +36,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{hash_map::Entry, LinkedList},
     iter, mem,
-    ops::{Index, Range},
+    ops::Range,
 };
 
 #[derive(Default)]
@@ -206,7 +206,7 @@ impl World {
             .map(utils::chunk_coords)
             .chain(
                 include_outline
-                    .then_some(Self::chunk_area_points(points.iter().copied()))
+                    .then_some(Self::chunk_area_points(points))
                     .into_iter()
                     .flatten(),
             )
@@ -225,12 +225,13 @@ impl World {
         }
     }
 
-    fn chunk_area_points<I>(points: I) -> impl Iterator<Item = Point3<i32>>
+    fn chunk_area_points<'a, I>(points: I) -> impl Iterator<Item = Point3<i32>>
     where
-        I: IntoIterator<Item = Point3<i32>>,
+        I: IntoIterator<Item = &'a Point3<i32>>,
     {
         points
             .into_iter()
+            .copied()
             .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
     }
 
@@ -481,14 +482,6 @@ impl Branch {
             .entry(utils::block_coords(coords))
             .and_modify(|_| unreachable!())
             .or_insert(action);
-    }
-}
-
-impl Index<Point3<i32>> for ChunkStore {
-    type Output = Chunk;
-
-    fn index(&self, coords: Point3<i32>) -> &Self::Output {
-        &self.0[&coords]
     }
 }
 
