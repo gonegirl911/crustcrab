@@ -65,16 +65,16 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
+    fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
+        array::from_fn(f).into()
+    }
+
     pub fn placeholder() -> Self {
         let mut value = Self::default();
         for i in Self::SKYLIGHT_RANGE {
             value.set_component(i, Self::COMPONENT_MAX)
         }
         value
-    }
-
-    fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
-        array::from_fn(f).into()
     }
 
     pub fn lum(self) -> f32 {
