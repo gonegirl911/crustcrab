@@ -48,7 +48,7 @@ impl WorldLight {
         chunks: &ChunkStore,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
-        self.par_load_exact_many(chunks, World::chunk_area_points(points).collect())
+        self.par_load_exact_many(chunks, World::chunk_area_points(points))
     }
 
     pub fn par_unload_many(
@@ -65,7 +65,7 @@ impl WorldLight {
                     false
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         self.par_load_exact_many(chunks, points)
     }
@@ -103,11 +103,10 @@ impl WorldLight {
             .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
     }
 
-    fn par_load_exact_many(
-        &mut self,
-        chunks: &ChunkStore,
-        points: FxHashSet<Point3<i32>>,
-    ) -> Vec<Point3<i64>> {
+    fn par_load_exact_many<I>(&mut self, chunks: &ChunkStore, points: I) -> Vec<Point3<i64>>
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
         Self::loads(points)
             .filter(|&coords| self.unload(coords))
             .collect::<Vec<_>>()
