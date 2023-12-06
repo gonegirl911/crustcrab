@@ -109,18 +109,9 @@ impl Index<Point3<u8>> for Chunk {
 pub struct ChunkLight {
     lights: DataStore<BlockLight>,
     non_zero_count: u16,
-    pub is_placeholder: bool,
 }
 
 impl ChunkLight {
-    pub fn placeholder() -> Self {
-        Self {
-            lights: DataStore::splat(BlockLight::placeholder()),
-            non_zero_count: Chunk::DIM.pow(3) as u16,
-            is_placeholder: true,
-        }
-    }
-
     pub fn set(&mut self, coords: Point3<u8>, value: BlockLight) -> bool {
         let prev = mem::replace(&mut self.lights[coords], value);
         if prev == value {
@@ -156,12 +147,6 @@ impl<T> DataStore<T> {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
-    }
-}
-
-impl<T: Copy> DataStore<T> {
-    fn splat(value: T) -> Self {
-        Self([[[value; Chunk::DIM]; Chunk::DIM]; Chunk::DIM])
     }
 }
 

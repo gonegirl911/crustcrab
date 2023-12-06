@@ -69,14 +69,6 @@ impl BlockLight {
         array::from_fn(f).into()
     }
 
-    pub fn placeholder() -> Self {
-        let mut value = Self::default();
-        for i in Self::SKYLIGHT_RANGE {
-            value.set_component(i, Self::COMPONENT_MAX)
-        }
-        value
-    }
-
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
             .saturate()
