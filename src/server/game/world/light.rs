@@ -189,7 +189,7 @@ impl WorldLight {
     fn loads<I: IntoIterator<Item = Point3<i32>>>(points: I) -> impl Iterator<Item = Point3<i32>> {
         Self::columns(points)
             .into_iter()
-            .flat_map(|(xz, y)| (World::Y_RANGE.start..=y).map(move |y| point![xz.x, y, xz.y]))
+            .flat_map(|(xz, y)| (World::Y_RANGE.start - 1..=y).map(move |y| point![xz.x, y, xz.y]))
     }
 
     fn node<'a>(
