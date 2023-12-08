@@ -1,6 +1,7 @@
 pub mod action;
 pub mod block;
 pub mod chunk;
+pub mod height;
 pub mod light;
 
 use self::{
@@ -15,6 +16,7 @@ use self::{
         generator::ChunkGenerator,
         Chunk,
     },
+    height::HeightMap,
     light::WorldLight,
 };
 use super::player::ray::Hittable;
@@ -42,6 +44,7 @@ use std::{
 #[derive(Default)]
 pub struct World {
     chunks: ChunkStore,
+    heights: HeightMap,
     generator: ChunkGenerator,
     actions: ActionStore,
     light: WorldLight,
@@ -182,6 +185,10 @@ impl World {
         loads: &[Point3<i32>],
         unloads: &FxHashSet<Point3<i32>>,
     ) -> impl Iterator<Item = Point3<i64>> {
+        if self.heights.unload_many(&self.chunks, unloads) | self.heights.load_many(loads) {
+            self.light.set_placeholders(self.heights.placeholders());
+        }
+
         self.light
             .par_unload_many(&self.chunks, unloads)
             .into_iter()
@@ -206,7 +213,7 @@ impl World {
             .map(utils::chunk_coords)
             .chain(
                 include_outline
-                    .then_some(Self::chunk_area_points(points))
+                    .then_some(Self::chunk_area_points(points.iter().copied()))
                     .into_iter()
                     .flatten(),
             )
@@ -225,13 +232,12 @@ impl World {
         }
     }
 
-    fn chunk_area_points<'a, I>(points: I) -> impl Iterator<Item = Point3<i32>>
+    fn chunk_area_points<I>(points: I) -> impl Iterator<Item = Point3<i32>>
     where
-        I: IntoIterator<Item = &'a Point3<i32>>,
+        I: IntoIterator<Item = Point3<i32>>,
     {
         points
             .into_iter()
-            .copied()
             .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
     }
 
@@ -253,7 +259,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                self.light.par_load_many(&self.chunks, &loads);
+                let _ = self.par_light_up(&loads, &Default::default());
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
@@ -393,6 +399,7 @@ impl Branch {
         self,
         World {
             chunks,
+            heights,
             light,
             actions,
             ..
@@ -432,6 +439,10 @@ impl Branch {
                     }
                 }
             }
+        }
+
+        if heights.unload_many(chunks, &unloads) | heights.load_many(&loads) {
+            light.set_placeholders(heights.placeholders());
         }
 
         (

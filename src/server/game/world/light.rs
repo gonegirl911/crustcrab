@@ -12,7 +12,7 @@ use super::{
     ChunkStore, World,
 };
 use crate::shared::utils;
-use nalgebra::{point, Point2, Point3};
+use nalgebra::{point, vector, Point2, Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -46,12 +46,19 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn par_load_many(
-        &mut self,
-        chunks: &ChunkStore,
-        points: &[Point3<i32>],
-    ) -> Vec<Point3<i64>> {
-        self.par_load_exact_many(chunks, World::chunk_area_points(points))
+    pub fn set_placeholders(&mut self, placeholders: FxHashSet<Point3<i32>>) {
+        for &coords in placeholders.difference(&self.placeholders) {
+            *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+        }
+
+        self.placeholders = placeholders;
+    }
+
+    pub fn par_load_many<'a, I>(&mut self, chunks: &ChunkStore, points: I) -> Vec<Point3<i64>>
+    where
+        I: IntoIterator<Item = &'a Point3<i32>>,
+    {
+        self.par_load_exact_many(chunks, Self::chunk_area_points(points))
     }
 
     pub fn par_unload_many(
@@ -59,7 +66,7 @@ impl WorldLight {
         chunks: &ChunkStore,
         points: &FxHashSet<Point3<i32>>,
     ) -> Vec<Point3<i64>> {
-        let points = World::chunk_area_points(points)
+        let points = Self::chunk_area_points(points)
             .filter(|coords| {
                 if !points.contains(coords) {
                     true
@@ -180,10 +187,14 @@ impl WorldLight {
         !(Self::is_exposed(index, coords, value) && side == target) as u8
     }
 
-    fn is_exposed(index: usize, coords: Point3<i64>, value: u8) -> bool {
-        BlockLight::SKYLIGHT_RANGE.contains(&index)
-            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
-            && value == BlockLight::COMPONENT_MAX
+    fn chunk_area_points<'a, I>(points: I) -> impl Iterator<Item = Point3<i32>>
+    where
+        I: IntoIterator<Item = &'a Point3<i32>>,
+    {
+        points
+            .into_iter()
+            .copied()
+            .flat_map(|coords| Self::chunk_deltas().map(move |delta| coords + delta))
     }
 
     fn loads<I: IntoIterator<Item = Point3<i32>>>(points: I) -> impl Iterator<Item = Point3<i32>> {
@@ -210,6 +221,16 @@ impl WorldLight {
 
     fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
         value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
+    }
+
+    fn is_exposed(index: usize, coords: Point3<i64>, value: u8) -> bool {
+        BlockLight::SKYLIGHT_RANGE.contains(&index)
+            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
+            && value == BlockLight::COMPONENT_MAX
+    }
+
+    fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
+        (-1..=1).flat_map(|x| (-1..=1).flat_map(move |y| (-1..=1).map(move |z| vector![x, y, z])))
     }
 
     fn columns<I: IntoIterator<Item = Point3<i32>>>(points: I) -> FxHashMap<Point2<i32>, i32> {
