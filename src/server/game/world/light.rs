@@ -256,7 +256,7 @@ impl Branch {
         coords: Point3<i64>,
         data: BlockData,
     ) {
-        for (i, f) in BlockLight::TORCHLIGHT_RANGE.zip(data.light_filter) {
+        for (i, f) in BlockLight::SKYLIGHT_RANGE.zip(data.light_filter) {
             self.place_filter(chunks, light, coords, i, 0, f);
         }
 

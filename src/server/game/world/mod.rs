@@ -77,6 +77,21 @@ impl World {
             .collect()
     }
 
+    fn par_light_up(
+        &mut self,
+        loads: &[Point3<i32>],
+        unloads: &FxHashSet<Point3<i32>>,
+    ) -> impl Iterator<Item = Point3<i64>> {
+        if self.heights.unload_many(&self.chunks, unloads) | self.heights.load_many(loads) {
+            self.light.set_placeholders(self.heights.placeholders());
+        }
+
+        self.light
+            .par_unload_many(&self.chunks, unloads)
+            .into_iter()
+            .chain(self.light.par_load_many(&self.chunks, loads))
+    }
+
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -178,21 +193,6 @@ impl World {
                 .collect::<LinkedList<_>>(),
             proxy,
         );
-    }
-
-    fn par_light_up(
-        &mut self,
-        loads: &[Point3<i32>],
-        unloads: &FxHashSet<Point3<i32>>,
-    ) -> impl Iterator<Item = Point3<i64>> {
-        if self.heights.unload_many(&self.chunks, unloads) | self.heights.load_many(loads) {
-            self.light.set_placeholders(self.heights.placeholders());
-        }
-
-        self.light
-            .par_unload_many(&self.chunks, unloads)
-            .into_iter()
-            .chain(self.light.par_load_many(&self.chunks, loads))
     }
 
     fn gen(&self, coords: Point3<i32>) -> Box<Chunk> {

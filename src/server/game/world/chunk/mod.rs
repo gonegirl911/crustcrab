@@ -163,9 +163,7 @@ impl<T> DataStore<T> {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
     }
-}
 
-impl<T> DataStore<T> {
     fn values(&self) -> impl Iterator<Item = (Point3<u8>, &T)> {
         self.0.iter().enumerate().flat_map(move |(x, values)| {
             values.iter().enumerate().flat_map(move |(y, values)| {
