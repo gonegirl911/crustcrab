@@ -195,8 +195,8 @@ pub struct SkyConfig {
     day: StageConfig,
     night: StageConfig,
     glow: GlowConfig,
-    object: ObjectConfig,
     star: StarConfig,
+    object: ObjectConfig,
 }
 
 impl SkyConfig {

@@ -21,13 +21,13 @@ light_intensity = [0.1, 0.1, 0.25]
 [sky.glow]
 colors = [[1.0, 0.45, 0.0], [1.0, 0.0, 0.0]]
 
-[sky.object]
-size = 0.1
-
 [sky.star]
 size = 0.005
 brightness = 0.15
 count = 1500
+
+[sky.object]
+size = 0.1
 
 [cloud]
 size = [12, 4]
@@ -38,6 +38,9 @@ color = [1.0, 1.0, 1.0, 0.99]
 
 [cloud.night]
 color = [0.06, 0.06, 0.1, 0.85]
+
+[highlight]
+size = 1.001
 
 [gui.crosshair]
 size = 1.0

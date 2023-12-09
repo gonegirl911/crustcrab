@@ -56,7 +56,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     return VertexOutput(
-        player.vp * pc.m * vec4(-0.001 + vertex.coords * 1.002, 1.0),
+        player.vp * pc.m * vec4(vertex.coords, 1.0),
         0.1 * luminance(saturate(global_light + local_light)),
     );
 }

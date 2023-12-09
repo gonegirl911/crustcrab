@@ -8,6 +8,7 @@ use crate::{
             texture::screen::DepthBuffer,
             Renderer,
         },
+        CLIENT_CONFIG,
     },
     server::{
         game::world::{block::BlockLight, BlockHoverData},
@@ -17,6 +18,7 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Point3, Vector3};
+use serde::Deserialize;
 
 pub struct BlockHover {
     highlight: BlockHighlight,
@@ -166,14 +168,27 @@ struct BlockHighlightPushConstants {
 impl BlockHighlightPushConstants {
     fn new(hitbox: Aabb, brightness: BlockLight) -> Self {
         Self {
-            m: hitbox.to_homogeneous(),
+            m: Self::m(hitbox),
             brightness: brightness.0,
         }
+    }
+
+    fn m(hitbox: Aabb) -> Matrix4<f32> {
+        hitbox
+            .to_homogeneous()
+            .prepend_translation(&Vector3::repeat(0.5))
+            .prepend_scaling(CLIENT_CONFIG.highlight.size)
+            .prepend_translation(&(-Vector3::repeat(0.5)))
     }
 }
 
 impl PushConstants for BlockHighlightPushConstants {
     const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
+}
+
+#[derive(Deserialize)]
+pub struct HighlightConfig {
+    size: f32,
 }
 
 const DELTAS: [Vector3<f32>; 8] = [
