@@ -108,7 +108,7 @@ impl<'de> Deserialize<'de> for ModelData {
 
         impl RawModelData {
             fn into_side_corner_deltas(self) -> SideCornerDeltas {
-                Option::variants()
+                Enum::variants()
                     .zip(
                         self.side_corner_deltas
                             .into_values()
