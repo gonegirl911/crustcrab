@@ -6,7 +6,6 @@ use self::data::{BlockData, BLOCK_DATA};
 use super::action::BlockAction;
 use crate::shared::{color::Rgb, enum_map::Enum};
 use bitfield::bitfield;
-use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
 use std::{array, ops::Range};
 
@@ -55,8 +54,7 @@ impl Block {
 }
 
 bitfield! {
-    #[repr(transparent)]
-    #[derive(Clone, Copy, PartialEq, Default, Zeroable, Pod)]
+    #[derive(Clone, Copy, PartialEq, Default)]
     pub struct BlockLight(u32);
     pub u8, component, set_component: Self::COMPONENT_MAX.ilog2() as usize, 0, Self::LEN;
 }

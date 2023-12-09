@@ -48,7 +48,7 @@ impl WorldLight {
 
     pub fn set_placeholders(&mut self, placeholders: FxHashSet<Point3<i32>>) {
         for &coords in placeholders.difference(&self.placeholders) {
-            *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+            self.lights.insert(coords, ChunkLight::placeholder());
         }
 
         self.placeholders = placeholders;
