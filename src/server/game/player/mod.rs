@@ -7,7 +7,7 @@ use crate::{
     server::event_loop::{Event, EventHandler},
     shared::utils,
 };
-use nalgebra::{vector, Point3};
+use nalgebra::{point, vector, Point3, Vector3};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::ops::Range;
@@ -59,55 +59,62 @@ pub struct WorldArea {
 
 impl WorldArea {
     pub fn points(self) -> impl Iterator<Item = Point3<i32>> {
-        self.cube_points().filter(move |point| {
-            utils::magnitude_squared(point.xz() - self.center.xz()) <= self.radius.pow(2)
-        })
+        self.cuboid_points()
+            .filter(move |&coords| self.contains(coords))
     }
 
     pub fn par_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
-        self.par_cube_points().filter(move |point| {
-            utils::magnitude_squared(point.xz() - self.center.xz()) <= self.radius.pow(2)
-        })
+        self.par_cuboid_points()
+            .filter(move |&coords| self.contains(coords))
     }
 
     pub fn exclusive_points(self, other: WorldArea) -> impl Iterator<Item = Point3<i32>> {
-        self.points().filter(move |point| {
-            utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
-                || (point.y - other.center.y).unsigned_abs() > other.radius
-        })
+        self.points()
+            .filter(move |&coords| self.is_exclusive(coords, other))
     }
 
     pub fn par_exclusive_points(
         self,
         other: WorldArea,
     ) -> impl ParallelIterator<Item = Point3<i32>> {
-        self.par_points().filter(move |point| {
-            utils::magnitude_squared(point.xz() - other.center.xz()) > other.radius.pow(2)
-                || (point.y - other.center.y).unsigned_abs() > other.radius
-        })
+        self.par_points()
+            .filter(move |&coords| self.is_exclusive(coords, other))
     }
 
-    fn cube_points(self) -> impl Iterator<Item = Point3<i32>> {
+    fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
         let radius = self.radius as i32;
         (-radius..=radius).flat_map(move |dx| {
-            (-radius..=radius).flat_map(move |dy| {
-                (-radius..=radius)
-                    .map(move |dz| self.center + vector![dx, dy, dz])
-                    .filter(|point| World::Y_RANGE.contains(&point.y))
+            self.y_range(radius).flat_map(move |dy| {
+                (-radius..=radius).map(move |dz| self.coords(vector![dx, dy, dz]))
             })
         })
     }
 
-    fn par_cube_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
+    fn par_cuboid_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
         let radius = self.radius as i32;
         (-radius..=radius).into_par_iter().flat_map(move |dx| {
-            (-radius..=radius).into_par_iter().flat_map(move |dy| {
+            self.y_range(radius).into_par_iter().flat_map(move |dy| {
                 (-radius..=radius)
                     .into_par_iter()
-                    .map(move |dz| self.center + vector![dx, dy, dz])
-                    .filter(|point| World::Y_RANGE.contains(&point.y))
+                    .map(move |dz| self.coords(vector![dx, dy, dz]))
             })
         })
+    }
+
+    fn contains(self, coords: Point3<i32>) -> bool {
+        utils::magnitude_squared(coords.xz() - self.center.xz()) <= self.radius.pow(2)
+    }
+
+    fn is_exclusive(self, coords: Point3<i32>, other: WorldArea) -> bool {
+        !other.contains(coords) || (coords.y - other.center.y).unsigned_abs() > other.radius
+    }
+
+    fn y_range(self, radius: i32) -> Range<i32> {
+        World::Y_RANGE.start.max(self.center.y - radius)..World::Y_RANGE.end
+    }
+
+    fn coords(self, delta: Vector3<i32>) -> Point3<i32> {
+        point![self.center.x, 0, self.center.z] + delta
     }
 }
 

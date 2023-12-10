@@ -12,7 +12,7 @@ use super::{
     ChunkStore, World,
 };
 use crate::shared::utils;
-use nalgebra::{point, vector, Point2, Point3, Vector3};
+use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -24,10 +24,7 @@ use std::{
 };
 
 #[derive(Default)]
-pub struct WorldLight {
-    lights: FxHashMap<Point3<i32>, ChunkLight>,
-    placeholders: FxHashSet<Point3<i32>>,
-}
+pub struct WorldLight(FxHashMap<Point3<i32>, ChunkLight>);
 
 impl WorldLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
@@ -46,38 +43,51 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn set_placeholders(&mut self, placeholders: FxHashSet<Point3<i32>>) {
-        for &coords in placeholders.difference(&self.placeholders) {
-            *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
-        }
-
-        self.placeholders = placeholders;
-    }
-
-    pub fn par_load_many<'a, I>(&mut self, chunks: &ChunkStore, points: I) -> Vec<Point3<i64>>
-    where
-        I: IntoIterator<Item = &'a Point3<i32>>,
-    {
-        self.par_load_exact_many(chunks, Self::chunk_area_points(points))
-    }
-
-    pub fn par_unload_many(
+    pub fn par_load_many(
         &mut self,
         chunks: &ChunkStore,
-        points: &FxHashSet<Point3<i32>>,
+        points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
-        let points = Self::chunk_area_points(points)
-            .filter(|coords| {
-                if !points.contains(coords) {
-                    true
-                } else {
-                    self.unload(*coords);
-                    false
-                }
-            })
-            .collect::<Vec<_>>();
+        for coords in points {
+            self.0.remove(coords);
+        }
 
-        self.par_load_exact_many(chunks, points)
+        points
+            .par_iter()
+            .fold(Branch::default, |mut branch, &chunk_coords| {
+                let chunk = chunks.get(chunk_coords);
+                let light = self.get(chunk_coords);
+
+                if let Some(chunk) = chunk.filter(|chunk| chunk.is_glowing()) {
+                    for (block_coords, block) in chunk.blocks() {
+                        let node = Self::node(Some(chunk), light, chunk_coords, block_coords);
+                        for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
+                            if c != 0 {
+                                branch.place_node(chunks, self, node.with_value(c), i);
+                            }
+                        }
+                    }
+                }
+
+                for (side, delta) in *SIDE_DELTAS {
+                    if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
+                        for (block_coords, opp) in side.points() {
+                            let node = Self::node(chunk, light, chunk_coords, block_coords);
+                            let value = neighbor[opp].torchlight();
+                            let filter = node.block().data().light_filter;
+                            for ((i, c), f) in BlockLight::TORCHLIGHT_RANGE.zip(value).zip(filter) {
+                                if c > 1 && f {
+                                    branch.place_node(chunks, self, node.with_value(c - 1), i);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                branch
+            })
+            .reduce(Default::default, Branch::sup)
+            .merge(self)
     }
 
     pub fn apply(
@@ -101,70 +111,16 @@ impl WorldLight {
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
-        self.lights.get(&coords)
+        self.0.get(&coords)
     }
 
     fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
-        self.lights.entry(coords)
+        self.0.entry(coords)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
         self.get(utils::chunk_coords(coords))
             .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
-    }
-
-    fn par_load_exact_many<I>(&mut self, chunks: &ChunkStore, points: I) -> Vec<Point3<i64>>
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        Self::loads(points)
-            .filter(|&coords| self.unload(coords))
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .fold(Branch::default, |mut branch, chunk_coords| {
-                let chunk = chunks.get(chunk_coords);
-                let light = self.get(chunk_coords);
-
-                if let Some(chunk) = chunk.filter(|chunk| chunk.is_glowing()) {
-                    for (block_coords, block) in chunk.blocks() {
-                        let node = Self::node(Some(chunk), light, chunk_coords, block_coords);
-                        for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
-                            if c != 0 {
-                                branch.place_node(chunks, self, node.with_value(c), i);
-                            }
-                        }
-                    }
-                }
-
-                for (side, delta) in *SIDE_DELTAS {
-                    if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
-                        for (block_coords, opp) in side.points() {
-                            let coords = utils::coords((chunk_coords, opp));
-                            let value = neighbor[opp].map(|i, c| Self::value(i, coords, side, c));
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            let filter = node.block().data().light_filter;
-                            for (i, c) in value.into_iter().enumerate() {
-                                if c != 0 && filter[i % 3] {
-                                    branch.place_node(chunks, self, node.with_value(c), i);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                branch
-            })
-            .reduce(Default::default, Branch::sup)
-            .merge(self)
-    }
-
-    fn unload(&mut self, coords: Point3<i32>) -> bool {
-        if !self.placeholders.contains(&coords) {
-            self.lights.remove(&coords);
-            true
-        } else {
-            false
-        }
     }
 
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
@@ -185,22 +141,6 @@ impl WorldLight {
 
     fn absorption(index: usize, coords: Point3<i64>, value: u8, side: Side, target: Side) -> u8 {
         !(Self::is_exposed(index, coords, value) && side == target) as u8
-    }
-
-    fn chunk_area_points<'a, I>(points: I) -> impl Iterator<Item = Point3<i32>>
-    where
-        I: IntoIterator<Item = &'a Point3<i32>>,
-    {
-        points
-            .into_iter()
-            .copied()
-            .flat_map(|coords| Self::chunk_deltas().map(move |delta| coords + delta))
-    }
-
-    fn loads<I: IntoIterator<Item = Point3<i32>>>(points: I) -> impl Iterator<Item = Point3<i32>> {
-        Self::columns(points)
-            .into_iter()
-            .flat_map(|(xz, y)| (World::Y_RANGE.start - 1..=y).map(move |y| point![xz.x, y, xz.y]))
     }
 
     fn node<'a>(
@@ -227,21 +167,6 @@ impl WorldLight {
         BlockLight::SKYLIGHT_RANGE.contains(&index)
             && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
             && value == BlockLight::COMPONENT_MAX
-    }
-
-    fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        (-1..=1).flat_map(|x| (-1..=1).flat_map(move |y| (-1..=1).map(move |z| vector![x, y, z])))
-    }
-
-    fn columns<I: IntoIterator<Item = Point3<i32>>>(points: I) -> FxHashMap<Point2<i32>, i32> {
-        let mut columns = FxHashMap::<_, i32>::default();
-        for coords in points {
-            columns
-                .entry(coords.xz())
-                .and_modify(|y| *y = (*y).max(coords.y))
-                .or_insert(coords.y);
-        }
-        columns
     }
 }
 

@@ -1,7 +1,6 @@
 pub mod action;
 pub mod block;
 pub mod chunk;
-pub mod height;
 pub mod light;
 
 use self::{
@@ -16,7 +15,6 @@ use self::{
         generator::ChunkGenerator,
         Chunk,
     },
-    height::HeightMap,
     light::WorldLight,
 };
 use super::player::ray::Hittable;
@@ -44,7 +42,6 @@ use std::{
 #[derive(Default)]
 pub struct World {
     chunks: ChunkStore,
-    heights: HeightMap,
     generator: ChunkGenerator,
     actions: ActionStore,
     light: WorldLight,
@@ -75,21 +72,6 @@ impl World {
             .into_iter()
             .filter(|&coords| self.chunks.unload(coords))
             .collect()
-    }
-
-    fn par_light_up(
-        &mut self,
-        loads: &[Point3<i32>],
-        unloads: &FxHashSet<Point3<i32>>,
-    ) -> impl Iterator<Item = Point3<i64>> {
-        if self.heights.unload_many(&self.chunks, unloads) | self.heights.load_many(loads) {
-            self.light.set_placeholders(self.heights.placeholders());
-        }
-
-        self.light
-            .par_unload_many(&self.chunks, unloads)
-            .into_iter()
-            .chain(self.light.par_load_many(&self.chunks, loads))
     }
 
     fn apply(
@@ -259,7 +241,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let mut loads = self.par_load_many(area.par_points());
 
-                let _ = self.par_light_up(&loads, &Default::default());
+                self.light.par_load_many(&self.chunks, &loads);
 
                 loads.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
@@ -272,7 +254,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let loads = self.par_load_many(curr.par_exclusive_points(prev));
-                let light_updates = self.par_light_up(&loads, &unloads.iter().copied().collect());
+                let light_updates = self.light.par_load_many(&self.chunks, &loads);
                 let updates = self.updates(
                     &loads.iter().chain(&unloads).copied().collect(),
                     light_updates,
@@ -399,7 +381,6 @@ impl Branch {
         self,
         World {
             chunks,
-            heights,
             light,
             actions,
             ..
@@ -439,10 +420,6 @@ impl Branch {
                     }
                 }
             }
-        }
-
-        if heights.unload_many(chunks, &unloads) | heights.load_many(&loads) {
-            light.set_placeholders(heights.placeholders());
         }
 
         (
