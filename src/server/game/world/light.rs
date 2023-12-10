@@ -605,7 +605,7 @@ impl<'a> BlockLightRefMut<'a> {
                 coords,
                 fallback,
             } => {
-                entry.insert(FxHashMap::from_iter([(
+                entry.insert(FromIterator::from_iter([(
                     coords,
                     fallback.with_component(index, value),
                 )]));
