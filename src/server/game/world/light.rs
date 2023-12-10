@@ -69,7 +69,7 @@ impl WorldLight {
     ) -> Vec<Point3<i64>> {
         let points = Self::chunk_area_points(points)
             .filter(|coords| {
-                if !points.contains(coords) {
+                if points.contains(coords) {
                     true
                 } else {
                     self.unload(*coords);
