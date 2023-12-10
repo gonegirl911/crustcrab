@@ -47,11 +47,10 @@ impl WorldLight {
     }
 
     pub fn set_placeholders(&mut self, placeholders: FxHashSet<Point3<i32>>) {
-        self.lights.extend(
-            placeholders
-                .difference(&self.placeholders)
-                .map(|&coords| (coords, ChunkLight::placeholder())),
-        );
+        for &coords in placeholders.difference(&self.placeholders) {
+            *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+        }
+
         self.placeholders = placeholders;
     }
 
@@ -69,7 +68,7 @@ impl WorldLight {
     ) -> Vec<Point3<i64>> {
         let points = Self::chunk_area_points(points)
             .filter(|coords| {
-                if points.contains(coords) {
+                if !points.contains(coords) {
                     true
                 } else {
                     self.unload(*coords);

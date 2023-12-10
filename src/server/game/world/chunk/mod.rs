@@ -12,7 +12,7 @@ use crate::shared::{
 use nalgebra::{point, Point3, Vector3};
 use std::{
     array, mem,
-    ops::{Index, IndexMut},
+    ops::{BitOrAssign, Index, IndexMut},
 };
 
 #[derive(Default)]
@@ -113,13 +113,6 @@ pub struct ChunkLight {
 }
 
 impl ChunkLight {
-    pub fn placeholder() -> Self {
-        Self {
-            lights: DataStore::splat(BlockLight::placeholder()),
-            non_zero_count: Chunk::DIM.pow(3) as u16,
-        }
-    }
-
     pub fn set(&mut self, coords: Point3<u8>, value: BlockLight) -> bool {
         let prev = mem::replace(&mut self.lights[coords], value);
         if prev == value {
@@ -147,6 +140,20 @@ impl Index<Point3<u8>> for ChunkLight {
     }
 }
 
+impl BitOrAssign<BlockLight> for ChunkLight {
+    fn bitor_assign(&mut self, light: BlockLight) {
+        let mask = bytemuck::cast::<_, u128>([light; DataStore::CHUNK_SIZE]);
+
+        for lights in self.lights.array_chunks_mut() {
+            *bytemuck::cast_mut::<_, u128>(lights) |= mask;
+        }
+
+        if light != Default::default() {
+            self.non_zero_count = Chunk::DIM.pow(3) as u16;
+        }
+    }
+}
+
 #[derive(Default)]
 struct DataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
@@ -169,9 +176,14 @@ impl<T> DataStore<T> {
     }
 }
 
-impl<T: Copy> DataStore<T> {
-    fn splat(value: T) -> Self {
-        Self([[[value; Chunk::DIM]; Chunk::DIM]; Chunk::DIM])
+impl DataStore<BlockLight> {
+    const CHUNK_SIZE: usize = mem::size_of::<u128>() / mem::size_of::<BlockLight>();
+
+    fn array_chunks_mut(&mut self) -> impl Iterator<Item = &mut [BlockLight; Self::CHUNK_SIZE]> {
+        self.0
+            .iter_mut()
+            .flatten()
+            .flat_map(bytemuck::cast_mut::<_, [_; Chunk::DIM / Self::CHUNK_SIZE]>)
     }
 }
 
