@@ -76,9 +76,10 @@ impl WorldLight {
                         for (block_coords, opp) in side.points() {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
                             let value = neighbor[opp];
+                            let opp = utils::coords((chunk_coords, opp));
                             let filter = node.block().data().light_filter;
                             for i in Self::indices(side, chunk_coords) {
-                                let value = Self::value(i, node.coords, side, value.component(i));
+                                let value = Self::value(i, opp, side, value.component(i));
                                 if value != 0 && filter[i % 3] {
                                     nodes[i].insert(node.with_value(value));
                                 }
@@ -87,7 +88,7 @@ impl WorldLight {
                     }
                 }
 
-                for (i, nodes) in BlockLight::TORCHLIGHT_RANGE.zip(nodes) {
+                for (i, nodes) in nodes.into_iter().enumerate() {
                     for nodes in nodes {
                         branch.place_nodes(chunks, self, nodes, i);
                     }
