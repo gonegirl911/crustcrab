@@ -36,7 +36,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     collections::{hash_map::Entry, LinkedList},
     iter, mem,
-    ops::Range,
+    ops::{Index, Range},
 };
 
 #[derive(Default)]
@@ -359,6 +359,14 @@ impl ChunkStore {
 
     fn contains(&self, coords: Point3<i32>) -> bool {
         self.0.contains_key(&coords)
+    }
+}
+
+impl Index<Point3<i32>> for ChunkStore {
+    type Output = Chunk;
+
+    fn index(&self, coords: Point3<i32>) -> &Self::Output {
+        &self.0[&coords]
     }
 }
 

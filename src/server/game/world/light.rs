@@ -55,12 +55,12 @@ impl WorldLight {
         points
             .par_iter()
             .fold(Branch::default, |mut branch, &chunk_coords| {
-                let chunk = chunks.get(chunk_coords);
+                let chunk = &chunks[chunk_coords];
                 let light = self.get(chunk_coords);
 
-                if let Some(chunk) = chunk.filter(|chunk| chunk.is_glowing()) {
+                if chunk.is_glowing() {
                     for (block_coords, block) in chunk.blocks() {
-                        let node = Self::node(Some(chunk), light, chunk_coords, block_coords);
+                        let node = Self::node(chunk, light, chunk_coords, block_coords);
                         for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
                             if c != 0 {
                                 branch.place_node(chunks, self, node.with_value(c), i);
@@ -144,13 +144,13 @@ impl WorldLight {
     }
 
     fn node<'a>(
-        chunk: Option<&'a Chunk>,
+        chunk: &'a Chunk,
         light: Option<&'a ChunkLight>,
         chunk_coords: Point3<i32>,
         block_coords: Point3<u8>,
     ) -> Node<'a> {
         Node {
-            chunk,
+            chunk: Some(chunk),
             light,
             chunk_coords,
             block_coords,
