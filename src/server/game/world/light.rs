@@ -12,7 +12,7 @@ use super::{
     height::HeightMap,
     ChunkStore, World,
 };
-use crate::shared::utils;
+use crate::shared::{pool::NUM_CPUS, utils};
 use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -22,6 +22,7 @@ use std::{
         hash_map::{Entry, IntoValues, VacantEntry},
         VecDeque,
     },
+    num::NonZeroUsize,
     ops::Range,
 };
 
@@ -62,13 +63,58 @@ impl WorldLight {
         heights: &HeightMap,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
+        Self::chunk_size(points.len())
+            .map(|size| self.par_insert_many_chunks(chunks, heights, points, size))
+            .unwrap_or_default()
+    }
+
+    pub fn apply(
+        &mut self,
+        chunks: &ChunkStore,
+        coords: Point3<i64>,
+        action: BlockAction,
+    ) -> Vec<Point3<i64>> {
+        match action {
+            BlockAction::Place(block) => {
+                let mut branch = Branch::default();
+                branch.place(chunks, self, coords, block.data());
+                branch.merge(self)
+            }
+            BlockAction::Destroy => {
+                let mut branch = Branch::default();
+                branch.destroy(chunks, self, coords, self.flood(coords));
+                branch.merge(self)
+            }
+        }
+    }
+
+    fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
+        self.lights.get(&coords)
+    }
+
+    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
+        self.lights.entry(coords)
+    }
+
+    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
+        self.get(utils::chunk_coords(coords))
+            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
+    }
+
+    fn par_insert_many_chunks(
+        &mut self,
+        chunks: &ChunkStore,
+        heights: &HeightMap,
+        points: &[Point3<i32>],
+        size: usize,
+    ) -> Vec<Point3<i64>> {
         for coords in points {
             self.lights.remove(coords);
         }
 
         points
             .par_iter()
-            .fold(Branch::default, |mut branch, &chunk_coords| {
+            .fold_chunks(size, Branch::default, |mut branch, &chunk_coords| {
                 let chunk = &chunks[chunk_coords];
                 let light = self.get(chunk_coords);
                 let mut nodes = <[NodeGatherer; BlockLight::LEN]>::default();
@@ -114,39 +160,6 @@ impl WorldLight {
             .merge(self)
     }
 
-    pub fn apply(
-        &mut self,
-        chunks: &ChunkStore,
-        coords: Point3<i64>,
-        action: BlockAction,
-    ) -> Vec<Point3<i64>> {
-        match action {
-            BlockAction::Place(block) => {
-                let mut branch = Branch::default();
-                branch.place(chunks, self, coords, block.data());
-                branch.merge(self)
-            }
-            BlockAction::Destroy => {
-                let mut branch = Branch::default();
-                branch.destroy(chunks, self, coords, self.flood(coords));
-                branch.merge(self)
-            }
-        }
-    }
-
-    fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
-        self.lights.get(&coords)
-    }
-
-    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
-        self.lights.entry(coords)
-    }
-
-    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
-        self.get(utils::chunk_coords(coords))
-            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
-    }
-
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
             .map(|(side, coords)| {
@@ -165,6 +178,10 @@ impl WorldLight {
 
     fn absorption(index: usize, coords: Point3<i64>, value: u8, side: Side, target: Side) -> u8 {
         !(Self::is_exposed(index, coords, value) && side == target) as u8
+    }
+
+    fn chunk_size(len: usize) -> Option<usize> {
+        NonZeroUsize::new(len.div_ceil(*NUM_CPUS)).map(NonZeroUsize::get)
     }
 
     fn node<'a>(
