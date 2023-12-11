@@ -43,7 +43,7 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn par_load_many(
+    pub fn par_insert_many(
         &mut self,
         chunks: &ChunkStore,
         points: &[Point3<i32>],

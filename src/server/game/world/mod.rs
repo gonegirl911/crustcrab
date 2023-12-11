@@ -51,17 +51,29 @@ pub struct World {
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    fn par_load_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    fn par_load_many<I>(&mut self, points: I) -> (Vec<Point3<i32>>, Vec<Point3<i32>>)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
-        points
-            .into_par_iter()
-            .map(|coords| (coords, self.gen(coords)))
-            .collect::<LinkedList<_>>()
-            .into_iter()
-            .filter_map(|(coords, chunk)| self.chunks.load(coords, chunk).then_some(coords))
-            .collect()
+        let mut inserts = vec![];
+        (
+            points
+                .into_par_iter()
+                .map(|coords| (coords, self.gen(coords)))
+                .collect::<LinkedList<_>>()
+                .into_iter()
+                .filter_map(|(coords, chunk)| match chunk {
+                    Some(Some(chunk)) => {
+                        self.chunks.insert(coords, chunk);
+                        inserts.push(coords);
+                        Some(coords)
+                    }
+                    Some(None) => None,
+                    None => Some(coords),
+                })
+                .collect(),
+            inserts,
+        )
     }
 
     fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
@@ -70,7 +82,7 @@ impl World {
     {
         points
             .into_iter()
-            .filter(|&coords| self.chunks.unload(coords))
+            .filter(|&coords| self.chunks.contains(coords))
             .collect()
     }
 
@@ -177,12 +189,14 @@ impl World {
         );
     }
 
-    fn gen(&self, coords: Point3<i32>) -> Box<Chunk> {
-        let mut chunk = Box::new(self.generator.gen(coords));
-        for (coords, action) in self.actions.actions(coords) {
-            chunk.apply_unchecked(coords, action);
-        }
-        chunk
+    fn gen(&self, coords: Point3<i32>) -> Option<Option<Box<Chunk>>> {
+        (!self.chunks.contains(coords)).then(|| {
+            let mut chunk = Box::new(self.generator.gen(coords));
+            for (coords, action) in self.actions.actions(coords) {
+                chunk.apply_unchecked(coords, action);
+            }
+            (!chunk.is_empty()).then_some(chunk)
+        })
     }
 
     fn updates<I: IntoIterator<Item = Point3<i64>>>(
@@ -239,22 +253,22 @@ impl EventHandler<WorldEvent> for World {
     fn handle(&mut self, event: &WorldEvent, proxy: Self::Context<'_>) {
         match *event {
             WorldEvent::InitialRenderRequested { area, ray } => {
-                let mut loads = self.par_load_many(area.par_points());
+                let (_, mut inserts) = self.par_load_many(area.par_points());
 
-                self.light.par_load_many(&self.chunks, &loads);
+                self.light.par_insert_many(&self.chunks, &inserts);
 
-                loads.par_sort_unstable_by_key(|coords| {
+                inserts.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
                 });
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                self.par_send_loads(loads, proxy, false);
+                self.par_send_loads(inserts, proxy, false);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
-                let loads = self.par_load_many(curr.par_exclusive_points(prev));
-                let light_updates = self.light.par_load_many(&self.chunks, &loads);
+                let (loads, inserts) = self.par_load_many(curr.par_exclusive_points(prev));
+                let light_updates = self.light.par_insert_many(&self.chunks, &inserts);
                 let updates = self.updates(
                     &loads.iter().chain(&unloads).copied().collect(),
                     light_updates,
@@ -331,17 +345,8 @@ impl ChunkStore {
             .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
     }
 
-    fn load(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) -> bool {
-        if !chunk.is_empty() {
-            assert!(self.0.insert(coords, chunk).is_none());
-            true
-        } else {
-            false
-        }
-    }
-
-    fn unload(&mut self, coords: Point3<i32>) -> bool {
-        self.0.remove(&coords).is_some()
+    fn insert(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) {
+        assert!(self.0.insert(coords, chunk).is_none());
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
