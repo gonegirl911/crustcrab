@@ -421,7 +421,7 @@ struct NodeGatherer<'a>(FxHashMap<u8, Vec<Node<'a>>>);
 
 impl<'a> NodeGatherer<'a> {
     fn insert(&mut self, node: Node<'a>) {
-        self.0.entry(node.value / 2).or_default().push(node);
+        self.0.entry(node.value).or_default().push(node);
     }
 }
 
