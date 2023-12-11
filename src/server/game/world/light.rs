@@ -9,6 +9,7 @@ use super::{
         area::{ChunkArea, ChunkAreaLight},
         Chunk, ChunkLight,
     },
+    height::HeightMap,
     ChunkStore, World,
 };
 use crate::shared::utils;
@@ -47,6 +48,7 @@ impl WorldLight {
     pub fn par_insert_many(
         &mut self,
         chunks: &ChunkStore,
+        heights: &HeightMap,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
         for coords in points {
@@ -73,12 +75,13 @@ impl WorldLight {
 
                 for (side, delta) in *SIDE_DELTAS {
                     if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
+                        let indices = Self::indices(side, chunk_coords, heights);
                         for (block_coords, opp) in side.points() {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
                             let value = neighbor[opp];
                             let opp = utils::coords((chunk_coords, opp));
                             let filter = node.block().data().light_filter;
-                            for i in Self::indices(side, chunk_coords) {
+                            for i in indices.clone() {
                                 let value = Self::value(i, opp, side, value.component(i));
                                 if value != 0 && filter[i % 3] {
                                     nodes[i].insert(node.with_value(value));
@@ -169,8 +172,12 @@ impl WorldLight {
         }
     }
 
-    fn indices(side: Side, coords: Point3<i32>) -> impl Iterator<Item = usize> + Clone {
-        Self::skylight_range(side, coords).chain(BlockLight::TORCHLIGHT_RANGE)
+    fn indices(
+        side: Side,
+        coords: Point3<i32>,
+        heights: &HeightMap,
+    ) -> impl Iterator<Item = usize> + Clone {
+        Self::skylight_range(side, coords, heights).chain(BlockLight::TORCHLIGHT_RANGE)
     }
 
     fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
@@ -183,11 +190,19 @@ impl WorldLight {
             && value == BlockLight::COMPONENT_MAX
     }
 
-    fn skylight_range(side: Side, coords: Point3<i32>) -> Range<usize> {
-        if (side == Side::Top && coords.y == 3) || !matches!(side, Side::Top | Side::Bottom) {
+    fn skylight_range(side: Side, coords: Point3<i32>, heights: &HeightMap) -> Range<usize> {
+        if Self::includes_skylight(side, coords, heights) {
             BlockLight::SKYLIGHT_RANGE
         } else {
             0..0
+        }
+    }
+
+    fn includes_skylight(side: Side, coords: Point3<i32>, heights: &HeightMap) -> bool {
+        match side {
+            Side::Top => coords.y == heights[coords.xz()],
+            Side::Bottom => false,
+            _ => true,
         }
     }
 }

@@ -1,6 +1,7 @@
 pub mod action;
 pub mod block;
 pub mod chunk;
+pub mod height;
 pub mod light;
 
 use self::{
@@ -15,6 +16,7 @@ use self::{
         generator::ChunkGenerator,
         Chunk,
     },
+    height::HeightMap,
     light::WorldLight,
 };
 use super::player::ray::Hittable;
@@ -42,6 +44,7 @@ use std::{
 #[derive(Default)]
 pub struct World {
     chunks: ChunkStore,
+    heights: HeightMap,
     generator: ChunkGenerator,
     actions: ActionStore,
     light: WorldLight,
@@ -84,6 +87,11 @@ impl World {
             .into_iter()
             .filter(|&coords| self.chunks.contains(coords))
             .collect()
+    }
+
+    fn par_light_up(&mut self, points: &[Point3<i32>]) -> Vec<Point3<i64>> {
+        self.light
+            .par_insert_many(&self.chunks, &self.heights, points)
     }
 
     fn apply(
@@ -255,7 +263,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::InitialRenderRequested { area, ray } => {
                 let (_, mut inserts) = self.par_load_many(area.par_points());
 
-                self.light.par_insert_many(&self.chunks, &inserts);
+                self.par_light_up(&inserts);
 
                 inserts.par_sort_unstable_by_key(|coords| {
                     utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
@@ -268,7 +276,7 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let (loads, inserts) = self.par_load_many(curr.par_exclusive_points(prev));
-                let light_updates = self.light.par_insert_many(&self.chunks, &inserts);
+                let light_updates = self.par_light_up(&inserts);
                 let updates = self.updates(
                     &loads.iter().chain(&unloads).copied().collect(),
                     light_updates,
