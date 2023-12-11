@@ -21,6 +21,7 @@ use std::{
         hash_map::{Entry, IntoValues, VacantEntry},
         VecDeque,
     },
+    ops::Range,
 };
 
 #[derive(Default)]
@@ -57,14 +58,14 @@ impl WorldLight {
             .fold(Branch::default, |mut branch, &chunk_coords| {
                 let chunk = &chunks[chunk_coords];
                 let light = self.get(chunk_coords);
-                let mut nodes = <[NodeGatherer; 3]>::default();
+                let mut nodes = <[NodeGatherer; BlockLight::LEN]>::default();
 
                 if chunk.is_glowing() {
                     for (block_coords, block) in chunk.blocks() {
                         let node = Self::node(chunk, light, chunk_coords, block_coords);
                         for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
                             if c != 0 {
-                                nodes[i % 3].insert(node.with_value(c));
+                                nodes[i].insert(node.with_value(c));
                             }
                         }
                     }
@@ -74,11 +75,12 @@ impl WorldLight {
                     if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
                         for (block_coords, opp) in side.points() {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            let value = neighbor[opp].torchlight();
+                            let value = neighbor[opp];
                             let filter = node.block().data().light_filter;
-                            for ((i, c), f) in BlockLight::TORCHLIGHT_RANGE.zip(value).zip(filter) {
-                                if c > 1 && f {
-                                    nodes[i % 3].insert(node.with_value(c - 1));
+                            for i in Self::indices(side, chunk_coords) {
+                                let value = Self::value(i, node.coords, side, value.component(i));
+                                if value != 0 && filter[i % 3] {
+                                    nodes[i].insert(node.with_value(value));
                                 }
                             }
                         }
@@ -166,6 +168,10 @@ impl WorldLight {
         }
     }
 
+    fn indices(side: Side, coords: Point3<i32>) -> impl Iterator<Item = usize> + Clone {
+        Self::skylight_range(side, coords).chain(BlockLight::TORCHLIGHT_RANGE)
+    }
+
     fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
         value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
     }
@@ -174,6 +180,14 @@ impl WorldLight {
         BlockLight::SKYLIGHT_RANGE.contains(&index)
             && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
             && value == BlockLight::COMPONENT_MAX
+    }
+
+    fn skylight_range(side: Side, coords: Point3<i32>) -> Range<usize> {
+        if (side == Side::Top && coords.y == 3) || !matches!(side, Side::Top | Side::Bottom) {
+            BlockLight::SKYLIGHT_RANGE
+        } else {
+            0..0
+        }
     }
 }
 

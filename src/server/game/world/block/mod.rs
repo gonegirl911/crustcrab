@@ -60,21 +60,13 @@ bitfield! {
 }
 
 impl BlockLight {
-    const LEN: usize = 6;
+    pub const LEN: usize = 6;
     pub const COMPONENT_MAX: u8 = 15;
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
     fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
         array::from_fn(f).into()
-    }
-
-    fn skylight(self) -> Rgb<u8> {
-        Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
-    }
-
-    pub fn torchlight(self) -> Rgb<u8> {
-        Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
     }
 
     pub fn lum(self) -> f32 {
@@ -98,6 +90,14 @@ impl BlockLight {
 
     fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {
         Self::from_fn(|i| f(self.component(i), other.component(i)))
+    }
+
+    fn skylight(self) -> Rgb<u8> {
+        Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
+    }
+
+    fn torchlight(self) -> Rgb<u8> {
+        Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
     }
 
     fn linearize(color: Rgb<u8>) -> Rgb<f32> {
