@@ -110,9 +110,11 @@ impl WorldArea {
     }
 
     fn y_range(self, radius: i32) -> Range<i32> {
-        self.is_close_enough(radius)
-            .then_some(World::Y_RANGE)
-            .unwrap_or_default()
+        if self.is_close_enough(radius) {
+            World::Y_RANGE
+        } else {
+            0..0
+        }
     }
 
     fn coords(self, delta: Vector3<i32>) -> Point3<i32> {
