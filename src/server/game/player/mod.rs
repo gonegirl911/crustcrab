@@ -110,11 +110,17 @@ impl WorldArea {
     }
 
     fn y_range(self, radius: i32) -> Range<i32> {
-        World::Y_RANGE.start.max(self.center.y - radius)..World::Y_RANGE.end
+        self.is_close_enough(radius)
+            .then_some(World::Y_RANGE)
+            .unwrap_or_default()
     }
 
     fn coords(self, delta: Vector3<i32>) -> Point3<i32> {
         point![self.center.x, 0, self.center.z] + delta
+    }
+
+    fn is_close_enough(self, radius: i32) -> bool {
+        (World::Y_RANGE.start - radius..World::Y_RANGE.end + radius).contains(&self.center.y)
     }
 }
 
