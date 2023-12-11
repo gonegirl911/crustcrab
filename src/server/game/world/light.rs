@@ -18,7 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp::Ordering,
     collections::{
-        hash_map::{Entry, VacantEntry},
+        hash_map::{Entry, IntoValues, VacantEntry},
         VecDeque,
     },
 };
@@ -57,13 +57,14 @@ impl WorldLight {
             .fold(Branch::default, |mut branch, &chunk_coords| {
                 let chunk = &chunks[chunk_coords];
                 let light = self.get(chunk_coords);
+                let mut nodes = <[NodeGatherer; 3]>::default();
 
                 if chunk.is_glowing() {
                     for (block_coords, block) in chunk.blocks() {
                         let node = Self::node(chunk, light, chunk_coords, block_coords);
                         for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
                             if c != 0 {
-                                branch.place_node(chunks, self, node.with_value(c), i);
+                                nodes[i % 3].insert(node.with_value(c));
                             }
                         }
                     }
@@ -77,10 +78,16 @@ impl WorldLight {
                             let filter = node.block().data().light_filter;
                             for ((i, c), f) in BlockLight::TORCHLIGHT_RANGE.zip(value).zip(filter) {
                                 if c > 1 && f {
-                                    branch.place_node(chunks, self, node.with_value(c - 1), i);
+                                    nodes[i % 3].insert(node.with_value(c - 1));
                                 }
                             }
                         }
+                    }
+                }
+
+                for (i, nodes) in BlockLight::TORCHLIGHT_RANGE.zip(nodes) {
+                    for nodes in nodes {
+                        branch.place_nodes(chunks, self, nodes, i);
                     }
                 }
 
@@ -269,12 +276,11 @@ impl Branch {
             let component = block_light.component(index);
             if component > value {
                 block_light.set_component(index, 0);
-                self.unspread_component(chunks, light, node.with_value(component), index);
+                self.unspread_node(chunks, light, node.with_value(component), index);
             }
         }
     }
 
-    #[rustfmt::skip]
     fn place_component(
         &mut self,
         chunks: &ChunkStore,
@@ -284,7 +290,12 @@ impl Branch {
         value: u8,
     ) {
         if value != 0 {
-            self.place_node(chunks, light, Node::new(chunks, light, coords, value), index);
+            self.place_nodes(
+                chunks,
+                light,
+                [Node::new(chunks, light, coords, value)],
+                index,
+            );
         }
     }
 
@@ -302,34 +313,40 @@ impl Branch {
         match component.cmp(&value) {
             Ordering::Less => {
                 block_light.set_component(index, value);
-                self.spread_component(chunks, light, node, index);
+                self.spread_nodes(chunks, light, Self::collections([node]), index);
             }
             Ordering::Equal => {}
             Ordering::Greater => {
                 block_light.set_component(index, 0);
-                self.unspread_component(chunks, light, node.with_value(component), index);
+                self.unspread_node(chunks, light, node.with_value(component), index);
             }
         }
     }
 
-    fn place_node(&mut self, chunks: &ChunkStore, light: &WorldLight, node: Node, index: usize) {
-        let block_light = BlockLightRefMut::new(self, &node);
-        if block_light.component(index) < node.value {
-            block_light.set_component(index, node.value);
-            self.spread_component(chunks, light, node, index);
-        }
-    }
-
-    fn unspread_component(
+    fn place_nodes<'a, I: IntoIterator<Item = Node<'a>>>(
         &mut self,
         chunks: &ChunkStore,
         light: &WorldLight,
-        node: Node,
+        nodes: I,
         index: usize,
     ) {
+        let collections = Self::collections(nodes.into_iter().filter(|node| {
+            let block_light = BlockLightRefMut::new(self, node);
+            if block_light.component(index) < node.value {
+                block_light.set_component(index, node.value);
+                true
+            } else {
+                false
+            }
+        }));
+
+        self.spread_nodes(chunks, light, collections, index);
+    }
+
+    fn unspread_node(&mut self, chunks: &ChunkStore, light: &WorldLight, node: Node, index: usize) {
         let mut visits = FxHashSet::from_iter([node.coords]);
         let mut deq = VecDeque::from([node]);
-        let mut sources = vec![];
+        let mut sources = NodeGatherer::default();
 
         while let Some(node) = deq.pop_front() {
             for node in node.unvisited_neighbors(chunks, light, index, &mut visits) {
@@ -343,32 +360,30 @@ impl Branch {
                         Ordering::Equal => {
                             block_light.set_component(index, value);
                             if value != 0 {
-                                sources.push(node.with_value(value));
+                                sources.insert(node.with_value(value));
                             }
                             deq.push_back(node);
                         }
-                        Ordering::Greater => sources.push(node.with_value(component)),
+                        Ordering::Greater => sources.insert(node.with_value(component)),
                     }
                 } else if value != 0 {
-                    sources.push(node.with_value(value));
+                    sources.insert(node.with_value(value));
                 }
             }
         }
 
-        for node in sources {
-            self.spread_component(chunks, light, node, index);
+        for nodes in sources {
+            self.spread_nodes(chunks, light, Self::collections(nodes), index);
         }
     }
 
-    fn spread_component(
+    fn spread_nodes(
         &mut self,
         chunks: &ChunkStore,
         light: &WorldLight,
-        node: Node,
+        (mut visits, mut deq): (FxHashSet<Point3<i64>>, VecDeque<Node>),
         index: usize,
     ) {
-        let mut visits = FxHashSet::from_iter([node.coords]);
-        let mut deq = VecDeque::from([node]);
         while let Some(node) = deq.pop_front() {
             for node in node.unvisited_neighbors(chunks, light, index, &mut visits) {
                 if node.block().data().light_filter[index % 3] {
@@ -389,8 +404,33 @@ impl Branch {
         self.0.entry(coords)
     }
 
+    fn collections<'a, I>(nodes: I) -> (FxHashSet<Point3<i64>>, VecDeque<Node<'a>>)
+    where
+        I: IntoIterator<Item = Node<'a>>,
+    {
+        nodes.into_iter().map(|node| (node.coords, node)).unzip()
+    }
+
     fn value(data: BlockData, index: usize) -> u8 {
         data.luminance[index % 3] * BlockLight::TORCHLIGHT_RANGE.contains(&index) as u8
+    }
+}
+
+#[derive(Default)]
+struct NodeGatherer<'a>(FxHashMap<u8, Vec<Node<'a>>>);
+
+impl<'a> NodeGatherer<'a> {
+    fn insert(&mut self, node: Node<'a>) {
+        self.0.entry(node.value / 2).or_default().push(node);
+    }
+}
+
+impl<'a> IntoIterator for NodeGatherer<'a> {
+    type Item = Vec<Node<'a>>;
+    type IntoIter = IntoValues<u8, Vec<Node<'a>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_values()
     }
 }
 
