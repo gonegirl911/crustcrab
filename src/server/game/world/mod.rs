@@ -89,9 +89,13 @@ impl World {
             .collect()
     }
 
+    #[rustfmt::skip]
     fn par_light_up(&mut self, points: &[Point3<i32>]) -> Vec<Point3<i64>> {
-        self.light
-            .par_insert_many(&self.chunks, &self.heights, points)
+        if self.heights.load_many(points) {
+            self.light.set_placeholders(self.heights.placeholders());
+        }
+
+        self.light.par_insert_many(&self.chunks, &self.heights, points)
     }
 
     fn apply(
@@ -402,6 +406,7 @@ impl Branch {
         self,
         World {
             chunks,
+            heights,
             light,
             actions,
             ..
@@ -441,6 +446,10 @@ impl Branch {
                     }
                 }
             }
+        }
+
+        if heights.unload_many(chunks, &unloads) | heights.load_many(&loads) {
+            light.set_placeholders(heights.placeholders());
         }
 
         (

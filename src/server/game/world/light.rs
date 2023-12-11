@@ -26,7 +26,10 @@ use std::{
 };
 
 #[derive(Default)]
-pub struct WorldLight(FxHashMap<Point3<i32>, ChunkLight>);
+pub struct WorldLight {
+    lights: FxHashMap<Point3<i32>, ChunkLight>,
+    placeholders: FxHashSet<Point3<i32>>,
+}
 
 impl WorldLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
@@ -45,6 +48,14 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
+    pub fn set_placeholders(&mut self, placeholders: FxHashSet<Point3<i32>>) {
+        for &coords in placeholders.difference(&self.placeholders) {
+            *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+        }
+
+        self.placeholders = placeholders;
+    }
+
     pub fn par_insert_many(
         &mut self,
         chunks: &ChunkStore,
@@ -52,7 +63,7 @@ impl WorldLight {
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
         for coords in points {
-            self.0.remove(coords);
+            self.lights.remove(coords);
         }
 
         points
@@ -124,11 +135,11 @@ impl WorldLight {
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
-        self.0.get(&coords)
+        self.lights.get(&coords)
     }
 
     fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
-        self.0.entry(coords)
+        self.lights.entry(coords)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
