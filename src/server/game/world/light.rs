@@ -339,6 +339,7 @@ impl Branch {
         }
     }
 
+    #[rustfmt::skip]
     fn place_component(
         &mut self,
         chunks: &ChunkStore,
@@ -348,12 +349,7 @@ impl Branch {
         value: u8,
     ) {
         if value != 0 {
-            self.place_nodes(
-                chunks,
-                light,
-                [Node::new(chunks, light, coords, value)],
-                index,
-            );
+            self.place_nodes(chunks, light, [Node::new(chunks, light, coords, value)], index);
         }
     }
 
