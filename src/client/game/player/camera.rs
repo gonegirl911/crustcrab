@@ -122,7 +122,7 @@ impl Controller {
         changes
     }
 
-    fn apply_rotation(&mut self, view: &mut View) {
+    fn apply_rotation(&self, view: &mut View) {
         const BOUND_Y: f32 = FRAC_PI_2 - f32::EPSILON;
 
         view.yaw = (view.yaw - self.dx * self.sensitivity) % TAU;
@@ -132,7 +132,7 @@ impl Controller {
         view.up = view.forward.cross(&view.right);
     }
 
-    fn apply_movement(&mut self, view: &mut View, dt: Duration) {
+    fn apply_movement(&self, view: &mut View, dt: Duration) {
         let mut dir = Vector3::zeros();
         let right = view.right;
         let up = Vector3::y();
