@@ -22,8 +22,8 @@ pub struct View {
 impl View {
     pub fn new(origin: Point3<f32>, dir: Vector3<f32>) -> Self {
         let forward = dir.normalize();
-        let right = Vector3::y().cross(&forward).normalize();
-        let up = forward.cross(&right);
+        let right = Self::right(forward);
+        let up = Self::up(forward, right);
         let yaw = forward.z.atan2(forward.x);
         let pitch = forward.y.asin();
         Self {
@@ -43,6 +43,22 @@ impl View {
             self.forward.x, self.forward.y, self.forward.z, -self.origin.coords.dot(&self.forward);
             0.0,            0.0,            0.0,            1.0;
         ]
+    }
+
+    fn forward(yaw: f32, pitch: f32) -> Vector3<f32> {
+        vector![
+            yaw.cos() * pitch.cos(),
+            pitch.sin(),
+            yaw.sin() * pitch.cos()
+        ]
+    }
+
+    fn right(forward: Vector3<f32>) -> Vector3<f32> {
+        Vector3::y().cross(&forward).normalize()
+    }
+
+    fn up(forward: Vector3<f32>, right: Vector3<f32>) -> Vector3<f32> {
+        forward.cross(&right)
     }
 }
 
@@ -127,16 +143,14 @@ impl Controller {
 
         view.yaw = (view.yaw - self.dx * self.sensitivity) % TAU;
         view.pitch = (view.pitch - self.dy * self.sensitivity).clamp(-BOUND_Y, BOUND_Y);
-        view.forward = Self::forward(view.yaw, view.pitch);
-        view.right = Vector3::y().cross(&view.forward).normalize();
-        view.up = view.forward.cross(&view.right);
+        view.forward = View::forward(view.yaw, view.pitch);
+        view.right = View::right(view.forward);
+        view.up = View::up(view.forward, view.right);
     }
 
     fn apply_movement(&self, view: &mut View, dt: Duration) {
         let mut dir = Vector3::zeros();
-        let right = view.right;
-        let up = Vector3::y();
-        let forward = right.cross(&up);
+        let forward = view.right.cross(&Vector3::y());
 
         if self.relevant_keys.contains(Keys::W) {
             dir += forward;
@@ -145,26 +159,18 @@ impl Controller {
         }
 
         if self.relevant_keys.contains(Keys::A) {
-            dir -= right;
+            dir -= view.right;
         } else if self.relevant_keys.contains(Keys::D) {
-            dir += right;
+            dir += view.right;
         }
 
         if self.relevant_keys.contains(Keys::SPACE) {
-            dir += up;
+            dir.y += 1.0;
         } else if self.relevant_keys.contains(Keys::LSHIFT) {
-            dir -= up;
+            dir.y -= 1.0;
         }
 
         view.origin += dir.normalize() * self.speed * dt.as_secs_f32();
-    }
-
-    fn forward(yaw: f32, pitch: f32) -> Vector3<f32> {
-        vector![
-            yaw.cos() * pitch.cos(),
-            pitch.sin(),
-            yaw.sin() * pitch.cos()
-        ]
     }
 }
 
