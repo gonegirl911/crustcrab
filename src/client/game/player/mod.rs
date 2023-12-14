@@ -31,10 +31,10 @@ pub struct Player {
 
 impl Player {
     pub fn new(renderer: &Renderer) -> Self {
-        let state = &CLIENT_CONFIG.player;
-        let view = View::new(state.origin, Vector3::x());
-        let projection = Projection::new(state.fovy, 0.0, 0.1, state.zfar());
-        let controller = Controller::new(state.speed, state.sensitivity);
+        let config = &CLIENT_CONFIG.player;
+        let view = View::new(config.origin, Vector3::x());
+        let projection = Projection::new(config.fovy, 0.0, 0.1, config.zfar());
+        let controller = Controller::new(config.speed, config.sensitivity);
         let uniform = Uniform::new(
             renderer,
             MemoryState::UNINIT,
