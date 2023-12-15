@@ -6,14 +6,11 @@ use std::{collections::hash_map::Entry, ops::Index};
 pub struct HeightMap(FxHashMap<Point2<i32>, i32>);
 
 impl HeightMap {
-    pub fn load_many<'a, I: IntoIterator<Item = &'a Point3<i32>>>(&mut self, loads: I) -> bool {
-        loads
-            .into_iter()
-            .fold(false, |accum, &coords| accum | self.load(coords))
-    }
-
-    pub fn placeholders(&self) -> FxHashSet<Point3<i32>> {
-        Self::chunk_area_points(self.0.keys().copied())
+    pub fn load_placeholders<'a, I>(&mut self, points: I) -> impl Iterator<Item = Point3<i32>> + '_
+    where
+        I: IntoIterator<Item = &'a Point3<i32>>,
+    {
+        Self::chunk_area_points(points.into_iter().filter_map(|&coords| self.load(coords)))
             .collect::<FxHashSet<_>>()
             .into_iter()
             .flat_map(|coords| {
@@ -21,22 +18,19 @@ impl HeightMap {
                 let bottom = self.bottom(coords).unwrap_or(top);
                 (bottom..=top).map(move |y| point![coords.x, y, coords.y])
             })
-            .collect()
     }
 
-    fn load(&mut self, coords: Point3<i32>) -> bool {
-        match self.0.entry(coords.xz()) {
-            Entry::Occupied(entry) => {
-                if *entry.get() < coords.y {
-                    *entry.into_mut() = coords.y;
-                    true
-                } else {
-                    false
-                }
+    fn load(&mut self, coords: Point3<i32>) -> Option<Point2<i32>> {
+        let xz = coords.xz();
+        match self.0.entry(xz) {
+            Entry::Occupied(entry) if *entry.get() < coords.y => {
+                *entry.into_mut() = coords.y;
+                Some(xz)
             }
+            Entry::Occupied(_) => None,
             Entry::Vacant(entry) => {
                 entry.insert(coords.y);
-                true
+                Some(xz)
             }
         }
     }

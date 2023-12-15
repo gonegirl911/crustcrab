@@ -49,12 +49,12 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn set_placeholders(&mut self, placeholders: FxHashSet<Point3<i32>>) {
-        for &coords in placeholders.difference(&self.placeholders) {
-            *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+    pub fn extend_placeholders<I: IntoIterator<Item = Point3<i32>>>(&mut self, points: I) {
+        for coords in points {
+            if self.placeholders.insert(coords) {
+                *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+            }
         }
-
-        self.placeholders = placeholders;
     }
 
     pub fn par_insert_many(
