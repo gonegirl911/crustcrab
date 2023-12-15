@@ -448,7 +448,7 @@ impl Branch {
             }
         }
 
-        if heights.unload_many(chunks, &unloads) | heights.load_many(&loads) {
+        if heights.load_many(&loads) {
             light.set_placeholders(heights.placeholders());
         }
 
