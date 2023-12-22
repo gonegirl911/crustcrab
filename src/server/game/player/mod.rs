@@ -39,7 +39,7 @@ impl EventHandler<Event> for Player {
                     self.ray.dir = dir;
                 }
                 ClientEvent::PlayerPositionChanged { origin } => {
-                    self.curr.center = utils::chunk_coords(origin);
+                    self.curr.set_origin(origin);
                     self.ray.origin = origin;
                 }
                 _ => {}
@@ -82,6 +82,10 @@ impl WorldArea {
     ) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_points()
             .filter(move |&coords| !other.contains(coords))
+    }
+
+    fn set_origin(&mut self, coords: Point3<f32>) {
+        self.center = utils::chunk_coords(coords);
     }
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
