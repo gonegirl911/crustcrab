@@ -32,14 +32,17 @@ impl EventHandler<Event> for Player {
                     dir,
                     render_distance,
                 } => {
-                    self.curr = WorldArea::new(origin, render_distance);
+                    self.curr = WorldArea {
+                        center: utils::chunk_coords(origin),
+                        radius: render_distance as i32,
+                    };
                     self.ray = Ray { origin, dir };
                 }
                 ClientEvent::PlayerOrientationChanged { dir } => {
                     self.ray.dir = dir;
                 }
                 ClientEvent::PlayerPositionChanged { origin } => {
-                    self.curr.set_origin(origin);
+                    self.curr.center = utils::chunk_coords(origin);
                     self.ray.origin = origin;
                 }
                 _ => {}
@@ -55,13 +58,6 @@ pub struct WorldArea {
 }
 
 impl WorldArea {
-    fn new(origin: Point3<f32>, render_distance: u32) -> Self {
-        Self {
-            center: utils::chunk_coords(origin),
-            radius: render_distance as i32,
-        }
-    }
-
     fn points(self) -> impl Iterator<Item = Point3<i32>> {
         self.cuboid_points()
             .filter(move |&coords| self.contains(coords))
@@ -82,10 +78,6 @@ impl WorldArea {
     ) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_points()
             .filter(move |&coords| !other.contains(coords))
-    }
-
-    fn set_origin(&mut self, coords: Point3<f32>) {
-        self.center = utils::chunk_coords(coords);
     }
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
