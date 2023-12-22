@@ -167,7 +167,7 @@ impl Default for StarPushConstants {
 }
 
 impl PushConstants for StarPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
+    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::FRAGMENT;
 }
 
 #[derive(Deserialize)]

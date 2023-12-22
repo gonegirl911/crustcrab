@@ -23,7 +23,7 @@ pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
 
 pub fn magnitude_squared<T, const N: usize>(vector: SVector<T, N>) -> T
 where
-    T: Copy + Mul<Output = T> + Sum<T>,
+    T: Mul<Output = T> + Sum<T> + Copy,
 {
     vector.iter().copied().map(|c| c * c).sum()
 }

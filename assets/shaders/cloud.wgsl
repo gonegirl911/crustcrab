@@ -78,8 +78,7 @@ var s_clouds: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let is_visible = textureSample(t_clouds, s_clouds, in.offset).a == 1.0;
-    if is_visible {
+    if textureSample(t_clouds, s_clouds, in.offset).a == 1.0 {
         return vec4(pc.color * in.light, 1.0);
     } else {
         discard;
