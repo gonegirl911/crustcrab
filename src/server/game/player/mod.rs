@@ -7,7 +7,7 @@ use crate::{
     server::event_loop::{Event, EventHandler},
     shared::utils,
 };
-use nalgebra::{point, vector, Point3, Vector3};
+use nalgebra::{point, Point3};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::ops::Range;
@@ -32,10 +32,7 @@ impl EventHandler<Event> for Player {
                     dir,
                     render_distance,
                 } => {
-                    self.curr = WorldArea {
-                        center: utils::chunk_coords(origin),
-                        radius: render_distance,
-                    };
+                    self.curr = WorldArea::new(origin, render_distance);
                     self.ray = Ray { origin, dir };
                 }
                 ClientEvent::PlayerOrientationChanged { dir } => {
@@ -53,12 +50,19 @@ impl EventHandler<Event> for Player {
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct WorldArea {
-    pub center: Point3<i32>,
-    pub radius: u32,
+    center: Point3<i32>,
+    radius: i32,
 }
 
 impl WorldArea {
-    pub fn points(self) -> impl Iterator<Item = Point3<i32>> {
+    fn new(origin: Point3<f32>, render_distance: u32) -> Self {
+        Self {
+            center: utils::chunk_coords(origin),
+            radius: render_distance as i32,
+        }
+    }
+
+    fn points(self) -> impl Iterator<Item = Point3<i32>> {
         self.cuboid_points()
             .filter(move |&coords| self.contains(coords))
     }
@@ -69,8 +73,7 @@ impl WorldArea {
     }
 
     pub fn exclusive_points(self, other: WorldArea) -> impl Iterator<Item = Point3<i32>> {
-        self.points()
-            .filter(move |&coords| self.is_exclusive(coords, other))
+        self.points().filter(move |&coords| !other.contains(coords))
     }
 
     pub fn par_exclusive_points(
@@ -78,51 +81,35 @@ impl WorldArea {
         other: WorldArea,
     ) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_points()
-            .filter(move |&coords| self.is_exclusive(coords, other))
+            .filter(move |&coords| !other.contains(coords))
     }
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
-        let radius = self.radius as i32;
-        (-radius..=radius).flat_map(move |dx| {
-            self.y_range(radius).flat_map(move |dy| {
-                (-radius..=radius).map(move |dz| self.coords(vector![dx, dy, dz]))
+        (-self.radius..=self.radius).flat_map(move |dx| {
+            World::Y_RANGE.flat_map(move |y| {
+                (-self.radius..=self.radius).map(move |dz| self.coords(dx, y, dz))
             })
         })
     }
 
     fn par_cuboid_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
-        let radius = self.radius as i32;
-        (-radius..=radius).into_par_iter().flat_map(move |dx| {
-            self.y_range(radius).into_par_iter().flat_map(move |dy| {
-                (-radius..=radius)
-                    .into_par_iter()
-                    .map(move |dz| self.coords(vector![dx, dy, dz]))
+        (-self.radius..=self.radius)
+            .into_par_iter()
+            .flat_map(move |dx| {
+                World::Y_RANGE.into_par_iter().flat_map(move |y| {
+                    (-self.radius..=self.radius)
+                        .into_par_iter()
+                        .map(move |dz| self.coords(dx, y, dz))
+                })
             })
-        })
     }
 
     fn contains(self, coords: Point3<i32>) -> bool {
         utils::magnitude_squared(coords.xz() - self.center.xz()) <= self.radius.pow(2)
     }
 
-    fn is_exclusive(self, coords: Point3<i32>, other: WorldArea) -> bool {
-        !other.contains(coords) || (coords.y - other.center.y).unsigned_abs() > other.radius
-    }
-
-    fn y_range(self, radius: i32) -> Range<i32> {
-        if self.is_close_enough(radius) {
-            World::Y_RANGE
-        } else {
-            0..0
-        }
-    }
-
-    fn coords(self, delta: Vector3<i32>) -> Point3<i32> {
-        point![self.center.x, 0, self.center.z] + delta
-    }
-
-    fn is_close_enough(self, radius: i32) -> bool {
-        (World::Y_RANGE.start - radius..World::Y_RANGE.end + radius).contains(&self.center.y)
+    fn coords(self, dx: i32, y: i32, dz: i32) -> Point3<i32> {
+        point![self.center.x + dx, y, self.center.z + dz]
     }
 }
 

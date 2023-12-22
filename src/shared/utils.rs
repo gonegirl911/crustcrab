@@ -1,6 +1,9 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
-use std::ops::{Add, Mul};
+use std::{
+    iter::Sum,
+    ops::{Add, Mul},
+};
 
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a.lerp(b, t)
@@ -18,8 +21,11 @@ pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
     t.coords()
 }
 
-pub fn magnitude_squared<T: MagnitudeSquared>(t: T) -> T::Output {
-    t.magnitude_squared()
+pub fn magnitude_squared<T, const N: usize>(vector: SVector<T, N>) -> T
+where
+    T: Copy + Mul<Output = T> + Sum<T>,
+{
+    vector.iter().copied().map(|c| c * c).sum()
 }
 
 pub trait Lerp {
@@ -149,28 +155,6 @@ impl WorldCoords for f32 {
 
     fn coords(self) -> Self::Point<i64> {
         self as i64
-    }
-}
-
-pub trait MagnitudeSquared {
-    type Output;
-
-    fn magnitude_squared(self) -> Self::Output;
-}
-
-impl<const D: usize> MagnitudeSquared for SVector<i32, D> {
-    type Output = u32;
-
-    fn magnitude_squared(self) -> Self::Output {
-        self.map(|c| c.pow(2) as u32).sum()
-    }
-}
-
-impl<const D: usize> MagnitudeSquared for SVector<i64, D> {
-    type Output = u64;
-
-    fn magnitude_squared(self) -> Self::Output {
-        self.map(|c| c.pow(2) as u64).sum()
     }
 }
 
