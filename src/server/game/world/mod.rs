@@ -587,22 +587,22 @@ pub enum WorldEvent {
 impl WorldEvent {
     pub fn new(event: &Event, &Player { prev, curr, ray }: &Player) -> Option<Self> {
         match *event {
-            Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
+            Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
                 Some(Self::InitialRenderRequested { area: curr, ray })
             }
-            Event::ClientEvent(ClientEvent::PlayerPositionChanged { .. }) if curr != prev => {
+            Event::Client(ClientEvent::PlayerPositionChanged { .. }) if curr != prev => {
                 Some(Self::WorldAreaChanged { prev, curr, ray })
             }
-            Event::ClientEvent(ClientEvent::PlayerPositionChanged { .. }) => {
+            Event::Client(ClientEvent::PlayerPositionChanged { .. }) => {
                 Some(Self::BlockHoverRequested { ray })
             }
-            Event::ClientEvent(ClientEvent::PlayerOrientationChanged { .. }) => {
+            Event::Client(ClientEvent::PlayerOrientationChanged { .. }) => {
                 Some(Self::BlockHoverRequested { ray })
             }
-            Event::ClientEvent(ClientEvent::BlockPlaced { block }) => {
+            Event::Client(ClientEvent::BlockPlaced { block }) => {
                 Some(Self::BlockPlaced { block, ray })
             }
-            Event::ClientEvent(ClientEvent::BlockDestroyed) => Some(Self::BlockDestroyed { ray }),
+            Event::Client(ClientEvent::BlockDestroyed) => Some(Self::BlockDestroyed { ray }),
             _ => None,
         }
     }

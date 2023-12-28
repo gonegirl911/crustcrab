@@ -22,7 +22,7 @@ impl EventLoop {
         loop {
             handler.handle(
                 &match ticker.recv_deadline(&self.client_rx) {
-                    Ok(event) => Event::ClientEvent(event),
+                    Ok(event) => Event::Client(event),
                     Err(RecvTimeoutError::Timeout) => Event::Tick,
                     Err(RecvTimeoutError::Disconnected) => break,
                 },
@@ -40,7 +40,7 @@ pub trait EventHandler<E> {
 
 pub enum Event {
     Init,
-    ClientEvent(ClientEvent),
+    Client(ClientEvent),
     Tick,
 }
 

@@ -25,7 +25,7 @@ impl EventHandler<Event> for Player {
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         self.prev = self.curr;
 
-        if let Event::ClientEvent(event) = event {
+        if let Event::Client(event) = event {
             match *event {
                 ClientEvent::InitialRenderRequested {
                     origin,

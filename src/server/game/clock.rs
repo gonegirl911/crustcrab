@@ -38,7 +38,7 @@ impl EventHandler<Event> for Clock {
 
     fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
         match event {
-            Event::ClientEvent(ClientEvent::InitialRenderRequested { .. }) => {
+            Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
                 self.send(proxy);
             }
             Event::Tick => {
