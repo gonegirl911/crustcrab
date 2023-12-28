@@ -77,7 +77,7 @@ impl<E: Enum, T: Clone> Clone for EnumMap<E, T> {
     }
 }
 
-impl<E: Enum, T: Clone> Copy for EnumMap<E, T> where GenericArray<T, E::Length>: Copy {}
+impl<E: Enum, T: Copy> Copy for EnumMap<E, T> where GenericArray<T, E::Length>: Copy {}
 
 impl<E: Enum, T: Default> Default for EnumMap<E, T> {
     fn default() -> Self {
