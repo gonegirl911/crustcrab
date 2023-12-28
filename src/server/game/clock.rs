@@ -92,10 +92,10 @@ impl Stage {
 
     pub fn progress(self) -> f32 {
         match self {
-            Stage::Dawn { progress } => 1.0 - progress,
-            Stage::Day => 0.0,
-            Stage::Dusk { progress } => progress,
-            Stage::Night => 1.0,
+            Self::Dawn { progress } => 1.0 - progress,
+            Self::Day => 0.0,
+            Self::Dusk { progress } => progress,
+            Self::Night => 1.0,
         }
     }
 }
@@ -116,7 +116,7 @@ pub struct ClockState {
 impl ClockState {
     fn starting_ticks(self) -> u16 {
         match self.starting_stage {
-            StartingStage::Dawn => self.dawn_start(),
+            StartingStage::Dawn => 0,
             StartingStage::Day => self.day_start(),
             StartingStage::Dusk => self.dusk_start(),
             StartingStage::Night => self.night_start(),
@@ -152,7 +152,7 @@ impl ClockState {
     }
 
     fn dawn_range(self) -> Range<u16> {
-        self.dawn_start()..self.day_start()
+        0..self.day_start()
     }
 
     fn day_range(self) -> Range<u16> {
@@ -165,10 +165,6 @@ impl ClockState {
 
     fn pm_range(self) -> Range<u16> {
         self.noon()..self.midnight()
-    }
-
-    fn dawn_start(self) -> u16 {
-        0
     }
 
     fn horizon(self) -> u16 {

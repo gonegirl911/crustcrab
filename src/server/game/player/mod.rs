@@ -68,14 +68,11 @@ impl WorldArea {
             .filter(move |&coords| self.contains(coords))
     }
 
-    pub fn exclusive_points(self, other: WorldArea) -> impl Iterator<Item = Point3<i32>> {
+    pub fn exclusive_points(self, other: Self) -> impl Iterator<Item = Point3<i32>> {
         self.points().filter(move |&coords| !other.contains(coords))
     }
 
-    pub fn par_exclusive_points(
-        self,
-        other: WorldArea,
-    ) -> impl ParallelIterator<Item = Point3<i32>> {
+    pub fn par_exclusive_points(self, other: Self) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_points()
             .filter(move |&coords| !other.contains(coords))
     }

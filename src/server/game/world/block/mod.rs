@@ -40,16 +40,15 @@ impl Block {
     pub fn apply_unchecked(&mut self, action: BlockAction) {
         *self = match action {
             BlockAction::Place(block) => block,
-            BlockAction::Destroy => Block::Air,
+            BlockAction::Destroy => Self::Air,
         };
     }
 
     pub fn is_action_valid(self, action: BlockAction) -> bool {
         match (self, action) {
             (Self::Air, BlockAction::Place(Self::Air) | BlockAction::Destroy) => false,
-            (Self::Air, BlockAction::Place(_)) => true,
+            (Self::Air, BlockAction::Place(_)) | (_, BlockAction::Destroy) => true,
             (_, BlockAction::Place(_)) => false,
-            (_, BlockAction::Destroy) => true,
         }
     }
 }

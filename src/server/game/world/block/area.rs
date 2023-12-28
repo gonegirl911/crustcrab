@@ -75,13 +75,11 @@ impl BlockArea {
     }
 
     unsafe fn delta_unchecked(index: Point3<usize>) -> Vector3<i8> {
-        index.coords.map(|c| c as i8 - BlockArea::PADDING as i8)
+        index.coords.map(|c| c as i8 - Self::PADDING as i8)
     }
 
     unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
-        delta
-            .map(|c| (c + BlockArea::PADDING as i8) as usize)
-            .into()
+        delta.map(|c| (c + Self::PADDING as i8) as usize).into()
     }
 }
 

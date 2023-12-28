@@ -62,7 +62,7 @@ impl World {
         (
             points
                 .into_par_iter()
-                .map(|coords| (coords, self.gen(coords)))
+                .map(|coords| (coords, self.generate(coords)))
                 .collect::<LinkedList<_>>()
                 .into_iter()
                 .filter_map(|(coords, chunk)| match chunk {
@@ -115,7 +115,7 @@ impl World {
             self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
             self.send_updates(updates, proxy, true);
-            self.send_unloads(unloads, proxy);
+            Self::send_unloads(unloads, proxy);
             self.send_loads(loads, proxy, true);
         }
     }
@@ -124,7 +124,7 @@ impl World {
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
-        self.send_events(
+        Self::send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
                 coords,
                 data: ChunkData::new(&self.chunks, &self.light, coords).into(),
@@ -138,7 +138,7 @@ impl World {
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
-        self.send_events(
+        Self::send_events(
             points
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkLoaded {
@@ -151,25 +151,13 @@ impl World {
         );
     }
 
-    fn send_unloads<I>(&self, points: I, proxy: &EventLoopProxy)
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
-        self.send_events(
-            points
-                .into_iter()
-                .map(|coords| ServerEvent::ChunkUnloaded { coords }),
-            proxy,
-        );
-    }
-
     fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: I,
         proxy: &EventLoopProxy,
         is_important: bool,
     ) {
-        self.send_events(
+        Self::send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
                 coords,
                 data: ChunkData::new(&self.chunks, &self.light, coords).into(),
@@ -185,7 +173,7 @@ impl World {
         proxy: &EventLoopProxy,
         is_important: bool,
     ) {
-        self.send_events(
+        Self::send_events(
             points
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkUpdated {
@@ -198,9 +186,9 @@ impl World {
         );
     }
 
-    fn gen(&self, coords: Point3<i32>) -> Option<Option<Box<Chunk>>> {
+    fn generate(&self, coords: Point3<i32>) -> Option<Option<Box<Chunk>>> {
         (!self.chunks.contains(coords)).then(|| {
-            let mut chunk = Box::new(self.generator.gen(coords));
+            let mut chunk = Box::new(self.generator.generate(coords));
             for (coords, action) in self.actions.actions(coords) {
                 chunk.apply_unchecked(coords, action);
             }
@@ -226,7 +214,19 @@ impl World {
             .collect()
     }
 
-    fn send_events<I>(&self, events: I, proxy: &EventLoopProxy)
+    fn send_unloads<I>(points: I, proxy: &EventLoopProxy)
+    where
+        I: IntoIterator<Item = Point3<i32>>,
+    {
+        Self::send_events(
+            points
+                .into_iter()
+                .map(|coords| ServerEvent::ChunkUnloaded { coords }),
+            proxy,
+        );
+    }
+
+    fn send_events<I>(events: I, proxy: &EventLoopProxy)
     where
         I: IntoIterator<Item = ServerEvent>,
     {
@@ -286,7 +286,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                self.send_unloads(unloads, proxy);
+                Self::send_unloads(unloads, proxy);
                 self.par_send_loads(loads, proxy, false);
                 self.par_send_updates(updates, proxy, false);
             }

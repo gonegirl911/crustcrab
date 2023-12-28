@@ -85,21 +85,6 @@ impl Inventory {
         }
     }
 
-    fn index(&self, keycode: KeyCode) -> Option<usize> {
-        match keycode {
-            KeyCode::Digit1 => Some(0),
-            KeyCode::Digit2 => Some(1),
-            KeyCode::Digit3 => Some(2),
-            KeyCode::Digit4 => Some(3),
-            KeyCode::Digit5 => Some(4),
-            KeyCode::Digit6 => Some(5),
-            KeyCode::Digit7 => Some(6),
-            KeyCode::Digit8 => Some(7),
-            KeyCode::Digit9 => Some(8),
-            _ => None,
-        }
-    }
-
     fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
         let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
         Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44))
@@ -115,6 +100,21 @@ impl Inventory {
             } else {
                 Matrix4::identity()
             }
+    }
+
+    fn index(keycode: KeyCode) -> Option<usize> {
+        match keycode {
+            KeyCode::Digit1 => Some(0),
+            KeyCode::Digit2 => Some(1),
+            KeyCode::Digit3 => Some(2),
+            KeyCode::Digit4 => Some(3),
+            KeyCode::Digit5 => Some(4),
+            KeyCode::Digit6 => Some(5),
+            KeyCode::Digit7 => Some(6),
+            KeyCode::Digit8 => Some(7),
+            KeyCode::Digit9 => Some(8),
+            _ => None,
+        }
     }
 }
 
@@ -133,7 +133,7 @@ impl EventHandler for Inventory {
                         },
                     ..
                 } => {
-                    if let Some(idx) = self.index(keycode) {
+                    if let Some(idx) = Self::index(keycode) {
                         self.is_updated = mem::replace(&mut self.index, idx) != idx;
                     }
                 }

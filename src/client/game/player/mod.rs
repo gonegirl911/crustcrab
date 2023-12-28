@@ -42,8 +42,8 @@ impl Player {
         );
         Self {
             view,
-            controller,
             projection,
+            controller,
             uniform,
         }
     }

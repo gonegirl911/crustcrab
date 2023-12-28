@@ -39,14 +39,14 @@ impl<T> Rgb<T> {
 }
 
 impl<T: Mul + Copy> Rgb<T> {
-    fn dot<S: Sum<T::Output>>(self, other: Rgb<T>) -> S {
+    fn dot<S: Sum<T::Output>>(self, other: Self) -> S {
         (self * other).sum()
     }
 }
 
 impl Rgb<f32> {
     pub fn lum(self) -> f32 {
-        self.dot(Rgb::new(0.2126, 0.7152, 0.0722))
+        self.dot(Self::new(0.2126, 0.7152, 0.0722))
     }
 
     pub fn saturate(self) -> Self {
