@@ -410,7 +410,7 @@ impl Branch {
                     let block_light = BlockLightRefMut::new(self, &node);
                     let component = block_light.component(index);
                     match component.cmp(&node.value) {
-                        Ordering::Less => unreachable!(),
+                        Ordering::Less => {}
                         Ordering::Equal => {
                             block_light.set_component(index, value);
                             if value != 0 {
