@@ -3,6 +3,7 @@ use bitflags::bitflags;
 use nalgebra::{matrix, vector, Matrix4, Point3, Vector3};
 use std::{
     f32::consts::{FRAC_PI_2, TAU},
+    mem,
     time::Duration,
 };
 use winit::{
@@ -99,8 +100,8 @@ pub struct Controller {
     dy: f32,
     relevant_keys: Keys,
     key_history: Keys,
-    relevant_buttons: MouseButtons,
-    button_history: MouseButtons,
+    block_placed: bool,
+    block_destroyed: bool,
     speed: f32,
     sensitivity: f32,
 }
@@ -129,10 +130,10 @@ impl Controller {
             changes.insert(Changes::MOVED);
         }
 
-        if self.relevant_buttons.contains(MouseButtons::LEFT) {
-            changes.insert(Changes::BLOCK_DESTROYED);
-        } else if self.relevant_buttons.contains(MouseButtons::RIGHT) {
+        if mem::take(&mut self.block_placed) {
             changes.insert(Changes::BLOCK_PLACED);
+        } else if mem::take(&mut self.block_destroyed) {
+            changes.insert(Changes::BLOCK_DESTROYED);
         }
 
         changes
@@ -220,27 +221,15 @@ impl EventHandler for Controller {
                         }
                     }
                 }
-                WindowEvent::MouseInput { button, state, .. } => {
-                    let (button, opp) = match button {
-                        MouseButton::Left => (MouseButtons::LEFT, MouseButtons::RIGHT),
-                        MouseButton::Right => (MouseButtons::RIGHT, MouseButtons::LEFT),
-                        _ => return,
-                    };
-                    match state {
-                        ElementState::Pressed => {
-                            self.relevant_buttons.insert(button);
-                            self.relevant_buttons.remove(opp);
-                            self.button_history.insert(button);
-                        }
-                        ElementState::Released => {
-                            self.relevant_buttons.remove(button);
-                            if self.button_history.contains(opp) {
-                                self.relevant_buttons.insert(opp);
-                            }
-                            self.button_history.remove(button);
-                        }
-                    }
-                }
+                WindowEvent::MouseInput {
+                    button,
+                    state: ElementState::Pressed,
+                    ..
+                } => match button {
+                    MouseButton::Left => self.block_destroyed = true,
+                    MouseButton::Right => self.block_placed = true,
+                    _ => {}
+                },
                 _ => {}
             },
             _ => {}
@@ -265,11 +254,5 @@ bitflags! {
         const D = 1 << 3;
         const SPACE = 1 << 4;
         const LSHIFT = 1 << 5;
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct MouseButtons: u8 {
-        const LEFT = 1 << 0;
-        const RIGHT = 1 << 1;
     }
 }
