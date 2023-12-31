@@ -131,6 +131,48 @@ impl ImageTexture {
         })
     }
 
+    fn create_bind_group_layout(
+        Renderer { device, .. }: &Renderer,
+        count: Option<NonZeroU32>,
+        is_pixelated: bool,
+    ) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float {
+                            filterable: !is_pixelated,
+                        },
+                    },
+                    count,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(if is_pixelated {
+                        wgpu::SamplerBindingType::NonFiltering
+                    } else {
+                        wgpu::SamplerBindingType::Filtering
+                    }),
+                    count: None,
+                },
+            ],
+        })
+    }
+
+    fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
+        ImageReader::open(path)
+            .expect("file should exist")
+            .decode()
+            .expect("format should be valid")
+            .into_rgba8()
+    }
+
     fn gen_mip_levels(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
@@ -206,48 +248,6 @@ impl ImageTexture {
             });
 
         queue.submit([encoder.finish()]);
-    }
-
-    fn create_bind_group_layout(
-        Renderer { device, .. }: &Renderer,
-        count: Option<NonZeroU32>,
-        is_pixelated: bool,
-    ) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float {
-                            filterable: !is_pixelated,
-                        },
-                    },
-                    count,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(if is_pixelated {
-                        wgpu::SamplerBindingType::NonFiltering
-                    } else {
-                        wgpu::SamplerBindingType::Filtering
-                    }),
-                    count: None,
-                },
-            ],
-        })
-    }
-
-    fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
-        ImageReader::open(path)
-            .expect("file should exist")
-            .decode()
-            .expect("format should be valid")
-            .into_rgba8()
     }
 }
 

@@ -15,11 +15,11 @@ use crate::{
         game::{clock::Stage, world::block::Block},
         ServerEvent,
     },
-    shared::color::{Float3, Rgba},
+    shared::color::{Float3, Rgb, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
 use image::io::Reader as ImageReader;
-use nalgebra::{point, vector, Point2, Vector2};
+use nalgebra::{point, vector, Point2, Vector2, Vector3};
 use serde::Deserialize;
 use std::time::Duration;
 use winit::event::WindowEvent;
@@ -38,7 +38,6 @@ impl CloudLayer {
     pub fn new(
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let vertex_buffer = VertexBuffer::new(
@@ -61,11 +60,7 @@ impl CloudLayer {
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/cloud.wgsl"),
             &[CloudVertex::desc(), CloudInstance::desc()],
-            &[
-                player_bind_group_layout,
-                sky_bind_group_layout,
-                texture.bind_group_layout(),
-            ],
+            &[player_bind_group_layout, texture.bind_group_layout()],
             &[CloudPushConstants::range()],
             PostProcessor::FORMAT,
             None,
@@ -73,7 +68,7 @@ impl CloudLayer {
             Some(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
                 depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -98,7 +93,6 @@ impl CloudLayer {
         encoder: &mut wgpu::CommandEncoder,
         spare_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         spare_bind_group: &wgpu::BindGroup,
     ) {
@@ -124,7 +118,7 @@ impl CloudLayer {
             });
             self.program.bind(
                 &mut render_pass,
-                [player_bind_group, sky_bind_group, self.texture.bind_group()],
+                [player_bind_group, self.texture.bind_group()],
             );
             self.pc.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
@@ -216,6 +210,7 @@ impl Instance for CloudInstance {
 struct CloudPushConstants {
     dims: Point2<f32>,
     size: Point2<f32>,
+    scale_factor: Float3,
     color: Float3,
     offset: Vector2<f32>,
     padding: [f32; 2],
@@ -223,21 +218,12 @@ struct CloudPushConstants {
 
 impl CloudPushConstants {
     fn update_color(&mut self, stage: Stage) {
-        self.color = Self::color(stage);
+        self.color = Self::color(stage).into();
     }
 
     fn update_offset(&mut self, dt: Duration) {
         self.offset.x -= CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
         self.offset.x %= self.size.x * self.dims.x;
-    }
-
-    fn color(stage: Stage) -> Float3 {
-        stage
-            .lerp(
-                CLIENT_CONFIG.cloud.day.color.rgb,
-                CLIENT_CONFIG.cloud.night.color.rgb,
-            )
-            .into()
     }
 
     fn dims() -> Point2<u32> {
@@ -247,6 +233,19 @@ impl CloudPushConstants {
             .map(|(width, height)| point![width, height])
             .expect("format should be valid")
     }
+
+    fn scale_factor() -> Vector3<f32> {
+        let size = CLIENT_CONFIG.cloud.size;
+        let factor = CLIENT_CONFIG.highlight.size;
+        vector![size.x, size.y, size.x].map(|c| 1.0 + (factor - 1.0) / c as f32)
+    }
+
+    fn color(stage: Stage) -> Rgb<f32> {
+        stage.lerp(
+            CLIENT_CONFIG.cloud.day.color.rgb,
+            CLIENT_CONFIG.cloud.night.color.rgb,
+        )
+    }
 }
 
 impl Default for CloudPushConstants {
@@ -254,7 +253,8 @@ impl Default for CloudPushConstants {
         Self {
             dims: Self::dims().cast(),
             size: CLIENT_CONFIG.cloud.size.cast(),
-            color: Self::color(Default::default()),
+            scale_factor: Self::scale_factor().into(),
+            color: Self::color(Default::default()).into(),
             offset: Default::default(),
             padding: Default::default(),
         }

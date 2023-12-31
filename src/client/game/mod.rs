@@ -53,7 +53,6 @@ impl Game {
         let clouds = CloudLayer::new(
             renderer,
             player.bind_group_layout(),
-            sky.bind_group_layout(),
             processor.bind_group_layout(),
         );
         let depth = DepthBuffer::new(renderer);
@@ -132,7 +131,6 @@ impl Game {
             encoder,
             self.processor.spare_view(),
             self.player.bind_group(),
-            self.sky.bind_group(),
             self.depth.view(),
             self.processor.spare_bind_group(),
         );

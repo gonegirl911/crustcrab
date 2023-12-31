@@ -188,7 +188,7 @@ impl PushConstants for BlockHighlightPushConstants {
 
 #[derive(Deserialize)]
 pub struct HighlightConfig {
-    size: f32,
+    pub size: f32,
 }
 
 const DELTAS: [Vector3<f32>; 8] = [
