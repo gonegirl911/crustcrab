@@ -54,7 +54,7 @@ pub struct World {
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    fn par_load_many<I>(&mut self, points: I) -> (Vec<Point3<i32>>, Vec<Point3<i32>>)
+    fn par_load_many<I>(&mut self, points: I) -> (FxHashSet<Point3<i32>>, Vec<Point3<i32>>)
     where
         I: IntoParallelIterator<Item = Point3<i32>>,
     {
@@ -79,7 +79,7 @@ impl World {
         )
     }
 
-    fn unload_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    fn unload_many<I>(&mut self, points: I) -> FxHashSet<Point3<i32>>
     where
         I: IntoIterator<Item = Point3<i32>>,
     {
@@ -106,11 +106,7 @@ impl World {
         let mut branch = Branch::default();
         if branch.apply(&self.chunks, coords, normal, action) {
             let (loads, unloads, block_updates) = branch.merge(self);
-            let updates = self.updates(
-                &loads.iter().chain(&unloads).copied().collect(),
-                block_updates,
-                false,
-            );
+            let updates = self.updates(&loads, &unloads, block_updates, false);
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
@@ -198,7 +194,8 @@ impl World {
 
     fn updates<I: IntoIterator<Item = Point3<i64>>>(
         &self,
-        points: &FxHashSet<Point3<i32>>,
+        loads: &FxHashSet<Point3<i32>>,
+        unloads: &FxHashSet<Point3<i32>>,
         block_updates: I,
         include_outline: bool,
     ) -> FxHashSet<Point3<i32>> {
@@ -206,11 +203,15 @@ impl World {
             .map(utils::chunk_coords)
             .chain(
                 include_outline
-                    .then_some(Self::chunk_area_points(points.iter().copied()))
+                    .then_some(Self::chunk_area_points(loads.iter().copied()))
                     .into_iter()
                     .flatten(),
             )
-            .filter(|coords| self.chunks.contains(*coords) && !points.contains(coords))
+            .filter(|coords| {
+                self.chunks.contains(*coords)
+                    && !loads.contains(coords)
+                    && !unloads.contains(coords)
+            })
             .collect()
     }
 
@@ -278,11 +279,7 @@ impl EventHandler<WorldEvent> for World {
                 let unloads = self.unload_many(prev.exclusive_points(curr));
                 let (loads, inserts) = self.par_load_many(curr.par_exclusive_points(prev));
                 let light_updates = self.par_light_up(&inserts);
-                let updates = self.updates(
-                    &loads.iter().chain(&unloads).copied().collect(),
-                    light_updates,
-                    true,
-                );
+                let updates = self.updates(&loads, &unloads, light_updates, true);
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
@@ -382,6 +379,12 @@ impl Index<Point3<i32>> for ChunkStore {
 #[derive(Default)]
 struct Branch(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 
+type Changes = (
+    FxHashSet<Point3<i32>>,
+    FxHashSet<Point3<i32>>,
+    Vec<Point3<i64>>,
+);
+
 impl Branch {
     fn apply(
         &mut self,
@@ -398,7 +401,6 @@ impl Branch {
         }
     }
 
-    #[allow(clippy::type_complexity)]
     fn merge(
         self,
         World {
@@ -408,10 +410,10 @@ impl Branch {
             actions,
             ..
         }: &mut World,
-    ) -> (Vec<Point3<i32>>, Vec<Point3<i32>>, Vec<Point3<i64>>) {
+    ) -> Changes {
         let mut hits = vec![];
-        let mut loads = vec![];
-        let mut unloads = vec![];
+        let mut loads = FxHashSet::default();
+        let mut unloads = FxHashSet::default();
 
         for (chunk_coords, actions) in self.0 {
             match chunks.entry(chunk_coords) {
@@ -424,7 +426,7 @@ impl Branch {
                     }
                     if chunk.is_empty() {
                         entry.remove();
-                        unloads.push(chunk_coords);
+                        unloads.insert(chunk_coords);
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -439,7 +441,7 @@ impl Branch {
                             chunk.apply_unchecked(block_coords, action);
                             hits.push((utils::coords((chunk_coords, block_coords)), action));
                         }
-                        loads.push(chunk_coords);
+                        loads.insert(chunk_coords);
                     }
                 }
             }
