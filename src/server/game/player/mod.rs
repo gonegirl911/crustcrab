@@ -79,7 +79,7 @@ impl WorldArea {
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
         (-self.radius..=self.radius).flat_map(move |dx| {
-            World::Y_RANGE.flat_map(move |y| {
+            self.y_range().flat_map(move |y| {
                 (-self.radius..=self.radius).map(move |dz| self.coords(dx, y, dz))
             })
         })
@@ -89,7 +89,7 @@ impl WorldArea {
         (-self.radius..=self.radius)
             .into_par_iter()
             .flat_map(move |dx| {
-                World::Y_RANGE.into_par_iter().flat_map(move |y| {
+                self.y_range().into_par_iter().flat_map(move |y| {
                     (-self.radius..=self.radius)
                         .into_par_iter()
                         .map(move |dz| self.coords(dx, y, dz))
@@ -99,10 +99,24 @@ impl WorldArea {
 
     fn contains(self, coords: Point3<i32>) -> bool {
         utils::magnitude_squared(coords.xz() - self.center.xz()) <= self.radius.pow(2)
+            && self.is_close_enough()
+    }
+
+    fn y_range(self) -> Range<i32> {
+        if self.is_close_enough() {
+            World::Y_RANGE
+        } else {
+            0..0
+        }
     }
 
     fn coords(self, dx: i32, y: i32, dz: i32) -> Point3<i32> {
         point![self.center.x + dx, y, self.center.z + dz]
+    }
+
+    fn is_close_enough(self) -> bool {
+        (World::Y_RANGE.start - self.radius..World::Y_RANGE.end + self.radius)
+            .contains(&self.center.y)
     }
 }
 
