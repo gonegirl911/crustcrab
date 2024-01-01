@@ -7,7 +7,7 @@ use crate::{
     server::event_loop::{Event, EventHandler},
     shared::utils,
 };
-use nalgebra::{point, Point3};
+use nalgebra::{point, Point2, Point3};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::ops::Range;
@@ -58,23 +58,31 @@ pub struct WorldArea {
 }
 
 impl WorldArea {
-    fn points(self) -> impl Iterator<Item = Point3<i32>> {
+    pub fn points(self) -> impl Iterator<Item = Point3<i32>> {
         self.cuboid_points()
-            .filter(move |&coords| self.contains(coords))
+            .filter(move |&coords| self.contains_xz(coords.xz()))
     }
 
     pub fn par_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_cuboid_points()
-            .filter(move |&coords| self.contains(coords))
-    }
-
-    pub fn exclusive_points(self, other: Self) -> impl Iterator<Item = Point3<i32>> {
-        self.points().filter(move |&coords| !other.contains(coords))
+            .filter(move |&coords| self.contains_xz(coords.xz()))
     }
 
     pub fn par_exclusive_points(self, other: Self) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_points()
-            .filter(move |&coords| !other.contains(coords))
+            .filter(move |&coords| !other.contains_xz(coords.xz()))
+    }
+
+    fn contains_xz(self, xz: Point2<i32>) -> bool {
+        utils::magnitude_squared(xz - self.center.xz()) <= self.radius.pow(2)
+    }
+
+    pub fn contains_y(self, y: i32) -> bool {
+        (y - self.center.y).abs() <= self.radius
+    }
+
+    pub fn contains(self, coords: Point3<i32>) -> bool {
+        self.contains_xz(coords.xz()) && self.contains_y(coords.y)
     }
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
@@ -95,10 +103,6 @@ impl WorldArea {
                         .map(move |dz| self.coords(dx, y, dz))
                 })
             })
-    }
-
-    fn contains(self, coords: Point3<i32>) -> bool {
-        utils::magnitude_squared(coords.xz() - self.center.xz()) <= self.radius.pow(2)
     }
 
     fn coords(self, dx: i32, y: i32, dz: i32) -> Point3<i32> {
