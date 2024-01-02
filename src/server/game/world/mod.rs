@@ -19,11 +19,11 @@ use self::{
     height::HeightMap,
     light::WorldLight,
 };
+use super::player::{Player, WorldArea};
 use crate::{
     client::{event_loop::EventLoopProxy, game::world::BlockVertex, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
-        game::player::{Player, WorldArea},
         ServerEvent, SERVER_CONFIG,
     },
     shared::{

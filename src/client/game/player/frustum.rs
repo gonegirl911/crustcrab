@@ -45,11 +45,11 @@ impl Frustum {
     }
 }
 
-pub trait FrustumCheck {
+pub trait Cullable {
     fn is_visible(&self, frustum: &Frustum) -> bool;
 }
 
-impl FrustumCheck for BoundingSphere {
+impl Cullable for BoundingSphere {
     fn is_visible(&self, frustum: &Frustum) -> bool {
         let v = self.center - frustum.origin;
 

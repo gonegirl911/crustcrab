@@ -19,16 +19,16 @@ impl Aabb {
         }
     }
 
-    pub fn to_homogeneous(self) -> Matrix4<f32> {
-        Matrix4::new_translation(&self.min.coords).prepend_nonuniform_scaling(&self.diagonal())
-    }
-
-    fn circumcenter(self) -> Point3<f32> {
+    pub fn circumcenter(self) -> Point3<f32> {
         self.min + self.diagonal() * 0.5
     }
 
     fn circumradius(self) -> f32 {
         self.diagonal().magnitude() * 0.5
+    }
+
+    pub fn to_homogeneous(self) -> Matrix4<f32> {
+        Matrix4::new_translation(&self.min.coords).prepend_nonuniform_scaling(&self.diagonal())
     }
 
     fn diagonal(self) -> Vector3<f32> {

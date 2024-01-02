@@ -1,7 +1,7 @@
+use super::player::frustum::{Cullable, Frustum};
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        game::player::frustum::{Frustum, FrustumCheck},
         renderer::{
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
@@ -220,9 +220,13 @@ impl World {
     }
 
     fn origin(origin: Point3<f32>, coords: Point3<i32>) -> Point3<f32> {
-        Chunk::bounding_box(coords)
-            .intersection(Ray::look_at(origin, Chunk::center(coords)))
-            .unwrap_or_else(|| unreachable!())
+        let aabb = Chunk::bounding_box(coords);
+        if aabb.contains(origin) {
+            origin
+        } else {
+            aabb.intersection(Ray::look_at(origin, aabb.circumcenter()))
+                .unwrap_or_else(|| unreachable!())
+        }
     }
 
     fn block_coords(coords: Point3<f32>, chunk_coords: Point3<i32>) -> Point3<f32> {
