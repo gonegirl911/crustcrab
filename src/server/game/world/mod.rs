@@ -274,8 +274,8 @@ impl EventHandler<WorldEvent> for World {
 
                 self.par_light_up(&inserts);
 
-                inserts.par_sort_unstable_by_key(|coords| {
-                    utils::magnitude_squared(coords - utils::chunk_coords(ray.origin))
+                inserts.par_sort_unstable_by_key(|&coords| {
+                    utils::magnitude_squared(coords, utils::chunk_coords(ray.origin))
                 });
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);

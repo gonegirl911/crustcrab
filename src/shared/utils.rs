@@ -1,7 +1,7 @@
 use crate::server::game::world::chunk::Chunk;
-use nalgebra::{Point, SVector, Scalar};
+use nalgebra::{vector, Point, SVector, Scalar};
 use std::{
-    iter::Sum,
+    iter,
     ops::{Add, Mul},
 };
 
@@ -21,11 +21,8 @@ pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
     t.coords()
 }
 
-pub fn magnitude_squared<T, const N: usize>(vector: SVector<T, N>) -> T
-where
-    T: Mul<Output = T> + Sum<T> + Copy,
-{
-    vector.iter().copied().map(|c| c * c).sum()
+pub fn magnitude_squared<T: MagnitudeSquared>(a: T, b: T) -> u128 {
+    a.magnitude_squared(b)
 }
 
 pub trait Lerp {
@@ -46,22 +43,6 @@ pub trait WorldCoords {
     fn coords(self) -> Self::Point<i64>;
 }
 
-impl<const D: usize> WorldCoords for (Point<i32, D>, Point<u8, D>) {
-    type Point<T: Scalar> = Point<T, D>;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        self.0
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.1
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        self.0.cast() * Chunk::DIM as i64 + self.1.coords.cast()
-    }
-}
-
 impl<const D: usize> WorldCoords for (SVector<i32, D>, SVector<u8, D>) {
     type Point<T: Scalar> = SVector<T, D>;
 
@@ -78,6 +59,22 @@ impl<const D: usize> WorldCoords for (SVector<i32, D>, SVector<u8, D>) {
     }
 }
 
+impl<const D: usize> WorldCoords for (Point<i32, D>, Point<u8, D>) {
+    type Point<T: Scalar> = Point<T, D>;
+
+    fn chunk_coords(self) -> Self::Point<i32> {
+        self.0
+    }
+
+    fn block_coords(self) -> Self::Point<u8> {
+        self.1
+    }
+
+    fn coords(self) -> Self::Point<i64> {
+        coords((self.0.coords, self.1.coords)).into()
+    }
+}
+
 impl WorldCoords for (i32, u8) {
     type Point<T: Scalar> = T;
 
@@ -90,7 +87,7 @@ impl WorldCoords for (i32, u8) {
     }
 
     fn coords(self) -> Self::Point<i64> {
-        self.0 as i64 * Chunk::DIM as i64 + self.1 as i64
+        coords((vector![self.0], vector![self.1])).x
     }
 }
 
@@ -157,6 +154,26 @@ impl WorldCoords for f32 {
         self as i64
     }
 }
+
+pub trait MagnitudeSquared {
+    fn magnitude_squared(self, other: Self) -> u128;
+}
+
+macro_rules! impl_magnitude_squared {
+    ($($T:ident),*) => {
+        $(
+            impl<const N: usize> MagnitudeSquared for Point<$T, N> {
+                fn magnitude_squared(self, other: Self) -> u128 {
+                    iter::zip(&self.coords, &other.coords)
+                        .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
+                        .sum()
+                }
+            }
+        )*
+    };
+}
+
+impl_magnitude_squared!(i32, i64);
 
 fn div_floor(a: i64, b: i64) -> i64 {
     let d = a / b;

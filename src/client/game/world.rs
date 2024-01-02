@@ -126,16 +126,17 @@ impl World {
             [player_bind_group, sky_bind_group, textures_bind_group],
         );
 
-        transparent_meshes.sort_unstable_by_key(|(coords, _)| {
+        transparent_meshes.sort_unstable_by_key(|&(coords, _)| {
             Reverse(utils::magnitude_squared(
-                coords - utils::chunk_coords(frustum.origin),
+                coords,
+                utils::chunk_coords(frustum.origin),
             ))
         });
 
         for (coords, mesh) in transparent_meshes {
             BlockPushConstants::new(coords).set(&mut render_pass);
-            mesh.draw(renderer, &mut render_pass, |coords| {
-                utils::magnitude_squared(coords - utils::coords(frustum.origin))
+            mesh.draw(renderer, &mut render_pass, |&coords| {
+                utils::magnitude_squared(coords, utils::coords(frustum.origin))
             });
         }
     }

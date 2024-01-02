@@ -74,11 +74,11 @@ impl WorldArea {
     }
 
     fn contains_xz(self, xz: Point2<i32>) -> bool {
-        utils::magnitude_squared(xz - self.center.xz()) <= self.radius.pow(2)
+        utils::magnitude_squared(xz, self.center.xz()) <= (self.radius as u128).pow(2)
     }
 
     pub fn contains_y(self, y: i32) -> bool {
-        (y - self.center.y).abs() <= self.radius
+        y.abs_diff(self.center.y) <= self.radius as u32
     }
 
     pub fn contains(self, coords: Point3<i32>) -> bool {
