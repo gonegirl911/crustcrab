@@ -19,6 +19,12 @@ impl Aabb {
         }
     }
 
+    pub fn contains(self, point: Point3<f32>) -> bool {
+        (self.min.x..=self.max.x).contains(&point.x)
+            && (self.min.y..=self.max.y).contains(&point.y)
+            && (self.min.z..=self.max.z).contains(&point.z)
+    }
+
     pub fn circumcenter(self) -> Point3<f32> {
         self.min + self.diagonal() * 0.5
     }
