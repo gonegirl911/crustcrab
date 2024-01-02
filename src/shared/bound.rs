@@ -1,4 +1,4 @@
-use crate::server::game::player::ray::{Hittable, Ray};
+use super::ray::{Intersectable, Ray};
 use nalgebra::{Matrix4, Point3, Vector3};
 
 #[derive(Clone, Copy, Default)]
@@ -36,14 +36,14 @@ impl Aabb {
     }
 }
 
-impl Hittable for Aabb {
-    fn hit(&self, ray: Ray) -> bool {
+impl Intersectable for Aabb {
+    fn intersect(&self, ray: Ray) -> Option<f32> {
         let (t_min, t_max) = (0..3).fold((f32::MIN, f32::MAX), |(t_min, t_max), i| {
             let t1 = (self.min[i] - ray.origin[i]) / ray.dir[i];
             let t2 = (self.max[i] - ray.origin[i]) / ray.dir[i];
             (t_min.max(t1.min(t2)), t_max.min(t1.max(t2)))
         });
-        t_min <= t_max
+        (t_min <= t_max).then_some(t_min)
     }
 }
 

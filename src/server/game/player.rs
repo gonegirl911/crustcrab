@@ -1,11 +1,8 @@
-pub mod ray;
-
-use self::ray::Ray;
 use super::world::World;
 use crate::{
     client::ClientEvent,
     server::event_loop::{Event, EventHandler},
-    shared::utils,
+    shared::{ray::Ray, utils},
 };
 use nalgebra::{point, Point2, Point3};
 use rayon::prelude::*;

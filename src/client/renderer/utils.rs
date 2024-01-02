@@ -3,7 +3,7 @@ use super::{
     Renderer,
 };
 use bytemuck::Pod;
-use std::cmp::Reverse;
+use std::cmp::{Ordering, Reverse};
 
 pub struct TransparentMesh<C, V> {
     data: Vec<(C, [V; 6])>,
@@ -40,5 +40,27 @@ impl<C, V: Pod> TransparentMesh<C, V> {
         self.vertices.extend(self.data.iter().flat_map(|&(_, v)| v));
         self.buffer.write(renderer, &self.vertices);
         self.buffer.draw(render_pass);
+    }
+}
+
+pub struct TotalOrd(pub f32);
+
+impl PartialEq for TotalOrd {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for TotalOrd {}
+
+impl PartialOrd for TotalOrd {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TotalOrd {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.total_cmp(&other.0)
     }
 }

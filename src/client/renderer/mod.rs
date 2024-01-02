@@ -1,9 +1,9 @@
 pub mod buffer;
 pub mod effect;
-pub mod mesh;
 pub mod program;
 pub mod texture;
 pub mod uniform;
+pub mod utils;
 
 use super::event_loop::{Event, EventHandler};
 use std::mem;

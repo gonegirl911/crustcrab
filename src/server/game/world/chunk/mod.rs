@@ -85,7 +85,7 @@ impl Chunk {
         })
     }
 
-    fn bounding_box(coords: Point3<i32>) -> Aabb {
+    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
             utils::coords((coords, Default::default())).cast(),
             Vector3::repeat(Self::DIM).cast(),
@@ -94,6 +94,10 @@ impl Chunk {
 
     pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
         Self::bounding_box(coords).into()
+    }
+
+    pub fn center(coords: Point3<i32>) -> Point3<f32> {
+        Self::bounding_sphere(coords).center
     }
 }
 

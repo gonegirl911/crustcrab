@@ -8,6 +8,17 @@ pub struct Ray {
 }
 
 impl Ray {
+    pub fn look_at(origin: Point3<f32>, target: Point3<f32>) -> Self {
+        Self {
+            origin,
+            dir: (target - origin).normalize(),
+        }
+    }
+
+    pub fn at(self, t: f32) -> Point3<f32> {
+        self.origin + self.dir * t
+    }
+
     pub fn cast<R>(self, reach: R) -> impl Iterator<Item = BlockIntersection>
     where
         R: RangeBounds<f32>,
@@ -51,6 +62,14 @@ impl BlockIntersection {
     }
 }
 
-pub trait Hittable {
-    fn hit(&self, ray: Ray) -> bool;
+pub trait Intersectable {
+    fn intersect(&self, ray: Ray) -> Option<f32>;
+
+    fn intersects(&self, ray: Ray) -> bool {
+        self.intersect(ray).is_some()
+    }
+
+    fn intersection(&self, ray: Ray) -> Option<Point3<f32>> {
+        Some(ray.at(self.intersect(ray)?))
+    }
 }

@@ -5,9 +5,9 @@ use crate::{
         renderer::{
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            mesh::TransparentMesh,
             program::{Program, PushConstants},
             texture::screen::DepthBuffer,
+            utils::{TotalOrd, TransparentMesh},
             Renderer,
         },
     },
@@ -19,7 +19,11 @@ use crate::{
         },
         ServerEvent,
     },
-    shared::{pool::ThreadPool, utils},
+    shared::{
+        pool::ThreadPool,
+        ray::{Intersectable, Ray},
+        utils,
+    },
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -38,7 +42,7 @@ pub struct World {
 
 type ChunkMesh = (
     VertexBuffer<BlockVertex>,
-    Option<TransparentMesh<Point3<i64>, BlockVertex>>,
+    Option<TransparentMesh<Point3<f32>, BlockVertex>>,
     Instant,
 );
 
@@ -134,10 +138,19 @@ impl World {
         });
 
         for (coords, mesh) in transparent_meshes {
+            let origin = Self::block_coords(Self::origin(frustum.origin, coords), coords);
             BlockPushConstants::new(coords).set(&mut render_pass);
             mesh.draw(renderer, &mut render_pass, |&coords| {
-                utils::magnitude_squared(coords, utils::coords(frustum.origin))
+                TotalOrd((coords - origin).magnitude_squared())
             });
+        }
+    }
+
+    fn workers(&self, is_important: bool) -> &ThreadPool<ChunkInput, ChunkOutput> {
+        if is_important {
+            &self.priority_workers
+        } else {
+            &self.workers
         }
     }
 
@@ -161,28 +174,17 @@ impl World {
         )
     }
 
-    fn workers(&self, is_important: bool) -> &ThreadPool<ChunkInput, ChunkOutput> {
-        if is_important {
-            &self.priority_workers
-        } else {
-            &self.workers
-        }
-    }
-
     fn transparent_mesh(
         renderer: &Renderer,
-        coords: Point3<i32>,
         vertices: &[BlockVertex],
-    ) -> Option<TransparentMesh<Point3<i64>, BlockVertex>> {
+    ) -> Option<TransparentMesh<Point3<f32>, BlockVertex>> {
         TransparentMesh::new_non_empty(renderer, vertices, |v| {
-            utils::coords((
-                coords,
-                v.iter()
-                    .copied()
-                    .map(BlockVertex::coords)
-                    .fold(Point3::default(), |accum, c| accum + c.coords)
-                    / v.len() as u8,
-            ))
+            v.iter()
+                .copied()
+                .map(BlockVertex::coords)
+                .fold(Point3::default(), |accum, c| accum + c.coords)
+                .cast()
+                / v.len() as f32
         })
     }
 
@@ -215,6 +217,16 @@ impl World {
             }),
             ..Default::default()
         })
+    }
+
+    fn origin(origin: Point3<f32>, coords: Point3<i32>) -> Point3<f32> {
+        Chunk::bounding_box(coords)
+            .intersection(Ray::look_at(origin, Chunk::center(coords)))
+            .unwrap_or_else(|| unreachable!())
+    }
+
+    fn block_coords(coords: Point3<f32>, chunk_coords: Point3<i32>) -> Point3<f32> {
+        coords - chunk_coords.coords.cast() * Chunk::DIM as f32
     }
 }
 
@@ -267,11 +279,7 @@ impl EventHandler for World {
                                                 renderer,
                                                 MemoryState::Immutable(&vertices),
                                             ),
-                                            Self::transparent_mesh(
-                                                renderer,
-                                                coords,
-                                                &transparent_vertices,
-                                            ),
+                                            Self::transparent_mesh(renderer, &transparent_vertices),
                                             updated_at,
                                         );
                                     }
@@ -282,11 +290,7 @@ impl EventHandler for World {
                                             renderer,
                                             MemoryState::Immutable(&vertices),
                                         ),
-                                        Self::transparent_mesh(
-                                            renderer,
-                                            coords,
-                                            &transparent_vertices,
-                                        ),
+                                        Self::transparent_mesh(renderer, &transparent_vertices),
                                         updated_at,
                                     ));
                                 }

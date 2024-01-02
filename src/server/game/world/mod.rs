@@ -19,18 +19,19 @@ use self::{
     height::HeightMap,
     light::WorldLight,
 };
-use super::player::ray::Hittable;
 use crate::{
     client::{event_loop::EventLoopProxy, game::world::BlockVertex, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
-        game::player::{
-            ray::{BlockIntersection, Ray},
-            Player, WorldArea,
-        },
+        game::player::{Player, WorldArea},
         ServerEvent, SERVER_CONFIG,
     },
-    shared::{bound::Aabb, enum_map::Enum, utils},
+    shared::{
+        bound::Aabb,
+        enum_map::Enum,
+        ray::{BlockIntersection, Intersectable, Ray},
+        utils,
+    },
 };
 use nalgebra::{Point3, Vector3};
 use rayon::prelude::*;
@@ -298,7 +299,11 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
                     |&BlockIntersection { coords, .. }| {
-                        self.chunks.block(coords).data().hitbox(coords).hit(ray)
+                        self.chunks
+                            .block(coords)
+                            .data()
+                            .hitbox(coords)
+                            .intersects(ray)
                     },
                 );
 

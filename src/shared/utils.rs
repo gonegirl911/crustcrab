@@ -6,7 +6,7 @@ use std::{
 };
 
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
-    a.lerp(b, t)
+    a * (1.0 - t) + b * t
 }
 
 pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
@@ -21,19 +21,15 @@ pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
     t.coords()
 }
 
-pub fn magnitude_squared<T: MagnitudeSquared>(a: T, b: T) -> u128 {
-    a.magnitude_squared(b)
+pub fn magnitude_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> u128 {
+    iter::zip(&a.coords, &b.coords)
+        .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
+        .sum()
 }
 
-pub trait Lerp {
-    fn lerp(self, other: Self, t: f32) -> Self;
-}
+pub trait Lerp: Mul<f32, Output = Self> + Add<Output = Self> + Sized {}
 
-impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {
-    fn lerp(self, other: Self, t: f32) -> Self {
-        self * (1.0 - t) + other * t
-    }
-}
+impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {}
 
 pub trait WorldCoords {
     type Point<T: Scalar>;
@@ -154,26 +150,6 @@ impl WorldCoords for f32 {
         self as i64
     }
 }
-
-pub trait MagnitudeSquared {
-    fn magnitude_squared(self, other: Self) -> u128;
-}
-
-macro_rules! impl_magnitude_squared {
-    ($($T:ident),*) => {
-        $(
-            impl<const N: usize> MagnitudeSquared for Point<$T, N> {
-                fn magnitude_squared(self, other: Self) -> u128 {
-                    iter::zip(&self.coords, &other.coords)
-                        .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
-                        .sum()
-                }
-            }
-        )*
-    };
-}
-
-impl_magnitude_squared!(i32, i64);
 
 fn div_floor(a: i64, b: i64) -> i64 {
     let d = a / b;
