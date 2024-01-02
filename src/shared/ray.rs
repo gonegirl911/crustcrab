@@ -65,11 +65,11 @@ impl BlockIntersection {
 pub trait Intersectable {
     fn intersect(&self, ray: Ray) -> Option<f32>;
 
-    fn intersects(&self, ray: Ray) -> bool {
-        self.intersect(ray).is_some()
-    }
-
     fn intersection(&self, ray: Ray) -> Option<Point3<f32>> {
         Some(ray.at(self.intersect(ray)?))
+    }
+
+    fn intersects(&self, ray: Ray) -> bool {
+        self.intersect(ray).is_some()
     }
 }
