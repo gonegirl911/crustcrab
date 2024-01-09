@@ -33,7 +33,7 @@ use crate::{
         utils,
     },
 };
-use nalgebra::{point, Point3, Vector3};
+use nalgebra::{point, Point2, Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -556,12 +556,9 @@ impl ChunkData {
                             if let Some(quad) = quad {
                                 vertices.extend(quad.vertices(
                                     side,
-                                    mask.map(|i| {
-                                        (
-                                            [axis, axis, main as i8, secondary as i8][i] as u8,
-                                            [0, 0, width as u8, height as u8][i],
-                                        )
-                                    }),
+                                    mask,
+                                    [axis as u8, main as u8, secondary as u8],
+                                    point![width as u8, height as u8],
                                 ));
                             }
 
@@ -601,7 +598,8 @@ impl ChunkData {
                 let is_externally_lit = data.is_externally_lit();
                 vertices.extend(data.vertices(
                     None,
-                    coords.map(|c| (c, 1)),
+                    coords,
+                    point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(None, is_externally_lit),
                     area_light.corner_lights(None, area, is_externally_lit),
@@ -674,7 +672,7 @@ impl ChunkData {
         side: Side,
         coords: Point3<i8>,
     ) -> Option<Option<Quad>> {
-        cond.then(|| Quad::new(Some(side), &areas[coords.map(|c| c as u8)]))
+        cond.then(|| Quad::new(side, &areas[coords.map(|c| c as u8)]))
     }
 }
 
@@ -687,22 +685,33 @@ struct Quad {
 }
 
 impl Quad {
-    fn new(side: Option<Side>, (area, area_light): &(BlockArea, BlockAreaLight)) -> Option<Self> {
+    fn new(side: Side, (area, area_light): &(BlockArea, BlockAreaLight)) -> Option<Self> {
         let block = area.block();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
-        (!data.requires_blending && area.is_side_visible(side)).then(|| Self {
+        (!data.requires_blending && area.is_side_visible(Some(side))).then(|| Self {
             block,
             tex_idx: data.tex_idx(),
-            corner_aos: area.corner_aos(side, is_externally_lit),
-            corner_lights: area_light.corner_lights(side, *area, is_externally_lit),
+            corner_aos: area.corner_aos(Some(side), is_externally_lit),
+            corner_lights: area_light.corner_lights(Some(side), *area, is_externally_lit),
         })
     }
 
-    fn vertices(self, side: Side, bounds: Point3<(u8, u8)>) -> impl Iterator<Item = BlockVertex> {
-        self.block
-            .data()
-            .vertices(Some(side), bounds, self.corner_aos, self.corner_lights)
+    fn vertices(
+        self,
+        side: Side,
+        mask: Point3<usize>,
+        [axis, main, secondary]: [u8; 3],
+        dims: Point2<u8>,
+    ) -> impl Iterator<Item = BlockVertex> {
+        self.block.data().vertices(
+            Some(side),
+            mask.map(|i| [axis, axis, main, secondary][i]),
+            mask.map(|i| [0, 0, dims.x, dims.y][i]),
+            dims,
+            self.corner_aos,
+            self.corner_lights,
+        )
     }
 }
 

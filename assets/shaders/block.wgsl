@@ -1,6 +1,5 @@
 struct VertexInput {
-    @location(0) data: u32,
-    @location(1) light: u32,
+    @location(0) data: vec2<u32>,
 }
 
 struct PlayerUniform {
@@ -46,26 +45,26 @@ var<push_constant> pc: PushConstants;
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let coords = pc.chunk_coords * 16.0 + vec3(
-        f32(extractBits(vertex.data, 0u, 5u)),
-        f32(extractBits(vertex.data, 5u, 5u)),
-        f32(extractBits(vertex.data, 10u, 5u)),
+        f32(extractBits(vertex.data[0], 0u, 5u)),
+        f32(extractBits(vertex.data[0], 5u, 5u)),
+        f32(extractBits(vertex.data[0], 10u, 5u)),
     );
-    let tex_idx = extractBits(vertex.data, 15u, 8u);
+    let tex_idx = extractBits(vertex.data[0], 15u, 8u);
     let tex_coords = vec2(
-        f32(extractBits(vertex.data, 23u, 1u)),
-        f32(extractBits(vertex.data, 24u, 1u)),
+        f32(extractBits(vertex.data[0], 27u, 5u)),
+        f32(extractBits(vertex.data[1], 27u, 5u)),
     );
-    let face = extractBits(vertex.data, 25u, 2u);
-    let ao = f32(extractBits(vertex.data, 27u, 2u));
+    let face = extractBits(vertex.data[0], 23u, 2u);
+    let ao = f32(extractBits(vertex.data[0], 25u, 2u));
     let skylight = vec3(
-        f32(extractBits(vertex.light, 0u, 4u)),
-        f32(extractBits(vertex.light, 4u, 4u)),
-        f32(extractBits(vertex.light, 8u, 4u)),
+        f32(extractBits(vertex.data[1], 0u, 4u)),
+        f32(extractBits(vertex.data[1], 4u, 4u)),
+        f32(extractBits(vertex.data[1], 8u, 4u)),
     );
     let torchlight = vec3(
-        f32(extractBits(vertex.light, 12u, 4u)),
-        f32(extractBits(vertex.light, 16u, 4u)),
-        f32(extractBits(vertex.light, 20u, 4u)),
+        f32(extractBits(vertex.data[1], 12u, 4u)),
+        f32(extractBits(vertex.data[1], 16u, 4u)),
+        f32(extractBits(vertex.data[1], 20u, 4u)),
     );
     let face_light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     let ambient_light = mix(0.2, 1.0, ao / 3.0);

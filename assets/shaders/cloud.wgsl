@@ -1,5 +1,5 @@
 struct VertexInput {
-    @location(0) data: u32,
+    @location(0) data: vec2<u32>,
 }
 
 struct InstanceInput {
@@ -39,11 +39,11 @@ var<push_constant> pc: PushConstants;
 @vertex
 fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     let coords = vec3(
-        f32(extractBits(vertex.data, 0u, 5u)),
-        f32(extractBits(vertex.data, 5u, 5u)),
-        f32(extractBits(vertex.data, 10u, 5u)),
+        f32(extractBits(vertex.data[0], 0u, 5u)),
+        f32(extractBits(vertex.data[0], 5u, 5u)),
+        f32(extractBits(vertex.data[0], 10u, 5u)),
     );
-    let face = extractBits(vertex.data, 25u, 2u);
+    let face = extractBits(vertex.data[0], 23u, 2u);
     let offset = player.origin.xz + instance.offset - rem_euclid(player.origin.xz - pc.offset, pc.size.x);
     let light_factor = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     return VertexOutput(

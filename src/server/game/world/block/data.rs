@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::{
-    fs,
+    array, fs,
     iter::{self, Zip},
     sync::Arc,
 };
@@ -36,22 +36,22 @@ impl BlockData {
     pub fn vertices(
         self,
         side: Option<Side>,
-        bounds: Point3<(u8, u8)>,
+        coords: Point3<u8>,
+        dims: Point3<u8>,
         tex_dims: Point2<u8>,
         corner_aos: EnumMap<Corner, u8>,
         corner_lights: EnumMap<Corner, BlockLight>,
     ) -> impl Iterator<Item = BlockVertex> {
         let corner_deltas = self.model.corner_deltas(side);
-        let coords = bounds.map(|c| c.0);
-        let dims = bounds.map(|c| c.1);
         let face = side.into();
         let corners = Self::corners(corner_aos, corner_lights);
         corner_deltas.iter().flat_map(move |corner_deltas| {
             corners.into_iter().map(move |corner| {
+                let tex_coords = CORNER_TEX_COORDS[corner];
                 BlockVertex::new(
                     coords + corner_deltas[corner].component_mul(&dims.coords),
                     self.model.tex_index,
-                    Self::tex_coords(corner, tex_dims),
+                    array::from_fn(|i| tex_coords[i] * tex_dims[i]).into(),
                     face,
                     corner_aos[corner],
                     corner_lights[corner],
@@ -72,7 +72,8 @@ impl BlockData {
             .flat_map(move |side| {
                 self.vertices(
                     side,
-                    coords.map(|c| (c, 1)),
+                    coords,
+                    point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(side, is_externally_lit),
                     area_light.corner_lights(side, area, is_externally_lit),
@@ -132,13 +133,6 @@ impl BlockData {
         } else {
             CORNERS
         }
-    }
-
-    fn tex_coords(corner: Corner, dims: Point2<u8>) -> Point2<u8> {
-        CORNER_TEX_COORDS[corner]
-            .coords
-            .component_mul(&dims.coords)
-            .into()
     }
 }
 
@@ -339,18 +333,14 @@ pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
 });
 
 pub static SIDE_MASKS: Lazy<EnumMap<Side, Point3<(usize, usize)>>> = Lazy::new(|| {
-    SIDE_DELTAS.map(|_, delta| {
-        let mut i = 1;
-        delta
-            .map(|c| {
-                i += (c == 0) as usize;
-                (
-                    i * (c == 0) as usize + (c == 1) as usize,
-                    i * (c == 0) as usize + (c == -1) as usize,
-                )
-            })
-            .into()
-    })
+    enum_map! {
+        Side::Front => point![(2, 2), (3, 3), (0, 1)],
+        Side::Right => point![(1, 0), (3, 3), (2, 2)],
+        Side::Back => point![(2, 2), (3, 3), (1, 0)],
+        Side::Left => point![(0, 1), (3, 3), (2, 2)],
+        Side::Top => point![(2, 2), (1, 0), (3, 3)],
+        Side::Bottom => point![(2, 2), (0, 1), (3, 3)],
+    }
 });
 
 static SIDE_CORNER_DELTAS: Lazy<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> = Lazy::new(|| {

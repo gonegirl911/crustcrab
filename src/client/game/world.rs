@@ -297,8 +297,7 @@ impl EventHandler for World {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 pub struct BlockVertex {
-    pub data: u32,
-    light: u32,
+    data: [u32; 2],
 }
 
 impl BlockVertex {
@@ -310,33 +309,30 @@ impl BlockVertex {
         ao: u8,
         light: BlockLight,
     ) -> Self {
-        let mut data = 0;
-        data.set_bit_range(4, 0, coords.x);
-        data.set_bit_range(9, 5, coords.y);
-        data.set_bit_range(14, 10, coords.z);
-        data.set_bit_range(22, 15, tex_index);
-        data.set_bit_range(23, 23, tex_coords.x);
-        data.set_bit_range(24, 24, tex_coords.y);
-        data.set_bit_range(26, 25, face as u8);
-        data.set_bit_range(28, 27, ao);
-        Self {
-            data,
-            light: light.0,
-        }
+        let mut data = [0; 2];
+        data[0].set_bit_range(4, 0, coords.x);
+        data[0].set_bit_range(9, 5, coords.y);
+        data[0].set_bit_range(14, 10, coords.z);
+        data[0].set_bit_range(22, 15, tex_index);
+        data[0].set_bit_range(31, 27, tex_coords.x);
+        data[1].set_bit_range(31, 27, tex_coords.y);
+        data[0].set_bit_range(24, 23, face as u8);
+        data[0].set_bit_range(26, 25, ao);
+        data[1].set_bit_range(26, 0, light.0);
+        Self { data }
     }
 
     fn coords(self) -> Point3<u8> {
         point![
-            self.data.bit_range(4, 0),
-            self.data.bit_range(9, 5),
-            self.data.bit_range(14, 10),
+            self.data[0].bit_range(4, 0),
+            self.data[0].bit_range(9, 5),
+            self.data[0].bit_range(14, 10),
         ]
     }
 }
 
 impl Vertex for BlockVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] =
-        &wgpu::vertex_attr_array![0 => Uint32, 1 => Uint32];
+    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32x2];
 }
 
 #[repr(C)]

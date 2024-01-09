@@ -25,7 +25,7 @@ use std::time::Duration;
 use winit::event::WindowEvent;
 
 pub struct CloudLayer {
-    vertex_buffer: VertexBuffer<CloudVertex>,
+    vertex_buffer: VertexBuffer<BlockVertex>,
     instance_buffer: InstanceBuffer<CloudInstance>,
     texture: ImageTexture,
     program: Program,
@@ -56,7 +56,7 @@ impl CloudLayer {
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/cloud.wgsl"),
-            &[CloudVertex::desc(), CloudInstance::desc()],
+            &[BlockVertex::desc(), CloudInstance::desc()],
             &[player_bind_group_layout, texture.bind_group_layout()],
             &[CloudPushConstants::range()],
             PostProcessor::FORMAT,
@@ -123,11 +123,10 @@ impl CloudLayer {
         self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
     }
 
-    fn vertices() -> Vec<CloudVertex> {
+    fn vertices() -> Vec<BlockVertex> {
         Block::Sand
             .data()
             .mesh(Default::default(), Block::Sand.into(), &Default::default())
-            .map(Into::into)
             .collect()
     }
 
@@ -167,22 +166,6 @@ impl EventHandler for CloudLayer {
             _ => {}
         }
     }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Zeroable, Pod)]
-struct CloudVertex {
-    data: u32,
-}
-
-impl From<BlockVertex> for CloudVertex {
-    fn from(vertex: BlockVertex) -> Self {
-        Self { data: vertex.data }
-    }
-}
-
-impl Vertex for CloudVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32];
 }
 
 #[repr(C)]
