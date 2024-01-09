@@ -35,32 +35,53 @@ pub struct BlockData {
 impl BlockData {
     pub fn vertices(
         self,
+        side: Option<Side>,
+        bounds: Point3<(u8, u8)>,
+        tex_dims: Point2<u8>,
+        corner_aos: EnumMap<Corner, u8>,
+        corner_lights: EnumMap<Corner, BlockLight>,
+    ) -> impl Iterator<Item = BlockVertex> {
+        let corner_deltas = self.model.corner_deltas(side);
+        let coords = bounds.map(|c| c.0);
+        let dims = bounds.map(|c| c.1);
+        let face = side.into();
+        let corners = Self::corners(corner_aos, corner_lights);
+        corner_deltas.iter().flat_map(move |corner_deltas| {
+            corners.into_iter().map(move |corner| {
+                BlockVertex::new(
+                    coords + corner_deltas[corner].component_mul(&dims.coords),
+                    self.model.tex_index,
+                    Self::tex_coords(corner, tex_dims),
+                    face,
+                    corner_aos[corner],
+                    corner_lights[corner],
+                )
+            })
+        })
+    }
+
+    pub fn mesh(
+        self,
         coords: Point3<u8>,
         area: BlockArea,
-        area_light: BlockAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> {
+        area_light: &BlockAreaLight,
+    ) -> impl Iterator<Item = BlockVertex> + '_ {
         let is_externally_lit = self.is_externally_lit();
-        self.model
-            .side_corner_deltas()
-            .filter(move |&(side, _)| area.is_side_visible(side))
-            .flat_map(move |(side, corner_deltas)| {
-                let face = side.into();
-                let corner_aos = area.corner_aos(side, is_externally_lit);
-                let corner_lights = area_light.corner_lights(side, area, is_externally_lit);
-                let corners = Self::corners(corner_aos, corner_lights);
-                corner_deltas.iter().flat_map(move |corner_deltas| {
-                    corners.into_iter().map(move |corner| {
-                        BlockVertex::new(
-                            coords + corner_deltas[corner],
-                            self.model.tex_index,
-                            CORNER_TEX_COORDS[corner],
-                            face,
-                            corner_aos[corner],
-                            corner_lights[corner],
-                        )
-                    })
-                })
+        Enum::variants()
+            .filter(move |&side| area.is_side_visible(side))
+            .flat_map(move |side| {
+                self.vertices(
+                    side,
+                    coords.map(|c| (c, 1)),
+                    point![1, 1],
+                    area.corner_aos(side, is_externally_lit),
+                    area_light.corner_lights(side, area, is_externally_lit),
+                )
             })
+    }
+
+    pub fn tex_idx(self) -> u8 {
+        self.model.tex_index
     }
 
     pub fn hitbox(self, coords: Point3<i64>) -> Aabb {
@@ -111,6 +132,13 @@ impl BlockData {
         } else {
             CORNERS
         }
+    }
+
+    fn tex_coords(corner: Corner, dims: Point2<u8>) -> Point2<u8> {
+        CORNER_TEX_COORDS[corner]
+            .coords
+            .component_mul(&dims.coords)
+            .into()
     }
 }
 
@@ -310,7 +338,7 @@ pub static SIDE_DELTAS: Lazy<EnumMap<Side, Vector3<i8>>> = Lazy::new(|| {
     }
 });
 
-static SIDE_MASKS: Lazy<EnumMap<Side, Point3<(usize, usize)>>> = Lazy::new(|| {
+pub static SIDE_MASKS: Lazy<EnumMap<Side, Point3<(usize, usize)>>> = Lazy::new(|| {
     SIDE_DELTAS.map(|_, delta| {
         let mut i = 1;
         delta

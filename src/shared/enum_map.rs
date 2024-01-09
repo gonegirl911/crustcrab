@@ -41,6 +41,13 @@ impl<E: Enum, T> EnumMap<E, T> {
         EnumMap(GenericArray::uninit())
     }
 
+    pub fn iter(&self) -> Iter<E, T> {
+        Iter {
+            inner: self.0.iter().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+
     pub fn values(&self) -> slice::Iter<T> {
         self.0.iter()
     }
@@ -71,6 +78,23 @@ impl<E: Enum, T> EnumMap<E, MaybeUninit<T>> {
     }
 }
 
+impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
+    fn from_iter<I: IntoIterator<Item = (E, T)>>(iter: I) -> Self {
+        let mut uninit = EnumMap::uninit();
+        let mut guard = Guard::new(&mut uninit);
+
+        for (variant, value) in iter {
+            guard.set(variant, value);
+        }
+
+        if guard.finish() {
+            unsafe { uninit.assume_init() }
+        } else {
+            panic!("missing variants")
+        }
+    }
+}
+
 impl<E: Enum, T: Clone> Clone for EnumMap<E, T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -78,6 +102,12 @@ impl<E: Enum, T: Clone> Clone for EnumMap<E, T> {
 }
 
 impl<E: Enum, T: Copy> Copy for EnumMap<E, T> where GenericArray<T, E::Length>: Copy {}
+
+impl<E: Enum, T: PartialEq> PartialEq for EnumMap<E, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
 
 impl<E: Enum, T: Default> Default for EnumMap<E, T> {
     fn default() -> Self {
@@ -125,10 +155,7 @@ impl<'a, E: Enum, T> IntoIterator for &'a EnumMap<E, T> {
     type IntoIter = Iter<'a, E, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        Iter {
-            inner: self.0.iter().enumerate(),
-            phantom: PhantomData,
-        }
+        self.iter()
     }
 }
 
@@ -204,13 +231,18 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
     }
 
     fn init(&mut self, variant: E, value: T) -> bool {
-        if !mem::replace(&mut self.is_init[variant], true) {
-            self.uninit[variant].write(value);
-            self.count += 1;
+        if !self.is_init[variant] {
+            self.set(variant, value);
             true
         } else {
             false
         }
+    }
+
+    fn set(&mut self, variant: E, value: T) {
+        self.uninit[variant].write(value);
+        self.is_init[variant] = true;
+        self.count += 1;
     }
 
     fn finish(self) -> bool {

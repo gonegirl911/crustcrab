@@ -8,13 +8,13 @@ use self::{
     action::{ActionStore, BlockAction},
     block::{
         area::{BlockArea, BlockAreaLight},
-        data::BlockData,
+        data::{BlockData, Corner, Side, SIDE_DELTAS, SIDE_MASKS},
         Block, BlockLight,
     },
     chunk::{
         area::{ChunkArea, ChunkAreaLight},
         generator::ChunkGenerator,
-        Chunk,
+        Chunk, DataStore,
     },
     height::HeightMap,
     light::WorldLight,
@@ -28,15 +28,16 @@ use crate::{
     },
     shared::{
         bound::Aabb,
-        enum_map::Enum,
+        enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
         utils,
     },
 };
-use nalgebra::{Point3, Vector3};
+use nalgebra::{point, Point3, Vector3};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
+    array,
     collections::{hash_map::Entry, LinkedList},
     mem,
     ops::{Index, Range},
@@ -529,26 +530,187 @@ impl ChunkData {
         }
     }
 
-    pub fn vertices(
+    pub fn vertices(&self) -> (Vec<BlockVertex>, Vec<BlockVertex>) {
+        let mut vertices = vec![];
+        let mut transparent_vertices = vec![];
+        let areas = self.block_areas(&mut vertices, &mut transparent_vertices);
+
+        for side in Enum::variants() {
+            let mask = SIDE_MASKS[side].map(|c| c.0);
+            let delta = SIDE_DELTAS[side];
+            let is_negative = delta.sum() == -1;
+            let abs_delta = delta.map(i8::abs);
+
+            for axis in 0..=Chunk::DIM as i8 {
+                let mut quads = Self::quads(&areas, side, mask, is_negative, abs_delta, axis - 1);
+                let mut curr = 0;
+
+                for secondary in 0..Chunk::DIM {
+                    let mut main = 0;
+
+                    while main < Chunk::DIM {
+                        if let Some(quad) = quads[secondary * Chunk::DIM + main] {
+                            let width = Self::width(&quads, curr, main, quad);
+                            let height = Self::height(&quads, curr, secondary, quad, width);
+
+                            if let Some(quad) = quad {
+                                vertices.extend(quad.vertices(
+                                    side,
+                                    mask.map(|i| {
+                                        (
+                                            [axis, axis, main as i8, secondary as i8][i] as u8,
+                                            [0, 0, width as u8, height as u8][i],
+                                        )
+                                    }),
+                                ));
+                            }
+
+                            for secondary in 0..height {
+                                for main in 0..width {
+                                    quads[curr + secondary * Chunk::DIM + main] = None;
+                                }
+                            }
+
+                            curr += width;
+                            main += width;
+                        } else {
+                            curr += 1;
+                            main += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        (vertices, transparent_vertices)
+    }
+
+    fn block_areas(
         &self,
-    ) -> impl Iterator<Item = (BlockData, impl Iterator<Item = BlockVertex>)> + '_ {
-        self.blocks().map(|(coords, block)| {
-            let data = block.data();
-            (
-                data,
-                data.vertices(
-                    coords,
-                    self.area.block_area(coords),
-                    self.area_light.block_area_light(coords),
-                ),
-            )
+        vertices: &mut Vec<BlockVertex>,
+        transparent_vertices: &mut Vec<BlockVertex>,
+    ) -> DataStore<(BlockArea, BlockAreaLight)> {
+        DataStore::from_fn(|coords| {
+            let area = self.area.block_area(coords);
+            let area_light = self.area_light.block_area_light(coords);
+            let data = area.block().data();
+
+            if data.requires_blending {
+                transparent_vertices.extend(data.mesh(coords, area, &area_light));
+            } else {
+                let is_externally_lit = data.is_externally_lit();
+                vertices.extend(data.vertices(
+                    None,
+                    coords.map(|c| (c, 1)),
+                    point![1, 1],
+                    area.corner_aos(None, is_externally_lit),
+                    area_light.corner_lights(None, area, is_externally_lit),
+                ))
+            }
+
+            (area, area_light)
         })
     }
 
-    fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, Block)> + '_ {
-        Chunk::points()
-            .map(|coords| (coords, self.area.block(coords)))
-            .filter(|(_, block)| *block != Block::Air)
+    fn quads(
+        areas: &DataStore<(BlockArea, BlockAreaLight)>,
+        side: Side,
+        mask: Point3<usize>,
+        is_negative: bool,
+        abs_delta: Vector3<i8>,
+        axis: i8,
+    ) -> [Option<Option<Quad>>; Chunk::DIM * Chunk::DIM] {
+        array::from_fn(|i| {
+            let secondary = i / Chunk::DIM;
+            let main = i % Chunk::DIM;
+            let coords = mask.map(|i| [axis, axis, main as i8, secondary as i8][i]);
+            let quad = Self::quad(axis >= 0, areas, side, coords);
+            let neighbor = Self::quad(axis < Chunk::DIM as i8 - 1, areas, side, coords + abs_delta);
+            if quad == neighbor {
+                None
+            } else if is_negative {
+                neighbor
+            } else {
+                quad
+            }
+        })
+    }
+
+    fn width(
+        quads: &[Option<Option<Quad>>; Chunk::DIM * Chunk::DIM],
+        index: usize,
+        main: usize,
+        quad: Option<Quad>,
+    ) -> usize {
+        let mut width = 1;
+        while main + width < Chunk::DIM && quads[index + width] == Some(quad) {
+            width += 1;
+        }
+        width
+    }
+
+    fn height(
+        quads: &[Option<Option<Quad>>; Chunk::DIM * Chunk::DIM],
+        index: usize,
+        secondary: usize,
+        quad: Option<Quad>,
+        width: usize,
+    ) -> usize {
+        let mut height = 1;
+        'outer: while secondary + height < Chunk::DIM {
+            for main in 0..width {
+                if quads[index + height * Chunk::DIM + main] != Some(quad) {
+                    break 'outer;
+                }
+            }
+            height += 1;
+        }
+        height
+    }
+
+    fn quad(
+        cond: bool,
+        areas: &DataStore<(BlockArea, BlockAreaLight)>,
+        side: Side,
+        coords: Point3<i8>,
+    ) -> Option<Option<Quad>> {
+        cond.then(|| Quad::new(Some(side), &areas[coords.map(|c| c as u8)]))
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Quad {
+    block: Block,
+    tex_idx: u8,
+    corner_aos: EnumMap<Corner, u8>,
+    corner_lights: EnumMap<Corner, BlockLight>,
+}
+
+impl Quad {
+    fn new(side: Option<Side>, (area, area_light): &(BlockArea, BlockAreaLight)) -> Option<Self> {
+        let block = area.block();
+        let data = block.data();
+        let is_externally_lit = data.is_externally_lit();
+        (!data.requires_blending && area.is_side_visible(side)).then(|| Self {
+            block,
+            tex_idx: data.tex_idx(),
+            corner_aos: area.corner_aos(side, is_externally_lit),
+            corner_lights: area_light.corner_lights(side, *area, is_externally_lit),
+        })
+    }
+
+    fn vertices(self, side: Side, bounds: Point3<(u8, u8)>) -> impl Iterator<Item = BlockVertex> {
+        self.block
+            .data()
+            .vertices(Some(side), bounds, self.corner_aos, self.corner_lights)
+    }
+}
+
+impl PartialEq for Quad {
+    fn eq(&self, other: &Self) -> bool {
+        self.tex_idx == other.tex_idx
+            && self.corner_aos == other.corner_aos
+            && self.corner_lights == other.corner_lights
     }
 }
 

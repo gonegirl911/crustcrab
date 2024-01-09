@@ -227,6 +227,7 @@ impl BlockTextureArray {
             true,
             true,
             4,
+            wgpu::AddressMode::Repeat,
         ))
     }
 

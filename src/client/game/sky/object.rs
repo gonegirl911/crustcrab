@@ -37,6 +37,7 @@ impl ObjectSet {
             true,
             true,
             1,
+            Default::default(),
         );
         let program = Program::new(
             renderer,

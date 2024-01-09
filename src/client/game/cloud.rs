@@ -40,10 +40,7 @@ impl CloudLayer {
         player_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let vertex_buffer = VertexBuffer::new(
-            renderer,
-            MemoryState::Immutable(&Self::vertices().collect::<Vec<_>>()),
-        );
+        let vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&Self::vertices()));
         let instance_buffer = InstanceBuffer::new(
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
@@ -126,11 +123,12 @@ impl CloudLayer {
         self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
     }
 
-    fn vertices() -> impl Iterator<Item = CloudVertex> {
+    fn vertices() -> Vec<CloudVertex> {
         Block::Sand
             .data()
-            .vertices(Default::default(), Block::Sand.into(), Default::default())
+            .mesh(Default::default(), Block::Sand.into(), &Default::default())
             .map(Into::into)
+            .collect()
     }
 
     fn instances() -> impl Iterator<Item = CloudInstance> {

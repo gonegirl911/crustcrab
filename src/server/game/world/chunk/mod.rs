@@ -79,12 +79,6 @@ impl Chunk {
         self.glowing_count += curr.data().is_glowing() as u16;
     }
 
-    pub fn points() -> impl Iterator<Item = Point3<u8>> {
-        (0..Self::DIM).flat_map(|x| {
-            (0..Self::DIM).flat_map(move |y| (0..Self::DIM).map(move |z| point![x, y, z].cast()))
-        })
-    }
-
     pub fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
             utils::coords((coords, Default::default())).cast(),
@@ -155,10 +149,10 @@ impl BitOrAssign<BlockLight> for ChunkLight {
 }
 
 #[derive(Default)]
-struct DataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
+pub struct DataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
 impl<T> DataStore<T> {
-    fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
+    pub fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))

@@ -151,12 +151,8 @@ impl EventHandler for Inventory {
                                     is_flat = true;
                                     vertices.collect::<Vec<_>>()
                                 } else {
-                                    data.vertices(
-                                        Default::default(),
-                                        block.into(),
-                                        Default::default(),
-                                    )
-                                    .collect()
+                                    data.mesh(Default::default(), block.into(), &Default::default())
+                                        .collect()
                                 }),
                             )
                         });

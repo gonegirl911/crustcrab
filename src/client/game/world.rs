@@ -48,7 +48,7 @@ type ChunkMesh = (
 
 type ChunkInput = (Point3<i32>, Arc<ChunkData>, Instant);
 
-type ChunkOutput = (Point3<i32>, Vec<BlockVertex>, Vec<BlockVertex>, Instant);
+type ChunkOutput = (Point3<i32>, (Vec<BlockVertex>, Vec<BlockVertex>), Instant);
 
 impl World {
     pub fn new(
@@ -155,23 +155,7 @@ impl World {
     }
 
     fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
-        let mut transparent_vertices = vec![];
-        (
-            coords,
-            data.vertices()
-                .filter_map(|(data, vertices)| {
-                    if data.requires_blending {
-                        transparent_vertices.extend(vertices);
-                        None
-                    } else {
-                        Some(vertices)
-                    }
-                })
-                .flatten()
-                .collect(),
-            transparent_vertices,
-            updated_at,
-        )
+        (coords, data.vertices(), updated_at)
     }
 
     fn transparent_mesh(
@@ -269,7 +253,7 @@ impl EventHandler for World {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                for (coords, vertices, transparent_vertices, updated_at) in
+                for (coords, (vertices, transparent_vertices), updated_at) in
                     self.priority_workers.drain().chain(self.workers.drain())
                 {
                     if !self.unloaded.contains(&coords) {

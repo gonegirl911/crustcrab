@@ -6,7 +6,6 @@ use crate::{
         enum_map::{Display, Enum, EnumMap},
     },
 };
-use arrayvec::ArrayVec;
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
@@ -19,8 +18,8 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn side_corner_deltas(self) -> impl Iterator<Item = (Option<Side>, &'static CornerDeltas)> {
-        self.data.side_corner_deltas()
+    pub fn corner_deltas(self, side: Option<Side>) -> &'static CornerDeltas {
+        self.data.corner_deltas(side)
     }
 
     pub fn hitbox(self, coords: Point3<i64>) -> Aabb {
@@ -74,15 +73,13 @@ struct ModelData {
     side_corner_deltas: SideCornerDeltas,
 }
 
-type SideCornerDeltas = ArrayVec<(Option<Side>, Box<CornerDeltas>), { Option::<Side>::LEN }>;
+type SideCornerDeltas = EnumMap<Option<Side>, Box<CornerDeltas>>;
 
 type CornerDeltas = [EnumMap<Corner, Vector3<u8>>];
 
 impl ModelData {
-    fn side_corner_deltas(&self) -> impl Iterator<Item = (Option<Side>, &CornerDeltas)> {
-        self.side_corner_deltas
-            .iter()
-            .map(|(side, corner_deltas)| (*side, &**corner_deltas))
+    fn corner_deltas(&self, side: Option<Side>) -> &CornerDeltas {
+        &self.side_corner_deltas[side]
     }
 
     fn hitbox(&self, coords: Point3<i64>) -> Aabb {
@@ -114,7 +111,6 @@ impl<'de> Deserialize<'de> for ModelData {
                             .into_values()
                             .chain([self.internal_corner_deltas]),
                     )
-                    .filter(|(_, corner_deltas)| !corner_deltas.is_empty())
                     .collect()
             }
         }
