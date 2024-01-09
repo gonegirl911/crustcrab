@@ -43,8 +43,8 @@ impl BlockData {
         corner_lights: EnumMap<Corner, BlockLight>,
     ) -> impl Iterator<Item = BlockVertex> {
         let corner_deltas = self.model.corner_deltas(side);
-        let face = side.into();
         let corners = Self::corners(corner_aos, corner_lights);
+        let face = side.into();
         corner_deltas.iter().flat_map(move |corner_deltas| {
             corners.into_iter().map(move |corner| {
                 let tex_coords = CORNER_TEX_COORDS[corner];
