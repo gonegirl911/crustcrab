@@ -603,7 +603,7 @@ impl ChunkData {
                     point![1, 1],
                     area.corner_aos(None, is_externally_lit),
                     area_light.corner_lights(None, area, is_externally_lit),
-                ))
+                ));
             }
 
             (area, area_light)
