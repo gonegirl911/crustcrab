@@ -8,7 +8,7 @@ impl Program {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         Renderer { device, .. }: &Renderer,
-        desc: wgpu::ShaderModuleDescriptor,
+        shader_desc: wgpu::ShaderModuleDescriptor,
         buffers: &[wgpu::VertexBufferLayout],
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         push_constant_ranges: &[wgpu::PushConstantRange],
@@ -17,7 +17,7 @@ impl Program {
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
     ) -> Self {
-        let shader = device.create_shader_module(desc);
+        let shader = device.create_shader_module(shader_desc);
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: None,

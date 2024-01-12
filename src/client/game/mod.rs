@@ -202,13 +202,13 @@ impl EventHandler for Game {
         } = event
         {
             match surface.get_current_texture() {
-                Ok(surface) => {
-                    let view = surface.texture.create_view(&Default::default());
+                Ok(texture) => {
+                    let view = texture.texture.create_view(&Default::default());
                     let mut encoder = device.create_command_encoder(&Default::default());
                     self.draw(renderer, &view, &mut encoder);
                     queue.submit([encoder.finish()]);
                     window.pre_present_notify();
-                    surface.present();
+                    texture.present();
                 }
                 Err(wgpu::SurfaceError::Lost) => renderer.recreate_surface(),
                 Err(_) => {}
