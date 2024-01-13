@@ -14,19 +14,13 @@ impl ImageTexture {
     pub fn new<P: AsRef<Path>>(
         renderer @ Renderer { device, .. }: &Renderer,
         path: P,
-        is_srgb: bool,
-        is_pixelated: bool,
         mip_level_count: u32,
+        is_srgb: bool,
         address_mode: wgpu::AddressMode,
     ) -> Self {
-        let view = Self::create_view(renderer, path, is_srgb, mip_level_count);
-        let sampler = ImageTextureArray::create_sampler(
-            renderer,
-            is_pixelated,
-            mip_level_count,
-            address_mode,
-        );
-        let bind_group_layout = Self::create_bind_group_layout(renderer, None, is_pixelated);
+        let view = Self::create_view(renderer, path, mip_level_count, is_srgb);
+        let sampler = Self::create_sampler(renderer, address_mode, mip_level_count);
+        let bind_group_layout = ImageTextureArray::create_bind_group_layout(renderer, &[]);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -63,8 +57,8 @@ impl ImageTexture {
             ..
         }: &Renderer,
         path: P,
-        is_srgb: bool,
         mip_level_count: u32,
+        is_srgb: bool,
     ) -> wgpu::TextureView {
         let image = Self::load_rgba(path);
         let (width, height) = image.dimensions();
@@ -112,37 +106,22 @@ impl ImageTexture {
         texture.create_view(&Default::default())
     }
 
-    fn create_bind_group_layout(
+    fn create_sampler(
         Renderer { device, .. }: &Renderer,
-        count: Option<NonZeroU32>,
-        is_pixelated: bool,
-    ) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float {
-                            filterable: !is_pixelated,
-                        },
-                    },
-                    count,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(if is_pixelated {
-                        wgpu::SamplerBindingType::NonFiltering
-                    } else {
-                        wgpu::SamplerBindingType::Filtering
-                    }),
-                    count: None,
-                },
-            ],
+        address_mode: wgpu::AddressMode,
+        mip_level_count: u32,
+    ) -> wgpu::Sampler {
+        device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: address_mode,
+            address_mode_v: address_mode,
+            mag_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: if mip_level_count > 1 {
+                wgpu::FilterMode::Linear
+            } else {
+                wgpu::FilterMode::Nearest
+            },
+            anisotropy_clamp: 1,
+            ..Default::default()
         })
     }
 
@@ -241,18 +220,13 @@ impl ImageTextureArray {
     pub fn new(
         renderer @ Renderer { device, .. }: &Renderer,
         paths: impl IntoIterator<Item = impl AsRef<Path>>,
-        is_srgb: bool,
-        is_pixelated: bool,
         mip_level_count: u32,
+        is_srgb: bool,
         address_mode: wgpu::AddressMode,
     ) -> Self {
-        let views = Self::create_views(renderer, paths, is_srgb, mip_level_count);
-        let sampler = Self::create_sampler(renderer, is_pixelated, mip_level_count, address_mode);
-        let bind_group_layout = ImageTexture::create_bind_group_layout(
-            renderer,
-            NonZeroU32::new(views.len() as u32),
-            is_pixelated,
-        );
+        let views = Self::create_views(renderer, paths, mip_level_count, is_srgb);
+        let sampler = ImageTexture::create_sampler(renderer, address_mode, mip_level_count);
+        let bind_group_layout = Self::create_bind_group_layout(renderer, &views);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -286,36 +260,39 @@ impl ImageTextureArray {
     fn create_views(
         renderer: &Renderer,
         paths: impl IntoIterator<Item = impl AsRef<Path>>,
-        is_srgb: bool,
         mip_level_count: u32,
+        is_srgb: bool,
     ) -> Vec<wgpu::TextureView> {
         paths
             .into_iter()
-            .map(|path| ImageTexture::create_view(renderer, path, is_srgb, mip_level_count))
+            .map(|path| ImageTexture::create_view(renderer, path, mip_level_count, is_srgb))
             .collect()
     }
 
-    fn create_sampler(
+    fn create_bind_group_layout(
         Renderer { device, .. }: &Renderer,
-        is_pixelated: bool,
-        mip_level_count: u32,
-        address_mode: wgpu::AddressMode,
-    ) -> wgpu::Sampler {
-        device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: address_mode,
-            address_mode_v: address_mode,
-            mag_filter: if is_pixelated {
-                wgpu::FilterMode::Nearest
-            } else {
-                wgpu::FilterMode::Linear
-            },
-            mipmap_filter: if mip_level_count > 1 {
-                wgpu::FilterMode::Linear
-            } else {
-                wgpu::FilterMode::Nearest
-            },
-            anisotropy_clamp: 1,
-            ..Default::default()
+        views: &[wgpu::TextureView],
+    ) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
+                    count: NonZeroU32::new(views.len() as u32),
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+            ],
         })
     }
 }

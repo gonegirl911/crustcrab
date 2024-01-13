@@ -108,9 +108,9 @@ impl Blit {
             &[],
             &[input_bind_group_layout],
             &[],
+            None,
+            None,
             format,
-            None,
-            None,
             None,
         ))
     }
@@ -144,10 +144,10 @@ impl Blender {
                 stages: wgpu::ShaderStages::FRAGMENT,
                 range: 0..mem::size_of::<BlenderPushConstants>() as u32,
             }],
+            None,
+            None,
             format,
             Some(wgpu::BlendState::ALPHA_BLENDING),
-            None,
-            None,
         ))
     }
 
@@ -210,9 +210,9 @@ impl Aces {
             &[],
             &[input_bind_group_layout],
             &[],
+            None,
+            None,
             format,
-            None,
-            None,
             None,
         ))
     }

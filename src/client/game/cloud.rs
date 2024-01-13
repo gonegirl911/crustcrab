@@ -45,22 +45,13 @@ impl CloudLayer {
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
         );
-        let texture = ImageTexture::new(
-            renderer,
-            TEX_PATH,
-            false,
-            true,
-            1,
-            wgpu::AddressMode::Repeat,
-        );
+        let texture = ImageTexture::new(renderer, TEX_PATH, 1, false, wgpu::AddressMode::Repeat);
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../assets/shaders/cloud.wgsl"),
             &[BlockVertex::desc(), CloudInstance::desc()],
             &[player_bind_group_layout, texture.bind_group_layout()],
             &[CloudPushConstants::range()],
-            PostProcessor::FORMAT,
-            None,
             None,
             Some(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
@@ -69,6 +60,8 @@ impl CloudLayer {
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
+            PostProcessor::FORMAT,
+            None,
         );
         let blender = Blender::new(renderer, spare_bind_group_layout, PostProcessor::FORMAT);
         Self {

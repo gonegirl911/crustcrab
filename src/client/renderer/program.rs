@@ -12,26 +12,31 @@ impl Program {
         buffers: &[wgpu::VertexBufferLayout],
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         push_constant_ranges: &[wgpu::PushConstantRange],
-        format: wgpu::TextureFormat,
-        blend: Option<wgpu::BlendState>,
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
+        format: wgpu::TextureFormat,
+        blend: Option<wgpu::BlendState>,
     ) -> Self {
         let shader = device.create_shader_module(shader_desc);
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts,
-                push_constant_ranges,
-            });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts,
+            push_constant_ranges,
+        });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
-            layout: Some(&render_pipeline_layout),
+            layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
                 buffers,
             },
+            primitive: wgpu::PrimitiveState {
+                cull_mode,
+                ..Default::default()
+            },
+            depth_stencil,
+            multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_main",
@@ -41,12 +46,6 @@ impl Program {
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
-            primitive: wgpu::PrimitiveState {
-                cull_mode,
-                ..Default::default()
-            },
-            depth_stencil,
-            multisample: Default::default(),
             multiview: None,
         });
         Self(render_pipeline)

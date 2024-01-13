@@ -63,9 +63,9 @@ impl WorldLight {
         heights: &HeightMap,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
-        Self::chunk_size(points.len())
-            .map(|size| self.par_insert_many_chunks(chunks, heights, points, size))
-            .unwrap_or_default()
+        Self::chunk_size(points.len()).map_or(vec![], |size| {
+            self.par_insert_many_chunks(chunks, heights, points, size)
+        })
     }
 
     pub fn apply(

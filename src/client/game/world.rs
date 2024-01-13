@@ -69,8 +69,6 @@ impl World {
                     textures_bind_group_layout,
                 ],
                 &[BlockPushConstants::range()],
-                PostProcessor::FORMAT,
-                Some(wgpu::BlendState::ALPHA_BLENDING),
                 Some(wgpu::Face::Back),
                 Some(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
@@ -79,6 +77,8 @@ impl World {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
+                PostProcessor::FORMAT,
+                Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
             unloaded: Default::default(),
             priority_workers: ThreadPool::new(Self::vertices),

@@ -112,8 +112,6 @@ impl BlockHighlight {
                 &[BlockHighlightVertex::desc()],
                 &[player_bind_group_layout, sky_bind_group_layout],
                 &[BlockHighlightPushConstants::range()],
-                PostProcessor::FORMAT,
-                Some(wgpu::BlendState::ALPHA_BLENDING),
                 Some(wgpu::Face::Back),
                 Some(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
@@ -122,6 +120,8 @@ impl BlockHighlight {
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
+                PostProcessor::FORMAT,
+                Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
         }
     }

@@ -34,9 +34,8 @@ impl ObjectSet {
                 "assets/textures/sky/sun.png",
                 "assets/textures/sky/moon.png",
             ],
-            true,
-            true,
             1,
+            true,
             Default::default(),
         );
         let program = Program::new(
@@ -49,9 +48,9 @@ impl ObjectSet {
                 textures.bind_group_layout(),
             ],
             &[ObjectPushConstants::range()],
+            None,
+            None,
             PostProcessor::FORMAT,
-            None,
-            None,
             None,
         );
         let (sun_pc, moon_pc) = Self::pc(Default::default());

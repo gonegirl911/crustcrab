@@ -23,9 +23,8 @@ impl Crosshair {
         let texture = ImageTexture::new(
             renderer,
             "assets/textures/gui/crosshair.png",
-            false,
-            true,
             1,
+            false,
             Default::default(),
         );
         let program = Program::new(
@@ -38,10 +37,10 @@ impl Crosshair {
                 input_bind_group_layout,
             ],
             &[],
+            None,
+            None,
             PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
-            None,
-            None,
         );
         Self {
             uniform,

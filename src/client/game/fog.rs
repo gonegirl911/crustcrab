@@ -27,10 +27,10 @@ impl Fog {
                 depth_bind_group_layout,
             ],
             &[],
+            None,
+            None,
             PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
-            None,
-            None,
         );
         Self { texture, program }
     }

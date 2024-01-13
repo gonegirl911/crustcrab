@@ -14,9 +14,9 @@ impl Atmosphere {
             &[],
             &[player_bind_group_layout, sky_bind_group_layout],
             &[],
+            None,
+            None,
             PostProcessor::FORMAT,
-            None,
-            None,
             None,
         ))
     }

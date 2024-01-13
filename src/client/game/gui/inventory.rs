@@ -46,8 +46,6 @@ impl Inventory {
             &[BlockVertex::desc()],
             &[uniform.bind_group_layout(), textures_bind_group_layout],
             &[],
-            PostProcessor::FORMAT,
-            Some(wgpu::BlendState::ALPHA_BLENDING),
             Some(wgpu::Face::Back),
             Some(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
@@ -56,6 +54,8 @@ impl Inventory {
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
+            PostProcessor::FORMAT,
+            Some(wgpu::BlendState::ALPHA_BLENDING),
         );
         Self {
             buffer: None,

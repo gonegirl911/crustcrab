@@ -88,6 +88,23 @@ impl World {
         })
     }
 
+    fn updates(
+        &self,
+        inserts: impl IntoIterator<Item = Point3<i32>>,
+        block_updates: impl IntoIterator<Item = Point3<i64>>,
+        loads: &FxHashSet<Point3<i32>>,
+        unloads: &FxHashSet<Point3<i32>>,
+    ) -> FxHashSet<Point3<i32>> {
+        Self::chunk_area_points(inserts)
+            .chain(Self::block_area_points(block_updates).map(utils::chunk_coords))
+            .filter(|coords| {
+                self.chunks.contains(*coords)
+                    && !loads.contains(coords)
+                    && !unloads.contains(coords)
+            })
+            .collect()
+    }
+
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -99,8 +116,8 @@ impl World {
     ) {
         let mut branch = Branch::default();
         if branch.apply(&self.chunks, coords, normal, action) {
-            let (inserts, removals, block_updates) = branch.merge(self);
-            let updates = self.updates(&inserts, &removals, block_updates, []);
+            let (block_updates, inserts, removals) = branch.merge(self);
+            let updates = self.updates([], block_updates, &inserts, &removals);
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
@@ -188,24 +205,6 @@ impl World {
         }
     }
 
-    fn updates(
-        &self,
-        loads: &FxHashSet<Point3<i32>>,
-        unloads: &FxHashSet<Point3<i32>>,
-        block_updates: impl IntoIterator<Item = Point3<i64>>,
-        inserts: impl IntoIterator<Item = Point3<i32>>,
-    ) -> FxHashSet<Point3<i32>> {
-        Self::block_area_points(block_updates)
-            .map(utils::chunk_coords)
-            .chain(Self::chunk_area_points(inserts))
-            .filter(|coords| {
-                self.chunks.contains(*coords)
-                    && !loads.contains(coords)
-                    && !unloads.contains(coords)
-            })
-            .collect()
-    }
-
     fn send_unloads<I>(points: I, proxy: &EventLoopProxy)
     where
         I: IntoIterator<Item = Point3<i32>>,
@@ -286,10 +285,10 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let inserts = self.par_insert_many(curr.par_exclusive_points(prev));
+                let block_updates = self.par_light_up(&inserts);
                 let loads = self.exclusive_points(prev, curr).collect();
                 let unloads = self.exclusive_points(curr, prev).collect();
-                let block_updates = self.par_light_up(&inserts);
-                let updates = self.updates(&loads, &unloads, block_updates, inserts);
+                let updates = self.updates(inserts, block_updates, &loads, &unloads);
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
@@ -395,9 +394,9 @@ impl Index<Point3<i32>> for ChunkStore {
 struct Branch(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 
 type Changes = (
-    FxHashSet<Point3<i32>>,
-    FxHashSet<Point3<i32>>,
     Vec<Point3<i64>>,
+    FxHashSet<Point3<i32>>,
+    FxHashSet<Point3<i32>>,
 );
 
 impl Branch {
@@ -465,8 +464,6 @@ impl Branch {
         light.extend_placeholders(heights.load_placeholders(&inserts));
 
         (
-            inserts,
-            removals,
             hits.into_iter()
                 .inspect(|&(coords, action)| actions.insert(coords, action))
                 .flat_map(|(coords, action)| {
@@ -475,6 +472,8 @@ impl Branch {
                         .chain(light.apply(chunks, coords, action))
                 })
                 .collect(),
+            inserts,
+            removals,
         )
     }
 

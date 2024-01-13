@@ -224,9 +224,8 @@ impl BlockTextureArray {
         Self(ImageTextureArray::new(
             renderer,
             Self::tex_paths(),
-            true,
-            true,
             4,
+            true,
             wgpu::AddressMode::Repeat,
         ))
     }

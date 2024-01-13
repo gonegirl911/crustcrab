@@ -43,10 +43,10 @@ impl StarDome {
             &[StarInstance::desc()],
             &[player_bind_group_layout],
             &[StarPushConstants::range()],
+            None,
+            None,
             PostProcessor::FORMAT,
             Some(wgpu::BlendState::ALPHA_BLENDING),
-            None,
-            None,
         );
         Self {
             stars,
