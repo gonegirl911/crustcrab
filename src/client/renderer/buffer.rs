@@ -120,26 +120,9 @@ pub struct Buffer<T: ?Sized> {
 }
 
 impl<T: Pod> Buffer<T> {
-    pub fn new(
-        Renderer { device, .. }: &Renderer,
-        value: Option<&T>,
-        usage: wgpu::BufferUsages,
-    ) -> Self {
+    pub fn new(renderer: &Renderer, value: Option<&T>, usage: wgpu::BufferUsages) -> Self {
         Self {
-            buffer: if let Some(value) = value {
-                device.create_buffer_init(&BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::cast_slice(slice::from_ref(value)),
-                    usage,
-                })
-            } else {
-                device.create_buffer(&wgpu::BufferDescriptor {
-                    label: None,
-                    size: mem::size_of::<T>() as u64,
-                    usage,
-                    mapped_at_creation: false,
-                })
-            },
+            buffer: Buffer::<[_]>::new(renderer, value.map(slice::from_ref).ok_or(1), usage).buffer,
             phantom: PhantomData,
         }
     }
