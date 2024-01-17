@@ -90,7 +90,7 @@ impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
         if guard.finish() {
             unsafe { uninit.assume_init() }
         } else {
-            panic!("missing variants")
+            panic!("missing variants");
         }
     }
 }
