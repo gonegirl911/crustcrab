@@ -1,5 +1,5 @@
 use super::event_loop::{Event, EventHandler};
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 use winit::{
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::EventLoop as RawEventLoop,
@@ -7,7 +7,7 @@ use winit::{
     window::{CursorGrabMode, Window as RawWindow, WindowBuilder as RawWindowBuilder},
 };
 
-pub struct Window(RawWindow);
+pub struct Window(Arc<RawWindow>);
 
 impl Window {
     pub fn new<T>(event_loop: &RawEventLoop<T>) -> Self {
@@ -15,7 +15,8 @@ impl Window {
             RawWindowBuilder::new()
                 .with_title("Crustcrab")
                 .build(event_loop)
-                .expect("window should be buildable"),
+                .expect("window should be buildable")
+                .into(),
         )
     }
 
@@ -64,7 +65,7 @@ impl EventHandler for Window {
 }
 
 impl Deref for Window {
-    type Target = RawWindow;
+    type Target = Arc<RawWindow>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

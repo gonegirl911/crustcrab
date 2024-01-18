@@ -6,11 +6,11 @@ pub mod uniform;
 pub mod utils;
 
 use super::event_loop::{Event, EventHandler};
-use std::mem;
+use std::{mem, sync::Arc};
 use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window as RawWindow};
 
 pub struct Renderer {
-    pub surface: wgpu::Surface,
+    pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
@@ -19,14 +19,12 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: &RawWindow) -> Self {
+    pub async fn new(window: &Arc<RawWindow>) -> Self {
         let PhysicalSize { width, height } = window.inner_size();
         let instance = wgpu::Instance::default();
-        let surface = unsafe {
-            instance
-                .create_surface(window)
-                .expect("surface should be creatable")
-        };
+        let surface = instance
+            .create_surface(window.clone())
+            .expect("surface should be creatable");
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -38,11 +36,11 @@ impl Renderer {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    features: wgpu::Features::PUSH_CONSTANTS
+                    required_features: wgpu::Features::PUSH_CONSTANTS
                         | wgpu::Features::TEXTURE_BINDING_ARRAY
                         | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
-                    limits: wgpu::Limits {
-                        max_push_constant_size: 128,
+                    required_limits: wgpu::Limits {
+                        max_push_constant_size: 68,
                         ..Default::default()
                     },
                     ..Default::default()
