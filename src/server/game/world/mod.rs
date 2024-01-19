@@ -84,7 +84,7 @@ impl World {
         curr: WorldArea,
     ) -> impl Iterator<Item = Point3<i32>> + '_ {
         curr.points().filter(move |&coords| {
-            curr.contains(coords) && !prev.contains(coords) && self.chunks.contains(coords)
+            curr.contains_y(coords.y) && !prev.contains(coords) && self.chunks.contains(coords)
         })
     }
 
