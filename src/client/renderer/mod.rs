@@ -5,9 +5,12 @@ pub mod texture;
 pub mod uniform;
 pub mod utils;
 
-use super::event_loop::{Event, EventHandler};
+use super::{
+    event_loop::{Event, EventHandler},
+    window::RawWindow,
+};
 use std::{mem, sync::Arc};
-use winit::{dpi::PhysicalSize, event::WindowEvent, window::Window as RawWindow};
+use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Renderer {
     pub surface: wgpu::Surface<'static>,

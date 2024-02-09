@@ -4,8 +4,10 @@ use winit::{
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::EventLoop as RawEventLoop,
     keyboard::{KeyCode, PhysicalKey},
-    window::{CursorGrabMode, Window as RawWindow, WindowBuilder as RawWindowBuilder},
+    window::{CursorGrabMode, WindowBuilder as RawWindowBuilder},
 };
+
+pub use winit::window::Window as RawWindow;
 
 pub struct Window(Arc<RawWindow>);
 

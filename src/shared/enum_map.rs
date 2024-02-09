@@ -1,5 +1,3 @@
-pub use macros::{Display, Enum};
-
 use generic_array::{
     functional::FunctionalSequence,
     sequence::GenericSequence,
@@ -18,6 +16,8 @@ use std::{
     ops::{Add, Index, IndexMut},
     slice,
 };
+
+pub use macros::{Display, Enum};
 
 #[macro_export]
 macro_rules! enum_map {

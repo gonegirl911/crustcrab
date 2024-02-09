@@ -17,12 +17,13 @@ use super::{
         texture::{image::ImageTextureArray, screen::DepthBuffer},
         Renderer,
     },
+    window::RawWindow,
     ClientEvent,
 };
 use crate::server::game::world::block::data::TEX_PATHS;
 use flume::Sender;
 use std::{ops::Deref, time::Duration};
-use winit::{event::WindowEvent, window::Window as RawWindow};
+use winit::event::WindowEvent;
 
 pub struct Game {
     sky: Sky,
