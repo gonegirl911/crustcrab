@@ -39,9 +39,9 @@ impl View {
 
     pub fn mat(&self) -> Matrix4<f32> {
         matrix![
-            self.right.x,   self.right.y,   self.right.z,   -self.origin.coords.dot(&self.right);
-            self.up.x,      self.up.y,      self.up.z,      -self.origin.coords.dot(&self.up);
-            self.forward.x, self.forward.y, self.forward.z, -self.origin.coords.dot(&self.forward);
+            self.right.x,   self.right.y,   self.right.z,   0.0;
+            self.up.x,      self.up.y,      self.up.z,      0.0;
+            self.forward.x, self.forward.y, self.forward.z, 0.0;
             0.0,            0.0,            0.0,            1.0;
         ]
     }

@@ -32,7 +32,7 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     let x = f32(((vertex.index + 2u) / 3u) % 2u);
     let y = f32(((vertex.index + 1u) / 3u) % 2u);
     let m = mat4x4(instance.m0, instance.m1, instance.m2, instance.m3);
-    let coords = player.vp * (vec4(player.origin, 0.0) + m * vec4(x - 0.5, y - 0.5, 0.0, 1.0));
+    let coords = player.vp * m * vec4(x - 0.5, y - 0.5, 0.0, 1.0);
     return VertexOutput(coords);
 }
 

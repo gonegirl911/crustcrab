@@ -1,5 +1,5 @@
 use crate::server::game::world::chunk::Chunk;
-use nalgebra::{vector, Point, SVector, Scalar};
+use nalgebra::{Point, SVector, Scalar};
 use std::{
     iter,
     ops::{Add, Mul},
@@ -71,31 +71,15 @@ impl<const D: usize> WorldCoords for (Point<i32, D>, Point<u8, D>) {
     }
 }
 
-impl WorldCoords for (i32, u8) {
-    type Point<T: Scalar> = T;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        self.0
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.1
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        coords((vector![self.0], vector![self.1])).x
-    }
-}
-
 impl<const D: usize> WorldCoords for Point<i64, D> {
     type Point<U: Scalar> = Point<U, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
-        self.map(chunk_coords)
+        self.map(|c| div_floor(c, Chunk::DIM as i64) as i32)
     }
 
     fn block_coords(self) -> Self::Point<u8> {
-        self.map(block_coords)
+        self.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
 
     fn coords(self) -> Self::Point<i64> {
@@ -107,47 +91,15 @@ impl<const D: usize> WorldCoords for Point<f32, D> {
     type Point<U: Scalar> = Point<U, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
-        self.map(chunk_coords)
+        self.map(|c| (c / Chunk::DIM as f32).floor() as i32)
     }
 
     fn block_coords(self) -> Self::Point<u8> {
-        self.map(block_coords)
+        self.map(|c| c.rem_euclid(Chunk::DIM as f32) as u8)
     }
 
     fn coords(self) -> Self::Point<i64> {
-        self.map(coords)
-    }
-}
-
-impl WorldCoords for i64 {
-    type Point<T: Scalar> = T;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        div_floor(self, Chunk::DIM as i64) as i32
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.rem_euclid(Chunk::DIM as i64) as u8
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        self
-    }
-}
-
-impl WorldCoords for f32 {
-    type Point<T: Scalar> = T;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        (self / Chunk::DIM as f32).floor() as i32
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.rem_euclid(Chunk::DIM as f32) as u8
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        self as i64
+        self.map(|c| c as i64)
     }
 }
 

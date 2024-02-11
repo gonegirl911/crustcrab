@@ -72,7 +72,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     let light_factor = saturate(global_light + local_light) * ambient_light * face_light;
     return VertexOutput(
-        player.vp * vec4(coords, 1.0),
+        player.vp * vec4(-player.origin + coords, 1.0),
         tex_idx,
         tex_coords,
         light_factor,
