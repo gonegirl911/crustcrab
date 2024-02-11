@@ -128,8 +128,7 @@ impl EventHandler for Player {
                     self.uniform.set(
                         renderer,
                         &PlayerUniformData::new(
-                            self.view.mat(),
-                            self.projection.mat(),
+                            self.projection.mat() * self.view.mat(),
                             self.view.origin,
                             self.view.forward,
                             self.projection.znear,
@@ -147,8 +146,7 @@ impl EventHandler for Player {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct PlayerUniformData {
     vp: Matrix4<f32>,
-    inv_v: Matrix4<f32>,
-    inv_p: Matrix4<f32>,
+    inv_vp: Matrix4<f32>,
     origin: Float3,
     forward: Vector3<f32>,
     render_distance: u32,
@@ -159,17 +157,15 @@ struct PlayerUniformData {
 
 impl PlayerUniformData {
     fn new(
-        v: Matrix4<f32>,
-        p: Matrix4<f32>,
+        vp: Matrix4<f32>,
         origin: Point3<f32>,
         forward: Vector3<f32>,
         znear: f32,
         zfar: f32,
     ) -> Self {
         Self {
-            vp: p * v,
-            inv_v: v.try_inverse().unwrap_or_else(|| unreachable!()),
-            inv_p: p.try_inverse().unwrap_or_else(|| unreachable!()),
+            vp,
+            inv_vp: vp.try_inverse().unwrap_or_else(|| unreachable!()),
             origin: origin.into(),
             forward,
             render_distance: CLIENT_CONFIG.player.render_distance,

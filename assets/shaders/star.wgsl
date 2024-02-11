@@ -11,8 +11,7 @@ struct InstanceInput {
 
 struct PlayerUniform {
     vp: mat4x4<f32>,
-    inv_v: mat4x4<f32>,
-    inv_p: mat4x4<f32>,
+    inv_vp: mat4x4<f32>,
     origin: vec3<f32>,
     forward: vec3<f32>,
     render_distance: u32,
@@ -32,8 +31,7 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     let x = f32(((vertex.index + 2u) / 3u) % 2u);
     let y = f32(((vertex.index + 1u) / 3u) % 2u);
     let m = mat4x4(instance.m0, instance.m1, instance.m2, instance.m3);
-    let coords = player.vp * m * vec4(x - 0.5, y - 0.5, 0.0, 1.0);
-    return VertexOutput(coords);
+    return VertexOutput(player.vp * m * vec4(x - 0.5, y - 0.5, 0.0, 1.0));
 }
 
 struct PushConstants {

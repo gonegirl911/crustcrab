@@ -17,8 +17,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
 
 struct PlayerUniform {
     vp: mat4x4<f32>,
-    inv_v: mat4x4<f32>,
-    inv_p: mat4x4<f32>,
+    inv_vp: mat4x4<f32>,
     origin: vec3<f32>,
     forward: vec3<f32>,
     render_distance: u32,
@@ -53,9 +52,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
-    let eye = player.inv_p * vec4(screen_coords, 1.0, 1.0);
-    let dir = player.inv_v * vec4(eye.xy, 1.0, 0.0);
-    return normalize(dir.xyz);
+    return normalize((player.inv_vp * vec4(screen_coords, 1.0, 1.0)).xyz);
 }
 
 fn factor(theta: f32) -> f32 {
