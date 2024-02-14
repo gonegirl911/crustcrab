@@ -56,7 +56,7 @@ var s_depth: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let dir = dir(in.screen_coords);
+    let dir = normalize((player.inv_vp * vec4(in.screen_coords, 1.0, 1.0)).xyz);
     let cos_theta = dot(dir, player.forward);
     let sin_gamma = max(abs(dir.y), sqrt(1.0 - dir.y * dir.y));
     let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x) / cos_theta * sin_gamma;
@@ -66,10 +66,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let fog_color = mix(sky.horizon_color, sky.glow_color.rgb, glow_factor);
     let color = textureSample(t_input, s_input, in.input_coords);
     return mix(vec4(fog_color, 1.0), color, fog_factor) * f32(color.a != 0.0);
-}
-
-fn dir(screen_coords: vec2<f32>) -> vec3<f32> {
-    return normalize((player.inv_vp * vec4(screen_coords, 1.0, 1.0)).xyz);
 }
 
 fn linearize(depth: f32) -> f32 {
