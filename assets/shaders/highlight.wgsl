@@ -60,11 +60,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     );
 }
 
+fn luminance(color: vec3<f32>) -> f32 {
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(vec3(1.0), in.opacity);
-}
-
-fn luminance(color: vec3<f32>) -> f32 {
-    return dot(color, vec3(0.299, 0.587, 0.114));
 }
