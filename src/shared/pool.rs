@@ -38,4 +38,5 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
     }
 }
 
-pub static NUM_CPUS: Lazy<usize> = Lazy::new(num_cpus::get);
+pub static NUM_CPUS: Lazy<usize> =
+    Lazy::new(|| thread::available_parallelism().map_or(1, Into::into));

@@ -1,6 +1,5 @@
 [package]
 name = "macros"
-version = "0.1.0"
 edition = "2021"
 
 [lib]
@@ -10,4 +9,4 @@ proc-macro = true
 heck = "0.5.0"
 proc-macro2 = "1.0.79"
 quote = "1.0.35"
-syn = "2.0.52"
+syn = "2.0.55"

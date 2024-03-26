@@ -3,20 +3,19 @@ members = ["macros"]
 
 [package]
 name = "crustcrab"
-version = "0.1.0"
 edition = "2021"
 
 [profile.lto]
 inherits = "release"
-lto = "fat"
 codegen-units = 1
+lto = "fat"
 panic = "abort"
 strip = "symbols"
 
 [dependencies]
 arrayvec = { version = "0.7.4", features = ["serde"] }
 bitfield = "0.14.0"
-bitflags = "2.4.2"
+bitflags = "2.5.0"
 bytemuck = { version = "1.15.0", features = ["derive"] }
 env_logger = "0.11.3"
 flume = "0.11.0"
@@ -24,14 +23,13 @@ generic-array = "1.0.0"
 image = "0.25.0"
 macros = { path = "macros" }
 nalgebra = { version = "0.32.4", features = ["bytemuck", "serde-serialize"] }
-noise = "0.8.2"
-num_cpus = "1.16.0"
+noise = "0.9.0"
 once_cell = "1.19.0"
 pollster = "0.3.0"
 rand = "0.8.5"
-rayon = "1.9.0"
+rayon = "1.10.0"
 rustc-hash = "1.1.0"
 serde = { version = "1.0.197", features = ["derive", "rc"] }
-toml = "0.8.11"
+toml = "0.8.12"
 wgpu = "0.19.3"
 winit = "0.29.15"
