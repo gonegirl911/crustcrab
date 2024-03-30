@@ -4,12 +4,6 @@ use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{parse_macro_input, Attribute, Data, DataEnum, DeriveInput, Fields, LitStr, Variant};
 
-macro_rules! error {
-    ($span:expr, $msg:expr $(,)?) => {
-        ::syn::Error::new_spanned($span, $msg)
-    };
-}
-
 #[proc_macro_derive(Enum)]
 pub fn derive_enum(input: TokenStream) -> TokenStream {
     expand_enum_input(&parse_macro_input!(input))
@@ -26,8 +20,8 @@ fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
     };
 
     if let Some(variant) = invalid_variant(variants) {
-        return Err(error!(
-            &variant,
+        return Err(syn::Error::new_spanned(
+            variant,
             "#[derive(Enum)] only supports unit enum variants",
         ));
     }
@@ -84,8 +78,8 @@ fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error>
     };
 
     if let Some(variant) = invalid_variant(variants) {
-        return Err(error!(
-            &variant,
+        return Err(syn::Error::new_spanned(
+            variant,
             "#[derive(Display)] only supports unit enum variants",
         ));
     }
@@ -93,7 +87,7 @@ fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error>
     let format = parse_display_attrs(&input.attrs)?;
 
     if format.value() != "snek_case" {
-        return Err(error!(
+        return Err(syn::Error::new_spanned(
             &format,
             "unknown display format, expected one of \"snek_case\"",
         ));
