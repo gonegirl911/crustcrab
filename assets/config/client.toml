@@ -40,7 +40,7 @@ color = [1.0, 1.0, 1.0, 0.99]
 color = [0.06, 0.06, 0.1, 0.85]
 
 [highlight]
-size = 1.005
+size = 1.01
 
 [gui.crosshair]
 size = 1.0

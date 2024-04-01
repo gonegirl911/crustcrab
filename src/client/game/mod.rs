@@ -118,6 +118,13 @@ impl Game {
                     self.sky.bind_group(),
                     self.depth.bind_group(),
                 );
+                self.hover.draw(
+                    self.processor.view(),
+                    encoder,
+                    self.player.bind_group(),
+                    self.sky.bind_group(),
+                    self.depth.view(),
+                );
             },
         );
         self.fog.draw(
@@ -141,13 +148,6 @@ impl Game {
             self.player.bind_group(),
             self.sky.bind_group(),
             self.depth.bind_group(),
-        );
-        self.hover.draw(
-            self.processor.view(),
-            encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
-            self.depth.view(),
         );
         self.processor.apply(encoder, &self.aces);
         self.processor.apply_raw(|view, bind_group| {
