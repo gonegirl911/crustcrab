@@ -19,11 +19,7 @@ use crate::{
         },
         ServerEvent,
     },
-    shared::{
-        pool::ThreadPool,
-        ray::{Intersectable, Ray},
-        utils,
-    },
+    shared::{pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -138,10 +134,10 @@ impl World {
         });
 
         for (coords, mesh) in transparent_meshes {
-            let origin = Self::block_coords(Self::origin(frustum.origin, coords), coords);
+            let delta = coords.cast() * Chunk::DIM as f32 - frustum.origin;
             BlockPushConstants::new(coords).set(&mut render_pass);
             mesh.draw(renderer, &mut render_pass, |&coords| {
-                TotalOrd((coords - origin).magnitude_squared())
+                TotalOrd((coords.coords + delta).magnitude_squared())
             });
         }
     }
@@ -201,20 +197,6 @@ impl World {
             }),
             ..Default::default()
         })
-    }
-
-    fn origin(origin: Point3<f32>, coords: Point3<i32>) -> Point3<f32> {
-        let aabb = Chunk::bounding_box(coords);
-        if aabb.contains(origin) {
-            origin
-        } else {
-            aabb.intersection(Ray::look_at(origin, aabb.circumcenter()))
-                .unwrap_or_else(|| unreachable!())
-        }
-    }
-
-    fn block_coords(coords: Point3<f32>, chunk_coords: Point3<i32>) -> Point3<f32> {
-        coords - chunk_coords.coords.cast() * Chunk::DIM as f32
     }
 }
 

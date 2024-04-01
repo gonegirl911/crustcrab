@@ -79,7 +79,7 @@ impl Chunk {
         self.glowing_count += curr.data().is_glowing() as u16;
     }
 
-    pub fn bounding_box(coords: Point3<i32>) -> Aabb {
+    fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
             utils::coords((coords, Default::default())).cast(),
             Vector3::repeat(Self::DIM).cast(),
