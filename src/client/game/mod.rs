@@ -93,14 +93,15 @@ impl Game {
         }
     }
 
-    #[rustfmt::skip]
     fn draw(
         &mut self,
         renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
-        self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
+        self.sky
+            .draw(self.processor.view(), encoder, self.player.bind_group());
+
         self.world.draw(
             renderer,
             self.fog.view(),
@@ -118,6 +119,7 @@ impl Game {
                     self.sky.bind_group(),
                     self.depth.bind_group(),
                 );
+
                 self.hover.draw(
                     self.processor.view(),
                     encoder,
@@ -127,6 +129,7 @@ impl Game {
                 );
             },
         );
+
         self.fog.draw(
             self.processor.view(),
             encoder,
@@ -134,6 +137,7 @@ impl Game {
             self.sky.bind_group(),
             self.depth.bind_group(),
         );
+
         self.clouds.draw(
             self.fog.view(),
             encoder,
@@ -142,6 +146,7 @@ impl Game {
             self.depth.view(),
             self.processor.spare_bind_group(),
         );
+
         self.fog.draw(
             self.processor.view(),
             encoder,
@@ -149,7 +154,9 @@ impl Game {
             self.sky.bind_group(),
             self.depth.bind_group(),
         );
+
         self.processor.apply(encoder, &self.aces);
+
         self.processor.apply_raw(|view, bind_group| {
             self.gui.draw(
                 view,
@@ -159,6 +166,7 @@ impl Game {
                 self.depth.view(),
             );
         });
+
         self.processor.draw(view, encoder);
     }
 }

@@ -6,10 +6,7 @@ pub mod window;
 
 use self::{
     event_loop::{Event, EventHandler, EventLoop, EventLoopProxy},
-    game::{
-        cloud::CloudConfig, gui::GuiConfig, hover::HighlightConfig, player::PlayerConfig,
-        sky::SkyConfig, Game,
-    },
+    game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig, Game},
     renderer::Renderer,
     window::Window,
 };
@@ -102,7 +99,6 @@ struct ClientConfig {
     player: PlayerConfig,
     sky: SkyConfig,
     cloud: CloudConfig,
-    highlight: HighlightConfig,
     gui: GuiConfig,
 }
 

@@ -18,7 +18,6 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Point3, Vector3};
-use serde::Deserialize;
 
 pub struct BlockHover {
     highlight: BlockHighlight,
@@ -174,21 +173,12 @@ impl BlockHighlightPushConstants {
     }
 
     fn m(hitbox: Aabb) -> Matrix4<f32> {
-        hitbox
-            .to_homogeneous()
-            .prepend_translation(&Vector3::repeat(0.5))
-            .prepend_scaling(CLIENT_CONFIG.highlight.size)
-            .prepend_translation(&(-Vector3::repeat(0.5)))
+        hitbox.pad(CLIENT_CONFIG.cloud.padding).to_homogeneous()
     }
 }
 
 impl PushConstants for BlockHighlightPushConstants {
     const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
-}
-
-#[derive(Deserialize)]
-pub struct HighlightConfig {
-    pub size: f32,
 }
 
 const DELTAS: [Vector3<f32>; 8] = [

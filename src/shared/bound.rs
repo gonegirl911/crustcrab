@@ -19,6 +19,12 @@ impl Aabb {
         }
     }
 
+    pub fn pad(mut self, amount: f32) -> Self {
+        self.min.apply(|c| *c -= amount);
+        self.max.apply(|c| *c += amount);
+        self
+    }
+
     pub fn circumcenter(self) -> Point3<f32> {
         self.min + self.diagonal() * 0.5
     }

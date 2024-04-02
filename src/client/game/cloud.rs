@@ -76,7 +76,6 @@ impl CloudLayer {
     }
 
     #[rustfmt::skip]
-    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -209,9 +208,9 @@ impl CloudPushConstants {
     }
 
     fn scale_factor() -> Vector3<f32> {
-        let size = CLIENT_CONFIG.cloud.size;
-        let factor = CLIENT_CONFIG.highlight.size;
-        vector![size.x, size.y, size.x].map(|c| 1.0 + (factor - 1.0) / c as f32)
+        let size = CLIENT_CONFIG.cloud.size.coords.xyx();
+        let padding = CLIENT_CONFIG.cloud.padding;
+        size.map(|c| 1.0 + padding * 2.0 / c as f32)
     }
 
     fn color(stage: Stage) -> Rgb<f32> {
@@ -242,6 +241,7 @@ impl PushConstants for CloudPushConstants {
 #[derive(Deserialize)]
 pub struct CloudConfig {
     size: Point2<u64>,
+    pub padding: f32,
     speed: f32,
     day: StageConfig,
     night: StageConfig,
