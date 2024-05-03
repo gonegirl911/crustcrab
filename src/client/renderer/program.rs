@@ -29,6 +29,7 @@ impl Program {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
+                compilation_options: Default::default(),
                 buffers,
             },
             primitive: wgpu::PrimitiveState {
@@ -40,6 +41,7 @@ impl Program {
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: "fs_main",
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
                     blend,

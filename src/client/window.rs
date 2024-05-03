@@ -2,9 +2,9 @@ use super::event_loop::{Event, EventHandler};
 use std::{ops::Deref, sync::Arc};
 use winit::{
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
-    event_loop::EventLoop as RawEventLoop,
+    event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
-    window::{CursorGrabMode, WindowBuilder as RawWindowBuilder},
+    window::{CursorGrabMode, WindowAttributes},
 };
 
 pub use winit::window::Window as RawWindow;
@@ -12,11 +12,10 @@ pub use winit::window::Window as RawWindow;
 pub struct Window(Arc<RawWindow>);
 
 impl Window {
-    pub fn new<T>(event_loop: &RawEventLoop<T>) -> Self {
+    pub fn new(event_loop: &ActiveEventLoop) -> Self {
         Self(
-            RawWindowBuilder::new()
-                .with_title("Crustcrab")
-                .build(event_loop)
+            event_loop
+                .create_window(WindowAttributes::default().with_title("Crustcrab"))
                 .expect("window should be buildable")
                 .into(),
         )

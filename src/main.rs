@@ -4,5 +4,5 @@ mod server;
 mod shared;
 
 fn main() {
-    pollster::block_on(app::App::new()).run();
+    app::App::new().run();
 }

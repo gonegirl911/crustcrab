@@ -11,10 +11,7 @@ use self::{
         Game,
     },
 };
-use crate::{
-    client::{event_loop::EventLoopProxy, ClientEvent},
-    server::event_loop::{Event, EventHandler},
-};
+use crate::client::{event_loop::EventLoopProxy, ClientEvent};
 use flume::Receiver;
 use nalgebra::Point3;
 use once_cell::sync::Lazy;
@@ -35,19 +32,7 @@ impl Server {
     }
 
     pub fn run(self) {
-        struct MiniServer {
-            game: Game,
-        }
-
-        impl EventHandler<Event> for MiniServer {
-            type Context<'a> = &'a EventLoopProxy;
-
-            fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
-                self.game.handle(event, proxy);
-            }
-        }
-
-        self.event_loop.run(MiniServer { game: self.game });
+        self.event_loop.run(self.game);
     }
 }
 

@@ -10,34 +10,40 @@ use self::{
     renderer::Renderer,
     window::Window,
 };
-use crate::{client::stopwatch::Stopwatch, server::game::world::block::Block};
+use crate::{
+    client::stopwatch::Stopwatch,
+    server::{game::world::block::Block, ServerEvent},
+};
 use flume::Sender;
 use nalgebra::{Point3, Vector3};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::fs;
+use winit::{
+    application::ApplicationHandler,
+    event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
+    event_loop::{ActiveEventLoop, ControlFlow},
+    window::WindowId,
+};
 
 pub struct Client {
     event_loop: EventLoop,
-    window: Window,
-    renderer: Renderer,
-    game: Game,
+    client_tx: Sender<ClientEvent>,
 }
 
 impl Client {
-    pub async fn new(client_tx: Sender<ClientEvent>) -> Self {
+    pub fn new(client_tx: Sender<ClientEvent>) -> Self {
         env_logger::init();
 
-        let event_loop = EventLoop::new(client_tx);
-        let window = Window::new(&event_loop);
-        let renderer = Renderer::new(&window).await;
-        let game = Game::new(&renderer);
+        let event_loop = EventLoop::with_user_event()
+            .build()
+            .expect("event loop should be buildable");
+
+        event_loop.set_control_flow(ControlFlow::Poll);
 
         Self {
             event_loop,
-            window,
-            renderer,
-            game,
+            client_tx,
         }
     }
 
@@ -46,14 +52,29 @@ impl Client {
     }
 
     pub fn run(self) {
-        struct MiniClient {
+        struct Program {
             stopwatch: Stopwatch,
             window: Window,
             renderer: Renderer,
             game: Game,
         }
 
-        impl EventHandler for MiniClient {
+        impl Program {
+            async fn new(event_loop: &ActiveEventLoop) -> Self {
+                let stopwatch = Stopwatch::start();
+                let window = Window::new(event_loop);
+                let renderer = Renderer::new(&window).await;
+                let game = Game::new(&renderer);
+                Self {
+                    stopwatch,
+                    window,
+                    renderer,
+                    game,
+                }
+            }
+        }
+
+        impl EventHandler for Program {
             type Context<'a> = &'a Sender<ClientEvent>;
 
             fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
@@ -67,12 +88,81 @@ impl Client {
             }
         }
 
-        self.event_loop.run(MiniClient {
-            stopwatch: Stopwatch::start(),
-            window: self.window,
-            renderer: self.renderer,
-            game: self.game,
-        });
+        impl ApplicationHandler<ServerEvent> for (Sender<ClientEvent>, Option<Program>) {
+            fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::NewEvents(cause), &self.0);
+                }
+            }
+
+            fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+                let mut program = pollster::block_on(Program::new(event_loop));
+                program.handle(&Event::Resumed, &self.0);
+                self.1 = Some(program);
+            }
+
+            fn user_event(&mut self, _: &ActiveEventLoop, event: ServerEvent) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::UserEvent(event), &self.0);
+                }
+            }
+
+            fn window_event(
+                &mut self,
+                event_loop: &ActiveEventLoop,
+                window_id: WindowId,
+                event: WindowEvent,
+            ) {
+                let should_exit = event == WindowEvent::CloseRequested;
+
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::WindowEvent { window_id, event }, &self.0);
+                }
+
+                if should_exit {
+                    event_loop.exit();
+                }
+            }
+
+            fn device_event(
+                &mut self,
+                _: &ActiveEventLoop,
+                device_id: DeviceId,
+                event: DeviceEvent,
+            ) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::DeviceEvent { device_id, event }, &self.0);
+                }
+            }
+
+            fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::AboutToWait, &self.0);
+                }
+            }
+
+            fn suspended(&mut self, _: &ActiveEventLoop) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::Suspended, &self.0);
+                }
+            }
+
+            fn exiting(&mut self, _: &ActiveEventLoop) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::LoopExiting, &self.0);
+                }
+            }
+
+            fn memory_warning(&mut self, _: &ActiveEventLoop) {
+                if let Some(program) = &mut self.1 {
+                    program.handle(&Event::MemoryWarning, &self.0);
+                }
+            }
+        }
+
+        self.event_loop
+            .run_app(&mut (self.client_tx, None::<Program>))
+            .expect("event loop should be runnable");
     }
 }
 

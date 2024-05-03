@@ -20,7 +20,7 @@ use flume::Sender;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
 use std::{f32::consts::SQRT_2, time::Duration};
-use winit::event::{StartCause, WindowEvent};
+use winit::event::WindowEvent;
 
 pub struct Player {
     view: View,
@@ -77,7 +77,7 @@ impl EventHandler for Player {
         self.controller.handle(event, ());
 
         match event {
-            Event::NewEvents(StartCause::Init) => {
+            Event::Resumed => {
                 client_tx
                     .send(ClientEvent::InitialRenderRequested {
                         origin: self.view.origin,
