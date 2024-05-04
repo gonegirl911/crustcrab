@@ -52,14 +52,14 @@ impl Client {
     }
 
     pub fn run(self) {
-        struct Program {
+        struct State {
             stopwatch: Stopwatch,
             window: Window,
             renderer: Renderer,
             game: Game,
         }
 
-        impl Program {
+        impl State {
             async fn new(event_loop: &ActiveEventLoop) -> Self {
                 let stopwatch = Stopwatch::start();
                 let window = Window::new(event_loop);
@@ -74,7 +74,7 @@ impl Client {
             }
         }
 
-        impl EventHandler for Program {
+        impl EventHandler for State {
             type Context<'a> = &'a Sender<ClientEvent>;
 
             fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
@@ -88,22 +88,22 @@ impl Client {
             }
         }
 
-        impl ApplicationHandler<ServerEvent> for (Sender<ClientEvent>, Option<Program>) {
+        impl ApplicationHandler<ServerEvent> for (Sender<ClientEvent>, Option<State>) {
             fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::NewEvents(cause), &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::NewEvents(cause), &self.0);
                 }
             }
 
             fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-                let mut program = pollster::block_on(Program::new(event_loop));
-                program.handle(&Event::Resumed, &self.0);
-                self.1 = Some(program);
+                let mut state = pollster::block_on(State::new(event_loop));
+                state.handle(&Event::Resumed, &self.0);
+                self.1 = Some(state);
             }
 
             fn user_event(&mut self, _: &ActiveEventLoop, event: ServerEvent) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::UserEvent(event), &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::UserEvent(event), &self.0);
                 }
             }
 
@@ -115,8 +115,8 @@ impl Client {
             ) {
                 let should_exit = event == WindowEvent::CloseRequested;
 
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::WindowEvent { window_id, event }, &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::WindowEvent { window_id, event }, &self.0);
                 }
 
                 if should_exit {
@@ -130,38 +130,38 @@ impl Client {
                 device_id: DeviceId,
                 event: DeviceEvent,
             ) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::DeviceEvent { device_id, event }, &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::DeviceEvent { device_id, event }, &self.0);
                 }
             }
 
             fn about_to_wait(&mut self, _: &ActiveEventLoop) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::AboutToWait, &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::AboutToWait, &self.0);
                 }
             }
 
             fn suspended(&mut self, _: &ActiveEventLoop) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::Suspended, &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::Suspended, &self.0);
                 }
             }
 
             fn exiting(&mut self, _: &ActiveEventLoop) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::LoopExiting, &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::LoopExiting, &self.0);
                 }
             }
 
             fn memory_warning(&mut self, _: &ActiveEventLoop) {
-                if let Some(program) = &mut self.1 {
-                    program.handle(&Event::MemoryWarning, &self.0);
+                if let Some(state) = &mut self.1 {
+                    state.handle(&Event::MemoryWarning, &self.0);
                 }
             }
         }
 
         self.event_loop
-            .run_app(&mut (self.client_tx, None::<Program>))
+            .run_app(&mut (self.client_tx, None::<State>))
             .expect("event loop should be runnable");
     }
 }
