@@ -96,9 +96,9 @@ impl Client {
             }
 
             fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-                let mut instance = pollster::block_on(Instance::new(event_loop));
-                instance.handle(&Event::Resumed, &self.0);
-                self.1 = Some(instance);
+                self.1
+                    .get_or_insert_with(|| pollster::block_on(Instance::new(event_loop)))
+                    .handle(&Event::Resumed, &self.0);
             }
 
             fn user_event(&mut self, _: &ActiveEventLoop, event: ServerEvent) {
@@ -115,9 +115,10 @@ impl Client {
             ) {
                 let should_exit = event == WindowEvent::CloseRequested;
 
-                if let Some(instance) = &mut self.1 {
-                    instance.handle(&Event::WindowEvent { window_id, event }, &self.0);
-                }
+                self.1
+                    .as_mut()
+                    .unwrap_or_else(|| unreachable!())
+                    .handle(&Event::WindowEvent { window_id, event }, &self.0);
 
                 if should_exit {
                     event_loop.exit();
@@ -142,7 +143,7 @@ impl Client {
             }
 
             fn suspended(&mut self, _: &ActiveEventLoop) {
-                if let Some(instance) = &mut self.1 {
+                if let Some(mut instance) = self.1.take() {
                     instance.handle(&Event::Suspended, &self.0);
                 }
             }
