@@ -188,7 +188,7 @@ pub enum Face {
 
 impl Default for Face {
     fn default() -> Self {
-        None::<Side>.into()
+        None.into()
     }
 }
 
