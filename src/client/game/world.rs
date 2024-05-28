@@ -162,7 +162,7 @@ impl World {
             v.iter()
                 .copied()
                 .map(BlockVertex::coords)
-                .fold(Point3::default(), |accum, c| accum + c.coords)
+                .fold(Point3::default(), |acc, c| acc + c.coords)
                 .cast()
                 / v.len() as f32
         })
