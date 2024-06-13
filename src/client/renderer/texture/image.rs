@@ -217,9 +217,9 @@ pub struct ImageTextureArray {
 }
 
 impl ImageTextureArray {
-    pub fn new(
+    pub fn new<P: IntoIterator<Item: AsRef<Path>>>(
         renderer @ Renderer { device, .. }: &Renderer,
-        paths: impl IntoIterator<Item = impl AsRef<Path>>,
+        paths: P,
         mip_level_count: u32,
         is_srgb: bool,
         address_mode: wgpu::AddressMode,
