@@ -257,9 +257,9 @@ impl ImageTextureArray {
         &self.bind_group
     }
 
-    fn create_views(
+    fn create_views<P: IntoIterator<Item: AsRef<Path>>>(
         renderer: &Renderer,
-        paths: impl IntoIterator<Item = impl AsRef<Path>>,
+        paths: P,
         mip_level_count: u32,
         is_srgb: bool,
     ) -> Vec<wgpu::TextureView> {
