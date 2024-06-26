@@ -1,6 +1,5 @@
 use flume::{Receiver, SendError, Sender};
-use once_cell::sync::Lazy;
-use std::thread;
+use std::{sync::LazyLock, thread};
 
 pub struct ThreadPool<I, O> {
     in_tx: Sender<I>,
@@ -38,5 +37,5 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
     }
 }
 
-pub static NUM_CPUS: Lazy<usize> =
-    Lazy::new(|| thread::available_parallelism().map_or(1, Into::into));
+pub static NUM_CPUS: LazyLock<usize> =
+    LazyLock::new(|| thread::available_parallelism().map_or(1, Into::into));

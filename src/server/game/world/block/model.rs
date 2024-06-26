@@ -7,9 +7,11 @@ use crate::{
     },
 };
 use nalgebra::{Point3, Vector3};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer};
-use std::{fs, sync::Arc};
+use std::{
+    fs,
+    sync::{Arc, LazyLock},
+};
 
 #[derive(Clone, Copy)]
 pub struct Model {
@@ -129,7 +131,7 @@ impl<'de> Deserialize<'de> for ModelData {
     }
 }
 
-static MODEL_DATA: Lazy<EnumMap<Option<Variant>, ModelData>> = Lazy::new(|| {
+static MODEL_DATA: LazyLock<EnumMap<Option<Variant>, ModelData>> = LazyLock::new(|| {
     enum_map! {
         Some(variant) => {
             let path = format!("assets/config/models/{variant}.toml");

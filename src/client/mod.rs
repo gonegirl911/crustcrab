@@ -16,9 +16,8 @@ use crate::{
 };
 use flume::Sender;
 use nalgebra::{Point3, Vector3};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::fs;
+use std::{fs, sync::LazyLock};
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -193,7 +192,7 @@ struct ClientConfig {
     gui: GuiConfig,
 }
 
-static CLIENT_CONFIG: Lazy<ClientConfig> = Lazy::new(|| {
+static CLIENT_CONFIG: LazyLock<ClientConfig> = LazyLock::new(|| {
     toml::from_str(&fs::read_to_string("assets/config/client.toml").expect("file should exist"))
         .expect("file should be valid")
 });
