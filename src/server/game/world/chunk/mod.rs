@@ -99,7 +99,6 @@ impl Index<Point3<u8>> for Chunk {
     }
 }
 
-#[repr(align(16))]
 #[derive(Default)]
 pub struct ChunkLight {
     lights: DataStore<BlockLight>,
@@ -135,14 +134,10 @@ impl Index<Point3<u8>> for ChunkLight {
 }
 
 impl BitOrAssign<BlockLight> for ChunkLight {
-    fn bitor_assign(&mut self, light: BlockLight) {
-        let mask = bytemuck::cast::<_, u128>([light; DataStore::CHUNK_SIZE]);
+    fn bitor_assign(&mut self, value: BlockLight) {
+        self.lights.for_each(|light| light.0 |= value.0);
 
-        for lights in self.lights.array_chunks_mut() {
-            *bytemuck::cast_mut::<_, u128>(lights) |= mask;
-        }
-
-        if light != Default::default() {
+        if value != Default::default() {
             self.non_zero_count = Chunk::DIM.pow(3) as u16;
         }
     }
@@ -168,16 +163,9 @@ impl<T> DataStore<T> {
             })
         })
     }
-}
 
-impl DataStore<BlockLight> {
-    const CHUNK_SIZE: usize = mem::size_of::<u128>() / mem::size_of::<BlockLight>();
-
-    fn array_chunks_mut(&mut self) -> impl Iterator<Item = &mut [BlockLight; Self::CHUNK_SIZE]> {
-        self.0
-            .iter_mut()
-            .flatten()
-            .flat_map(bytemuck::cast_mut::<_, [_; Chunk::DIM / Self::CHUNK_SIZE]>)
+    fn for_each<F: FnMut(&mut T)>(&mut self, f: F) {
+        self.0.iter_mut().flatten().flatten().for_each(f);
     }
 }
 
