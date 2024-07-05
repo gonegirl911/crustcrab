@@ -135,7 +135,7 @@ impl Index<Point3<u8>> for ChunkLight {
 
 impl BitOrAssign<BlockLight> for ChunkLight {
     fn bitor_assign(&mut self, value: BlockLight) {
-        self.lights.for_each(|light| light.0 |= value.0);
+        self.lights.apply(|light| light.0 |= value.0);
 
         if value != Default::default() {
             self.non_zero_count = Chunk::DIM.pow(3) as u16;
@@ -164,7 +164,7 @@ impl<T> DataStore<T> {
         })
     }
 
-    fn for_each<F: FnMut(&mut T)>(&mut self, f: F) {
+    fn apply<F: FnMut(&mut T)>(&mut self, f: F) {
         self.0.iter_mut().flatten().flatten().for_each(f);
     }
 }
