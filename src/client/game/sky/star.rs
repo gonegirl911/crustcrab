@@ -57,11 +57,7 @@ impl StarDome {
         }
     }
 
-    pub fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        player_bind_group: &'a wgpu::BindGroup,
-    ) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, player_bind_group: &wgpu::BindGroup) {
         if self.pc.opacity != 0.0 {
             self.program.bind(render_pass, [player_bind_group]);
             self.pc.set(render_pass);

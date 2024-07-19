@@ -19,7 +19,7 @@ bitflags = "2.6.0"
 bytemuck = { version = "1.16.1", features = ["derive"] }
 env_logger = "0.11.3"
 flume = "0.11.0"
-generic-array = "1.0.0"
+generic-array = "1.1.0"
 image = "0.25.1"
 macros = { path = "macros" }
 nalgebra = { version = "0.33.0", features = ["bytemuck", "serde-serialize"] }
@@ -28,7 +28,7 @@ pollster = "0.3.0"
 rand = "0.8.5"
 rayon = "1.10.0"
 rustc-hash = "2.0.0"
-serde = { version = "1.0.203", features = ["derive", "rc"] }
-toml = "0.8.14"
-wgpu = "0.20.1"
-winit = "0.30.3"
+serde = { version = "1.0.204", features = ["derive", "rc"] }
+toml = "0.8.15"
+wgpu = "22.0.0"
+winit = "0.30.4"

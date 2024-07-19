@@ -49,8 +49,21 @@ impl Gui {
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
     ) {
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            ..Default::default()
+        });
+        self.blit.draw(&mut render_pass, input_bind_group);
+        self.crosshair.draw(&mut render_pass, input_bind_group);
+        self.inventory.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     resolve_target: None,
@@ -59,35 +72,18 @@ impl Gui {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                ..Default::default()
-            });
-            self.blit.draw(&mut render_pass, input_bind_group);
-            self.crosshair.draw(&mut render_pass, input_bind_group);
-        }
-        {
-            self.inventory.draw(
-                &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: depth_view,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(1.0),
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
                     }),
-                    ..Default::default()
+                    stencil_ops: None,
                 }),
-                textures_bind_group,
-            );
-        }
+                ..Default::default()
+            }),
+            textures_bind_group,
+        );
     }
 
     fn scaling(Renderer { config, .. }: &Renderer, factor: f32) -> Vector2<f32> {

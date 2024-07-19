@@ -6,25 +6,25 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 pub struct VertexBuffer<V>(Buffer<[V]>);
 
 impl<V> VertexBuffer<V> {
-    pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass) {
         render_pass.set_vertex_buffer(0, self.slice(..));
         render_pass.draw(0..self.len(), 0..1);
     }
 
-    pub fn draw_indexed<'a, I: Index>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        index_buffer: &'a IndexBuffer<I>,
+    pub fn draw_indexed<I: Index>(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        index_buffer: &IndexBuffer<I>,
     ) {
         render_pass.set_vertex_buffer(0, self.slice(..));
         render_pass.set_index_buffer(index_buffer.slice(..), I::FORMAT);
         render_pass.draw_indexed(0..index_buffer.len(), 0, 0..1);
     }
 
-    pub fn draw_instanced<'a, E>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        instance_buffer: &'a InstanceBuffer<E>,
+    pub fn draw_instanced<E>(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        instance_buffer: &InstanceBuffer<E>,
     ) {
         render_pass.set_vertex_buffer(0, self.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));

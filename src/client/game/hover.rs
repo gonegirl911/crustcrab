@@ -126,11 +126,11 @@ impl BlockHighlight {
     }
 
     #[rustfmt::skip]
-    fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        player_bind_group: &'a wgpu::BindGroup,
-        sky_bind_group: &'a wgpu::BindGroup,
+    fn draw(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        player_bind_group: &wgpu::BindGroup,
+        sky_bind_group: &wgpu::BindGroup,
         pc: &BlockHighlightPushConstants,
     ) {
         self.program.bind(render_pass, [player_bind_group, sky_bind_group]);

@@ -49,11 +49,7 @@ impl Crosshair {
         }
     }
 
-    pub fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        input_bind_group: &'a wgpu::BindGroup,
-    ) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
         self.program.bind(
             render_pass,
             [

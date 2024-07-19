@@ -71,11 +71,7 @@ impl Inventory {
         CLIENT_CONFIG.gui.inventory.content.get(self.index).copied()
     }
 
-    pub fn draw<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        textures_bind_group: &'a wgpu::BindGroup,
-    ) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
         if let Some(buffer) = &self.buffer {
             self.program.bind(
                 render_pass,

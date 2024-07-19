@@ -26,10 +26,10 @@ impl<C, V: Pod> TransparentMesh<C, V> {
         })
     }
 
-    pub fn draw<'a, D, F>(
-        &'a mut self,
+    pub fn draw<D, F>(
+        &mut self,
         renderer: &Renderer,
-        render_pass: &mut wgpu::RenderPass<'a>,
+        render_pass: &mut wgpu::RenderPass,
         mut dist: F,
     ) where
         D: Ord,

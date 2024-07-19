@@ -49,11 +49,12 @@ impl Program {
                 })],
             }),
             multiview: None,
+            cache: None,
         });
         Self(render_pipeline)
     }
 
-    pub fn bind<'a, I>(&'a self, render_pass: &mut wgpu::RenderPass<'a>, bind_groups: I)
+    pub fn bind<'a, I>(&self, render_pass: &mut wgpu::RenderPass, bind_groups: I)
     where
         I: IntoIterator<Item = &'a wgpu::BindGroup>,
     {
