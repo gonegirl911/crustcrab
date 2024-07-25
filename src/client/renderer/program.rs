@@ -1,6 +1,6 @@
 use super::Renderer;
 use bytemuck::Pod;
-use std::{mem, slice};
+use std::slice;
 
 pub struct Program(wgpu::RenderPipeline);
 
@@ -79,7 +79,7 @@ pub trait PushConstants: Pod {
     fn range() -> wgpu::PushConstantRange {
         wgpu::PushConstantRange {
             stages: Self::STAGES,
-            range: 0..mem::size_of::<Self>() as u32,
+            range: 0..size_of::<Self>() as u32,
         }
     }
 }

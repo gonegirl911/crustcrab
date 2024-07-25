@@ -5,7 +5,6 @@ use super::{
 };
 use crate::client::event_loop::{Event, EventHandler};
 use bytemuck::{Pod, Zeroable};
-use std::mem;
 
 pub struct PostProcessor {
     textures: ScreenTextureArray<2>,
@@ -138,7 +137,7 @@ impl Blender {
             &[input_bind_group_layout],
             &[wgpu::PushConstantRange {
                 stages: wgpu::ShaderStages::FRAGMENT,
-                range: 0..mem::size_of::<BlenderPushConstants>() as u32,
+                range: 0..size_of::<BlenderPushConstants>() as u32,
             }],
             None,
             None,

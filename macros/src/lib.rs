@@ -46,14 +46,14 @@ fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
         unsafe impl #impl_generics crate::shared::enum_map::Enum for #ident #ty_generics #where_clause {
             type Length = ::generic_array::typenum::U<#len>;
 
-            unsafe fn from_index_unchecked(index: usize) -> Self {
+            unsafe fn from_index_unchecked(index: ::core::primitive::usize) -> Self {
                 match index {
                     #(#from_index_unchecked_arms),*,
-                    _ => unsafe { ::std::hint::unreachable_unchecked() },
+                    _ => unsafe { ::core::hint::unreachable_unchecked() },
                 }
             }
 
-            fn to_index(self) -> usize {
+            fn to_index(self) -> ::core::primitive::usize {
                 match self {
                     #(#to_index_arms),*
                 }

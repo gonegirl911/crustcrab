@@ -1,6 +1,6 @@
 use super::Renderer;
 use bytemuck::Pod;
-use std::{marker::PhantomData, mem, ops::Deref, slice};
+use std::{marker::PhantomData, ops::Deref, slice};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
@@ -143,7 +143,7 @@ impl<T: Pod> Buffer<[T]> {
                 }),
                 Err(len) => device.create_buffer(&wgpu::BufferDescriptor {
                     label: None,
-                    size: (len * mem::size_of::<T>()) as u64,
+                    size: (len * size_of::<T>()) as u64,
                     usage,
                     mapped_at_creation: false,
                 }),
@@ -155,7 +155,7 @@ impl<T: Pod> Buffer<[T]> {
 
 impl<T> Buffer<[T]> {
     pub fn len(&self) -> u32 {
-        (self.buffer.size() / mem::size_of::<T>() as u64) as u32
+        (self.buffer.size() / size_of::<T>() as u64) as u32
     }
 }
 
@@ -231,7 +231,7 @@ pub trait Vertex: Pod {
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: Self::ATTRIBS,
         }
@@ -255,7 +255,7 @@ pub trait Instance: Pod {
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: Self::ATTRIBS,
         }
