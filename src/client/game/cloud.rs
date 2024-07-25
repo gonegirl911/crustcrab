@@ -18,7 +18,7 @@ use crate::{
     shared::color::{Float3, Rgb, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use nalgebra::{point, vector, Point2, Vector2, Vector3};
 use serde::Deserialize;
 use std::time::Duration;
@@ -85,31 +85,33 @@ impl CloudLayer {
         depth_view: &wgpu::TextureView,
         spare_bind_group: &wgpu::BindGroup,
     ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: spare_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(Default::default()),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: spare_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(Default::default()),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
                 }),
-                stencil_ops: None,
-            }),
-            ..Default::default()
-        });
-        self.program.bind(
-            &mut render_pass,
-            [player_bind_group, self.texture.bind_group()],
-        );
-        self.pc.set(&mut render_pass);
-        self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
+                ..Default::default()
+            });
+            self.program.bind(
+                &mut render_pass,
+                [player_bind_group, self.texture.bind_group()],
+            );
+            self.pc.set(&mut render_pass);
+            self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
+        }
         self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
     }
 

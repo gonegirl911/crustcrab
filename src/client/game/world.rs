@@ -115,6 +115,8 @@ impl World {
             }
         }
 
+        drop(render_pass);
+
         intermediate_action(encoder);
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);

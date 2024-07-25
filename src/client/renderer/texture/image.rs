@@ -2,7 +2,7 @@ use crate::client::renderer::{
     effect::{Blit, Effect},
     Renderer,
 };
-use image::{io::Reader as ImageReader, RgbaImage};
+use image::{ImageReader, RgbaImage};
 use std::{num::NonZeroU32, path::Path};
 
 pub struct ImageTexture {
@@ -114,13 +114,11 @@ impl ImageTexture {
         device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: address_mode,
             address_mode_v: address_mode,
-            mag_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: if mip_level_count > 1 {
                 wgpu::FilterMode::Linear
             } else {
                 wgpu::FilterMode::Nearest
             },
-            anisotropy_clamp: 1,
             ..Default::default()
         })
     }
@@ -282,14 +280,14 @@ impl ImageTextureArray {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     },
                     count: NonZeroU32::new(views.len() as u32),
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],

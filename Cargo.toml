@@ -14,13 +14,13 @@ strip = "symbols"
 
 [dependencies]
 arrayvec = { version = "0.7.4", features = ["serde"] }
-bitfield = "0.15.0"
+bitfield = "0.16.0"
 bitflags = "2.6.0"
 bytemuck = { version = "1.16.1", features = ["derive"] }
-env_logger = "0.11.3"
+env_logger = "0.11.4"
 flume = "0.11.0"
 generic-array = "1.1.0"
-image = "0.25.1"
+image = "0.25.2"
 macros = { path = "macros" }
 nalgebra = { version = "0.33.0", features = ["bytemuck", "serde-serialize"] }
 noise = "0.9.0"

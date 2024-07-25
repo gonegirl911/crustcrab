@@ -49,19 +49,21 @@ impl Gui {
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
     ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            ..Default::default()
-        });
-        self.blit.draw(&mut render_pass, input_bind_group);
-        self.crosshair.draw(&mut render_pass, input_bind_group);
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                ..Default::default()
+            });
+            self.blit.draw(&mut render_pass, input_bind_group);
+            self.crosshair.draw(&mut render_pass, input_bind_group);
+        }
         self.inventory.draw(
             &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
