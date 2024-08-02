@@ -97,25 +97,25 @@ impl World {
     ) {
         let mut transparent_meshes = vec![];
 
-        let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
+        {
+            let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
-        self.program.bind(
-            &mut render_pass,
-            [player_bind_group, sky_bind_group, textures_bind_group],
-        );
+            self.program.bind(
+                &mut render_pass,
+                [player_bind_group, sky_bind_group, textures_bind_group],
+            );
 
-        for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
-            if Chunk::bounding_sphere(coords).is_visible(frustum) {
-                BlockPushConstants::new(coords).set(&mut render_pass);
-                buffer.draw(&mut render_pass);
+            for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
+                if Chunk::bounding_sphere(coords).is_visible(frustum) {
+                    BlockPushConstants::new(coords).set(&mut render_pass);
+                    buffer.draw(&mut render_pass);
 
-                if let Some(mesh) = transparent_mesh {
-                    transparent_meshes.push((coords, mesh));
+                    if let Some(mesh) = transparent_mesh {
+                        transparent_meshes.push((coords, mesh));
+                    }
                 }
             }
         }
-
-        drop(render_pass);
 
         intermediate_action(encoder);
 
