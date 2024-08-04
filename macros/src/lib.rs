@@ -6,12 +6,12 @@ use syn::{parse_macro_input, Attribute, Data, DataEnum, DeriveInput, Fields, Lit
 
 #[proc_macro_derive(Enum)]
 pub fn derive_enum(input: TokenStream) -> TokenStream {
-    expand_enum_input(&parse_macro_input!(input))
+    derive_enum2(&parse_macro_input!(input))
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
+fn derive_enum2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
     let Data::Enum(DataEnum { variants, .. }) = &input.data else {
         return Err(syn::Error::new(
             Span::call_site(),
@@ -55,7 +55,7 @@ fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
 
             fn to_index(self) -> ::core::primitive::usize {
                 match self {
-                    #(#to_index_arms),*
+                    #(#to_index_arms),*,
                 }
             }
         }
@@ -64,12 +64,12 @@ fn expand_enum_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
 
 #[proc_macro_derive(Display, attributes(display))]
 pub fn derive_display(input: TokenStream) -> TokenStream {
-    expand_display_input(&parse_macro_input!(input))
+    derive_display2(&parse_macro_input!(input))
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
+fn derive_display2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
     let Data::Enum(DataEnum { variants, .. }) = &input.data else {
         return Err(syn::Error::new(
             Span::call_site(),
@@ -107,7 +107,7 @@ fn expand_display_input(input: &DeriveInput) -> Result<TokenStream2, syn::Error>
         impl #impl_generics ::core::fmt::Display for #ident #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 match self {
-                    #(#arms),*
+                    #(#arms),*,
                 }
             }
         }
