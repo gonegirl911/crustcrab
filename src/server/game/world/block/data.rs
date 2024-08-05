@@ -80,7 +80,7 @@ impl BlockData {
             })
     }
 
-    pub fn tex_idx(self) -> u8 {
+    pub fn tex_index(self) -> u8 {
         self.model.tex_index
     }
 

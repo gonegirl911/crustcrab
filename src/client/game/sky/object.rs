@@ -106,16 +106,16 @@ impl EventHandler for ObjectSet {
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct ObjectPushConstants {
     m: Matrix4<f32>,
-    tex_idx: u32,
+    tex_index: u32,
 }
 
 impl ObjectPushConstants {
-    fn new(dir: Vector3<f32>, tex_idx: u32, is_am: bool) -> Self {
+    fn new(dir: Vector3<f32>, tex_index: u32, is_am: bool) -> Self {
         let size = CLIENT_CONFIG.sky.object.size;
         Self {
             m: Matrix4::face_towards(&dir.into(), &Point3::origin(), &Self::up(is_am))
                 .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
-            tex_idx,
+            tex_index,
         }
     }
 

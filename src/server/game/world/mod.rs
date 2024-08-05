@@ -678,7 +678,7 @@ impl ChunkData {
 #[derive(Clone, Copy)]
 struct Quad {
     block: Block,
-    tex_idx: u8,
+    tex_index: u8,
     corner_aos: EnumMap<Corner, u8>,
     corner_lights: EnumMap<Corner, BlockLight>,
 }
@@ -690,7 +690,7 @@ impl Quad {
         let is_externally_lit = data.is_externally_lit();
         (!data.requires_blending && area.is_side_visible(Some(side))).then(|| Self {
             block,
-            tex_idx: data.tex_idx(),
+            tex_index: data.tex_index(),
             corner_aos: area.corner_aos(Some(side), is_externally_lit),
             corner_lights: area_light.corner_lights(Some(side), *area, is_externally_lit),
         })
@@ -716,7 +716,7 @@ impl Quad {
 
 impl PartialEq for Quad {
     fn eq(&self, other: &Self) -> bool {
-        self.tex_idx == other.tex_idx
+        self.tex_index == other.tex_index
             && self.corner_aos == other.corner_aos
             && self.corner_lights == other.corner_lights
     }
