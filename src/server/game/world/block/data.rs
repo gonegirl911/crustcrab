@@ -180,7 +180,7 @@ impl RawBlockData {
         D: Deserializer<'de>,
     {
         let filter = Rgb::deserialize(deserializer)?;
-        if let Some(&c) = filter.find(|&c| c > 1) {
+        if let Some(c) = filter.into_iter().find(|&c| c > 1) {
             Err(serde::de::Error::invalid_value(
                 serde::de::Unexpected::Unsigned(c),
                 &"either 0 or 1",
