@@ -183,7 +183,7 @@ impl RawBlockData {
         if let Some(&c) = filter.find(|&c| c > 1) {
             Err(serde::de::Error::invalid_value(
                 serde::de::Unexpected::Unsigned(c),
-                &"0 or 1",
+                &"either 0 or 1",
             ))
         } else {
             Ok(filter.map(|c| c != 0))
