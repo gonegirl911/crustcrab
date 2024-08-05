@@ -65,16 +65,16 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
-    fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
-        array::from_fn(f).into()
-    }
-
     pub fn placeholder() -> Self {
         let mut value = Self::default();
-        for i in Self::SKYLIGHT_RANGE {
-            value.set_component(i, Self::COMPONENT_MAX);
-        }
+        value.set_skylight(
+            Block::Air.data().light_filter.map(|c| c as u8) * BlockLight::COMPONENT_MAX,
+        );
         value
+    }
+
+    fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
+        array::from_fn(f).into()
     }
 
     pub fn lum(self) -> f32 {
@@ -102,6 +102,12 @@ impl BlockLight {
 
     fn skylight(self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
+    }
+
+    fn set_skylight(&mut self, value: Rgb<u8>) {
+        for (i, c) in Self::SKYLIGHT_RANGE.zip(value) {
+            self.set_component(i, c);
+        }
     }
 
     fn torchlight(self) -> Rgb<u8> {

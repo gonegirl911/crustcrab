@@ -139,7 +139,7 @@ impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
             model: data.model.map_or_else(Default::default, Into::into),
-            luminance: data.luminance,
+            luminance: data.luminance * RAW_BLOCK_DATA[Block::Air].light_filter.map(|c| c as u8),
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface,

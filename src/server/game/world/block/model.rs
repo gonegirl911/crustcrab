@@ -51,23 +51,6 @@ impl From<RawModel> for Model {
     }
 }
 
-#[derive(Clone, Deserialize)]
-pub struct RawModel {
-    #[serde(rename = "model", default)]
-    variant: Variant,
-    #[serde(rename = "texture")]
-    pub tex_path: Arc<str>,
-}
-
-#[derive(Clone, Copy, Default, Enum, Display, Deserialize)]
-#[display(format = "snek_case")]
-#[serde(rename_all = "snake_case")]
-enum Variant {
-    #[default]
-    Cube,
-    Flower,
-}
-
 #[derive(Default)]
 struct ModelData {
     diagonal: Vector3<f32>,
@@ -129,6 +112,23 @@ impl<'de> Deserialize<'de> for ModelData {
 
         Ok(RawModelData::deserialize(deserializer)?.into())
     }
+}
+
+#[derive(Clone, Deserialize)]
+pub struct RawModel {
+    #[serde(rename = "model", default)]
+    variant: Variant,
+    #[serde(rename = "texture")]
+    pub tex_path: Arc<str>,
+}
+
+#[derive(Clone, Copy, Default, Enum, Display, Deserialize)]
+#[display(format = "snek_case")]
+#[serde(rename_all = "snake_case")]
+enum Variant {
+    #[default]
+    Cube,
+    Flower,
 }
 
 static MODEL_DATA: LazyLock<EnumMap<Option<Variant>, ModelData>> = LazyLock::new(|| {
