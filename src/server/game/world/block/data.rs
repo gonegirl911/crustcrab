@@ -162,7 +162,7 @@ struct RawBlockData {
     model: Option<RawModel>,
     #[serde(default)]
     luminance: Rgb<u8>,
-    #[serde(deserialize_with = "RawBlockData::light_filter", default)]
+    #[serde(deserialize_with = "RawBlockData::deserialize_light_filter", default)]
     light_filter: Rgb<bool>,
     #[serde(default)]
     requires_blending: bool,
@@ -175,7 +175,7 @@ impl RawBlockData {
         Some(self.model.as_ref()?.tex_path.clone())
     }
 
-    fn light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
+    fn deserialize_light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
     where
         D: Deserializer<'de>,
     {
