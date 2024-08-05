@@ -33,6 +33,10 @@ impl<T> Rgb<T> {
         Rgb::from_fn(|i| f(self[i], other[i]))
     }
 
+    pub fn find<F: FnMut(&T) -> bool>(&self, mut f: F) -> Option<&T> {
+        self.0.iter().find(|c| f(c))
+    }
+
     fn sum<S: Sum<T>>(self) -> S {
         self.into_iter().sum()
     }

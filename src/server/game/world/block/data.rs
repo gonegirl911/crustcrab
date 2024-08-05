@@ -15,7 +15,7 @@ use crate::{
 };
 use nalgebra::{point, Point2, Point3, Vector3};
 use rustc_hash::FxHashMap;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{
     array, fs,
     iter::{self, Zip},
@@ -140,7 +140,7 @@ impl From<RawBlockData> for BlockData {
         Self {
             model: data.model.map_or_else(Default::default, Into::into),
             luminance: data.luminance,
-            light_filter: data.light_filter.map(|c| c != 0),
+            light_filter: data.light_filter,
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface,
         }
@@ -162,8 +162,8 @@ struct RawBlockData {
     model: Option<RawModel>,
     #[serde(default)]
     luminance: Rgb<u8>,
-    #[serde(default)]
-    light_filter: Rgb<u8>,
+    #[serde(deserialize_with = "RawBlockData::light_filter", default)]
+    light_filter: Rgb<bool>,
     #[serde(default)]
     requires_blending: bool,
     #[serde(default)]
@@ -173,6 +173,21 @@ struct RawBlockData {
 impl RawBlockData {
     fn tex_path(&self) -> Option<Arc<str>> {
         Some(self.model.as_ref()?.tex_path.clone())
+    }
+
+    fn light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let filter = Rgb::deserialize(deserializer)?;
+        if let Some(&c) = filter.find(|&c| c > 1) {
+            Err(serde::de::Error::invalid_value(
+                serde::de::Unexpected::Unsigned(c),
+                &"0 or 1",
+            ))
+        } else {
+            Ok(filter.map(|c| c != 0))
+        }
     }
 }
 
