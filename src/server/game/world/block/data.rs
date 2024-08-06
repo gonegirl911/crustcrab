@@ -75,7 +75,7 @@ impl BlockData {
                     point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(side, is_externally_lit),
-                    area_light.corner_lights(side, area, is_externally_lit),
+                    area_light.corner_lights(side, area),
                 )
             })
     }
@@ -139,7 +139,7 @@ impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
             model: data.model.map_or_else(Default::default, Into::into),
-            luminance: data.luminance * RAW_BLOCK_DATA[Block::Air].light_filter.map(|c| c as u8),
+            luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface,

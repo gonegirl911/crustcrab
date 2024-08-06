@@ -123,27 +123,38 @@ impl BlockAreaLight {
         &self,
         side: Option<Side>,
         area: BlockArea,
-        is_externally_lit: bool,
     ) -> EnumMap<Corner, BlockLight> {
-        if let Some(side) = side.filter(|_| is_externally_lit) {
+        let light = self.block_light();
+        if let Some(side) = side {
             SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
-                let (count, sum) = component_deltas
-                    .into_values()
-                    .chain([SIDE_DELTAS[side]])
-                    .filter(|&delta| area[delta].data().is_transparent())
-                    .map(|delta| self[delta])
-                    .fold((0, [0; BlockLight::LEN]), |(count, sum), light| {
-                        (count + 1, array::from_fn(|i| sum[i] + light.component(i)))
-                    });
-                sum.map(|c| c / count.max(1)).into()
+                self.smooth_lighting(side, area, component_deltas)
+                    .sup(light)
             })
         } else {
-            enum_map! { _ => self.block_light() }
+            enum_map! { _ => light }
         }
     }
 
     fn block_light(&self) -> BlockLight {
         self[Default::default()]
+    }
+
+    fn smooth_lighting(
+        &self,
+        side: Side,
+        area: BlockArea,
+        component_deltas: EnumMap<Component, Vector3<i8>>,
+    ) -> BlockLight {
+        let (count, sum) = component_deltas
+            .into_values()
+            .chain([SIDE_DELTAS[side]])
+            .filter(|&delta| area[delta].data().is_transparent())
+            .map(|delta| self[delta])
+            .fold((0, [0; BlockLight::LEN]), |(count, sum), light| {
+                (count + 1, array::from_fn(|i| sum[i] + light.component(i)))
+            });
+
+        sum.map(|c| c / count.max(1)).into()
     }
 }
 

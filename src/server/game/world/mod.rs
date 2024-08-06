@@ -8,7 +8,7 @@ use self::{
     action::{ActionStore, BlockAction},
     block::{
         area::{BlockArea, BlockAreaLight},
-        data::{BlockData, Corner, Side, SIDE_DELTAS, SIDE_MASKS},
+        data::{Corner, Side, SIDE_DELTAS, SIDE_MASKS},
         Block, BlockLight,
     },
     chunk::{
@@ -601,7 +601,7 @@ impl ChunkData {
                     point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(None, is_externally_lit),
-                    area_light.corner_lights(None, area, is_externally_lit),
+                    area_light.corner_lights(None, area),
                 ));
             }
 
@@ -692,7 +692,7 @@ impl Quad {
             block,
             tex_index: data.tex_index(),
             corner_aos: area.corner_aos(Some(side), is_externally_lit),
-            corner_lights: area_light.corner_lights(Some(side), *area, is_externally_lit),
+            corner_lights: area_light.corner_lights(Some(side), *area),
         })
     }
 
@@ -733,18 +733,13 @@ impl BlockHoverData {
         let data = area.block().data();
         Self {
             hitbox: data.hitbox(coords),
-            brightness: Self::brightness(data, area, area_light),
+            brightness: Self::brightness(area, area_light),
         }
     }
 
-    fn brightness(data: BlockData, area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
-        let is_externally_lit = data.is_externally_lit();
+    fn brightness(area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         Enum::variants()
-            .flat_map(|side| {
-                area_light
-                    .corner_lights(side, area, is_externally_lit)
-                    .into_values()
-            })
+            .flat_map(|side| area_light.corner_lights(side, area).into_values())
             .max_by(|a, b| a.lum().total_cmp(&b.lum()))
             .unwrap_or_else(|| unreachable!())
     }
