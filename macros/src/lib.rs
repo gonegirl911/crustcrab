@@ -100,7 +100,7 @@ fn derive_display2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
     let arms = variants.iter().map(|variant| {
         let ident = &variant.ident;
         let output = ident.to_string().to_snek_case();
-        quote! { Self::#ident => #output.fmt(f) }
+        quote! { Self::#ident => #output }
     });
 
     Ok(quote! {
@@ -109,6 +109,7 @@ fn derive_display2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
                 match self {
                     #(#arms),*,
                 }
+                .fmt(f)
             }
         }
     })
