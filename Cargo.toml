@@ -13,11 +13,11 @@ panic = "abort"
 strip = "symbols"
 
 [dependencies]
-arrayvec = { version = "0.7.4", features = ["serde"] }
-bitfield = "0.16.0"
+arrayvec = { version = "0.7.6", features = ["serde"] }
+bitfield = "0.16.1"
 bitflags = "2.6.0"
-bytemuck = { version = "1.16.1", features = ["derive"] }
-env_logger = "0.11.4"
+bytemuck = { version = "1.17.0", features = ["derive"] }
+env_logger = "0.11.5"
 flume = "0.11.0"
 generic-array = "1.1.0"
 image = "0.25.2"
@@ -28,7 +28,7 @@ pollster = "0.3.0"
 rand = "0.8.5"
 rayon = "1.10.0"
 rustc-hash = "2.0.0"
-serde = { version = "1.0.204", features = ["derive", "rc"] }
-toml = "0.8.15"
-wgpu = "22.0.0"
-winit = "0.30.4"
+serde = { version = "1.0.209", features = ["derive", "rc"] }
+toml = "0.8.19"
+wgpu = "22.1.0"
+winit = "0.30.5"

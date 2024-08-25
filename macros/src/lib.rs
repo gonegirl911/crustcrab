@@ -136,9 +136,9 @@ fn parse_display_attrs(attrs: &[Attribute]) -> Result<LitStr, syn::Error> {
     format.ok_or_else(|| syn::Error::new(Span::call_site(), "expected #[display(format = \"...\")"))
 }
 
-fn invalid_variant<'a, I>(variants: I) -> Option<&'a Variant>
+fn invalid_variant<'a, V>(variants: V) -> Option<&'a Variant>
 where
-    I: IntoIterator<Item = &'a Variant>,
+    V: IntoIterator<Item = &'a Variant>,
 {
     variants
         .into_iter()

@@ -21,7 +21,7 @@ impl Window {
         )
     }
 
-    fn set_cursor_grab<I: IntoIterator<Item = CursorGrabMode>>(&self, modes: I) {
+    fn set_cursor_grab<M: IntoIterator<Item = CursorGrabMode>>(&self, modes: M) {
         modes
             .into_iter()
             .map(|mode| self.0.set_cursor_grab(mode).err())

@@ -56,9 +56,9 @@ pub struct World {
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    fn par_insert_many<I>(&mut self, points: I) -> Vec<Point3<i32>>
+    fn par_insert_many<P>(&mut self, points: P) -> Vec<Point3<i32>>
     where
-        I: IntoParallelIterator<Item = Point3<i32>>,
+        P: IntoParallelIterator<Item = Point3<i32>>,
     {
         points
             .into_par_iter()
@@ -127,9 +127,9 @@ impl World {
         }
     }
 
-    fn send_loads<I>(&self, points: I, proxy: &EventLoopProxy, is_important: bool)
+    fn send_loads<P>(&self, points: P, proxy: &EventLoopProxy, is_important: bool)
     where
-        I: IntoIterator<Item = Point3<i32>>,
+        P: IntoIterator<Item = Point3<i32>>,
     {
         Self::send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
@@ -141,9 +141,9 @@ impl World {
         );
     }
 
-    fn par_send_loads<I>(&self, points: I, proxy: &EventLoopProxy, is_important: bool)
+    fn par_send_loads<P>(&self, points: P, proxy: &EventLoopProxy, is_important: bool)
     where
-        I: IntoParallelIterator<Item = Point3<i32>>,
+        P: IntoParallelIterator<Item = Point3<i32>>,
     {
         Self::send_events(
             points
@@ -158,12 +158,10 @@ impl World {
         );
     }
 
-    fn send_updates<I: IntoIterator<Item = Point3<i32>>>(
-        &self,
-        points: I,
-        proxy: &EventLoopProxy,
-        is_important: bool,
-    ) {
+    fn send_updates<P>(&self, points: P, proxy: &EventLoopProxy, is_important: bool)
+    where
+        P: IntoIterator<Item = Point3<i32>>,
+    {
         Self::send_events(
             points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
                 coords,
@@ -174,9 +172,9 @@ impl World {
         );
     }
 
-    fn par_send_updates<I: IntoParallelIterator<Item = Point3<i32>>>(
+    fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
-        points: I,
+        points: P,
         proxy: &EventLoopProxy,
         is_important: bool,
     ) {
@@ -205,10 +203,7 @@ impl World {
         }
     }
 
-    fn send_unloads<I>(points: I, proxy: &EventLoopProxy)
-    where
-        I: IntoIterator<Item = Point3<i32>>,
-    {
+    fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(points: P, proxy: &EventLoopProxy) {
         Self::send_events(
             points
                 .into_iter()
@@ -217,28 +212,25 @@ impl World {
         );
     }
 
-    fn filter<I>(points: I, area: WorldArea) -> impl Iterator<Item = Point3<i32>>
+    fn filter<P>(points: P, area: WorldArea) -> impl Iterator<Item = Point3<i32>>
     where
-        I: IntoIterator<Item = Point3<i32>>,
+        P: IntoIterator<Item = Point3<i32>>,
     {
         points
             .into_iter()
             .filter(move |&coords| area.contains(coords))
     }
 
-    fn par_filter<I>(points: I, area: WorldArea) -> impl ParallelIterator<Item = Point3<i32>>
+    fn par_filter<P>(points: P, area: WorldArea) -> impl ParallelIterator<Item = Point3<i32>>
     where
-        I: IntoParallelIterator<Item = Point3<i32>>,
+        P: IntoParallelIterator<Item = Point3<i32>>,
     {
         points
             .into_par_iter()
             .filter(move |&coords| area.contains(coords))
     }
 
-    fn send_events<I>(events: I, proxy: &EventLoopProxy)
-    where
-        I: IntoIterator<Item = ServerEvent>,
-    {
+    fn send_events<E: IntoIterator<Item = ServerEvent>>(events: E, proxy: &EventLoopProxy) {
         for event in events {
             if proxy.send_event(event).is_err() {
                 break;
@@ -246,20 +238,20 @@ impl World {
         }
     }
 
-    fn chunk_area_points<I>(points: I) -> impl Iterator<Item = Point3<i32>>
+    fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point3<i32>>
     where
-        I: IntoIterator<Item = Point3<i32>>,
+        P: IntoIterator<Item = Point3<i32>>,
     {
         points
             .into_iter()
             .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
     }
 
-    fn block_area_points<I>(block_updates: I) -> impl Iterator<Item = Point3<i64>>
+    fn block_area_points<P>(points: P) -> impl Iterator<Item = Point3<i64>>
     where
-        I: IntoIterator<Item = Point3<i64>>,
+        P: IntoIterator<Item = Point3<i64>>,
     {
-        block_updates
+        points
             .into_iter()
             .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
     }

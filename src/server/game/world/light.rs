@@ -49,7 +49,7 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn extend_placeholders<I: IntoIterator<Item = Point3<i32>>>(&mut self, points: I) {
+    pub fn extend_placeholders<P: IntoIterator<Item = Point3<i32>>>(&mut self, points: P) {
         for coords in points {
             if self.placeholders.insert(coords) {
                 *self.lights.entry(coords).or_default() |= BlockLight::placeholder();

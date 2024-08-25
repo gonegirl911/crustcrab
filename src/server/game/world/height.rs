@@ -6,9 +6,9 @@ use std::{collections::hash_map::Entry, ops::Index};
 pub struct HeightMap(FxHashMap<Point2<i32>, i32>);
 
 impl HeightMap {
-    pub fn load_placeholders<'a, I>(&mut self, points: I) -> impl Iterator<Item = Point3<i32>> + '_
+    pub fn load_placeholders<'a, P>(&mut self, points: P) -> impl Iterator<Item = Point3<i32>> + '_
     where
-        I: IntoIterator<Item = &'a Point3<i32>>,
+        P: IntoIterator<Item = &'a Point3<i32>>,
     {
         Self::chunk_area_points(points.into_iter().filter_map(|&coords| self.load(coords)))
             .collect::<FxHashSet<_>>()
@@ -47,9 +47,9 @@ impl HeightMap {
         self.0.get(&coords).map(|&height| height + 1)
     }
 
-    fn chunk_area_points<I>(points: I) -> impl Iterator<Item = Point2<i32>>
+    fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point2<i32>>
     where
-        I: IntoIterator<Item = Point2<i32>>,
+        P: IntoIterator<Item = Point2<i32>>,
     {
         points
             .into_iter()
