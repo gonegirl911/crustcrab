@@ -1,4 +1,7 @@
-use super::data::{Corner, Side, TEX_INDICES};
+use super::{
+    data::{Corner, Side, TEX_INDICES},
+    Block,
+};
 use crate::{
     enum_map,
     shared::{
@@ -20,6 +23,13 @@ pub struct Model {
 }
 
 impl Model {
+    pub fn new(block: Block, model: RawModel) -> Self {
+        Self {
+            data: &MODEL_DATA[model.variant(block)],
+            tex_index: TEX_INDICES[&model.tex_path],
+        }
+    }
+
     pub fn corner_deltas(self, side: Option<Side>) -> &'static CornerDeltas {
         self.data.corner_deltas(side)
     }
@@ -30,24 +40,6 @@ impl Model {
 
     pub fn flat_icon(self) -> Option<u8> {
         self.data.has_flat_icon.then_some(self.tex_index)
-    }
-}
-
-impl Default for Model {
-    fn default() -> Self {
-        Self {
-            data: &MODEL_DATA[None],
-            tex_index: TEX_INDICES[&None],
-        }
-    }
-}
-
-impl From<RawModel> for Model {
-    fn from(model: RawModel) -> Self {
-        Self {
-            data: &MODEL_DATA[Some(model.variant)],
-            tex_index: TEX_INDICES[&Some(model.tex_path)],
-        }
     }
 }
 
@@ -117,9 +109,19 @@ impl<'de> Deserialize<'de> for ModelData {
 #[derive(Clone, Deserialize)]
 pub struct RawModel {
     #[serde(rename = "model", default)]
-    variant: Variant,
-    #[serde(rename = "texture")]
-    pub tex_path: Arc<str>,
+    variant: Option<Variant>,
+    #[serde(rename = "texture", default)]
+    pub tex_path: Option<Arc<str>>,
+}
+
+impl RawModel {
+    fn variant(&self, block: Block) -> Option<Variant> {
+        if block != Block::Air || self.tex_path.is_some() {
+            Some(self.variant.unwrap_or_default())
+        } else {
+            self.variant
+        }
+    }
 }
 
 #[derive(Clone, Copy, Default, Enum, Display, Deserialize)]

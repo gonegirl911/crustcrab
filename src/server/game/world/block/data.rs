@@ -32,6 +32,16 @@ pub struct BlockData {
 }
 
 impl BlockData {
+    fn new(block: Block, data: RawBlockData) -> Self {
+        Self {
+            model: Model::new(block, data.model),
+            luminance: data.luminance,
+            light_filter: data.light_filter,
+            requires_blending: data.requires_blending,
+            valid_surface: data.valid_surface,
+        }
+    }
+
     pub fn vertices(
         self,
         side: Option<Side>,
@@ -135,18 +145,6 @@ impl BlockData {
     }
 }
 
-impl From<RawBlockData> for BlockData {
-    fn from(data: RawBlockData) -> Self {
-        Self {
-            model: data.model.map_or_else(Default::default, Into::into),
-            luminance: data.luminance,
-            light_filter: data.light_filter,
-            requires_blending: data.requires_blending,
-            valid_surface: data.valid_surface,
-        }
-    }
-}
-
 impl IntoIterator for BlockData {
     type Item = (u8, bool);
     type IntoIter = Zip<<Rgb<u8> as IntoIterator>::IntoIter, <Rgb<bool> as IntoIterator>::IntoIter>;
@@ -158,8 +156,8 @@ impl IntoIterator for BlockData {
 
 #[derive(Clone, Deserialize)]
 struct RawBlockData {
-    #[serde(flatten, default)]
-    model: Option<RawModel>,
+    #[serde(flatten)]
+    model: RawModel,
     #[serde(default)]
     luminance: Rgb<u8>,
     #[serde(deserialize_with = "RawBlockData::deserialize_light_filter", default)]
@@ -172,7 +170,7 @@ struct RawBlockData {
 
 impl RawBlockData {
     fn tex_path(&self) -> Option<Arc<str>> {
-        Some(self.model.as_ref()?.tex_path.clone())
+        self.model.tex_path.clone()
     }
 
     fn deserialize_light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
@@ -260,7 +258,7 @@ pub enum Component {
 }
 
 pub static BLOCK_DATA: LazyLock<EnumMap<Block, BlockData>> =
-    LazyLock::new(|| RAW_BLOCK_DATA.clone().map(|_, data| data.into()));
+    LazyLock::new(|| RAW_BLOCK_DATA.clone().map(BlockData::new));
 
 pub static TEX_PATHS: LazyLock<Vec<Arc<str>>> = LazyLock::new(|| {
     let mut paths = Vec::<Arc<str>>::with_capacity(TEX_INDICES.len());
