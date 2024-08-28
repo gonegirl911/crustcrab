@@ -171,8 +171,8 @@ struct RawBlockData {
 }
 
 impl RawBlockData {
-    fn tex_path(&self) -> Option<Arc<str>> {
-        self.model.tex_path.clone()
+    fn tex_path(&self) -> &Arc<str> {
+        &self.model.tex_path
     }
 
     fn deserialize_light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
@@ -262,10 +262,10 @@ pub enum Component {
 pub(super) static BLOCK_DATA: LazyLock<Vec<BlockData>> = LazyLock::new(|| {
     let mut data = Vec::<BlockData>::with_capacity(STR_TO_BLOCK.len());
     unsafe {
-        for (str, &block) in STR_TO_BLOCK.iter() {
+        for (str, &block) in &*STR_TO_BLOCK {
             data.as_mut_ptr()
                 .add(block.0 as usize)
-                .write(BlockData::from(RAW_BLOCK_DATA[str].clone()));
+                .write(RAW_BLOCK_DATA[str].clone().into());
         }
         data.set_len(STR_TO_BLOCK.len());
     }
@@ -273,19 +273,16 @@ pub(super) static BLOCK_DATA: LazyLock<Vec<BlockData>> = LazyLock::new(|| {
 });
 
 pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(|| {
-    let mut hard_coded_idx = 0;
-    let mut non_hard_coded_idx = Block::HARD_CODED_VALUES.len() as u8;
+    let mut idx = Block::HARD_CODED_VALUES.len() as u8;
     RAW_BLOCK_DATA
         .keys()
         .cloned()
         .map(|str| {
-            if Block::HARD_CODED_VALUES.contains(&&*str) {
-                let entry = (str, Block(hard_coded_idx));
-                hard_coded_idx += 1;
-                entry
+            if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|s| s == &&*str) {
+                (str, Block(i as u8))
             } else {
-                let entry = (str, Block(non_hard_coded_idx));
-                non_hard_coded_idx += 1;
+                let entry = (str, Block(idx));
+                idx += 1;
                 entry
             }
         })
@@ -296,21 +293,18 @@ pub static TEX_PATHS: LazyLock<Vec<Arc<str>>> = LazyLock::new(|| {
     let mut paths = Vec::<Arc<str>>::with_capacity(TEX_INDICES.len());
     unsafe {
         for (path, &i) in &*TEX_INDICES {
-            paths
-                .as_mut_ptr()
-                .add(i as usize)
-                .write(path.clone().unwrap_or_else(|| "missing_texture.png".into()));
+            paths.as_mut_ptr().add(i as usize).write(path.clone());
         }
         paths.set_len(TEX_INDICES.len());
     }
     paths
 });
 
-pub static TEX_INDICES: LazyLock<FxHashMap<Option<Arc<str>>, u8>> = LazyLock::new(|| {
+pub static TEX_INDICES: LazyLock<FxHashMap<Arc<str>, u8>> = LazyLock::new(|| {
     let mut indices = FxHashMap::default();
     let mut idx = 0;
     for data in RAW_BLOCK_DATA.values() {
-        indices.entry(data.tex_path()).or_insert_with(|| {
+        indices.entry(data.tex_path().clone()).or_insert_with(|| {
             let i = idx;
             idx += 1;
             i

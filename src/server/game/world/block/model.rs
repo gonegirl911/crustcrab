@@ -74,7 +74,7 @@ pub struct RawModel {
     #[serde(rename = "model", deserialize_with = "RawModel::deserialize_variant")]
     variant: Arc<str>,
     #[serde(rename = "texture")]
-    pub tex_path: Option<Arc<str>>,
+    pub tex_path: Arc<str>,
 }
 
 impl RawModel {
@@ -105,7 +105,7 @@ impl Default for RawModel {
     fn default() -> Self {
         Self {
             variant: DEFAULT_VARIANT.clone(),
-            tex_path: None,
+            tex_path: "missing_texture.png".into(),
         }
     }
 }
