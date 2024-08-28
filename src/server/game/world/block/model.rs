@@ -103,9 +103,12 @@ impl RawModel {
 
 impl Default for RawModel {
     fn default() -> Self {
+        static DEFAULT_TEX_PATH: LazyLock<Arc<str>> =
+            LazyLock::new(|| "missing_texture.png".into());
+
         Self {
             variant: DEFAULT_VARIANT.clone(),
-            tex_path: "missing_texture.png".into(),
+            tex_path: DEFAULT_TEX_PATH.clone(),
         }
     }
 }
