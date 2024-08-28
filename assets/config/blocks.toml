@@ -1,4 +1,5 @@
 [air]
+model = "air"
 light_filter = [1, 1, 1]
 
 [sand]

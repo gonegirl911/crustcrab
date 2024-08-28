@@ -20,6 +20,7 @@ use serde::{Deserialize, Deserializer};
 use std::{
     array,
     iter::{self, Zip},
+    ops::Deref,
     sync::{Arc, LazyLock},
 };
 
@@ -33,16 +34,6 @@ pub struct BlockData {
 }
 
 impl BlockData {
-    fn new(block: Block, data: RawBlockData) -> Self {
-        Self {
-            model: Model::new(block, data.model),
-            luminance: data.luminance,
-            light_filter: data.light_filter,
-            requires_blending: data.requires_blending,
-            valid_surface: data.valid_surface.as_deref().map(|str| STR_TO_BLOCK[str]),
-        }
-    }
-
     pub fn vertices(
         self,
         side: Option<Side>,
@@ -146,6 +137,18 @@ impl BlockData {
     }
 }
 
+impl From<RawBlockData> for BlockData {
+    fn from(data: RawBlockData) -> Self {
+        Self {
+            model: data.model.into(),
+            luminance: data.luminance,
+            light_filter: data.light_filter,
+            requires_blending: data.requires_blending,
+            valid_surface: data.valid_surface.as_deref().map(|str| STR_TO_BLOCK[str]),
+        }
+    }
+}
+
 impl IntoIterator for BlockData {
     type Item = (u8, bool);
     type IntoIter = Zip<<Rgb<u8> as IntoIterator>::IntoIter, <Rgb<bool> as IntoIterator>::IntoIter>;
@@ -155,17 +158,15 @@ impl IntoIterator for BlockData {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
+#[serde(default)]
 struct RawBlockData {
     #[serde(flatten)]
     model: RawModel,
-    #[serde(default)]
     luminance: Rgb<u8>,
-    #[serde(deserialize_with = "RawBlockData::deserialize_light_filter", default)]
+    #[serde(deserialize_with = "RawBlockData::deserialize_light_filter")]
     light_filter: Rgb<bool>,
-    #[serde(default)]
     requires_blending: bool,
-    #[serde(default)]
     valid_surface: Option<Arc<str>>,
 }
 
@@ -264,7 +265,7 @@ pub(super) static BLOCK_DATA: LazyLock<Vec<BlockData>> = LazyLock::new(|| {
         for (str, &block) in STR_TO_BLOCK.iter() {
             data.as_mut_ptr()
                 .add(block.0 as usize)
-                .write(BlockData::new(block, RAW_BLOCK_DATA[str].clone()));
+                .write(BlockData::from(RAW_BLOCK_DATA[str].clone()));
         }
         data.set_len(STR_TO_BLOCK.len());
     }
@@ -343,7 +344,7 @@ static RAW_BLOCK_DATA: LazyLock<FxHashMap<Arc<str>, RawBlockData>> = LazyLock::n
         panic!(
             "invalid valid_surface \"{surface}\" of block \"{block}\", expected one of \"{}\"",
             data.keys()
-                .map(|variant| &**variant)
+                .map(Deref::deref)
                 .collect::<Vec<_>>()
                 .join("\", \""),
         );

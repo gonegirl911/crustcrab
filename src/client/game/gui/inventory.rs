@@ -22,6 +22,7 @@ use serde::{Deserialize, Deserializer};
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
     mem,
+    ops::Deref,
 };
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
@@ -201,7 +202,14 @@ impl InventoryConfig {
                 STR_TO_BLOCK.get(&*str).copied().ok_or_else(|| {
                     serde::de::Error::invalid_value(
                         serde::de::Unexpected::Str(&str),
-                        &"a valid block",
+                        &&*format!(
+                            "one of \"{}\"",
+                            STR_TO_BLOCK
+                                .keys()
+                                .map(Deref::deref)
+                                .collect::<Vec<_>>()
+                                .join("\", \"")
+                        ),
                     )
                 })
             })
