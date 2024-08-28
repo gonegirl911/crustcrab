@@ -2,19 +2,16 @@ use super::{
     data::{Corner, Side, TEX_INDICES},
     Block,
 };
-use crate::{
-    enum_map,
-    shared::{
-        bound::Aabb,
-        enum_map::{Display, Enum, EnumMap},
-    },
+use crate::shared::{
+    bound::Aabb,
+    enum_map::{Enum, EnumMap},
+    utils,
 };
 use nalgebra::{Point3, Vector3};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
-use std::{
-    fs,
-    sync::{Arc, LazyLock},
-};
+use std::sync::{Arc, LazyLock};
+use walkdir::{DirEntry, WalkDir};
 
 #[derive(Clone, Copy)]
 pub struct Model {
@@ -25,7 +22,7 @@ pub struct Model {
 impl Model {
     pub fn new(block: Block, model: RawModel) -> Self {
         Self {
-            data: &MODEL_DATA[model.variant(block)],
+            data: &MODEL_DATA[&model.variant(block)],
             tex_index: TEX_INDICES[&model.tex_path],
         }
     }
@@ -108,38 +105,90 @@ impl<'de> Deserialize<'de> for ModelData {
 
 #[derive(Clone, Deserialize)]
 pub struct RawModel {
-    #[serde(rename = "model", default)]
-    variant: Option<Variant>,
+    #[serde(
+        rename = "model",
+        deserialize_with = "RawModel::deserialize_variant",
+        default
+    )]
+    variant: Option<Arc<str>>,
     #[serde(rename = "texture", default)]
     pub tex_path: Option<Arc<str>>,
 }
 
 impl RawModel {
-    fn variant(&self, block: Block) -> Option<Variant> {
-        if block != Block::Air || self.tex_path.is_some() {
-            Some(self.variant.unwrap_or_default())
+    fn variant(&self, block: Block) -> Option<Arc<str>> {
+        if block != Block::AIR || self.tex_path.is_some() {
+            Some(
+                self.variant
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_VARIANT.clone()),
+            )
         } else {
-            self.variant
+            self.variant.clone()
+        }
+    }
+
+    fn deserialize_variant<'de, D>(deserializer: D) -> Result<Option<Arc<str>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let variant = Option::<Arc<str>>::deserialize(deserializer)?;
+        if !MODEL_DATA.contains_key(&variant) {
+            Err(serde::de::Error::invalid_value(
+                serde::de::Unexpected::Str(&variant.unwrap_or_else(|| unreachable!())),
+                &&*format!(
+                    "one of \"{}\"",
+                    MODEL_DATA
+                        .keys()
+                        .filter_map(|variant| Some(&**variant.as_ref()?))
+                        .collect::<Vec<_>>()
+                        .join("\", \"")
+                ),
+            ))
+        } else {
+            Ok(variant)
         }
     }
 }
 
-#[derive(Clone, Copy, Default, Enum, Display, Deserialize)]
-#[display(format = "snek_case")]
-#[serde(rename_all = "snake_case")]
-enum Variant {
-    #[default]
-    Cube,
-    Flower,
-}
-
-static MODEL_DATA: LazyLock<EnumMap<Option<Variant>, ModelData>> = LazyLock::new(|| {
-    enum_map! {
-        Some(variant) => {
-            let path = format!("assets/config/models/{variant}.toml");
-            toml::from_str(&fs::read_to_string(path).expect("file should exist"))
-                .expect("file should be valid")
-        }
-        None => Default::default(),
+static MODEL_DATA: LazyLock<FxHashMap<Option<Arc<str>>, ModelData>> = LazyLock::new(|| {
+    fn is_hidden(entry: &DirEntry) -> bool {
+        entry
+            .file_name()
+            .to_str()
+            .map(|s| s.starts_with("."))
+            .unwrap_or(false)
     }
+
+    let data = WalkDir::new("assets/config/models")
+        .follow_links(true)
+        .into_iter()
+        .filter_entry(|entry| !is_hidden(entry))
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().map_or(false, |s| s == "toml"))
+        .map(|entry| {
+            let path = entry.path();
+            (
+                Some(
+                    path.file_stem()
+                        .unwrap_or_else(|| unreachable!())
+                        .to_str()
+                        .unwrap_or_else(|| panic!("{path:?} should have a valid UTF-8 stem"))
+                        .into(),
+                ),
+                utils::deserialize(path),
+            )
+        })
+        .chain([Default::default()])
+        .collect::<FxHashMap<_, _>>();
+
+    assert!(
+        data.contains_key(&Some(DEFAULT_VARIANT.clone())),
+        "{} model must be configured",
+        *DEFAULT_VARIANT,
+    );
+
+    data
 });
+
+static DEFAULT_VARIANT: LazyLock<Arc<str>> = LazyLock::new(|| "cube".into());

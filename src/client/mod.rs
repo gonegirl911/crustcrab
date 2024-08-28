@@ -13,11 +13,12 @@ use self::{
 use crate::{
     client::stopwatch::Stopwatch,
     server::{game::world::block::Block, ServerEvent},
+    shared::utils,
 };
 use flume::Sender;
 use nalgebra::{Point3, Vector3};
 use serde::Deserialize;
-use std::{fs, sync::LazyLock};
+use std::sync::LazyLock;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -192,7 +193,5 @@ struct ClientConfig {
     gui: GuiConfig,
 }
 
-static CLIENT_CONFIG: LazyLock<ClientConfig> = LazyLock::new(|| {
-    toml::from_str(&fs::read_to_string("assets/config/client.toml").expect("file should exist"))
-        .expect("file should be valid")
-});
+static CLIENT_CONFIG: LazyLock<ClientConfig> =
+    LazyLock::new(|| utils::deserialize("assets/config/client.toml"));

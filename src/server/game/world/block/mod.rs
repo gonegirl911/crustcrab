@@ -4,27 +4,22 @@ pub mod model;
 
 use self::data::{BlockData, BLOCK_DATA};
 use super::action::BlockAction;
-use crate::shared::{color::Rgb, enum_map::Enum};
+use crate::shared::color::Rgb;
 use bitfield::bitfield;
-use serde::Deserialize;
 use std::{array, ops::Range};
 
-#[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Default, Enum, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Block {
-    #[default]
-    Air = 0,
-    Sand,
-    Glowstone,
-    GlassMagenta,
-    GlassCyan,
-    DeadBush,
-}
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Default)]
+pub struct Block(u8);
 
 impl Block {
+    const MAX_COUNT: usize = u8::MAX as usize + 1;
+    const HARD_CODED_VALUES: &'static [&'static str] = &["air", "sand"];
+    pub const AIR: Self = Self(0);
+    pub const SAND: Self = Self(1);
+
     pub fn data(self) -> BlockData {
-        BLOCK_DATA[self]
+        BLOCK_DATA[self.0 as usize]
     }
 
     pub fn apply(&mut self, action: BlockAction) -> bool {
@@ -39,14 +34,14 @@ impl Block {
     pub fn apply_unchecked(&mut self, action: BlockAction) {
         *self = match action {
             BlockAction::Place(block) => block,
-            BlockAction::Destroy => Self::Air,
+            BlockAction::Destroy => Self::AIR,
         };
     }
 
     pub fn is_action_valid(self, action: BlockAction) -> bool {
         match (self, action) {
-            (Self::Air, BlockAction::Place(Self::Air) | BlockAction::Destroy) => false,
-            (Self::Air, BlockAction::Place(_)) | (_, BlockAction::Destroy) => true,
+            (Self::AIR, BlockAction::Place(Self::AIR) | BlockAction::Destroy) => false,
+            (Self::AIR, BlockAction::Place(_)) | (_, BlockAction::Destroy) => true,
             (_, BlockAction::Place(_)) => false,
         }
     }

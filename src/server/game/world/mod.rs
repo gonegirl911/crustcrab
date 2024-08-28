@@ -354,7 +354,7 @@ impl ChunkStore {
 
     fn block(&self, coords: Point3<i64>) -> Block {
         self.get(utils::chunk_coords(coords))
-            .map_or(Block::Air, |chunk| chunk[utils::block_coords(coords)])
+            .map_or(Block::AIR, |chunk| chunk[utils::block_coords(coords)])
     }
 
     fn insert(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) {
@@ -438,7 +438,7 @@ impl Branch {
                 Entry::Vacant(entry) => {
                     let mut actions = actions
                         .into_iter()
-                        .filter(|&(_, action)| Block::Air.is_action_valid(action))
+                        .filter(|&(_, action)| Block::AIR.is_action_valid(action))
                         .peekable();
 
                     if actions.peek().is_some() {

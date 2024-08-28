@@ -31,7 +31,7 @@ impl Chunk {
         Self {
             blocks: DataStore::from_fn(|coords| {
                 let block = f(coords);
-                non_air_count += (block != Block::Air) as u16;
+                non_air_count += (block != Block::AIR) as u16;
                 glowing_count += block.data().is_glowing() as u16;
                 block
             }),
@@ -73,8 +73,8 @@ impl Chunk {
     }
 
     fn adjust_counts(&mut self, prev: Block, curr: Block) {
-        self.non_air_count -= (prev != Block::Air) as u16;
-        self.non_air_count += (curr != Block::Air) as u16;
+        self.non_air_count -= (prev != Block::AIR) as u16;
+        self.non_air_count += (curr != Block::AIR) as u16;
         self.glowing_count -= prev.data().is_glowing() as u16;
         self.glowing_count += curr.data().is_glowing() as u16;
     }

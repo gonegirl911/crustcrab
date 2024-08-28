@@ -17,7 +17,7 @@ use std::{
     slice,
 };
 
-pub use macros::{Display, Enum};
+pub use macros::Enum;
 
 #[macro_export]
 macro_rules! enum_map {

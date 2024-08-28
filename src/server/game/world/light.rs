@@ -544,7 +544,7 @@ impl<'a> Node<'a> {
 
     fn block(&self) -> Block {
         self.chunk
-            .map_or(Block::Air, |chunk| chunk[self.block_coords])
+            .map_or(Block::AIR, |chunk| chunk[self.block_coords])
     }
 
     fn block_light(&self) -> BlockLight {

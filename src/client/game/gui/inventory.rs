@@ -13,12 +13,12 @@ use crate::{
         },
         CLIENT_CONFIG,
     },
-    server::game::world::block::Block,
+    server::game::world::block::{data::STR_TO_BLOCK, Block},
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{vector, Matrix4, Vector3};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
     mem,
@@ -185,6 +185,26 @@ impl InventoryUniformData {
 
 #[derive(Deserialize)]
 pub struct InventoryConfig {
+    #[serde(deserialize_with = "InventoryConfig::deserialize_content")]
     content: ArrayVec<Block, 9>,
     size: f32,
+}
+
+impl InventoryConfig {
+    fn deserialize_content<'de, D>(deserializer: D) -> Result<ArrayVec<Block, 9>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        ArrayVec::<String, 9>::deserialize(deserializer)?
+            .into_iter()
+            .map(|str| {
+                STR_TO_BLOCK.get(&*str).copied().ok_or_else(|| {
+                    serde::de::Error::invalid_value(
+                        serde::de::Unexpected::Str(&str),
+                        &"a valid block",
+                    )
+                })
+            })
+            .collect()
+    }
 }

@@ -1,9 +1,18 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
+use serde::de::DeserializeOwned;
 use std::{
-    iter,
+    fs, iter,
     ops::{Add, Mul},
+    path::Path,
 };
+
+pub fn deserialize<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> T {
+    let path = path.as_ref();
+    let contents = fs::read_to_string(path);
+    toml::from_str(&contents.unwrap_or_else(|e| panic!("failed to open {path:?}: {e}")))
+        .unwrap_or_else(|e| panic!("failed to deserialize {path:?}: {e}"))
+}
 
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a * (1.0 - t) + b * t

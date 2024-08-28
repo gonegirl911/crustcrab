@@ -15,9 +15,9 @@ impl ChunkGenerator {
             Chunk::from_fn(|block_coords| {
                 let coords = utils::coords((coords, block_coords)).cast() / Chunk::DIM as f64;
                 if self.0.get(coords.into()) > 0.0 {
-                    Block::Sand
+                    Block::SAND
                 } else {
-                    Block::Air
+                    Block::AIR
                 }
             })
         } else {

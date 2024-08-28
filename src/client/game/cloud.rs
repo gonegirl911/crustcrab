@@ -116,9 +116,9 @@ impl CloudLayer {
     }
 
     fn vertices() -> Vec<BlockVertex> {
-        Block::Sand
+        Block::SAND
             .data()
-            .mesh(Default::default(), Block::Sand.into(), &Default::default())
+            .mesh(Default::default(), Block::SAND.into(), &Default::default())
             .collect()
     }
 

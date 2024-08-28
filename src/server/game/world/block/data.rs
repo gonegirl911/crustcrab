@@ -11,13 +11,14 @@ use crate::{
         bound::Aabb,
         color::Rgb,
         enum_map::{Enum, EnumMap},
+        utils,
     },
 };
 use nalgebra::{point, Point2, Point3, Vector3};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
 use std::{
-    array, fs,
+    array,
     iter::{self, Zip},
     sync::{Arc, LazyLock},
 };
@@ -38,7 +39,7 @@ impl BlockData {
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
-            valid_surface: data.valid_surface,
+            valid_surface: data.valid_surface.as_deref().map(|str| STR_TO_BLOCK[str]),
         }
     }
 
@@ -165,7 +166,7 @@ struct RawBlockData {
     #[serde(default)]
     requires_blending: bool,
     #[serde(default)]
-    valid_surface: Option<Block>,
+    valid_surface: Option<Arc<str>>,
 }
 
 impl RawBlockData {
@@ -257,8 +258,38 @@ pub enum Component {
     Corner,
 }
 
-pub static BLOCK_DATA: LazyLock<EnumMap<Block, BlockData>> =
-    LazyLock::new(|| RAW_BLOCK_DATA.clone().map(BlockData::new));
+pub(super) static BLOCK_DATA: LazyLock<Vec<BlockData>> = LazyLock::new(|| {
+    let mut data = Vec::<BlockData>::with_capacity(STR_TO_BLOCK.len());
+    unsafe {
+        for (str, &block) in STR_TO_BLOCK.iter() {
+            data.as_mut_ptr()
+                .add(block.0 as usize)
+                .write(BlockData::new(block, RAW_BLOCK_DATA[str].clone()));
+        }
+        data.set_len(STR_TO_BLOCK.len());
+    }
+    data
+});
+
+pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(|| {
+    let mut hard_coded_idx = 0;
+    let mut non_hard_coded_idx = Block::HARD_CODED_VALUES.len() as u8;
+    RAW_BLOCK_DATA
+        .keys()
+        .cloned()
+        .map(|str| {
+            if Block::HARD_CODED_VALUES.contains(&&*str) {
+                let entry = (str, Block(hard_coded_idx));
+                hard_coded_idx += 1;
+                entry
+            } else {
+                let entry = (str, Block(non_hard_coded_idx));
+                non_hard_coded_idx += 1;
+                entry
+            }
+        })
+        .collect()
+});
 
 pub static TEX_PATHS: LazyLock<Vec<Arc<str>>> = LazyLock::new(|| {
     let mut paths = Vec::<Arc<str>>::with_capacity(TEX_INDICES.len());
@@ -269,7 +300,7 @@ pub static TEX_PATHS: LazyLock<Vec<Arc<str>>> = LazyLock::new(|| {
                 .add(i as usize)
                 .write(path.clone().unwrap_or_else(|| "missing_texture.png".into()));
         }
-        paths.set_len(paths.capacity());
+        paths.set_len(TEX_INDICES.len());
     }
     paths
 });
@@ -287,9 +318,38 @@ pub static TEX_INDICES: LazyLock<FxHashMap<Option<Arc<str>>, u8>> = LazyLock::ne
     indices
 });
 
-static RAW_BLOCK_DATA: LazyLock<EnumMap<Block, RawBlockData>> = LazyLock::new(|| {
-    toml::from_str(&fs::read_to_string("assets/config/blocks.toml").expect("file should exist"))
-        .expect("file should be valid")
+static RAW_BLOCK_DATA: LazyLock<FxHashMap<Arc<str>, RawBlockData>> = LazyLock::new(|| {
+    let data =
+        utils::deserialize::<_, FxHashMap<Arc<_>, RawBlockData>>("assets/config/blocks.toml");
+
+    assert!(
+        data.len() <= Block::MAX_COUNT,
+        "block count must not exceed {}",
+        Block::MAX_COUNT,
+    );
+
+    if let Some(str) = Block::HARD_CODED_VALUES
+        .iter()
+        .find(|&&str| !data.contains_key(str))
+    {
+        panic!("{str} block must be configured");
+    }
+
+    if let Some((block, surface)) = data
+        .iter()
+        .filter_map(|(block, data)| Some((block, data.valid_surface.as_ref()?)))
+        .find(|&(_, surface)| !data.contains_key(surface))
+    {
+        panic!(
+            "invalid valid_surface \"{surface}\" of block \"{block}\", expected one of \"{}\"",
+            data.keys()
+                .map(|variant| &**variant)
+                .collect::<Vec<_>>()
+                .join("\", \""),
+        );
+    }
+
+    data
 });
 
 static SIDE_CORNER_SIDES: LazyLock<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> =

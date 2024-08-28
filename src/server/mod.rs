@@ -11,14 +11,14 @@ use self::{
         Game,
     },
 };
-use crate::client::{event_loop::EventLoopProxy, ClientEvent};
+use crate::{
+    client::{event_loop::EventLoopProxy, ClientEvent},
+    shared::utils,
+};
 use flume::Receiver;
 use nalgebra::Point3;
 use serde::Deserialize;
-use std::{
-    fs,
-    sync::{Arc, LazyLock},
-};
+use std::sync::{Arc, LazyLock};
 
 pub struct Server {
     event_loop: EventLoop,
@@ -63,7 +63,5 @@ struct ServerConfig {
     clock: ClockState,
 }
 
-static SERVER_CONFIG: LazyLock<ServerConfig> = LazyLock::new(|| {
-    toml::from_str(&fs::read_to_string("assets/config/server.toml").expect("file should exist"))
-        .expect("file should be valid")
-});
+static SERVER_CONFIG: LazyLock<ServerConfig> =
+    LazyLock::new(|| utils::deserialize("assets/config/server.toml"));
