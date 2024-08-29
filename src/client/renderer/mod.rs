@@ -54,7 +54,7 @@ impl Renderer {
             .expect("device should be available");
         let config = surface
             .get_default_config(&adapter, width, height)
-            .expect("surface should be supported by adapter");
+            .unwrap_or_else(|| unreachable!());
         Self {
             surface,
             device,

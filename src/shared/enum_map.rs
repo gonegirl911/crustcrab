@@ -17,7 +17,7 @@ use std::{
     slice,
 };
 
-pub use macros::Enum;
+pub use macros::{Enum, Field};
 
 #[macro_export]
 macro_rules! enum_map {
@@ -87,11 +87,8 @@ impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
             guard.set(variant, value);
         }
 
-        if guard.finish() {
-            unsafe { uninit.assume_init() }
-        } else {
-            panic!("missing variants");
-        }
+        assert!(guard.finish().is_ok());
+        unsafe { uninit.assume_init() }
     }
 }
 
@@ -176,7 +173,7 @@ impl<'a, E: Enum, T> Iterator for Iter<'a, E, T> {
 
 impl<'de, E, T> Deserialize<'de> for EnumMap<E, T>
 where
-    E: Enum + Deserialize<'de>,
+    E: Enum + Deserialize<'de> + Field,
     T: Deserialize<'de>,
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -184,7 +181,7 @@ where
 
         impl<'de, E, T> Visitor<'de> for MapVisitor<E, T>
         where
-            E: Enum + Deserialize<'de>,
+            E: Enum + Deserialize<'de> + Field,
             T: Deserialize<'de>,
         {
             type Value = EnumMap<E, T>;
@@ -194,19 +191,19 @@ where
             }
 
             fn visit_map<M: MapAccess<'de>>(self, mut access: M) -> Result<Self::Value, M::Error> {
-                let mut uninit = EnumMap::uninit();
+                let mut uninit = EnumMap::<E, _>::uninit();
                 let mut guard = Guard::new(&mut uninit);
 
                 while let Some((variant, value)) = access.next_entry()? {
                     if !guard.init(variant, value) {
-                        return Err(M::Error::custom("duplicate variant"));
+                        return Err(M::Error::duplicate_field(variant.as_field_name()));
                     }
                 }
 
-                if guard.finish() {
-                    Ok(unsafe { uninit.assume_init() })
+                if let Err(variant) = guard.finish() {
+                    Err(M::Error::missing_field(variant.as_field_name()))
                 } else {
-                    Err(M::Error::custom("missing variants"))
+                    Ok(unsafe { uninit.assume_init() })
                 }
             }
         }
@@ -245,22 +242,31 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
         self.count += 1;
     }
 
-    fn finish(self) -> bool {
+    fn finish(self) -> Result<(), E> {
         if self.count == E::LEN {
             mem::forget(self);
-            true
+            Ok(())
         } else {
-            false
+            Err(self.missing_variant().unwrap_or_else(|| unreachable!()))
         }
+    }
+
+    fn missing_variant(&self) -> Option<E> {
+        self.is_init
+            .iter()
+            .find(|(_, &is_init)| !is_init)
+            .map(|(variant, _)| variant)
     }
 }
 
 impl<E: Enum, T> Drop for Guard<'_, E, T> {
     fn drop(&mut self) {
-        for (uninit, &is_init) in self.uninit.values_mut().zip(self.is_init.values()) {
-            if is_init {
-                unsafe {
-                    uninit.assume_init_drop();
+        if mem::needs_drop::<T>() {
+            for (uninit, &is_init) in self.uninit.values_mut().zip(self.is_init.values()) {
+                if is_init {
+                    unsafe {
+                        uninit.assume_init_drop();
+                    }
                 }
             }
         }
@@ -324,4 +330,8 @@ impl<E: Enum> Iterator for Variants<E> {
     fn next(&mut self) -> Option<Self::Item> {
         (self.index < E::LEN).then(|| unsafe { self.next_unchecked() })
     }
+}
+
+pub trait Field {
+    fn as_field_name(&self) -> &'static str;
 }
