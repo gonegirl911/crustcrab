@@ -9,7 +9,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 use std::{
-    fmt,
+    fmt::{self, Debug},
     iter::Enumerate,
     marker::PhantomData,
     mem::{self, MaybeUninit},
@@ -17,7 +17,7 @@ use std::{
     slice,
 };
 
-pub use macros::{Enum, Field};
+pub use macros::Enum;
 
 #[macro_export]
 macro_rules! enum_map {
@@ -173,7 +173,7 @@ impl<'a, E: Enum, T> Iterator for Iter<'a, E, T> {
 
 impl<'de, E, T> Deserialize<'de> for EnumMap<E, T>
 where
-    E: Enum + Deserialize<'de> + Field,
+    E: Enum + Deserialize<'de> + Debug,
     T: Deserialize<'de>,
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -181,7 +181,7 @@ where
 
         impl<'de, E, T> Visitor<'de> for MapVisitor<E, T>
         where
-            E: Enum + Deserialize<'de> + Field,
+            E: Enum + Deserialize<'de> + Debug,
             T: Deserialize<'de>,
         {
             type Value = EnumMap<E, T>;
@@ -196,12 +196,14 @@ where
 
                 while let Some((variant, value)) = access.next_entry()? {
                     if !guard.init(variant, value) {
-                        return Err(M::Error::duplicate_field(variant.as_field_name()));
+                        return Err(M::Error::custom(format!(
+                            "duplicate variant \"{variant:?}\""
+                        )));
                     }
                 }
 
                 if let Err(variant) = guard.finish() {
-                    Err(M::Error::missing_field(variant.as_field_name()))
+                    Err(M::Error::custom(format!("missing variant \"{variant:?}\"")))
                 } else {
                     Ok(unsafe { uninit.assume_init() })
                 }
@@ -330,8 +332,4 @@ impl<E: Enum> Iterator for Variants<E> {
     fn next(&mut self) -> Option<Self::Item> {
         (self.index < E::LEN).then(|| unsafe { self.next_unchecked() })
     }
-}
-
-pub trait Field {
-    fn as_field_name(&self) -> &'static str;
 }

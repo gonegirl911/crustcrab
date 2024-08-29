@@ -10,7 +10,7 @@ use crate::{
     shared::{
         bound::Aabb,
         color::Rgb,
-        enum_map::{Enum, EnumMap, Field},
+        enum_map::{Enum, EnumMap},
         utils,
     },
 };
@@ -217,7 +217,7 @@ impl From<Option<Side>> for Face {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Enum, Deserialize, Field)]
+#[derive(Clone, Copy, PartialEq, Debug, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Bottom,
@@ -243,7 +243,7 @@ impl Side {
     }
 }
 
-#[derive(Clone, Copy, Enum, Deserialize, Field)]
+#[derive(Clone, Copy, Debug, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Corner {
     LowerLeft,
