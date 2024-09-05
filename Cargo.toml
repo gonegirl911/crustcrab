@@ -5,6 +5,9 @@ members = ["macros"]
 name = "crustcrab"
 edition = "2021"
 
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "forbid"
+
 [profile.lto]
 inherits = "release"
 codegen-units = 1
