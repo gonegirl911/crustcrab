@@ -292,10 +292,8 @@ impl<E: Enum> Iterator for Variants<E> {
     type Item = E;
 
     fn next(&mut self) -> Option<Self::Item> {
-        (self.index < E::LEN).then(|| {
-            let value = unsafe { E::from_index_unchecked(self.index) };
-            self.index += 1;
-            value
-        })
+        let value = E::from_index(self.index)?;
+        self.index += 1;
+        Some(value)
     }
 }
