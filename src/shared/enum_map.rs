@@ -10,7 +10,7 @@ use serde::{
 };
 use std::{
     fmt::{self, Debug},
-    iter::Enumerate,
+    iter::Zip,
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Add, Index, IndexMut},
@@ -41,11 +41,8 @@ impl<E: Enum, T> EnumMap<E, T> {
         EnumMap(GenericArray::uninit())
     }
 
-    pub fn iter(&self) -> Iter<E, T> {
-        Iter {
-            inner: self.0.iter().enumerate(),
-            phantom: PhantomData,
-        }
+    pub fn iter(&self) -> Zip<Variants<E>, slice::Iter<T>> {
+        E::variants().zip(&self.0)
     }
 
     pub fn values(&self) -> slice::Iter<T> {
@@ -67,7 +64,7 @@ impl<E: Enum, T> EnumMap<E, T> {
         let mut variants = E::variants();
         EnumMap(
             self.0
-                .map(|value| f(unsafe { variants.next_unchecked() }, value)),
+                .map(|value| f(unsafe { variants.next().unwrap_unchecked() }, value)),
         )
     }
 }
@@ -128,46 +125,19 @@ impl<E: Enum, T> IndexMut<E> for EnumMap<E, T> {
 
 impl<E: Enum, T> IntoIterator for EnumMap<E, T> {
     type Item = (E, T);
-    type IntoIter = IntoIter<E, T>;
+    type IntoIter = Zip<Variants<E>, GenericArrayIter<T, E::Length>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.0.into_iter().enumerate())
-    }
-}
-
-pub struct IntoIter<E: Enum, T>(Enumerate<GenericArrayIter<T, E::Length>>);
-
-impl<E: Enum, T> Iterator for IntoIter<E, T> {
-    type Item = (E, T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0
-            .next()
-            .map(|(i, value)| (unsafe { E::from_index_unchecked(i) }, value))
+        E::variants().zip(self.0)
     }
 }
 
 impl<'a, E: Enum, T> IntoIterator for &'a EnumMap<E, T> {
     type Item = (E, &'a T);
-    type IntoIter = Iter<'a, E, T>;
+    type IntoIter = Zip<Variants<E>, slice::Iter<'a, T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-pub struct Iter<'a, E: Enum, T> {
-    inner: Enumerate<slice::Iter<'a, T>>,
-    phantom: PhantomData<fn() -> (E, &'a T)>,
-}
-
-impl<'a, E: Enum, T> Iterator for Iter<'a, E, T> {
-    type Item = (E, &'a T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner
-            .next()
-            .map(|(i, value)| (unsafe { E::from_index_unchecked(i) }, value))
     }
 }
 
@@ -318,18 +288,14 @@ pub struct Variants<E> {
     phantom: PhantomData<fn() -> E>,
 }
 
-impl<E: Enum> Variants<E> {
-    unsafe fn next_unchecked(&mut self) -> <Self as Iterator>::Item {
-        let value = unsafe { E::from_index_unchecked(self.index) };
-        self.index += 1;
-        value
-    }
-}
-
 impl<E: Enum> Iterator for Variants<E> {
     type Item = E;
 
     fn next(&mut self) -> Option<Self::Item> {
-        (self.index < E::LEN).then(|| unsafe { self.next_unchecked() })
+        (self.index < E::LEN).then(|| {
+            let value = unsafe { E::from_index_unchecked(self.index) };
+            self.index += 1;
+            value
+        })
     }
 }

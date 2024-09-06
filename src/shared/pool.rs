@@ -1,4 +1,4 @@
-use flume::{Receiver, SendError, Sender};
+use flume::{Drain, Receiver, SendError, Sender};
 use std::{sync::LazyLock, thread};
 
 pub struct ThreadPool<I, O> {
@@ -11,7 +11,7 @@ impl<I, O> ThreadPool<I, O> {
         self.in_tx.send(input)
     }
 
-    pub fn drain(&self) -> impl Iterator<Item = O> + '_ {
+    pub fn drain(&self) -> Drain<O> {
         self.out_rx.drain()
     }
 }
