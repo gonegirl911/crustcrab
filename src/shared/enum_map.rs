@@ -296,4 +296,9 @@ impl<E: Enum> Iterator for Variants<E> {
         self.index += 1;
         Some(value)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let rem = E::LEN - self.index;
+        (rem, Some(rem))
+    }
 }
