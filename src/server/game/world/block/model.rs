@@ -82,7 +82,7 @@ impl RawModel {
     where
         D: Deserializer<'de>,
     {
-        let variant = Arc::<str>::deserialize(deserializer)?;
+        let variant = Arc::deserialize(deserializer)?;
         if !MODEL_DATA.contains_key(&variant) {
             Err(serde::de::Error::invalid_value(
                 serde::de::Unexpected::Str(&variant),
