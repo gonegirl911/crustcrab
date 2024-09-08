@@ -262,9 +262,9 @@ pub enum Component {
 pub(super) static BLOCK_DATA: LazyLock<Vec<BlockData>> = LazyLock::new(|| {
     let mut data = Vec::<BlockData>::with_capacity(STR_TO_BLOCK.len());
     unsafe {
-        for (str, &block) in &*STR_TO_BLOCK {
+        for (str, &Block(i)) in &*STR_TO_BLOCK {
             data.as_mut_ptr()
-                .add(block.0 as usize)
+                .add(i as usize)
                 .write(RAW_BLOCK_DATA[str].clone().into());
         }
         data.set_len(STR_TO_BLOCK.len());
