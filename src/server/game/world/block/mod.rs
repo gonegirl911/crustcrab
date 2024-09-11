@@ -10,7 +10,7 @@ use std::{array, ops::Range};
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Default)]
-pub struct Block(u8);
+pub struct Block(pub u8);
 
 impl Block {
     const MAX_COUNT: usize = u8::MAX as usize + 1;

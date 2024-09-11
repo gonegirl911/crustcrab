@@ -13,7 +13,7 @@ use crate::{
         },
         CLIENT_CONFIG,
     },
-    server::game::world::block::{data::STR_TO_BLOCK, Block},
+    server::game::world::block::{data::BLOCK_DATA, Block},
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
@@ -199,19 +199,21 @@ impl InventoryConfig {
         ArrayVec::<String, 9>::deserialize(deserializer)?
             .into_iter()
             .map(|str| {
-                STR_TO_BLOCK.get(&*str).copied().ok_or_else(|| {
-                    serde::de::Error::invalid_value(
+                if let Some(i) = BLOCK_DATA.get_index_of(&*str) {
+                    Ok(Block(i as u8))
+                } else {
+                    Err(serde::de::Error::invalid_value(
                         serde::de::Unexpected::Str(&str),
                         &&*format!(
                             "one of \"{}\"",
-                            STR_TO_BLOCK
+                            BLOCK_DATA
                                 .keys()
                                 .map(Deref::deref)
                                 .collect::<Vec<_>>()
                                 .join("\", \"")
                         ),
-                    )
-                })
+                    ))
+                }
             })
             .collect()
     }

@@ -3,7 +3,7 @@ use super::{
     Block, BlockLight,
 };
 use crate::{enum_map, shared::enum_map::EnumMap};
-use nalgebra::{point, vector, Point3, Vector3};
+use nalgebra::{vector, Vector3};
 use std::{
     array,
     ops::{Index, IndexMut, Range},
@@ -19,9 +19,7 @@ impl BlockArea {
 
     pub fn from_fn<F: FnMut(Vector3<i8>) -> Block>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
-            array::from_fn(|y| {
-                array::from_fn(|z| f(unsafe { Self::delta_unchecked(point![x, y, z]) }))
-            })
+            array::from_fn(|y| array::from_fn(|z| f(Self::delta_unchecked([x, y, z]))))
         }))
     }
 
@@ -74,11 +72,11 @@ impl BlockArea {
         })
     }
 
-    unsafe fn delta_unchecked(index: Point3<usize>) -> Vector3<i8> {
-        index.coords.map(|c| c as i8 - Self::PADDING as i8)
+    fn delta_unchecked(index: [usize; 3]) -> Vector3<i8> {
+        index.map(|c| c as i8 - Self::PADDING as i8).into()
     }
 
-    unsafe fn index_unchecked(delta: Vector3<i8>) -> Point3<usize> {
+    fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
         delta.map(|c| (c + Self::PADDING as i8) as usize).into()
     }
 }
@@ -95,15 +93,15 @@ impl Index<Vector3<i8>> for BlockArea {
     type Output = Block;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
-        &self.0[idx.x][idx.y][idx.z]
+        let [x, y, z] = Self::index_unchecked(delta);
+        &self.0[x][y][z]
     }
 }
 
 impl IndexMut<Vector3<i8>> for BlockArea {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let idx = unsafe { Self::index_unchecked(delta) };
-        &mut self.0[idx.x][idx.y][idx.z]
+        let [x, y, z] = Self::index_unchecked(delta);
+        &mut self.0[x][y][z]
     }
 }
 
@@ -113,9 +111,7 @@ pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; Block
 impl BlockAreaLight {
     pub fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
-            array::from_fn(|y| {
-                array::from_fn(|z| f(unsafe { BlockArea::delta_unchecked(point![x, y, z]) }))
-            })
+            array::from_fn(|y| array::from_fn(|z| f(BlockArea::delta_unchecked([x, y, z]))))
         }))
     }
 
@@ -162,7 +158,7 @@ impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let idx = unsafe { BlockArea::index_unchecked(delta) };
-        &self.0[idx.x][idx.y][idx.z]
+        let [x, y, z] = BlockArea::index_unchecked(delta);
+        &self.0[x][y][z]
     }
 }
