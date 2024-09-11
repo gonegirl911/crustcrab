@@ -66,7 +66,7 @@ impl StarDome {
         }
     }
 
-    fn instances(&self) -> Option<impl Iterator<Item = StarInstance> + '_> {
+    fn instances(&self) -> Option<impl Iterator<Item = StarInstance> + use<'_>> {
         self.updated_rotation.map(|rotation| {
             self.stars
                 .iter()

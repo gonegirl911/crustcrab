@@ -23,7 +23,6 @@ use std::{
     ops::Deref,
     sync::{Arc, LazyLock},
 };
-use wgpu::naga::{FastIndexMap, FastIndexSet};
 
 #[derive(Clone, Copy)]
 pub struct BlockData {
@@ -67,7 +66,7 @@ impl BlockData {
         coords: Point3<u8>,
         area: BlockArea,
         area_light: &BlockAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> + '_ {
+    ) -> impl Iterator<Item = BlockVertex> + use<'_> {
         let is_externally_lit = self.is_externally_lit();
         Enum::variants()
             .filter(move |&side| area.is_side_visible(side))
@@ -141,11 +140,11 @@ impl BlockData {
 impl From<RawBlockData> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
-            valid_surface: data.valid_surface(),
             model: data.model.into(),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
+            valid_surface: data.valid_surface.as_deref().map(|str| STR_TO_BLOCK[str]),
         }
     }
 }
@@ -174,14 +173,6 @@ struct RawBlockData {
 impl RawBlockData {
     fn tex_path(&self) -> &Arc<str> {
         &self.model.tex_path
-    }
-
-    fn valid_surface(&self) -> Option<Block> {
-        self.valid_surface.as_deref().map(|str| {
-            BLOCK_DATA
-                .get_index_of(str)
-                .map_or_else(|| unreachable!(), |i| Block(i as u8))
-        })
     }
 
     fn deserialize_light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
@@ -268,28 +259,54 @@ pub enum Component {
     Corner,
 }
 
-pub static BLOCK_DATA: LazyLock<FastIndexMap<Arc<str>, BlockData>> = LazyLock::new(|| {
-    Block::HARD_CODED_VALUES
-        .iter()
-        .map(|&str| {
-            RAW_BLOCK_DATA
-                .get_key_value(str)
-                .map_or_else(|| unreachable!(), |(str, _)| str)
+pub(super) static BLOCK_DATA: LazyLock<Box<[BlockData]>> = LazyLock::new(|| {
+    let mut data = Box::new_uninit_slice(STR_TO_BLOCK.len());
+    unsafe {
+        for (str, &Block(i)) in &*STR_TO_BLOCK {
+            data[i as usize].write(RAW_BLOCK_DATA[str].clone().into());
+        }
+        data.assume_init()
+    }
+});
+
+pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(|| {
+    let mut idx = Block::HARD_CODED_VALUES.len() as u8;
+    RAW_BLOCK_DATA
+        .keys()
+        .cloned()
+        .map(|str| {
+            if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|s| s == &&*str) {
+                (str, Block(i as u8))
+            } else {
+                let entry = (str, Block(idx));
+                idx += 1;
+                entry
+            }
         })
-        .chain(
-            RAW_BLOCK_DATA
-                .keys()
-                .filter(|&str| !Block::HARD_CODED_VALUES.contains(&&**str)),
-        )
-        .map(|str| (str.clone(), RAW_BLOCK_DATA[str].clone().into()))
         .collect()
 });
 
-pub static TEX_PATHS: LazyLock<FastIndexSet<Arc<str>>> = LazyLock::new(|| {
-    RAW_BLOCK_DATA
-        .values()
-        .map(|data| data.tex_path().clone())
-        .collect()
+pub static TEX_PATHS: LazyLock<Box<[Arc<str>]>> = LazyLock::new(|| {
+    let mut paths = Box::<[Arc<str>]>::new_uninit_slice(TEX_INDICES.len());
+    unsafe {
+        for (path, &i) in &*TEX_INDICES {
+            paths[i as usize].write(path.clone());
+        }
+        paths.assume_init()
+    }
+});
+
+pub static TEX_INDICES: LazyLock<FxHashMap<Arc<str>, u8>> = LazyLock::new(|| {
+    let mut indices = FxHashMap::default();
+    let mut idx = 0;
+    for data in RAW_BLOCK_DATA.values() {
+        indices.entry(data.tex_path().clone()).or_insert_with(|| {
+            let i = idx;
+            idx += 1;
+            i
+        });
+    }
+    indices
 });
 
 static RAW_BLOCK_DATA: LazyLock<FxHashMap<Arc<str>, RawBlockData>> = LazyLock::new(|| {

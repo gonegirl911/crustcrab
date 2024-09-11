@@ -1,4 +1,4 @@
-use super::data::{Corner, Side, TEX_PATHS};
+use super::data::{Corner, Side, TEX_INDICES};
 use crate::shared::{
     bound::Aabb,
     enum_map::{Enum, EnumMap},
@@ -38,7 +38,7 @@ impl From<RawModel> for Model {
     fn from(model: RawModel) -> Self {
         Self {
             data: &MODEL_DATA[&model.variant],
-            tex_index: model.tex_index(),
+            tex_index: TEX_INDICES[&model.tex_path],
         }
     }
 }
@@ -78,12 +78,6 @@ pub struct RawModel {
 }
 
 impl RawModel {
-    fn tex_index(&self) -> u8 {
-        TEX_PATHS
-            .get_index_of(&self.tex_path)
-            .map_or_else(|| unreachable!(), |i| i as u8)
-    }
-
     fn deserialize_variant<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
     where
         D: Deserializer<'de>,
@@ -98,7 +92,7 @@ impl RawModel {
                         .keys()
                         .map(Deref::deref)
                         .collect::<Vec<_>>()
-                        .join("\", \"")
+                        .join("\", \""),
                 ),
             ))
         } else {
