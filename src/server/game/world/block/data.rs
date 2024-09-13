@@ -287,7 +287,7 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(||
 });
 
 pub static TEX_PATHS: LazyLock<Box<[Arc<str>]>> = LazyLock::new(|| {
-    let mut paths = Box::<[Arc<str>]>::new_uninit_slice(TEX_INDICES.len());
+    let mut paths = Box::new_uninit_slice(TEX_INDICES.len());
     unsafe {
         for (path, &i) in &*TEX_INDICES {
             paths[i as usize].write(path.clone());
