@@ -85,7 +85,9 @@ impl Inventory {
     fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
         let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
         Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44))
-            * if !self.is_flat {
+            * if self.is_flat {
+                Matrix4::identity()
+            } else {
                 let diagonal = 3.0f32.sqrt();
                 let rot_x = -FRAC_PI_6;
                 let theta = (1.0 / diagonal).acos() + rot_x;
@@ -94,8 +96,6 @@ impl Inventory {
                     .append_translation(&vector![0.5, 0.5, 0.545])
                     * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
                         .prepend_translation(&Vector3::repeat(-0.5))
-            } else {
-                Matrix4::identity()
             }
     }
 

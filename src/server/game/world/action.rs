@@ -10,7 +10,7 @@ impl ActionStore {
     pub fn actions(
         &self,
         coords: Point3<i32>,
-    ) -> impl Iterator<Item = (Point3<u8>, BlockAction)> + use<'_> {
+    ) -> impl Iterator<Item = (Point3<u8>, BlockAction)> + '_ {
         self.0
             .get(&coords)
             .into_iter()

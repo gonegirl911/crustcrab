@@ -39,7 +39,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
     collections::{hash_map::Entry, LinkedList},
-    mem,
+    iter, mem,
     ops::{Index, Range},
 };
 
@@ -82,7 +82,7 @@ impl World {
         &self,
         prev: WorldArea,
         curr: WorldArea,
-    ) -> impl Iterator<Item = Point3<i32>> + use<'_> {
+    ) -> impl Iterator<Item = Point3<i32>> + '_ {
         curr.points().filter(move |&coords| {
             curr.contains_y(coords.y) && !prev.contains(coords) && self.chunks.contains(coords)
         })
@@ -459,9 +459,7 @@ impl Branch {
             hits.into_iter()
                 .inspect(|&(coords, action)| actions.insert(coords, action))
                 .flat_map(|(coords, action)| {
-                    [coords]
-                        .into_iter()
-                        .chain(light.apply(chunks, coords, action))
+                    iter::once(coords).chain(light.apply(chunks, coords, action))
                 })
                 .collect(),
             inserts,

@@ -198,26 +198,10 @@ impl<T: ?Sized, U> MemoryState<'_, T, U> {
     }
 }
 
-impl<T> MemoryState<'_, [T], usize> {
-    fn data(&self) -> Result<&[T], usize> {
-        match *self {
-            Self::Immutable(data) => Ok(data),
-            Self::Uninit(len) => Err(len),
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        match *self {
-            Self::Immutable(data) => data.is_empty(),
-            Self::Uninit(len) => len == 0,
-        }
-    }
-}
-
-impl<T> MemoryState<'_, T, ()> {
+impl<'a, T> MemoryState<'a, T, ()> {
     pub const UNINIT: Self = Self::Uninit(());
 
-    fn value(&self) -> Option<&T> {
+    fn value(self) -> Option<&'a T> {
         if let Self::Immutable(value) = self {
             Some(value)
         } else {
@@ -225,6 +209,33 @@ impl<T> MemoryState<'_, T, ()> {
         }
     }
 }
+
+impl<'a, T> MemoryState<'a, [T], usize> {
+    fn data(self) -> Result<&'a [T], usize> {
+        match self {
+            Self::Immutable(data) => Ok(data),
+            Self::Uninit(len) => Err(len),
+        }
+    }
+
+    fn is_empty(self) -> bool {
+        match self {
+            Self::Immutable(data) => data.is_empty(),
+            Self::Uninit(len) => len == 0,
+        }
+    }
+}
+
+impl<T: ?Sized, U: Clone> Clone for MemoryState<'_, T, U> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Immutable(data) => Self::Immutable(data),
+            Self::Uninit(fallback) => Self::Uninit(fallback.clone()),
+        }
+    }
+}
+
+impl<T: ?Sized, U: Copy> Copy for MemoryState<'_, T, U> {}
 
 pub trait Vertex: Pod {
     const ATTRIBS: &'static [wgpu::VertexAttribute];

@@ -77,7 +77,7 @@ impl<E: Enum, T> EnumMap<E, MaybeUninit<T>> {
 
 impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
     fn from_iter<I: IntoIterator<Item = (E, T)>>(iter: I) -> Self {
-        let mut uninit = EnumMap::uninit();
+        let mut uninit = Self::uninit();
         let mut guard = Guard::new(&mut uninit);
 
         for (variant, value) in iter {
@@ -161,7 +161,7 @@ where
             }
 
             fn visit_map<M: MapAccess<'de>>(self, mut access: M) -> Result<Self::Value, M::Error> {
-                let mut uninit = EnumMap::<E, _>::uninit();
+                let mut uninit = EnumMap::uninit();
                 let mut guard = Guard::new(&mut uninit);
 
                 while let Some((variant, value)) = access.next_entry()? {
@@ -200,11 +200,11 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
     }
 
     fn init(&mut self, variant: E, value: T) -> bool {
-        if !self.is_init[variant] {
+        if self.is_init[variant] {
+            false
+        } else {
             self.set(variant, value);
             true
-        } else {
-            false
         }
     }
 
