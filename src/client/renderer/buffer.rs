@@ -120,7 +120,7 @@ pub struct Buffer<T: ?Sized> {
 }
 
 impl<T: Pod> Buffer<T> {
-    pub fn new(renderer: &Renderer, value: Option<&T>, usage: wgpu::BufferUsages) -> Self {
+    fn new(renderer: &Renderer, value: Option<&T>, usage: wgpu::BufferUsages) -> Self {
         Self {
             buffer: Buffer::<[_]>::new(renderer, value.map(slice::from_ref).ok_or(1), usage).buffer,
             phantom: PhantomData,
@@ -129,7 +129,7 @@ impl<T: Pod> Buffer<T> {
 }
 
 impl<T: Pod> Buffer<[T]> {
-    pub fn new(
+    fn new(
         Renderer { device, .. }: &Renderer,
         data: Result<&[T], usize>,
         usage: wgpu::BufferUsages,
