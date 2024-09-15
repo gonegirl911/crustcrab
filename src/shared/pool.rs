@@ -1,6 +1,7 @@
 use flume::{Drain, Receiver, SendError, Sender};
 use std::{sync::LazyLock, thread};
 
+#[derive(Clone)]
 pub struct ThreadPool<I, O> {
     in_tx: Sender<I>,
     out_rx: Receiver<O>,

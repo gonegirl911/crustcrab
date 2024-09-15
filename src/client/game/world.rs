@@ -17,7 +17,7 @@ use crate::{
             chunk::Chunk,
             ChunkData,
         },
-        ServerEvent,
+        GroupId, ServerEvent,
     },
     shared::{pool::ThreadPool, utils},
 };
@@ -32,7 +32,8 @@ pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     program: Program,
     unloaded: FxHashSet<Point3<i32>>,
-    priority_workers: ThreadPool<ChunkInput, ChunkOutput>,
+    groups: FxHashMap<Instant, Vec<Result<ChunkOutput, Point3<i32>>>>,
+    group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
     workers: ThreadPool<ChunkInput, ChunkOutput>,
 }
 
@@ -77,7 +78,8 @@ impl World {
                 Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
             unloaded: Default::default(),
-            priority_workers: ThreadPool::new(Self::vertices),
+            groups: Default::default(),
+            group_workers: ThreadPool::new(|(input, group_id)| (Self::vertices(input), group_id)),
             workers: ThreadPool::new(Self::vertices),
         }
     }
@@ -142,30 +144,89 @@ impl World {
         }
     }
 
-    fn workers(&self, is_important: bool) -> &ThreadPool<ChunkInput, ChunkOutput> {
-        if is_important {
-            &self.priority_workers
+    fn send(&self, input: ChunkInput, group_id: Option<GroupId>) {
+        if let Some(id) = group_id {
+            self.group_workers
+                .send((input, id))
+                .unwrap_or_else(|_| unreachable!());
         } else {
-            &self.workers
+            self.workers.send(input).unwrap_or_else(|_| unreachable!());
+        }
+    }
+
+    fn process_output(
+        &mut self,
+        renderer: &Renderer,
+        output: Result<ChunkOutput, Point3<i32>>,
+        group_id: Option<GroupId>,
+    ) {
+        let Some(GroupId { id, size }) = group_id else {
+            self.apply_output(renderer, output);
+            return;
+        };
+
+        match self.groups.entry(id) {
+            Entry::Occupied(mut entry) => {
+                let group = entry.get_mut();
+                if group.len() == size - 1 {
+                    for output in entry.remove().into_iter().chain([output]) {
+                        self.apply_output(renderer, output)
+                    }
+                } else {
+                    group.push(output);
+                }
+            }
+            Entry::Vacant(entry) => {
+                if size == 1 {
+                    self.apply_output(renderer, output);
+                } else {
+                    entry.insert(vec![output]);
+                }
+            }
+        }
+    }
+
+    fn apply_output(&mut self, renderer: &Renderer, output: Result<ChunkOutput, Point3<i32>>) {
+        let (coords, (vertices, transparent_vertices), updated_at) = match output {
+            Ok(output) => output,
+            Err(coords) => {
+                self.meshes.remove(&coords);
+                return;
+            }
+        };
+
+        if self.unloaded.contains(&coords) {
+            return;
+        }
+
+        if vertices.is_empty() && transparent_vertices.is_empty() {
+            self.meshes.remove(&coords);
+            return;
+        }
+
+        match self.meshes.entry(coords) {
+            Entry::Occupied(entry) => {
+                let (_, _, last_updated_at) = *entry.get();
+                if last_updated_at < updated_at {
+                    *entry.into_mut() = (
+                        VertexBuffer::new(renderer, MemoryState::Immutable(&vertices)),
+                        Self::transparent_mesh(renderer, &transparent_vertices),
+                        updated_at,
+                    );
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((
+                    VertexBuffer::new(renderer, MemoryState::Immutable(&vertices)),
+                    Self::transparent_mesh(renderer, &transparent_vertices),
+                    updated_at,
+                ));
+            }
         }
     }
 
     fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
         (coords, data.vertices(), updated_at)
-    }
-
-    fn transparent_mesh(
-        renderer: &Renderer,
-        vertices: &[BlockVertex],
-    ) -> Option<TransparentMesh<Point3<f32>, BlockVertex>> {
-        TransparentMesh::new_non_empty(renderer, vertices, |v| {
-            v.iter()
-                .copied()
-                .map(BlockVertex::coords)
-                .fold(Point3::default(), |acc, c| acc + c.coords)
-                .cast()
-                / v.len() as f32
-        })
     }
 
     fn render_pass<'a>(
@@ -198,6 +259,20 @@ impl World {
             ..Default::default()
         })
     }
+
+    fn transparent_mesh(
+        renderer: &Renderer,
+        vertices: &[BlockVertex],
+    ) -> Option<TransparentMesh<Point3<f32>, BlockVertex>> {
+        TransparentMesh::new_non_empty(renderer, vertices, |v| {
+            v.iter()
+                .copied()
+                .map(BlockVertex::coords)
+                .fold(Point3::default(), |acc, c| acc + c.coords)
+                .cast()
+                / v.len() as f32
+        })
+    }
 }
 
 impl EventHandler for World {
@@ -209,25 +284,21 @@ impl EventHandler for World {
                 ServerEvent::ChunkLoaded {
                     coords,
                     data,
-                    is_important,
+                    group_id,
                 } => {
                     self.unloaded.remove(coords);
-                    self.workers(*is_important)
-                        .send((*coords, data.clone(), Instant::now()))
-                        .unwrap_or_else(|_| unreachable!());
+                    self.send((*coords, data.clone(), Instant::now()), *group_id);
                 }
-                ServerEvent::ChunkUnloaded { coords } => {
-                    self.meshes.remove(coords);
+                ServerEvent::ChunkUnloaded { coords, group_id } => {
                     self.unloaded.insert(*coords);
+                    self.process_output(renderer, Err(*coords), *group_id);
                 }
                 ServerEvent::ChunkUpdated {
                     coords,
                     data,
-                    is_important,
+                    group_id,
                 } => {
-                    self.workers(*is_important)
-                        .send((*coords, data.clone(), Instant::now()))
-                        .unwrap_or_else(|_| unreachable!());
+                    self.send((*coords, data.clone(), Instant::now()), *group_id);
                 }
                 _ => {}
             },
@@ -235,40 +306,12 @@ impl EventHandler for World {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                for (coords, (vertices, transparent_vertices), updated_at) in
-                    self.priority_workers.drain().chain(self.workers.drain())
-                {
-                    if !self.unloaded.contains(&coords) {
-                        if !vertices.is_empty() || !transparent_vertices.is_empty() {
-                            match self.meshes.entry(coords) {
-                                Entry::Occupied(entry) => {
-                                    let (_, _, last_updated_at) = *entry.get();
-                                    if last_updated_at < updated_at {
-                                        *entry.into_mut() = (
-                                            VertexBuffer::new(
-                                                renderer,
-                                                MemoryState::Immutable(&vertices),
-                                            ),
-                                            Self::transparent_mesh(renderer, &transparent_vertices),
-                                            updated_at,
-                                        );
-                                    }
-                                }
-                                Entry::Vacant(entry) => {
-                                    entry.insert((
-                                        VertexBuffer::new(
-                                            renderer,
-                                            MemoryState::Immutable(&vertices),
-                                        ),
-                                        Self::transparent_mesh(renderer, &transparent_vertices),
-                                        updated_at,
-                                    ));
-                                }
-                            }
-                        } else {
-                            self.meshes.remove(&coords);
-                        }
-                    }
+                for (output, group_id) in self.group_workers.clone().drain() {
+                    self.process_output(renderer, Ok(output), Some(group_id));
+                }
+
+                for output in self.workers.clone().drain() {
+                    self.process_output(renderer, Ok(output), None);
                 }
             }
             _ => {}

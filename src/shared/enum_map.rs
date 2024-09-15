@@ -233,12 +233,14 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
 
 impl<E: Enum, T> Drop for Guard<'_, E, T> {
     fn drop(&mut self) {
-        if mem::needs_drop::<T>() {
-            for (uninit, &is_init) in self.uninit.values_mut().zip(self.is_init.values()) {
-                if is_init {
-                    unsafe {
-                        uninit.assume_init_drop();
-                    }
+        if !mem::needs_drop::<T>() {
+            return;
+        }
+
+        for (uninit, &is_init) in self.uninit.values_mut().zip(self.is_init.values()) {
+            if is_init {
+                unsafe {
+                    uninit.assume_init_drop();
                 }
             }
         }

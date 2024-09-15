@@ -206,6 +206,7 @@ impl EventHandler for Controller {
                         KeyCode::ShiftLeft => (Keys::LSHIFT, Keys::SPACE),
                         _ => return,
                     };
+
                     match state {
                         ElementState::Pressed => {
                             self.relevant_keys.insert(key);

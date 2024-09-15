@@ -21,7 +21,7 @@ bitfield = "0.17.0"
 bitflags = "2.6.0"
 bytemuck = { version = "1.18.0", features = ["derive"] }
 env_logger = "0.11.5"
-flume = "0.11.0"
+flume = { version = "0.11.0", default-features = false }
 generic-array = "1.1.0"
 image = "0.25.2"
 macros = { path = "macros" }

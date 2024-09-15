@@ -24,7 +24,7 @@ use crate::{
     client::{event_loop::EventLoopProxy, game::world::BlockVertex, ClientEvent},
     server::{
         event_loop::{Event, EventHandler},
-        ServerEvent, SERVER_CONFIG,
+        GroupId, ServerEvent, SERVER_CONFIG,
     },
     shared::{
         bound::Aabb,
@@ -118,16 +118,23 @@ impl World {
         if branch.apply(&self.chunks, coords, normal, action) {
             let (block_updates, inserts, removals) = branch.merge(self);
             let updates = self.updates([], block_updates, &inserts, &removals);
+            let group_id = GroupId::new(
+                Self::filter(
+                    inserts.iter().chain(&updates).chain(&removals).copied(),
+                    area,
+                )
+                .count(),
+            );
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-            self.send_updates(Self::filter(updates, area), proxy, true);
-            Self::send_unloads(Self::filter(removals, area), proxy);
-            self.send_loads(Self::filter(inserts, area), proxy, true);
+            self.send_updates(Self::filter(updates, area), group_id, proxy);
+            Self::send_unloads(Self::filter(removals, area), Some(group_id), proxy);
+            self.send_loads(Self::filter(inserts, area), group_id, proxy);
         }
     }
 
-    fn send_loads<P>(&self, points: P, proxy: &EventLoopProxy, is_important: bool)
+    fn send_loads<P>(&self, points: P, group_id: GroupId, proxy: &EventLoopProxy)
     where
         P: IntoIterator<Item = Point3<i32>>,
     {
@@ -135,13 +142,13 @@ impl World {
             points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
                 coords,
                 data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                is_important,
+                group_id: Some(group_id),
             }),
             proxy,
         );
     }
 
-    fn par_send_loads<P>(&self, points: P, proxy: &EventLoopProxy, is_important: bool)
+    fn par_send_loads<P>(&self, points: P, proxy: &EventLoopProxy)
     where
         P: IntoParallelIterator<Item = Point3<i32>>,
     {
@@ -151,14 +158,14 @@ impl World {
                 .map(|coords| ServerEvent::ChunkLoaded {
                     coords,
                     data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    is_important,
+                    group_id: None,
                 })
                 .collect::<LinkedList<_>>(),
             proxy,
         );
     }
 
-    fn send_updates<P>(&self, points: P, proxy: &EventLoopProxy, is_important: bool)
+    fn send_updates<P>(&self, points: P, group_id: GroupId, proxy: &EventLoopProxy)
     where
         P: IntoIterator<Item = Point3<i32>>,
     {
@@ -166,7 +173,7 @@ impl World {
             points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
                 coords,
                 data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                is_important,
+                group_id: Some(group_id),
             }),
             proxy,
         );
@@ -176,7 +183,6 @@ impl World {
         &self,
         points: P,
         proxy: &EventLoopProxy,
-        is_important: bool,
     ) {
         Self::send_events(
             points
@@ -184,7 +190,7 @@ impl World {
                 .map(|coords| ServerEvent::ChunkUpdated {
                     coords,
                     data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    is_important,
+                    group_id: None,
                 })
                 .collect::<LinkedList<_>>(),
             proxy,
@@ -203,11 +209,14 @@ impl World {
         }
     }
 
-    fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(points: P, proxy: &EventLoopProxy) {
+    fn send_unloads<P>(points: P, group_id: Option<GroupId>, proxy: &EventLoopProxy)
+    where
+        P: IntoIterator<Item = Point3<i32>>,
+    {
         Self::send_events(
             points
                 .into_iter()
-                .map(|coords| ServerEvent::ChunkUnloaded { coords }),
+                .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id }),
             proxy,
         );
     }
@@ -273,7 +282,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                self.par_send_loads(Self::par_filter(inserts, area), proxy, false);
+                self.par_send_loads(Self::par_filter(inserts, area), proxy);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let inserts = self.par_insert_many(curr.par_exclusive_points(prev));
@@ -284,9 +293,9 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                Self::send_unloads(unloads, proxy);
-                self.par_send_loads(loads, proxy, false);
-                self.par_send_updates(Self::par_filter(updates, curr), proxy, false);
+                Self::send_unloads(unloads, None, proxy);
+                self.par_send_loads(loads, proxy);
+                self.par_send_updates(Self::par_filter(updates, curr), proxy);
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(

@@ -18,7 +18,10 @@ use crate::{
 use flume::Receiver;
 use nalgebra::Point3;
 use serde::Deserialize;
-use std::sync::{Arc, LazyLock};
+use std::{
+    sync::{Arc, LazyLock},
+    time::Instant,
+};
 
 pub struct Server {
     event_loop: EventLoop,
@@ -43,17 +46,33 @@ pub enum ServerEvent {
     ChunkLoaded {
         coords: Point3<i32>,
         data: Arc<ChunkData>,
-        is_important: bool,
+        group_id: Option<GroupId>,
     },
     ChunkUnloaded {
         coords: Point3<i32>,
+        group_id: Option<GroupId>,
     },
     ChunkUpdated {
         coords: Point3<i32>,
         data: Arc<ChunkData>,
-        is_important: bool,
+        group_id: Option<GroupId>,
     },
     BlockHovered(Option<BlockHoverData>),
+}
+
+#[derive(Clone, Copy)]
+pub struct GroupId {
+    pub id: Instant,
+    pub size: usize,
+}
+
+impl GroupId {
+    fn new(size: usize) -> Self {
+        Self {
+            id: Instant::now(),
+            size,
+        }
+    }
 }
 
 #[derive(Deserialize)]
