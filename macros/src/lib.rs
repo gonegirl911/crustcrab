@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields, Variant};
+use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Fields};
 
 #[proc_macro_derive(Enum)]
 pub fn derive_enum(input: TokenStream) -> TokenStream {
@@ -18,7 +18,10 @@ fn derive_enum2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
         ));
     };
 
-    if let Some(variant) = invalid_variant(variants) {
+    if let Some(variant) = variants
+        .into_iter()
+        .find(|variant| variant.fields != Fields::Unit)
+    {
         return Err(syn::Error::new_spanned(
             variant,
             "#[derive(Enum)] only supports unit enum variants",
@@ -59,13 +62,4 @@ fn derive_enum2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
             }
         }
     })
-}
-
-fn invalid_variant<'a, I>(variants: I) -> Option<&'a Variant>
-where
-    I: IntoIterator<Item = &'a Variant>,
-{
-    variants
-        .into_iter()
-        .find(|variant| !matches!(variant.fields, Fields::Unit))
 }

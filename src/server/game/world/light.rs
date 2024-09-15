@@ -64,7 +64,7 @@ impl WorldLight {
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
         Self::chunk_size(points.len()).map_or(vec![], |size| {
-            self.par_insert_many_chunks(chunks, heights, points, size)
+            self.par_insert_many_chunks(chunks, heights, points, size.get())
         })
     }
 
@@ -171,8 +171,8 @@ impl WorldLight {
         !(Self::is_exposed(index, coords, value) && side == target) as u8
     }
 
-    fn chunk_size(len: usize) -> Option<usize> {
-        NonZeroUsize::new(len.div_ceil(*NUM_CPUS)).map(NonZeroUsize::get)
+    fn chunk_size(len: usize) -> Option<NonZeroUsize> {
+        NonZeroUsize::new(len.div_ceil(*NUM_CPUS))
     }
 
     fn node<'a>(
@@ -490,7 +490,7 @@ struct NodeSet<'a> {
 
 impl<'a> NodeSet<'a> {
     fn insert(&mut self, node: Node<'a>) {
-        if !self.points.contains(&node.coords) {
+        if self.points.insert(node.coords) {
             self.deq.push_back(node);
         }
     }
