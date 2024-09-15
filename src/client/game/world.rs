@@ -145,9 +145,9 @@ impl World {
     }
 
     fn send(&self, input: ChunkInput, group_id: Option<GroupId>) {
-        if let Some(id) = group_id {
+        if let Some(group_id) = group_id {
             self.group_workers
-                .send((input, id))
+                .send((input, group_id))
                 .unwrap_or_else(|_| unreachable!());
         } else {
             self.workers.send(input).unwrap_or_else(|_| unreachable!());
@@ -160,15 +160,19 @@ impl World {
         output: Result<ChunkOutput, Point3<i32>>,
         group_id: Option<GroupId>,
     ) {
-        let Some(GroupId { id, size }) = group_id else {
+        let Some(GroupId {
+            id: group_id,
+            size: group_size,
+        }) = group_id
+        else {
             self.apply_output(renderer, output);
             return;
         };
 
-        match self.groups.entry(id) {
+        match self.groups.entry(group_id) {
             Entry::Occupied(mut entry) => {
                 let group = entry.get_mut();
-                if group.len() == size - 1 {
+                if group.len() == group_size - 1 {
                     for output in entry.remove().into_iter().chain([output]) {
                         self.apply_output(renderer, output)
                     }
@@ -177,7 +181,7 @@ impl World {
                 }
             }
             Entry::Vacant(entry) => {
-                if size == 1 {
+                if group_size == 1 {
                     self.apply_output(renderer, output);
                 } else {
                     entry.insert(vec![output]);
