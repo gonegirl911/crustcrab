@@ -31,6 +31,7 @@ use crate::{
         enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
         utils,
+        utils::SerialBridge,
     },
 };
 use nalgebra::{point, Point2, Point3, Vector3};
@@ -38,7 +39,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     array,
-    collections::{hash_map::Entry, LinkedList},
+    collections::hash_map::Entry,
     iter, mem,
     ops::{Index, Range},
 };
@@ -63,8 +64,7 @@ impl World {
         points
             .into_par_iter()
             .filter_map(|coords| Some((coords, self.generate(coords)?)))
-            .collect::<LinkedList<_>>()
-            .into_iter()
+            .ser_bridge()
             .map(|(coords, chunk)| {
                 self.chunks.insert(coords, chunk);
                 coords
@@ -139,10 +139,12 @@ impl World {
         P: IntoIterator<Item = Point3<i32>>,
     {
         Self::send_events(
-            points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
-                coords,
-                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                group_id: Some(group_id),
+            points.into_iter().filter_map(|coords| {
+                Some(ServerEvent::ChunkLoaded {
+                    coords,
+                    data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
+                    group_id: Some(group_id),
+                })
             }),
             proxy,
         );
@@ -155,12 +157,14 @@ impl World {
         Self::send_events(
             points
                 .into_par_iter()
-                .map(|coords| ServerEvent::ChunkLoaded {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
+                .filter_map(|coords| {
+                    Some(ServerEvent::ChunkLoaded {
+                        coords,
+                        data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
+                        group_id: None,
+                    })
                 })
-                .collect::<LinkedList<_>>(),
+                .ser_bridge(),
             proxy,
         );
     }
@@ -170,10 +174,12 @@ impl World {
         P: IntoIterator<Item = Point3<i32>>,
     {
         Self::send_events(
-            points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
-                coords,
-                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                group_id: Some(group_id),
+            points.into_iter().filter_map(|coords| {
+                Some(ServerEvent::ChunkUpdated {
+                    coords,
+                    data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
+                    group_id: Some(group_id),
+                })
             }),
             proxy,
         );
@@ -187,12 +193,14 @@ impl World {
         Self::send_events(
             points
                 .into_par_iter()
-                .map(|coords| ServerEvent::ChunkUpdated {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
+                .filter_map(|coords| {
+                    Some(ServerEvent::ChunkUpdated {
+                        coords,
+                        data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
+                        group_id: None,
+                    })
                 })
-                .collect::<LinkedList<_>>(),
+                .ser_bridge(),
             proxy,
         );
     }
@@ -522,11 +530,11 @@ pub struct ChunkData {
 }
 
 impl ChunkData {
-    fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Self {
-        Self {
+    fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Option<Self> {
+        chunks.contains(coords).then(|| Self {
             area: chunks.chunk_area(coords),
             area_light: light.chunk_area_light(coords),
-        }
+        })
     }
 
     pub fn vertices(&self) -> (Vec<BlockVertex>, Vec<BlockVertex>) {

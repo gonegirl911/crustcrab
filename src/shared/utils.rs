@@ -1,8 +1,11 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
+use rayon::prelude::*;
 use serde::de::DeserializeOwned;
 use std::{
-    fs, iter,
+    collections::linked_list,
+    fs,
+    iter::{self, Flatten},
     ops::{Add, Mul},
     path::Path,
 };
@@ -14,9 +17,25 @@ pub fn deserialize<P: AsRef<Path>, T: DeserializeOwned>(path: P) -> T {
         .unwrap_or_else(|e| panic!("failed to deserialize {path:?}: {e}"))
 }
 
+// ------------------------------------------------------------------------------------------------
+
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a * (1.0 - t) + b * t
 }
+
+pub trait Lerp: Mul<f32, Output = Self> + Add<Output = Self> + Sized {}
+
+impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {}
+
+// ------------------------------------------------------------------------------------------------
+
+pub fn magnitude_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> u128 {
+    iter::zip(&a.coords, &b.coords)
+        .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
+        .sum()
+}
+
+// ------------------------------------------------------------------------------------------------
 
 pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
     t.chunk_coords()
@@ -29,16 +48,6 @@ pub fn block_coords<T: WorldCoords>(t: T) -> T::Point<u8> {
 pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
     t.coords()
 }
-
-pub fn magnitude_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> u128 {
-    iter::zip(&a.coords, &b.coords)
-        .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
-        .sum()
-}
-
-pub trait Lerp: Mul<f32, Output = Self> + Add<Output = Self> + Sized {}
-
-impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {}
 
 pub trait WorldCoords {
     type Point<T: Scalar>;
@@ -119,5 +128,23 @@ fn div_floor(a: i64, b: i64) -> i64 {
         d - 1
     } else {
         d
+    }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+pub trait SerialBridge {
+    type Item;
+    type Iter: Iterator<Item = Self::Item>;
+
+    fn ser_bridge(self) -> Self::Iter;
+}
+
+impl<I: ParallelIterator> SerialBridge for I {
+    type Item = I::Item;
+    type Iter = Flatten<linked_list::IntoIter<Vec<Self::Item>>>;
+
+    fn ser_bridge(self) -> Self::Iter {
+        self.collect_vec_list().into_iter().flatten()
     }
 }
