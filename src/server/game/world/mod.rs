@@ -31,7 +31,7 @@ use crate::{
         enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
         utils,
-        utils::SerialBridge,
+        utils::IntoSequentialIteratorExt,
     },
 };
 use nalgebra::{point, Point2, Point3, Vector3};
@@ -64,7 +64,7 @@ impl World {
         points
             .into_par_iter()
             .filter_map(|coords| Some((coords, self.generate(coords)?)))
-            .ser_bridge()
+            .into_seq_iter()
             .map(|(coords, chunk)| {
                 self.chunks.insert(coords, chunk);
                 coords
@@ -164,7 +164,7 @@ impl World {
                         group_id: None,
                     })
                 })
-                .ser_bridge(),
+                .into_seq_iter(),
             proxy,
         );
     }
@@ -200,7 +200,7 @@ impl World {
                         group_id: None,
                     })
                 })
-                .ser_bridge(),
+                .into_seq_iter(),
             proxy,
         );
     }

@@ -133,18 +133,18 @@ fn div_floor(a: i64, b: i64) -> i64 {
 
 // ------------------------------------------------------------------------------------------------
 
-pub trait SerialBridge {
+pub trait IntoSequentialIteratorExt {
     type Item;
     type Iter: Iterator<Item = Self::Item>;
 
-    fn ser_bridge(self) -> Self::Iter;
+    fn into_seq_iter(self) -> Self::Iter;
 }
 
-impl<I: ParallelIterator> SerialBridge for I {
+impl<I: ParallelIterator> IntoSequentialIteratorExt for I {
     type Item = I::Item;
     type Iter = Flatten<linked_list::IntoIter<Vec<Self::Item>>>;
 
-    fn ser_bridge(self) -> Self::Iter {
+    fn into_seq_iter(self) -> Self::Iter {
         self.collect_vec_list().into_iter().flatten()
     }
 }
