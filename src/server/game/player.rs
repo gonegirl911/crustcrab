@@ -55,31 +55,39 @@ pub struct WorldArea {
 }
 
 impl WorldArea {
-    pub fn points(self) -> impl Iterator<Item = Point3<i32>> {
-        self.cuboid_points()
-            .filter(move |&coords| self.contains_xz(coords.xz()))
-    }
-
-    pub fn par_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
+    pub fn par_server_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
         self.par_cuboid_points()
             .filter(move |&coords| self.contains_xz(coords.xz()))
     }
 
-    pub fn par_exclusive_points(self, other: Self) -> impl ParallelIterator<Item = Point3<i32>> {
-        self.par_points()
+    pub fn client_points(self) -> impl Iterator<Item = Point3<i32>> {
+        self.cuboid_points()
+            .filter(move |&coords| self.client_contains(coords))
+    }
+
+    pub fn par_exclusive_server_points(
+        self,
+        other: Self,
+    ) -> impl ParallelIterator<Item = Point3<i32>> {
+        self.par_server_points()
             .filter(move |&coords| !other.contains_xz(coords.xz()))
+    }
+
+    pub fn exclusive_client_points(self, other: Self) -> impl Iterator<Item = Point3<i32>> {
+        self.client_points()
+            .filter(move |&coords| !other.client_contains(coords))
+    }
+
+    pub fn client_contains(self, coords: Point3<i32>) -> bool {
+        self.contains_xz(coords.xz()) && self.client_contains_y(coords.y)
     }
 
     fn contains_xz(self, xz: Point2<i32>) -> bool {
         utils::magnitude_squared(xz, self.center.xz()) <= (self.radius as u128).pow(2)
     }
 
-    pub fn contains_y(self, y: i32) -> bool {
+    fn client_contains_y(self, y: i32) -> bool {
         y.abs_diff(self.center.y) <= self.radius as u32
-    }
-
-    pub fn contains(self, coords: Point3<i32>) -> bool {
-        self.contains_xz(coords.xz()) && self.contains_y(coords.y)
     }
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {

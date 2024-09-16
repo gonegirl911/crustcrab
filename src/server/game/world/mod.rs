@@ -78,33 +78,6 @@ impl World {
         self.light.par_insert_many(&self.chunks, &self.heights, points)
     }
 
-    fn exclusive_points(
-        &self,
-        prev: WorldArea,
-        curr: WorldArea,
-    ) -> impl Iterator<Item = Point3<i32>> + '_ {
-        curr.points().filter(move |&coords| {
-            curr.contains_y(coords.y) && !prev.contains(coords) && self.chunks.contains(coords)
-        })
-    }
-
-    fn updates(
-        &self,
-        inserts: impl IntoIterator<Item = Point3<i32>>,
-        block_updates: impl IntoIterator<Item = Point3<i64>>,
-        loads: &FxHashSet<Point3<i32>>,
-        unloads: &FxHashSet<Point3<i32>>,
-    ) -> FxHashSet<Point3<i32>> {
-        Self::chunk_area_points(inserts)
-            .chain(Self::block_area_points(block_updates).map(utils::chunk_coords))
-            .filter(|coords| {
-                self.chunks.contains(*coords)
-                    && !loads.contains(coords)
-                    && !unloads.contains(coords)
-            })
-            .collect()
-    }
-
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -116,22 +89,35 @@ impl World {
     ) {
         let mut branch = Branch::default();
         if branch.apply(&self.chunks, coords, normal, action) {
-            let (block_updates, inserts, removals) = branch.merge(self);
-            let updates = self.updates([], block_updates, &inserts, &removals);
-            let group_id = GroupId::new(
-                Self::filter(
-                    inserts.iter().chain(&updates).chain(&removals).copied(),
-                    area,
-                )
-                .count(),
-            );
+            let (block_updates, inserts, removals) = branch.merge(self, area);
+            let updates = self.updates([], block_updates, area, &inserts, &removals);
+            let group_id = GroupId::new(inserts.len() + removals.len() + updates.len());
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-            self.send_updates(Self::filter(updates, area), group_id, proxy);
-            Self::send_unloads(Self::filter(removals, area), Some(group_id), proxy);
-            self.send_loads(Self::filter(inserts, area), group_id, proxy);
+            self.send_updates(updates, group_id, proxy);
+            Self::send_unloads(removals, Some(group_id), proxy);
+            self.send_loads(inserts, group_id, proxy);
         }
+    }
+
+    fn updates(
+        &self,
+        inserts: impl IntoIterator<Item = Point3<i32>>,
+        block_updates: impl IntoIterator<Item = Point3<i64>>,
+        area: WorldArea,
+        loads: &FxHashSet<Point3<i32>>,
+        unloads: &FxHashSet<Point3<i32>>,
+    ) -> FxHashSet<Point3<i32>> {
+        Self::chunk_area_points(inserts)
+            .chain(Self::block_area_points(block_updates).map(utils::chunk_coords))
+            .filter(|coords| {
+                area.client_contains(*coords)
+                    && self.chunks.contains(*coords)
+                    && !loads.contains(coords)
+                    && !unloads.contains(coords)
+            })
+            .collect()
     }
 
     fn send_loads<P>(&self, points: P, group_id: GroupId, proxy: &EventLoopProxy)
@@ -139,12 +125,10 @@ impl World {
         P: IntoIterator<Item = Point3<i32>>,
     {
         Self::send_events(
-            points.into_iter().filter_map(|coords| {
-                Some(ServerEvent::ChunkLoaded {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
-                    group_id: Some(group_id),
-                })
+            points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: Some(group_id),
             }),
             proxy,
         );
@@ -157,12 +141,10 @@ impl World {
         Self::send_events(
             points
                 .into_par_iter()
-                .filter_map(|coords| {
-                    Some(ServerEvent::ChunkLoaded {
-                        coords,
-                        data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
-                        group_id: None,
-                    })
+                .map(|coords| ServerEvent::ChunkLoaded {
+                    coords,
+                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                    group_id: None,
                 })
                 .into_seq_iter(),
             proxy,
@@ -174,12 +156,10 @@ impl World {
         P: IntoIterator<Item = Point3<i32>>,
     {
         Self::send_events(
-            points.into_iter().filter_map(|coords| {
-                Some(ServerEvent::ChunkUpdated {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
-                    group_id: Some(group_id),
-                })
+            points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: Some(group_id),
             }),
             proxy,
         );
@@ -193,12 +173,10 @@ impl World {
         Self::send_events(
             points
                 .into_par_iter()
-                .filter_map(|coords| {
-                    Some(ServerEvent::ChunkUpdated {
-                        coords,
-                        data: ChunkData::new(&self.chunks, &self.light, coords)?.into(),
-                        group_id: None,
-                    })
+                .map(|coords| ServerEvent::ChunkUpdated {
+                    coords,
+                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                    group_id: None,
                 })
                 .into_seq_iter(),
             proxy,
@@ -229,32 +207,6 @@ impl World {
         );
     }
 
-    fn filter<P>(points: P, area: WorldArea) -> impl Iterator<Item = Point3<i32>>
-    where
-        P: IntoIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_iter()
-            .filter(move |&coords| area.contains(coords))
-    }
-
-    fn par_filter<P>(points: P, area: WorldArea) -> impl ParallelIterator<Item = Point3<i32>>
-    where
-        P: IntoParallelIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_par_iter()
-            .filter(move |&coords| area.contains(coords))
-    }
-
-    fn send_events<E: IntoIterator<Item = ServerEvent>>(events: E, proxy: &EventLoopProxy) {
-        for event in events {
-            if proxy.send_event(event).is_err() {
-                break;
-            }
-        }
-    }
-
     fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point3<i32>>
     where
         P: IntoIterator<Item = Point3<i32>>,
@@ -272,6 +224,14 @@ impl World {
             .into_iter()
             .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
     }
+
+    fn send_events<E: IntoIterator<Item = ServerEvent>>(events: E, proxy: &EventLoopProxy) {
+        for event in events {
+            if proxy.send_event(event).is_err() {
+                break;
+            }
+        }
+    }
 }
 
 impl EventHandler<WorldEvent> for World {
@@ -280,10 +240,14 @@ impl EventHandler<WorldEvent> for World {
     fn handle(&mut self, event: &WorldEvent, proxy: Self::Context<'_>) {
         match *event {
             WorldEvent::InitialRenderRequested { area, ray } => {
-                let mut loads = area.par_points().collect::<Vec<_>>();
-                let inserts = self.par_insert_many(loads.par_iter().copied());
+                let inserts = self.par_insert_many(area.par_server_points());
 
                 self.par_light_up(&inserts);
+
+                let mut loads = area
+                    .client_points()
+                    .filter(|&coords| self.chunks.contains(coords))
+                    .collect::<Vec<_>>();
 
                 loads.par_sort_unstable_by_key(|&coords| {
                     utils::magnitude_squared(coords, utils::chunk_coords(ray.origin))
@@ -294,17 +258,23 @@ impl EventHandler<WorldEvent> for World {
                 self.par_send_loads(loads, proxy);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
-                let inserts = self.par_insert_many(curr.par_exclusive_points(prev));
+                let inserts = self.par_insert_many(curr.par_exclusive_server_points(prev));
                 let block_updates = self.par_light_up(&inserts);
-                let loads = self.exclusive_points(prev, curr).collect();
-                let unloads = self.exclusive_points(curr, prev).collect();
-                let updates = self.updates(inserts, block_updates, &loads, &unloads);
+                let loads = curr
+                    .exclusive_client_points(prev)
+                    .filter(|&coords| self.chunks.contains(coords))
+                    .collect();
+                let unloads = prev
+                    .exclusive_client_points(curr)
+                    .filter(|&coords| self.chunks.contains(coords))
+                    .collect();
+                let updates = self.updates(inserts, block_updates, curr, &loads, &unloads);
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
                 Self::send_unloads(unloads, None, proxy);
                 self.par_send_loads(loads, proxy);
-                self.par_send_updates(Self::par_filter(updates, curr), proxy);
+                self.par_send_updates(updates, proxy);
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
@@ -434,6 +404,7 @@ impl Branch {
             actions,
             ..
         }: &mut World,
+        area: WorldArea,
     ) -> Changes {
         let mut hits = vec![];
         let mut inserts = FxHashSet::default();
@@ -450,7 +421,9 @@ impl Branch {
                     }
                     if chunk.is_empty() {
                         entry.remove();
-                        removals.insert(chunk_coords);
+                        if area.client_contains(chunk_coords) {
+                            removals.insert(chunk_coords);
+                        }
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -472,6 +445,8 @@ impl Branch {
         }
 
         light.extend_placeholders(heights.load_placeholders(&inserts));
+
+        inserts.retain(|&coords| area.client_contains(coords));
 
         (
             hits.into_iter()
@@ -530,11 +505,11 @@ pub struct ChunkData {
 }
 
 impl ChunkData {
-    fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Option<Self> {
-        chunks.contains(coords).then(|| Self {
+    fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Self {
+        Self {
             area: chunks.chunk_area(coords),
             area_light: light.chunk_area_light(coords),
-        })
+        }
     }
 
     pub fn vertices(&self) -> (Vec<BlockVertex>, Vec<BlockVertex>) {
