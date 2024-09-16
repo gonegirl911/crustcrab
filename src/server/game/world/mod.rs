@@ -272,17 +272,18 @@ impl EventHandler<WorldEvent> for World {
     fn handle(&mut self, event: &WorldEvent, proxy: Self::Context<'_>) {
         match *event {
             WorldEvent::InitialRenderRequested { area, ray } => {
-                let mut inserts = self.par_insert_many(area.par_points());
+                let mut loads = area.par_points().collect::<Vec<_>>();
+                let inserts = self.par_insert_many(loads.par_iter().copied());
 
                 self.par_light_up(&inserts);
 
-                inserts.par_sort_unstable_by_key(|&coords| {
+                loads.par_sort_unstable_by_key(|&coords| {
                     utils::magnitude_squared(coords, utils::chunk_coords(ray.origin))
                 });
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
-                self.par_send_loads(Self::par_filter(inserts, area), proxy);
+                self.par_send_loads(loads, proxy);
             }
             WorldEvent::WorldAreaChanged { prev, curr, ray } => {
                 let inserts = self.par_insert_many(curr.par_exclusive_points(prev));
