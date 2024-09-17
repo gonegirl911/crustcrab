@@ -208,25 +208,22 @@ impl World {
             return;
         }
 
-        match self.meshes.entry(coords) {
-            Entry::Occupied(entry) => {
-                let (_, _, last_updated_at) = *entry.get();
-                if last_updated_at < updated_at {
-                    *entry.into_mut() = (
-                        VertexBuffer::new(renderer, MemoryState::Immutable(&vertices)),
-                        Self::transparent_mesh(renderer, &transparent_vertices),
-                        updated_at,
-                    );
+        self.meshes
+            .entry(coords)
+            .and_modify(|(vertex_buffer, transparent_mesh, last_updated_at)| {
+                if *last_updated_at < updated_at {
+                    *vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&vertices));
+                    *transparent_mesh = Self::transparent_mesh(renderer, &transparent_vertices);
+                    *last_updated_at = updated_at;
                 }
-            }
-            Entry::Vacant(entry) => {
-                entry.insert((
+            })
+            .or_insert_with(|| {
+                (
                     VertexBuffer::new(renderer, MemoryState::Immutable(&vertices)),
                     Self::transparent_mesh(renderer, &transparent_vertices),
                     updated_at,
-                ));
-            }
-        }
+                )
+            });
     }
 
     fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
@@ -270,9 +267,7 @@ impl World {
     ) -> Option<TransparentMesh<Point3<f32>, BlockVertex>> {
         TransparentMesh::new_non_empty(renderer, vertices, |v| {
             v.iter()
-                .copied()
-                .map(BlockVertex::coords)
-                .fold(Point3::default(), |acc, c| acc + c.coords)
+                .fold(Point3::default(), |acc, v| acc + v.coords().coords)
                 .cast()
                 / v.len() as f32
         })

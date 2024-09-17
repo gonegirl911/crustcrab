@@ -30,7 +30,7 @@ use winit::{
 };
 
 pub struct Inventory {
-    buffer: Option<VertexBuffer<BlockVertex>>,
+    vertex_buffer: Option<VertexBuffer<BlockVertex>>,
     uniform: Uniform<InventoryUniformData>,
     program: Program,
     index: usize,
@@ -59,7 +59,7 @@ impl Inventory {
             Some(wgpu::BlendState::ALPHA_BLENDING),
         );
         Self {
-            buffer: None,
+            vertex_buffer: None,
             uniform,
             program,
             index: 0,
@@ -73,7 +73,7 @@ impl Inventory {
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
-        if let Some(buffer) = &self.buffer {
+        if let Some(buffer) = &self.vertex_buffer {
             self.program.bind(
                 render_pass,
                 [self.uniform.bind_group(), textures_bind_group],
@@ -140,7 +140,7 @@ impl EventHandler for Inventory {
                     if mem::take(&mut self.is_updated) {
                         let mut is_flat = false;
 
-                        self.buffer = self.selected_block().and_then(|block| {
+                        self.vertex_buffer = self.selected_block().and_then(|block| {
                             let data = block.data();
                             VertexBuffer::new_non_empty(
                                 renderer,

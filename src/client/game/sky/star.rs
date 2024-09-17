@@ -23,7 +23,7 @@ use winit::event::WindowEvent;
 
 pub struct StarDome {
     stars: Vec<Star>,
-    buffer: InstanceBuffer<StarInstance>,
+    instance_buffer: InstanceBuffer<StarInstance>,
     program: Program,
     pc: StarPushConstants,
     updated_rotation: Option<UnitQuaternion<f32>>,
@@ -36,7 +36,7 @@ impl StarDome {
             let mut rng = StdRng::seed_from_u64(6);
             (0..count).map(|_| Star::new(&mut rng)).collect()
         };
-        let buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
+        let instance_buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
         let program = Program::new(
             renderer,
             wgpu::include_wgsl!("../../../../assets/shaders/star.wgsl"),
@@ -50,7 +50,7 @@ impl StarDome {
         );
         Self {
             stars,
-            buffer,
+            instance_buffer,
             program,
             pc: Default::default(),
             updated_rotation: Some(Time::default().sky_rotation()),
@@ -61,8 +61,8 @@ impl StarDome {
         if self.pc.opacity != 0.0 {
             self.program.bind(render_pass, [player_bind_group]);
             self.pc.set(render_pass);
-            render_pass.set_vertex_buffer(0, self.buffer.slice(..));
-            render_pass.draw(0..6, 0..self.buffer.len());
+            render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
+            render_pass.draw(0..6, 0..self.instance_buffer.len());
         }
     }
 
@@ -89,7 +89,8 @@ impl EventHandler for StarDome {
                 ..
             } => {
                 if let Some(instances) = self.instances() {
-                    self.buffer.write(renderer, &instances.collect::<Vec<_>>());
+                    self.instance_buffer
+                        .write(renderer, &instances.collect::<Vec<_>>());
                 }
             }
             _ => {}
