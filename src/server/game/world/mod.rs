@@ -345,20 +345,20 @@ impl ChunkStore {
             .map_or(Block::AIR, |chunk| chunk[utils::block_coords(coords)])
     }
 
-    fn insert(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) {
-        assert!(self.0.insert(coords, chunk).is_none());
-    }
-
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        Some(self.0.get(&coords)?)
-    }
-
-    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, Box<Chunk>> {
-        self.0.entry(coords)
+        self.0.get(&coords).map(|v| &**v)
     }
 
     fn contains(&self, coords: Point3<i32>) -> bool {
         self.0.contains_key(&coords)
+    }
+
+    fn insert(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) {
+        assert!(self.0.insert(coords, chunk).is_none());
+    }
+
+    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, Box<Chunk>> {
+        self.0.entry(coords)
     }
 }
 

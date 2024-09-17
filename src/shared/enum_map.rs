@@ -75,20 +75,6 @@ impl<E: Enum, T> EnumMap<E, MaybeUninit<T>> {
     }
 }
 
-impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
-    fn from_iter<I: IntoIterator<Item = (E, T)>>(iter: I) -> Self {
-        let mut uninit = Self::uninit();
-        let mut guard = Guard::new(&mut uninit);
-
-        for (variant, value) in iter {
-            guard.set(variant, value);
-        }
-
-        assert!(guard.finish().is_ok());
-        unsafe { uninit.assume_init() }
-    }
-}
-
 impl<E: Enum, T: Clone> Clone for EnumMap<E, T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -106,6 +92,20 @@ impl<E: Enum, T: PartialEq> PartialEq for EnumMap<E, T> {
 impl<E: Enum, T: Default> Default for EnumMap<E, T> {
     fn default() -> Self {
         Self(Default::default())
+    }
+}
+
+impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
+    fn from_iter<I: IntoIterator<Item = (E, T)>>(iter: I) -> Self {
+        let mut uninit = Self::uninit();
+        let mut guard = Guard::new(&mut uninit);
+
+        for (variant, value) in iter {
+            guard.set(variant, value);
+        }
+
+        assert!(guard.finish().is_ok());
+        unsafe { uninit.assume_init() }
     }
 }
 
@@ -210,8 +210,8 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
 
     fn set(&mut self, variant: E, value: T) {
         self.uninit[variant].write(value);
+        self.count += !self.is_init[variant] as usize;
         self.is_init[variant] = true;
-        self.count += 1;
     }
 
     fn finish(self) -> Result<(), E> {
