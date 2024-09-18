@@ -9,7 +9,7 @@ impl HeightMap {
     pub fn load_placeholders<'a, P: IntoIterator<Item = &'a Point3<i32>>>(
         &mut self,
         points: P,
-    ) -> impl Iterator<Item = Point3<i32>> + '_ {
+    ) -> impl Iterator<Item = Point3<i32>> + use<'_, P> {
         Self::chunk_area_points(points.into_iter().filter_map(|&coords| self.load(coords)))
             .collect::<FxHashSet<_>>()
             .into_iter()

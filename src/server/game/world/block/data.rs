@@ -66,7 +66,7 @@ impl BlockData {
         coords: Point3<u8>,
         area: BlockArea,
         area_light: &BlockAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> + '_ {
+    ) -> impl Iterator<Item = BlockVertex> + use<'_> {
         let is_externally_lit = self.is_externally_lit();
         Enum::variants()
             .filter(move |&side| area.is_side_visible(side))
@@ -259,17 +259,14 @@ pub enum Component {
     Corner,
 }
 
-pub(super) static BLOCK_DATA: LazyLock<Vec<BlockData>> = LazyLock::new(|| {
-    let mut data = Vec::<BlockData>::with_capacity(STR_TO_BLOCK.len());
+pub(super) static BLOCK_DATA: LazyLock<Box<[BlockData]>> = LazyLock::new(|| {
+    let mut data = Box::new_uninit_slice(STR_TO_BLOCK.len());
     unsafe {
         for (str, &Block(i)) in &*STR_TO_BLOCK {
-            data.as_mut_ptr()
-                .add(i as usize)
-                .write(RAW_BLOCK_DATA[str].clone().into());
+            data[i as usize].write(RAW_BLOCK_DATA[str].clone().into());
         }
-        data.set_len(STR_TO_BLOCK.len());
+        data.assume_init()
     }
-    data
 });
 
 pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(|| {
@@ -289,15 +286,14 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(||
         .collect()
 });
 
-pub static TEX_PATHS: LazyLock<Vec<Arc<str>>> = LazyLock::new(|| {
-    let mut paths = Vec::<Arc<str>>::with_capacity(TEX_INDICES.len());
+pub static TEX_PATHS: LazyLock<Box<[Arc<str>]>> = LazyLock::new(|| {
+    let mut paths = Box::new_uninit_slice(TEX_INDICES.len());
     unsafe {
         for (path, &i) in &*TEX_INDICES {
-            paths.as_mut_ptr().add(i as usize).write(path.clone());
+            paths[i as usize].write(path.clone());
         }
-        paths.set_len(TEX_INDICES.len());
+        paths.assume_init()
     }
-    paths
 });
 
 pub static TEX_INDICES: LazyLock<FxHashMap<Arc<str>, u8>> = LazyLock::new(|| {

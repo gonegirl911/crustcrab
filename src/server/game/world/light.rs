@@ -537,7 +537,7 @@ impl<'a> Node<'a> {
         chunks: &'a ChunkStore,
         light: &'a WorldLight,
         index: usize,
-    ) -> impl Iterator<Item = Self> + '_ {
+    ) -> impl Iterator<Item = Self> + use<'a, '_> {
         WorldLight::adjacent_points(self.coords)
             .map(move |(side, coords)| self.neighbor(chunks, light, coords, index, side))
     }
