@@ -19,7 +19,7 @@ impl Block {
     pub const SAND: Self = Self(1);
 
     pub fn data(self) -> BlockData {
-        BLOCK_DATA[self.0 as usize]
+        unsafe { *BLOCK_DATA.get_unchecked(self.0 as usize) }
     }
 
     pub fn apply(&mut self, action: BlockAction) -> bool {

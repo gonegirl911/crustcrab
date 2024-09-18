@@ -76,8 +76,13 @@ impl BlockArea {
         index.map(|c| c as i8 - Self::PADDING as i8).into()
     }
 
-    fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
-        delta.map(|c| (c + Self::PADDING as i8) as usize).into()
+    fn index(delta: Vector3<i8>) -> [usize; 3] {
+        delta
+            .map(|c| {
+                assert!(Self::AXIS_RANGE.contains(&c));
+                (c + Self::PADDING as i8) as usize
+            })
+            .into()
     }
 }
 
@@ -93,15 +98,20 @@ impl Index<Vector3<i8>> for BlockArea {
     type Output = Block;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = Self::index_unchecked(delta);
-        &self.0[x][y][z]
+        let [x, y, z] = Self::index(delta);
+        unsafe { self.0.get_unchecked(x).get_unchecked(y).get_unchecked(z) }
     }
 }
 
 impl IndexMut<Vector3<i8>> for BlockArea {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = Self::index_unchecked(delta);
-        &mut self.0[x][y][z]
+        let [x, y, z] = Self::index(delta);
+        unsafe {
+            self.0
+                .get_unchecked_mut(x)
+                .get_unchecked_mut(y)
+                .get_unchecked_mut(z)
+        }
     }
 }
 
@@ -158,7 +168,7 @@ impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = BlockArea::index_unchecked(delta);
-        &self.0[x][y][z]
+        let [x, y, z] = BlockArea::index(delta);
+        unsafe { self.0.get_unchecked(x).get_unchecked(y).get_unchecked(z) }
     }
 }

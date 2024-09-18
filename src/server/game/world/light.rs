@@ -12,7 +12,7 @@ use super::{
     height::HeightMap,
     ChunkStore, World,
 };
-use crate::shared::{pool::NUM_CPUS, utils};
+use crate::shared::utils;
 use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -172,7 +172,7 @@ impl WorldLight {
     }
 
     fn chunk_size(len: usize) -> Option<NonZeroUsize> {
-        NonZeroUsize::new(len.div_ceil(*NUM_CPUS))
+        NonZeroUsize::new(len.div_ceil(rayon::current_num_threads()))
     }
 
     fn node<'a>(

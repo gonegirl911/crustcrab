@@ -1,7 +1,6 @@
-use flume::{Drain, Receiver, SendError, Sender};
+use crossbeam_channel::{self, Receiver, SendError, Sender, TryRecvError};
 use std::{sync::LazyLock, thread};
 
-#[derive(Clone)]
 pub struct ThreadPool<I, O> {
     in_tx: Sender<I>,
     out_rx: Receiver<O>,
@@ -12,15 +11,15 @@ impl<I, O> ThreadPool<I, O> {
         self.in_tx.send(input)
     }
 
-    pub fn drain(&self) -> Drain<O> {
-        self.out_rx.drain()
+    pub fn try_recv(&self) -> Result<O, TryRecvError> {
+        self.out_rx.try_recv()
     }
 }
 
 impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
     pub fn new<F: Fn(I) -> O + Copy + Send + 'static>(f: F) -> Self {
-        let (in_tx, in_rx) = flume::unbounded();
-        let (out_tx, out_rx) = flume::unbounded();
+        let (in_tx, in_rx) = crossbeam_channel::unbounded();
+        let (out_tx, out_rx) = crossbeam_channel::unbounded();
 
         for _ in 0..*NUM_CPUS {
             let in_rx = in_rx.clone();
@@ -38,5 +37,5 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
     }
 }
 
-pub static NUM_CPUS: LazyLock<usize> =
+static NUM_CPUS: LazyLock<usize> =
     LazyLock::new(|| thread::available_parallelism().map_or(1, Into::into));

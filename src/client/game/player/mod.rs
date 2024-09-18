@@ -16,7 +16,7 @@ use crate::{
     shared::color::Float3,
 };
 use bytemuck::{Pod, Zeroable};
-use flume::Sender;
+use crossbeam_channel::Sender;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
 use std::{f32::consts::SQRT_2, time::Duration};

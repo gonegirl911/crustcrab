@@ -1,4 +1,4 @@
-use flume::{Receiver, RecvTimeoutError};
+use crossbeam_channel::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 pub struct Ticker {
@@ -14,8 +14,8 @@ impl Ticker {
         Self { dt, next }
     }
 
-    pub fn recv_deadline<T>(&mut self, tx: &Receiver<T>) -> Result<T, RecvTimeoutError> {
-        match self.deadline().map(|deadline| tx.recv_deadline(deadline)) {
+    pub fn recv_timeout<T>(&mut self, tx: &Receiver<T>) -> Result<T, RecvTimeoutError> {
+        match self.timeout().map(|timeout| tx.recv_timeout(timeout)) {
             Some(Err(RecvTimeoutError::Timeout)) | None => {
                 self.next += self.dt;
                 Err(RecvTimeoutError::Timeout)
@@ -24,7 +24,7 @@ impl Ticker {
         }
     }
 
-    fn deadline(&self) -> Option<Instant> {
-        (Instant::now() < self.next).then_some(self.next)
+    fn timeout(&self) -> Option<Duration> {
+        self.next.checked_duration_since(Instant::now())
     }
 }

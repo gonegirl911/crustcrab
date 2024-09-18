@@ -305,11 +305,11 @@ impl EventHandler for World {
                 event: WindowEvent::RedrawRequested,
                 ..
             } => {
-                for (output, group_id) in self.group_workers.clone().drain() {
+                while let Ok((output, group_id)) = self.group_workers.try_recv() {
                     self.process_output(renderer, Ok(output), Some(group_id));
                 }
 
-                for output in self.workers.clone().drain() {
+                while let Ok(output) = self.workers.try_recv() {
                     self.process_output(renderer, Ok(output), None);
                 }
             }

@@ -21,7 +21,7 @@ use super::{
     ClientEvent,
 };
 use crate::server::game::world::block::data::TEX_PATHS;
-use flume::Sender;
+use crossbeam_channel::Sender;
 use std::{ops::Deref, time::Duration};
 use winit::event::WindowEvent;
 

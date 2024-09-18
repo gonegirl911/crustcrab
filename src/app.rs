@@ -8,7 +8,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let (client_tx, client_rx) = flume::unbounded();
+        let (client_tx, client_rx) = crossbeam_channel::unbounded();
         let client = Client::new(client_tx);
         let server = Server::new(client.create_proxy(), client_rx);
         Self { client, server }

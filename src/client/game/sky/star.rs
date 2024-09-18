@@ -22,7 +22,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use winit::event::WindowEvent;
 
 pub struct StarDome {
-    stars: Vec<Star>,
+    stars: Box<[Star]>,
     instance_buffer: InstanceBuffer<StarInstance>,
     program: Program,
     pc: StarPushConstants,

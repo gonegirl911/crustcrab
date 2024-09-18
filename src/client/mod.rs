@@ -15,7 +15,7 @@ use crate::{
     server::{game::world::block::Block, ServerEvent},
     shared::utils,
 };
-use flume::Sender;
+use crossbeam_channel::Sender;
 use nalgebra::{Point3, Vector3};
 use serde::Deserialize;
 use std::sync::LazyLock;

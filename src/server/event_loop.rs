@@ -1,6 +1,6 @@
 use super::{ticker::Ticker, SERVER_CONFIG};
 use crate::client::{event_loop::EventLoopProxy, ClientEvent};
-use flume::{Receiver, RecvTimeoutError};
+use crossbeam_channel::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
 
 pub struct EventLoop {
@@ -21,7 +21,7 @@ impl EventLoop {
         handler.handle(&Event::Init, &self.proxy);
         loop {
             handler.handle(
-                &match ticker.recv_deadline(&self.client_rx) {
+                &match ticker.recv_timeout(&self.client_rx) {
                     Ok(event) => Event::Client(event),
                     Err(RecvTimeoutError::Timeout) => Event::Tick,
                     Err(RecvTimeoutError::Disconnected) => break,

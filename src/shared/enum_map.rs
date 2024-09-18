@@ -219,7 +219,7 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
             mem::forget(self);
             Ok(())
         } else {
-            Err(self.missing_variant().unwrap_or_else(|| unreachable!()))
+            Err(unsafe { self.missing_variant().unwrap_unchecked() })
         }
     }
 

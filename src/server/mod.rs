@@ -15,7 +15,7 @@ use crate::{
     client::{event_loop::EventLoopProxy, ClientEvent},
     shared::utils,
 };
-use flume::Receiver;
+use crossbeam_channel::Receiver;
 use nalgebra::Point3;
 use serde::Deserialize;
 use std::{

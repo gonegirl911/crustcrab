@@ -9,7 +9,7 @@ use self::{
 };
 use super::event_loop::{Event, EventHandler};
 use crate::client::event_loop::EventLoopProxy;
-use flume::Sender;
+use crossbeam_channel::Sender;
 use std::thread;
 
 pub struct Game {
@@ -22,7 +22,7 @@ impl Default for Game {
     fn default() -> Self {
         let player = Default::default();
         let clock = Default::default();
-        let (world_tx, world_rx) = flume::unbounded();
+        let (world_tx, world_rx) = crossbeam_channel::unbounded();
 
         thread::spawn(move || {
             let mut world = World::default();
