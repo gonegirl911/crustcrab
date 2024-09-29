@@ -31,7 +31,7 @@ impl BlockArea {
     }
 
     pub fn corner_aos(self, side: Option<Side>, is_externally_lit: bool) -> EnumMap<Corner, u8> {
-        if let Some(side) = side.filter(|_| is_externally_lit) {
+        if let (true, Some(side)) = (is_externally_lit, side) {
             enum_map! { corner => self.ao(side, corner) }
         } else {
             enum_map! { _ => 3 }

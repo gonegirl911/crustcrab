@@ -592,6 +592,7 @@ dependencies = [
  "env_logger",
  "generic-array",
  "image",
+ "indexmap",
  "macros",
  "nalgebra",
  "noise",

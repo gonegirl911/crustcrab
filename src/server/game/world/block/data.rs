@@ -11,6 +11,7 @@ use crate::{
         bound::Aabb,
         color::Rgb,
         enum_map::{Enum, EnumMap},
+        indexmap::FxIndexSet,
         utils,
     },
 };
@@ -286,27 +287,11 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(||
         .collect()
 });
 
-pub static TEX_PATHS: LazyLock<Box<[Arc<str>]>> = LazyLock::new(|| {
-    let mut paths = Box::new_uninit_slice(TEX_INDICES.len());
-    unsafe {
-        for (path, &i) in &*TEX_INDICES {
-            paths[i as usize].write(path.clone());
-        }
-        paths.assume_init()
-    }
-});
-
-pub static TEX_INDICES: LazyLock<FxHashMap<Arc<str>, u8>> = LazyLock::new(|| {
-    let mut indices = FxHashMap::default();
-    let mut idx = 0;
-    for data in RAW_BLOCK_DATA.values() {
-        indices.entry(data.tex_path().clone()).or_insert_with(|| {
-            let i = idx;
-            idx += 1;
-            i
-        });
-    }
-    indices
+pub static TEX_PATHS: LazyLock<FxIndexSet<Arc<str>>> = LazyLock::new(|| {
+    RAW_BLOCK_DATA
+        .values()
+        .map(|data| data.tex_path().clone())
+        .collect()
 });
 
 static RAW_BLOCK_DATA: LazyLock<FxHashMap<Arc<str>, RawBlockData>> = LazyLock::new(|| {
