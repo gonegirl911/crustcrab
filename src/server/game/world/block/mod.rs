@@ -2,7 +2,7 @@ pub mod area;
 pub mod data;
 pub mod model;
 
-use self::data::{BlockData, BLOCK_DATA};
+use self::data::{BLOCK_DATA, BlockData};
 use super::action::BlockAction;
 use crate::shared::color::Rgb;
 use bitfield::bitfield;
@@ -14,7 +14,7 @@ pub struct Block(u8);
 
 impl Block {
     const MAX_COUNT: usize = u8::MAX as usize + 1;
-    const HARD_CODED_VALUES: &'static [&'static str] = &["air", "sand"];
+    const HARD_CODED_VALUES: &[&str] = &["air", "sand"];
     pub const AIR: Self = Self(0);
     pub const SAND: Self = Self(1);
 

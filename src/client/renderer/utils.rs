@@ -1,6 +1,6 @@
 use super::{
-    buffer::{MemoryState, VertexBuffer},
     Renderer,
+    buffer::{MemoryState, VertexBuffer},
 };
 use bytemuck::Pod;
 use std::cmp::{Ordering, Reverse};
@@ -19,10 +19,7 @@ impl<C, V: Pod> TransparentMesh<C, V> {
         assert_eq!(vertices.len() % 6, 0);
         Some(Self {
             buffer: VertexBuffer::new_non_empty(renderer, MemoryState::Uninit(vertices.len()))?,
-            data: vertices
-                .chunks_exact(6)
-                .map(|v| (coords(v), v.try_into().unwrap_or_else(|_| unreachable!())))
-                .collect(),
+            data: vertices.array_chunks().map(|v| (coords(v), *v)).collect(),
             vertices: Vec::with_capacity(vertices.len()),
         })
     }

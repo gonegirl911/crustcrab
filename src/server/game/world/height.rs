@@ -1,4 +1,4 @@
-use nalgebra::{point, vector, Point2, Point3, Vector2};
+use nalgebra::{Point2, Point3, Vector2, point, vector};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{collections::hash_map::Entry, ops::Index};
 
@@ -6,11 +6,11 @@ use std::{collections::hash_map::Entry, ops::Index};
 pub struct HeightMap(FxHashMap<Point2<i32>, i32>);
 
 impl HeightMap {
-    pub fn load_placeholders<'a, P: IntoIterator<Item = &'a Point3<i32>>>(
-        &mut self,
-        points: P,
-    ) -> impl Iterator<Item = Point3<i32>> + use<'_, P> {
-        Self::chunk_area_points(points.into_iter().filter_map(|&coords| self.load(coords)))
+    pub fn load_placeholders<P>(&mut self, points: P) -> impl Iterator<Item = Point3<i32>>
+    where
+        P: IntoIterator<Item = Point3<i32>>,
+    {
+        Self::chunk_area_points(points.into_iter().filter_map(|coords| self.load(coords)))
             .collect::<FxHashSet<_>>()
             .into_iter()
             .flat_map(|coords| {

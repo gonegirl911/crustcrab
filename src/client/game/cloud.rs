@@ -1,25 +1,25 @@
 use super::world::BlockVertex;
 use crate::{
     client::{
+        CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         renderer::{
+            Renderer,
             buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
             effect::{Blender, PostProcessor},
             program::{Program, PushConstants},
             texture::{image::ImageTexture, screen::DepthBuffer},
-            Renderer,
         },
-        CLIENT_CONFIG,
     },
     server::{
-        game::{clock::Stage, world::block::Block},
         ServerEvent,
+        game::{clock::Stage, world::block::Block},
     },
     shared::color::{Float3, Rgb, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
 use image::ImageReader;
-use nalgebra::{point, vector, Point2, Vector2, Vector3};
+use nalgebra::{Point2, Vector2, Vector3, point, vector};
 use serde::Deserialize;
 use std::time::Duration;
 use winit::event::WindowEvent;
@@ -105,10 +105,10 @@ impl CloudLayer {
                 }),
                 ..Default::default()
             });
-            self.program.bind(
-                &mut render_pass,
-                [player_bind_group, self.texture.bind_group()],
-            );
+            self.program.bind(&mut render_pass, [
+                player_bind_group,
+                self.texture.bind_group(),
+            ]);
             self.pc.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }

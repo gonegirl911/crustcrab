@@ -1,6 +1,6 @@
 use super::Chunk;
 use crate::{
-    server::game::world::{block::Block, World},
+    server::game::world::{World, block::Block},
     shared::utils,
 };
 use nalgebra::Point3;

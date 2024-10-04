@@ -1,16 +1,16 @@
 use super::{
+    ChunkStore, World,
     action::BlockAction,
     block::{
-        area::BlockAreaLight,
-        data::{BlockData, Side, SIDE_DELTAS},
         Block, BlockLight,
+        area::BlockAreaLight,
+        data::{BlockData, SIDE_DELTAS, Side},
     },
     chunk::{
-        area::{ChunkArea, ChunkAreaLight},
         Chunk, ChunkLight,
+        area::{ChunkArea, ChunkAreaLight},
     },
     height::HeightMap,
-    ChunkStore, World,
 };
 use crate::shared::utils;
 use nalgebra::Point3;
@@ -19,8 +19,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp::Ordering,
     collections::{
-        hash_map::{Entry, VacantEntry},
         VecDeque,
+        hash_map::{Entry, VacantEntry},
     },
     num::NonZeroUsize,
     ops::Range,
@@ -537,7 +537,7 @@ impl<'a> Node<'a> {
         chunks: &'a ChunkStore,
         light: &'a WorldLight,
         index: usize,
-    ) -> impl Iterator<Item = Self> + use<'a, '_> {
+    ) -> impl Iterator<Item = Self> {
         WorldLight::adjacent_points(self.coords)
             .map(move |(side, coords)| self.neighbor(chunks, light, coords, index, side))
     }

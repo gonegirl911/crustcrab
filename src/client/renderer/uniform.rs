@@ -1,6 +1,6 @@
 use super::{
-    buffer::{MemoryState, UniformBuffer},
     Renderer,
+    buffer::{MemoryState, UniformBuffer},
 };
 use bytemuck::Pod;
 

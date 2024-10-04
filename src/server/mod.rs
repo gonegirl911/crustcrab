@@ -5,14 +5,14 @@ pub mod ticker;
 use self::{
     event_loop::{EventLoop, EventLoopConfig},
     game::{
+        Game,
         clock::{ClockState, Time},
         player::PlayerConfig,
         world::{BlockHoverData, ChunkData},
-        Game,
     },
 };
 use crate::{
-    client::{event_loop::EventLoopProxy, ClientEvent},
+    client::{ClientEvent, event_loop::EventLoopProxy},
     shared::utils,
 };
 use crossbeam_channel::Receiver;

@@ -1,22 +1,22 @@
 use crate::{
     client::{
+        CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         renderer::{
+            Renderer,
             buffer::{Instance, InstanceBuffer, MemoryState},
             effect::PostProcessor,
             program::{Program, PushConstants},
-            Renderer,
         },
-        CLIENT_CONFIG,
     },
     server::{
-        game::clock::{Stage, Time},
         ServerEvent,
+        game::clock::{Stage, Time},
     },
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{point, vector, Matrix4, Point3, UnitQuaternion, Vector3};
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use nalgebra::{Matrix4, Point3, UnitQuaternion, Vector3, point, vector};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::Deserialize;
 use std::f32::consts::{FRAC_PI_2, PI};
 use winit::event::WindowEvent;
@@ -66,7 +66,7 @@ impl StarDome {
         }
     }
 
-    fn instances(&self) -> Option<impl Iterator<Item = StarInstance> + use<'_>> {
+    fn instances(&self) -> Option<impl Iterator<Item = StarInstance>> {
         self.updated_rotation.map(|rotation| {
             self.stars
                 .iter()

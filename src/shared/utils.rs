@@ -23,9 +23,7 @@ pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
     a * (1.0 - t) + b * t
 }
 
-pub trait Lerp: Mul<f32, Output = Self> + Add<Output = Self> + Sized {}
-
-impl<T: Mul<f32, Output = T> + Add<Output = T>> Lerp for T {}
+pub trait Lerp = Mul<f32, Output = Self> + Add<Output = Self> + Sized;
 
 // ------------------------------------------------------------------------------------------------
 
@@ -93,7 +91,7 @@ impl<const D: usize> WorldCoords for Point<i64, D> {
     type Point<U: Scalar> = Point<U, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
-        self.map(|c| div_floor(c, Chunk::DIM as i64) as i32)
+        self.map(|c| c.div_floor(Chunk::DIM as i64) as i32)
     }
 
     fn block_coords(self) -> Self::Point<u8> {
@@ -118,16 +116,6 @@ impl<const D: usize> WorldCoords for Point<f32, D> {
 
     fn coords(self) -> Self::Point<i64> {
         self.map(|c| c as i64)
-    }
-}
-
-fn div_floor(a: i64, b: i64) -> i64 {
-    let d = a / b;
-    let r = a % b;
-    if (r > 0 && b < 0) || (r < 0 && b > 0) {
-        d - 1
-    } else {
-        d
     }
 }
 

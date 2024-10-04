@@ -6,13 +6,13 @@ pub mod window;
 
 use self::{
     event_loop::{Event, EventHandler, EventLoop, EventLoopProxy},
-    game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig, Game},
+    game::{Game, cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig},
     renderer::Renderer,
     window::Window,
 };
 use crate::{
     client::stopwatch::Stopwatch,
-    server::{game::world::block::Block, ServerEvent},
+    server::{ServerEvent, game::world::block::Block},
     shared::utils,
 };
 use crossbeam_channel::Sender;

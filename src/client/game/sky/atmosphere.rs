@@ -1,4 +1,4 @@
-use crate::client::renderer::{effect::PostProcessor, program::Program, Renderer};
+use crate::client::renderer::{Renderer, effect::PostProcessor, program::Program};
 
 pub struct Atmosphere(Program);
 

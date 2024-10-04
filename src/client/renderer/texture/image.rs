@@ -1,6 +1,6 @@
 use crate::client::renderer::{
-    effect::{Blit, Effect},
     Renderer,
+    effect::{Blit, Effect},
 };
 use image::{ImageReader, RgbaImage};
 use std::{num::NonZeroU32, path::Path};
@@ -93,7 +93,7 @@ impl ImageTexture {
             },
             &image,
             wgpu::ImageDataLayout {
-                bytes_per_row: Some(width * 4),
+                bytes_per_row: Some(4 * width),
                 ..Default::default()
             },
             size,

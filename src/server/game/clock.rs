@@ -1,8 +1,8 @@
 use crate::{
-    client::{event_loop::EventLoopProxy, ClientEvent},
+    client::{ClientEvent, event_loop::EventLoopProxy},
     server::{
+        SERVER_CONFIG, ServerEvent,
         event_loop::{Event, EventHandler},
-        ServerEvent, SERVER_CONFIG,
     },
     shared::utils::{self, Lerp},
 };

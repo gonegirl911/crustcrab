@@ -9,11 +9,11 @@ use self::{
 };
 use crate::{
     client::{
-        event_loop::{Event, EventHandler},
-        renderer::{buffer::MemoryState, uniform::Uniform, Renderer},
         CLIENT_CONFIG,
+        event_loop::{Event, EventHandler},
+        renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
     },
-    server::{game::clock::Time, ServerEvent},
+    server::{ServerEvent, game::clock::Time},
     shared::{
         color::{Float3, Rgb},
         utils,

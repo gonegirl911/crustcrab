@@ -1,18 +1,18 @@
 use crate::{
     client::{
+        CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         renderer::{
+            Renderer,
             effect::PostProcessor,
             program::{Program, PushConstants},
             texture::image::ImageTextureArray,
-            Renderer,
         },
-        CLIENT_CONFIG,
     },
-    server::{game::clock::Time, ServerEvent},
+    server::{ServerEvent, game::clock::Time},
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Matrix4, Point3, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3, vector};
 use serde::Deserialize;
 
 pub struct ObjectSet {
@@ -68,14 +68,11 @@ impl ObjectSet {
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
     ) {
-        self.program.bind(
-            render_pass,
-            [
-                player_bind_group,
-                sky_bind_group,
-                self.textures.bind_group(),
-            ],
-        );
+        self.program.bind(render_pass, [
+            player_bind_group,
+            sky_bind_group,
+            self.textures.bind_group(),
+        ]);
         self.sun_pc.set(render_pass);
         render_pass.draw(0..6, 0..1);
         self.moon_pc.set(render_pass);
@@ -120,11 +117,7 @@ impl ObjectPushConstants {
     }
 
     fn up(is_am: bool) -> Vector3<f32> {
-        if is_am {
-            -Vector3::y()
-        } else {
-            Vector3::y()
-        }
+        if is_am { -Vector3::y() } else { Vector3::y() }
     }
 }
 

@@ -4,7 +4,7 @@ use crate::{
     server::event_loop::{Event, EventHandler},
     shared::{ray::Ray, utils},
 };
-use nalgebra::{point, Point2, Point3};
+use nalgebra::{Point2, Point3, point};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::ops::Range;

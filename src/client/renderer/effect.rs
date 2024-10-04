@@ -1,7 +1,7 @@
 use super::{
+    Renderer,
     program::{Program, PushConstants},
     texture::screen::ScreenTextureArray,
-    Renderer,
 };
 use crate::client::event_loop::{Event, EventHandler};
 use bytemuck::{Pod, Zeroable};

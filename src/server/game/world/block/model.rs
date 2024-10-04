@@ -79,7 +79,9 @@ pub struct RawModel {
 
 impl RawModel {
     fn tex_index(&self) -> u8 {
-        TEX_PATHS.get_index_of(&self.tex_path).unwrap() as u8
+        TEX_PATHS
+            .get_index_of(&self.tex_path)
+            .unwrap_or_else(|| unreachable!()) as u8
     }
 
     fn deserialize_variant<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>

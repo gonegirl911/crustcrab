@@ -1,7 +1,7 @@
 use super::{
+    Block, BlockLight,
     area::{BlockArea, BlockAreaLight},
     model::{Model, RawModel},
-    Block, BlockLight,
 };
 use crate::{
     client::game::world::BlockVertex,
@@ -15,12 +15,11 @@ use crate::{
         utils,
     },
 };
-use nalgebra::{point, Point2, Point3, Vector3};
+use nalgebra::{Point2, Point3, Vector3, point};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
 use std::{
-    array,
-    iter::{self, Zip},
+    array, iter,
     ops::Deref,
     sync::{Arc, LazyLock},
 };
@@ -67,7 +66,7 @@ impl BlockData {
         coords: Point3<u8>,
         area: BlockArea,
         area_light: &BlockAreaLight,
-    ) -> impl Iterator<Item = BlockVertex> + use<'_> {
+    ) -> impl Iterator<Item = BlockVertex> {
         let is_externally_lit = self.is_externally_lit();
         Enum::variants()
             .filter(move |&side| area.is_side_visible(side))
@@ -152,7 +151,7 @@ impl From<RawBlockData> for BlockData {
 
 impl IntoIterator for BlockData {
     type Item = (u8, bool);
-    type IntoIter = Zip<<Rgb<u8> as IntoIterator>::IntoIter, <Rgb<bool> as IntoIterator>::IntoIter>;
+    type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         iter::zip(self.luminance, self.light_filter)

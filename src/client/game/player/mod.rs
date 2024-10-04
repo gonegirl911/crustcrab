@@ -8,9 +8,9 @@ use self::{
 use super::gui::Gui;
 use crate::{
     client::{
+        CLIENT_CONFIG, ClientEvent,
         event_loop::{Event, EventHandler},
-        renderer::{buffer::MemoryState, uniform::Uniform, Renderer},
-        ClientEvent, CLIENT_CONFIG,
+        renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
     },
     server::game::world::chunk::Chunk,
     shared::color::Float3,
@@ -84,7 +84,7 @@ impl EventHandler for Player {
                         dir: self.view.forward,
                         render_distance: CLIENT_CONFIG.player.render_distance,
                     })
-                    .unwrap();
+                    .unwrap_or_else(|_| unreachable!());
             }
             Event::WindowEvent {
                 event: WindowEvent::RedrawRequested,
@@ -97,7 +97,7 @@ impl EventHandler for Player {
                         .send(ClientEvent::PlayerPositionChanged {
                             origin: self.view.origin,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|_| unreachable!());
                 }
 
                 if changes.contains(Changes::ROTATED) {
@@ -105,7 +105,7 @@ impl EventHandler for Player {
                         .send(ClientEvent::PlayerOrientationChanged {
                             dir: self.view.forward,
                         })
-                        .unwrap();
+                        .unwrap_or_else(|_| unreachable!());
                 }
 
                 if renderer.is_resized {
@@ -114,10 +114,14 @@ impl EventHandler for Player {
 
                 if changes.contains(Changes::BLOCK_PLACED) {
                     if let Some(block) = gui.selected_block() {
-                        client_tx.send(ClientEvent::BlockPlaced { block }).unwrap();
+                        client_tx
+                            .send(ClientEvent::BlockPlaced { block })
+                            .unwrap_or_else(|_| unreachable!());
                     }
                 } else if changes.contains(Changes::BLOCK_DESTROYED) {
-                    client_tx.send(ClientEvent::BlockDestroyed).unwrap();
+                    client_tx
+                        .send(ClientEvent::BlockDestroyed)
+                        .unwrap_or_else(|_| unreachable!());
                 }
 
                 if changes.intersects(Changes::VIEW) || renderer.is_resized {
@@ -161,7 +165,7 @@ impl PlayerUniformData {
     ) -> Self {
         Self {
             vp,
-            inv_vp: vp.try_inverse().unwrap(),
+            inv_vp: vp.try_inverse().unwrap_or_else(|| unreachable!()),
             origin: origin.into(),
             forward,
             render_distance: CLIENT_CONFIG.player.render_distance,

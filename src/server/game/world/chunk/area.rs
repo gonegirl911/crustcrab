@@ -1,12 +1,12 @@
 use super::Chunk;
 use crate::{
     server::game::world::block::{
-        area::{BlockArea, BlockAreaLight},
         Block, BlockLight,
+        area::{BlockArea, BlockAreaLight},
     },
     shared::utils,
 };
-use nalgebra::{point, vector, Point3, Vector3};
+use nalgebra::{Point3, Vector3, point, vector};
 use std::ops::{Index, IndexMut, Range};
 
 #[derive(Default)]
@@ -52,13 +52,9 @@ impl ChunkArea {
         }
     }
 
-    fn index(delta: Vector3<i8>) -> [usize; 3] {
-        let range = -(BlockArea::PADDING as i8)..(Chunk::DIM + BlockArea::PADDING) as i8;
+    fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
         delta
-            .map(|c| {
-                assert!(range.contains(&c));
-                (c + BlockArea::PADDING as i8) as usize
-            })
+            .map(|c| (c + BlockArea::PADDING as i8) as usize)
             .into()
     }
 }
@@ -67,20 +63,15 @@ impl Index<Vector3<i8>> for ChunkArea {
     type Output = Block;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = Self::index(delta);
-        unsafe { self.0.get_unchecked(x).get_unchecked(y).get_unchecked(z) }
+        let [x, y, z] = Self::index_unchecked(delta);
+        &self.0[x][y][z]
     }
 }
 
 impl IndexMut<Vector3<i8>> for ChunkArea {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = Self::index(delta);
-        unsafe {
-            self.0
-                .get_unchecked_mut(x)
-                .get_unchecked_mut(y)
-                .get_unchecked_mut(z)
-        }
+        let [x, y, z] = Self::index_unchecked(delta);
+        &mut self.0[x][y][z]
     }
 }
 
@@ -97,19 +88,14 @@ impl Index<Vector3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = ChunkArea::index(delta);
-        unsafe { self.0.get_unchecked(x).get_unchecked(y).get_unchecked(z) }
+        let [x, y, z] = ChunkArea::index_unchecked(delta);
+        &self.0[x][y][z]
     }
 }
 
 impl IndexMut<Vector3<i8>> for ChunkAreaLight {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = ChunkArea::index(delta);
-        unsafe {
-            self.0
-                .get_unchecked_mut(x)
-                .get_unchecked_mut(y)
-                .get_unchecked_mut(z)
-        }
+        let [x, y, z] = ChunkArea::index_unchecked(delta);
+        &mut self.0[x][y][z]
     }
 }

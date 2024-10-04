@@ -3,27 +3,27 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
+            Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
             program::{Program, PushConstants},
             texture::screen::DepthBuffer,
             utils::{TotalOrd, TransparentMesh},
-            Renderer,
         },
     },
     server::{
-        game::world::{
-            block::{data::Face, BlockLight},
-            chunk::Chunk,
-            ChunkData,
-        },
         GroupId, ServerEvent,
+        game::world::{
+            ChunkData,
+            block::{BlockLight, data::Face},
+            chunk::Chunk,
+        },
     },
     shared::{pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{point, Point2, Point3};
+use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
 use winit::event::WindowEvent;
@@ -102,10 +102,11 @@ impl World {
         {
             let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
-            self.program.bind(
-                &mut render_pass,
-                [player_bind_group, sky_bind_group, textures_bind_group],
-            );
+            self.program.bind(&mut render_pass, [
+                player_bind_group,
+                sky_bind_group,
+                textures_bind_group,
+            ]);
 
             for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
                 if Chunk::bounding_sphere(coords).is_visible(frustum) {
@@ -123,10 +124,11 @@ impl World {
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
 
-        self.program.bind(
-            &mut render_pass,
-            [player_bind_group, sky_bind_group, textures_bind_group],
-        );
+        self.program.bind(&mut render_pass, [
+            player_bind_group,
+            sky_bind_group,
+            textures_bind_group,
+        ]);
 
         transparent_meshes.sort_unstable_by_key(|&(coords, _)| {
             Reverse(utils::magnitude_squared(

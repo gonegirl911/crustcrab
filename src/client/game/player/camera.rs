@@ -1,6 +1,6 @@
 use crate::client::event_loop::{Event, EventHandler};
 use bitflags::bitflags;
-use nalgebra::{matrix, vector, Matrix4, Point3, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3, matrix, vector};
 use std::{
     f32::consts::{FRAC_PI_2, TAU},
     mem,

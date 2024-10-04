@@ -11,14 +11,14 @@ use self::{
     world::World,
 };
 use super::{
+    ClientEvent,
     event_loop::{Event, EventHandler},
     renderer::{
+        Renderer,
         effect::{Aces, PostProcessor},
         texture::{image::ImageTextureArray, screen::DepthBuffer},
-        Renderer,
     },
     window::RawWindow,
-    ClientEvent,
 };
 use crate::server::game::world::block::data::TEX_PATHS;
 use crossbeam_channel::Sender;

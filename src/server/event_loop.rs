@@ -1,5 +1,5 @@
-use super::{ticker::Ticker, SERVER_CONFIG};
-use crate::client::{event_loop::EventLoopProxy, ClientEvent};
+use super::{SERVER_CONFIG, ticker::Ticker};
+use crate::client::{ClientEvent, event_loop::EventLoopProxy};
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
 

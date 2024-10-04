@@ -1,9 +1,9 @@
 use super::{
-    data::{Component, Corner, Side, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS},
     Block, BlockLight,
+    data::{Component, Corner, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS, Side},
 };
 use crate::{enum_map, shared::enum_map::EnumMap};
-use nalgebra::{vector, Vector3};
+use nalgebra::{Vector3, vector};
 use std::{
     array,
     ops::{Index, IndexMut, Range},
@@ -31,7 +31,7 @@ impl BlockArea {
     }
 
     pub fn corner_aos(self, side: Option<Side>, is_externally_lit: bool) -> EnumMap<Corner, u8> {
-        if let (true, Some(side)) = (is_externally_lit, side) {
+        if is_externally_lit && let Some(side) = side {
             enum_map! { corner => self.ao(side, corner) }
         } else {
             enum_map! { _ => 3 }
@@ -76,13 +76,8 @@ impl BlockArea {
         index.map(|c| c as i8 - Self::PADDING as i8).into()
     }
 
-    fn index(delta: Vector3<i8>) -> [usize; 3] {
-        delta
-            .map(|c| {
-                assert!(Self::AXIS_RANGE.contains(&c));
-                (c + Self::PADDING as i8) as usize
-            })
-            .into()
+    fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
+        delta.map(|c| (c + Self::PADDING as i8) as usize).into()
     }
 }
 
@@ -98,20 +93,15 @@ impl Index<Vector3<i8>> for BlockArea {
     type Output = Block;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = Self::index(delta);
-        unsafe { self.0.get_unchecked(x).get_unchecked(y).get_unchecked(z) }
+        let [x, y, z] = Self::index_unchecked(delta);
+        &self.0[x][y][z]
     }
 }
 
 impl IndexMut<Vector3<i8>> for BlockArea {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = Self::index(delta);
-        unsafe {
-            self.0
-                .get_unchecked_mut(x)
-                .get_unchecked_mut(y)
-                .get_unchecked_mut(z)
-        }
+        let [x, y, z] = Self::index_unchecked(delta);
+        &mut self.0[x][y][z]
     }
 }
 
@@ -156,7 +146,7 @@ impl BlockAreaLight {
             .chain([SIDE_DELTAS[side]])
             .filter(|&delta| area[delta].data().is_transparent())
             .map(|delta| self[delta])
-            .fold((0, [0; BlockLight::LEN]), |(count, sum), light| {
+            .fold((0, [0; _]), |(count, sum), light| {
                 (count + 1, array::from_fn(|i| sum[i] + light.component(i)))
             });
 
@@ -168,7 +158,7 @@ impl Index<Vector3<i8>> for BlockAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = BlockArea::index(delta);
-        unsafe { self.0.get_unchecked(x).get_unchecked(y).get_unchecked(z) }
+        let [x, y, z] = BlockArea::index_unchecked(delta);
+        &self.0[x][y][z]
     }
 }

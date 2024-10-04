@@ -7,24 +7,24 @@ pub mod light;
 use self::{
     action::{ActionStore, BlockAction},
     block::{
-        area::{BlockArea, BlockAreaLight},
-        data::{Corner, Side, SIDE_DELTAS, SIDE_MASKS},
         Block, BlockLight,
+        area::{BlockArea, BlockAreaLight},
+        data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
     },
     chunk::{
+        Chunk, DataStore,
         area::{ChunkArea, ChunkAreaLight},
         generator::ChunkGenerator,
-        Chunk, DataStore,
     },
     height::HeightMap,
     light::WorldLight,
 };
 use super::player::{Player, WorldArea};
 use crate::{
-    client::{event_loop::EventLoopProxy, game::world::BlockVertex, ClientEvent},
+    client::{ClientEvent, event_loop::EventLoopProxy, game::world::BlockVertex},
     server::{
+        GroupId, SERVER_CONFIG, ServerEvent,
         event_loop::{Event, EventHandler},
-        GroupId, ServerEvent, SERVER_CONFIG,
     },
     shared::{
         bound::Aabb,
@@ -34,7 +34,7 @@ use crate::{
         utils::IntoSequentialIteratorExt,
     },
 };
-use nalgebra::{point, Point2, Point3, Vector3};
+use nalgebra::{Point2, Point3, Vector3, point};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -74,7 +74,7 @@ impl World {
 
     #[rustfmt::skip]
     fn par_light_up(&mut self, points: &[Point3<i32>]) -> Vec<Point3<i64>> {
-        self.light.extend_placeholders(self.heights.load_placeholders(points));
+        self.light.extend_placeholders(self.heights.load_placeholders(points.iter().copied()));
         self.light.par_insert_many(&self.chunks, &self.heights, points)
     }
 
@@ -444,7 +444,7 @@ impl Branch {
             }
         }
 
-        light.extend_placeholders(heights.load_placeholders(&inserts));
+        light.extend_placeholders(heights.load_placeholders(inserts.iter().copied()));
 
         inserts.retain(|&coords| area.client_contains(coords));
 

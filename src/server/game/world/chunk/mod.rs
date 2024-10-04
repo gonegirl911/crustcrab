@@ -9,7 +9,7 @@ use crate::shared::{
     bound::{Aabb, BoundingSphere},
     utils,
 };
-use nalgebra::{point, Point3, Vector3};
+use nalgebra::{Point3, Vector3, point};
 use std::{
     array, mem,
     ops::{BitOrAssign, Index, IndexMut},

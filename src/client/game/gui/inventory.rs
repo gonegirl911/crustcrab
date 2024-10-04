@@ -1,23 +1,23 @@
 use super::Gui;
 use crate::{
     client::{
+        CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         game::world::BlockVertex,
         renderer::{
+            Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
             program::Program,
             texture::screen::DepthBuffer,
             uniform::Uniform,
-            Renderer,
         },
-        CLIENT_CONFIG,
     },
-    server::game::world::block::{data::STR_TO_BLOCK, Block},
+    server::game::world::block::{Block, data::STR_TO_BLOCK},
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{vector, Matrix4, Vector3};
+use nalgebra::{Matrix4, Vector3, vector};
 use serde::{Deserialize, Deserializer};
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
@@ -74,10 +74,10 @@ impl Inventory {
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
         if let Some(buffer) = &self.vertex_buffer {
-            self.program.bind(
-                render_pass,
-                [self.uniform.bind_group(), textures_bind_group],
-            );
+            self.program.bind(render_pass, [
+                self.uniform.bind_group(),
+                textures_bind_group,
+            ]);
             buffer.draw(render_pass);
         }
     }

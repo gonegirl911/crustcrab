@@ -1,16 +1,15 @@
 use generic_array::{
+    ArrayLength, GenericArray, GenericArrayIter,
     functional::FunctionalSequence,
     sequence::GenericSequence,
-    typenum::{bit::B1, Add1, Unsigned},
-    ArrayLength, GenericArray, GenericArrayIter,
+    typenum::{Add1, Unsigned, bit::B1},
 };
 use serde::{
-    de::{Error, MapAccess, Visitor},
     Deserialize, Deserializer,
+    de::{Error, MapAccess, Visitor},
 };
 use std::{
     fmt::{self, Debug},
-    iter::Zip,
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Add, Index, IndexMut},
@@ -41,7 +40,7 @@ impl<E: Enum, T> EnumMap<E, T> {
         EnumMap(GenericArray::uninit())
     }
 
-    pub fn iter(&self) -> Zip<Variants<E>, slice::Iter<T>> {
+    pub fn iter(&self) -> impl Iterator<Item = (E, &T)> {
         E::variants().zip(&self.0)
     }
 
@@ -125,7 +124,7 @@ impl<E: Enum, T> IndexMut<E> for EnumMap<E, T> {
 
 impl<E: Enum, T> IntoIterator for EnumMap<E, T> {
     type Item = (E, T);
-    type IntoIter = Zip<Variants<E>, GenericArrayIter<T, E::Length>>;
+    type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         E::variants().zip(self.0)
@@ -134,7 +133,7 @@ impl<E: Enum, T> IntoIterator for EnumMap<E, T> {
 
 impl<'a, E: Enum, T> IntoIterator for &'a EnumMap<E, T> {
     type Item = (E, &'a T);
-    type IntoIter = Zip<Variants<E>, slice::Iter<'a, T>>;
+    type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -233,10 +232,6 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
 
 impl<E: Enum, T> Drop for Guard<'_, E, T> {
     fn drop(&mut self) {
-        if !mem::needs_drop::<T>() {
-            return;
-        }
-
         for (uninit, &is_init) in self.uninit.values_mut().zip(self.is_init.values()) {
             if is_init {
                 unsafe {

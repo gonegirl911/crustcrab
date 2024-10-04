@@ -9,13 +9,13 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
-            effect::{Blit, Effect, PostProcessor},
             Renderer,
+            effect::{Blit, Effect, PostProcessor},
         },
     },
     server::game::world::block::Block,
 };
-use nalgebra::{vector, Matrix4, Vector2};
+use nalgebra::{Matrix4, Vector2, vector};
 use serde::Deserialize;
 
 pub struct Gui {

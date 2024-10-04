@@ -1,11 +1,11 @@
 use super::Gui;
 use crate::client::{
+    CLIENT_CONFIG,
     event_loop::{Event, EventHandler},
     renderer::{
-        buffer::MemoryState, effect::PostProcessor, program::Program, texture::image::ImageTexture,
-        uniform::Uniform, Renderer,
+        Renderer, buffer::MemoryState, effect::PostProcessor, program::Program,
+        texture::image::ImageTexture, uniform::Uniform,
     },
-    CLIENT_CONFIG,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector2};
@@ -50,14 +50,11 @@ impl Crosshair {
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
-        self.program.bind(
-            render_pass,
-            [
-                self.uniform.bind_group(),
-                self.texture.bind_group(),
-                input_bind_group,
-            ],
-        );
+        self.program.bind(render_pass, [
+            self.uniform.bind_group(),
+            self.texture.bind_group(),
+            input_bind_group,
+        ]);
         render_pass.draw(0..6, 0..1);
     }
 }
