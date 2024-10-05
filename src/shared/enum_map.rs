@@ -166,7 +166,7 @@ where
                 while let Some((variant, value)) = access.next_entry()? {
                     if !guard.init(variant, value) {
                         return Err(M::Error::custom(format!(
-                            "duplicate variant \"{variant:?}\""
+                            "duplicate variant \"{variant:?}\"",
                         )));
                     }
                 }
