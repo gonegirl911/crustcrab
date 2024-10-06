@@ -275,7 +275,7 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(||
         .keys()
         .cloned()
         .map(|str| {
-            if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|s| s == &&*str) {
+            if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|&s| *s == *str) {
                 (str, Block(i as u8))
             } else {
                 let entry = (str, Block(idx));
