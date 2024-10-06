@@ -1,9 +1,12 @@
-#![feature(array_chunks)]
-#![feature(generic_arg_infer)]
-#![feature(impl_trait_in_assoc_type)]
-#![feature(int_roundings)]
-#![feature(let_chains)]
-#![feature(trait_alias)]
+#![feature(
+    array_chunks,
+    generic_arg_infer,
+    impl_trait_in_assoc_type,
+    int_roundings,
+    let_chains,
+    trait_alias,
+    type_alias_impl_trait
+)]
 
 mod app;
 mod client;

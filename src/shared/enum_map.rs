@@ -257,12 +257,11 @@ pub unsafe trait Enum: Copy {
     fn to_index(self) -> usize;
 
     fn variants() -> Variants<Self> {
-        Variants {
-            index: 0,
-            phantom: PhantomData,
-        }
+        (0..Self::LEN).map(|i| unsafe { Self::from_index_unchecked(i) })
     }
 }
+
+pub type Variants<E: Enum> = impl Iterator<Item = E>;
 
 unsafe impl<E: Enum> Enum for Option<E>
 where
@@ -277,25 +276,5 @@ where
 
     fn to_index(self) -> usize {
         self.map_or(E::LEN, Enum::to_index)
-    }
-}
-
-pub struct Variants<E> {
-    index: usize,
-    phantom: PhantomData<fn() -> E>,
-}
-
-impl<E: Enum> Iterator for Variants<E> {
-    type Item = E;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let value = E::from_index(self.index)?;
-        self.index += 1;
-        Some(value)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let rem = E::LEN - self.index;
-        (rem, Some(rem))
     }
 }
