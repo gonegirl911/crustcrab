@@ -123,16 +123,16 @@ impl<const D: usize> WorldCoords for Point<f32, D> {
 
 pub trait IntoSequentialIteratorExt {
     type Item;
-    type Iter: Iterator<Item = Self::Item>;
+    type IntoSeqIter: Iterator<Item = Self::Item>;
 
-    fn into_seq_iter(self) -> Self::Iter;
+    fn into_seq_iter(self) -> Self::IntoSeqIter;
 }
 
 impl<I: ParallelIterator> IntoSequentialIteratorExt for I {
     type Item = I::Item;
-    type Iter = Flatten<linked_list::IntoIter<Vec<Self::Item>>>;
+    type IntoSeqIter = Flatten<linked_list::IntoIter<Vec<Self::Item>>>;
 
-    fn into_seq_iter(self) -> Self::Iter {
+    fn into_seq_iter(self) -> Self::IntoSeqIter {
         self.collect_vec_list().into_iter().flatten()
     }
 }
