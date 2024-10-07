@@ -31,7 +31,7 @@ use crate::{
         enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
         utils,
-        utils::IntoSequentialIteratorExt,
+        utils::ParallelIteratorExt,
     },
 };
 use nalgebra::{Point2, Point3, Vector3, point};
