@@ -225,7 +225,7 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
     fn missing_variant(&self) -> Option<E> {
         self.is_init
             .iter()
-            .find(|(_, &is_init)| !is_init)
+            .find(|&(_, is_init)| !is_init)
             .map(|(variant, _)| variant)
     }
 }
