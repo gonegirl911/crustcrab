@@ -6,10 +6,10 @@ use generic_array::{
 };
 use serde::{
     Deserialize, Deserializer,
-    de::{Error, MapAccess, Visitor},
+    de::{MapAccess, Visitor},
 };
 use std::{
-    fmt::{self, Debug},
+    fmt::{self, Debug, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Add, Index, IndexMut},
@@ -155,7 +155,7 @@ where
         {
             type Value = EnumMap<E, T>;
 
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, f: &mut Formatter) -> fmt::Result {
                 write!(f, "a map")
             }
 
@@ -165,14 +165,16 @@ where
 
                 while let Some((variant, value)) = access.next_entry()? {
                     if !guard.init(variant, value) {
-                        return Err(M::Error::custom(format!(
+                        return Err(serde::de::Error::custom(format_args!(
                             "duplicate variant \"{variant:?}\"",
                         )));
                     }
                 }
 
                 if let Err(variant) = guard.finish() {
-                    Err(M::Error::custom(format!("missing variant \"{variant:?}\"")))
+                    Err(serde::de::Error::custom(format_args!(
+                        "missing variant \"{variant:?}\"",
+                    )))
                 } else {
                     Ok(unsafe { uninit.assume_init() })
                 }
