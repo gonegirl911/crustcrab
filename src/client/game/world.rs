@@ -358,7 +358,7 @@ impl BlockVertex {
 }
 
 impl Vertex for BlockVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32x2];
+    const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32x2];
 }
 
 #[repr(C)]

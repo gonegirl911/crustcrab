@@ -238,7 +238,7 @@ impl<T: ?Sized, U: Clone> Clone for MemoryState<'_, T, U> {
 impl<T: ?Sized, U: Copy> Copy for MemoryState<'_, T, U> {}
 
 pub trait Vertex: Pod {
-    const ATTRIBS: &'static [wgpu::VertexAttribute];
+    const ATTRIBS: &[wgpu::VertexAttribute];
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -262,7 +262,7 @@ impl Index for u32 {
 }
 
 pub trait Instance: Pod {
-    const ATTRIBS: &'static [wgpu::VertexAttribute];
+    const ATTRIBS: &[wgpu::VertexAttribute];
 
     fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {

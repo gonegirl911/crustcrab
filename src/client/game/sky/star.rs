@@ -137,7 +137,7 @@ impl StarInstance {
 }
 
 impl Instance for StarInstance {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] =
+    const ATTRIBS: &[wgpu::VertexAttribute] =
         &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4];
 }
 

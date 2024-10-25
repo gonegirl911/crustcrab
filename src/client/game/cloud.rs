@@ -175,7 +175,7 @@ impl CloudInstance {
 }
 
 impl Instance for CloudInstance {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![1 => Float32x2];
+    const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![1 => Float32x2];
 }
 
 #[repr(C)]

@@ -154,7 +154,7 @@ impl BlockHighlightVertex {
 }
 
 impl Vertex for BlockHighlightVertex {
-    const ATTRIBS: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
+    const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
 }
 
 #[repr(C)]
