@@ -176,7 +176,7 @@ impl World {
                 let group = entry.get_mut();
                 if group.len() == group_size - 1 {
                     for output in entry.remove().into_iter().chain([output]) {
-                        self.apply_output(renderer, output)
+                        self.apply_output(renderer, output);
                     }
                 } else {
                     group.push(output);
