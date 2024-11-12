@@ -1,5 +1,6 @@
 #![feature(
     array_chunks,
+    array_windows,
     generic_arg_infer,
     impl_trait_in_assoc_type,
     int_roundings,

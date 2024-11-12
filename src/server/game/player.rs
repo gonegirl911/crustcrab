@@ -12,7 +12,7 @@ use std::ops::Range;
 #[derive(Default)]
 pub struct Player {
     pub prev: WorldArea,
-    pub curr: WorldArea,
+    pub cur: WorldArea,
     pub ray: Ray,
 }
 
@@ -20,7 +20,7 @@ impl EventHandler<Event> for Player {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        self.prev = self.curr;
+        self.prev = self.cur;
 
         if let Event::Client(event) = event {
             match *event {
@@ -29,7 +29,7 @@ impl EventHandler<Event> for Player {
                     dir,
                     render_distance,
                 } => {
-                    self.curr = WorldArea {
+                    self.cur = WorldArea {
                         center: utils::chunk_coords(origin),
                         radius: render_distance as i32,
                     };
@@ -39,7 +39,7 @@ impl EventHandler<Event> for Player {
                     self.ray.dir = dir;
                 }
                 ClientEvent::PlayerPositionChanged { origin } => {
-                    self.curr.center = utils::chunk_coords(origin);
+                    self.cur.center = utils::chunk_coords(origin);
                     self.ray.origin = origin;
                 }
                 _ => {}

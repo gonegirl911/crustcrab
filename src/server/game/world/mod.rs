@@ -257,18 +257,18 @@ impl EventHandler<WorldEvent> for World {
 
                 self.par_send_loads(loads, proxy);
             }
-            WorldEvent::WorldAreaChanged { prev, curr, ray } => {
-                let inserts = self.par_insert_many(curr.par_exclusive_server_points(prev));
+            WorldEvent::WorldAreaChanged { prev, cur, ray } => {
+                let inserts = self.par_insert_many(cur.par_exclusive_server_points(prev));
                 let block_updates = self.par_light_up(&inserts);
-                let loads = curr
+                let loads = cur
                     .exclusive_client_points(prev)
                     .filter(|&coords| self.chunks.contains(coords))
                     .collect();
                 let unloads = prev
-                    .exclusive_client_points(curr)
+                    .exclusive_client_points(cur)
                     .filter(|&coords| self.chunks.contains(coords))
                     .collect();
-                let updates = self.updates(inserts, block_updates, curr, &loads, &unloads);
+                let updates = self.updates(inserts, block_updates, cur, &loads, &unloads);
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, proxy);
 
@@ -525,15 +525,15 @@ impl ChunkData {
 
             for axis in 0..=Chunk::DIM as i8 {
                 let mut quads = Self::quads(&areas, side, mask, is_negative, abs_delta, axis - 1);
-                let mut curr = 0;
+                let mut cur = 0;
 
                 for secondary in 0..Chunk::DIM {
                     let mut main = 0;
 
                     while main < Chunk::DIM {
                         if let Some(quad) = quads[secondary * Chunk::DIM + main] {
-                            let width = Self::width(&quads, curr, main, quad);
-                            let height = Self::height(&quads, curr, secondary, quad, width);
+                            let width = Self::width(&quads, cur, main, quad);
+                            let height = Self::height(&quads, cur, secondary, quad, width);
 
                             if let Some(quad) = quad {
                                 vertices.extend(quad.vertices(
@@ -546,14 +546,14 @@ impl ChunkData {
 
                             for secondary in 0..height {
                                 for main in 0..width {
-                                    quads[curr + secondary * Chunk::DIM + main] = None;
+                                    quads[cur + secondary * Chunk::DIM + main] = None;
                                 }
                             }
 
-                            curr += width;
+                            cur += width;
                             main += width;
                         } else {
-                            curr += 1;
+                            cur += 1;
                             main += 1;
                         }
                     }
@@ -735,7 +735,7 @@ pub enum WorldEvent {
     },
     WorldAreaChanged {
         prev: WorldArea,
-        curr: WorldArea,
+        cur: WorldArea,
         ray: Ray,
     },
     BlockHoverRequested {
@@ -753,13 +753,13 @@ pub enum WorldEvent {
 }
 
 impl WorldEvent {
-    pub fn new(event: &Event, &Player { prev, curr, ray }: &Player) -> Option<Self> {
+    pub fn new(event: &Event, &Player { prev, cur, ray }: &Player) -> Option<Self> {
         match *event {
             Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
-                Some(Self::InitialRenderRequested { area: curr, ray })
+                Some(Self::InitialRenderRequested { area: cur, ray })
             }
-            Event::Client(ClientEvent::PlayerPositionChanged { .. }) if curr != prev => {
-                Some(Self::WorldAreaChanged { prev, curr, ray })
+            Event::Client(ClientEvent::PlayerPositionChanged { .. }) if cur != prev => {
+                Some(Self::WorldAreaChanged { prev, cur, ray })
             }
             Event::Client(ClientEvent::PlayerPositionChanged { .. }) => {
                 Some(Self::BlockHoverRequested { ray })
@@ -769,11 +769,11 @@ impl WorldEvent {
             }
             Event::Client(ClientEvent::BlockPlaced { block }) => Some(Self::BlockPlaced {
                 block,
-                area: curr,
+                area: cur,
                 ray,
             }),
             Event::Client(ClientEvent::BlockDestroyed) => {
-                Some(Self::BlockDestroyed { area: curr, ray })
+                Some(Self::BlockDestroyed { area: cur, ray })
             }
             _ => None,
         }

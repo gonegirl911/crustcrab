@@ -174,15 +174,15 @@ impl ImageTexture {
                 })
             })
             .collect::<Vec<_>>()
-            .windows(2)
-            .for_each(|views| {
+            .array_windows()
+            .for_each(|[prev, cur]| {
                 let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: None,
                     layout: &bind_group_layout,
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&views[0]),
+                            resource: wgpu::BindingResource::TextureView(prev),
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
@@ -193,7 +193,7 @@ impl ImageTexture {
                 blit.draw(
                     &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &views[1],
+                            view: cur,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
