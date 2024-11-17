@@ -149,7 +149,7 @@ static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
         entry
             .file_name()
             .to_str()
-            .map_or(false, |s| s.starts_with('.'))
+            .is_some_and(|s| s.starts_with('.'))
     }
 
     let data = WalkDir::new("assets/config/models")
@@ -157,7 +157,7 @@ static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
         .into_iter()
         .filter_entry(|entry| !is_hidden(entry))
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().extension().map_or(false, |s| s == "toml"))
+        .filter(|entry| entry.path().extension().is_some_and(|s| s == "toml"))
         .map(|entry| {
             let path = entry.path();
             (
