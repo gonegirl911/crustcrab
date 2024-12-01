@@ -24,7 +24,7 @@ impl BlockArea {
     }
 
     pub fn is_side_visible(self, side: Option<Side>) -> bool {
-        side.map_or(true, |side| {
+        side.is_none_or(|side| {
             let neighbor = self[SIDE_DELTAS[side]];
             neighbor != self.block() && neighbor.data().is_transparent()
         })
