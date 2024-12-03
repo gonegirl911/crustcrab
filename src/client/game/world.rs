@@ -29,19 +29,13 @@ use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
 use winit::event::WindowEvent;
 
 pub struct World {
-    meshes: FxHashMap<Point3<i32>, ChunkMesh>,
+    meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
     program: Program,
     unloaded: FxHashSet<Point3<i32>>,
     groups: FxHashMap<Instant, Vec<Result<ChunkOutput, Point3<i32>>>>,
     group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
     workers: ThreadPool<ChunkInput, ChunkOutput>,
 }
-
-type ChunkMesh = (
-    VertexBuffer<BlockVertex>,
-    Option<TransparentMesh<Point3<f32>, BlockVertex>>,
-    Instant,
-);
 
 type ChunkInput = (Point3<i32>, Arc<ChunkData>, Instant);
 
@@ -108,13 +102,15 @@ impl World {
                 textures_bind_group,
             ]);
 
-            for (&coords, (buffer, transparent_mesh, _)) in &mut self.meshes {
+            for (&coords, (mesh, _)) in &mut self.meshes {
                 if Chunk::bounding_sphere(coords).is_visible(frustum) {
-                    BlockPushConstants::new(coords).set(&mut render_pass);
-                    buffer.draw(&mut render_pass);
+                    if let Some(opaque_part) = mesh.opaque_part() {
+                        BlockPushConstants::new(coords).set(&mut render_pass);
+                        opaque_part.draw(&mut render_pass);
+                    }
 
-                    if let Some(mesh) = transparent_mesh {
-                        transparent_meshes.push((coords, mesh));
+                    if let Some(transparent_part) = mesh.transparent_part_mut() {
+                        transparent_meshes.push((coords, transparent_part));
                     }
                 }
             }
@@ -205,27 +201,23 @@ impl World {
             return;
         }
 
-        if vertices.is_empty() && transparent_vertices.is_empty() {
-            self.meshes.remove(&coords);
-            return;
-        }
-
-        self.meshes
-            .entry(coords)
-            .and_modify(|(vertex_buffer, transparent_mesh, last_updated_at)| {
+        match self.meshes.entry(coords) {
+            Entry::Occupied(mut entry) => {
+                let (chunk_mesh, last_updated_at) = entry.get_mut();
                 if *last_updated_at < updated_at {
-                    *vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&vertices));
-                    *transparent_mesh = Self::transparent_mesh(renderer, &transparent_vertices);
-                    *last_updated_at = updated_at;
+                    if let Some(mesh) = ChunkMesh::new(renderer, &vertices, &transparent_vertices) {
+                        *chunk_mesh = mesh;
+                    } else {
+                        entry.remove();
+                    }
                 }
-            })
-            .or_insert_with(|| {
-                (
-                    VertexBuffer::new(renderer, MemoryState::Immutable(&vertices)),
-                    Self::transparent_mesh(renderer, &transparent_vertices),
-                    updated_at,
-                )
-            });
+            }
+            Entry::Vacant(entry) => {
+                if let Some(mesh) = ChunkMesh::new(renderer, &vertices, &transparent_vertices) {
+                    entry.insert((mesh, updated_at));
+                }
+            }
+        }
     }
 
     fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
@@ -260,18 +252,6 @@ impl World {
                 stencil_ops: None,
             }),
             ..Default::default()
-        })
-    }
-
-    fn transparent_mesh(
-        renderer: &Renderer,
-        vertices: &[BlockVertex],
-    ) -> Option<TransparentMesh<Point3<f32>, BlockVertex>> {
-        TransparentMesh::new_non_empty(renderer, vertices, |v| {
-            v.iter()
-                .fold(Point3::default(), |acc, v| acc + v.coords().coords)
-                .cast()
-                / v.len() as f32
         })
     }
 }
@@ -316,6 +296,58 @@ impl EventHandler for World {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+enum ChunkMesh {
+    Mixed {
+        opaque_part: VertexBuffer<BlockVertex>,
+        transparent_part: TransparentMesh<Point3<f32>, BlockVertex>,
+    },
+    Opaque(VertexBuffer<BlockVertex>),
+    Transparent(TransparentMesh<Point3<f32>, BlockVertex>),
+}
+
+impl ChunkMesh {
+    fn new(
+        renderer: &Renderer,
+        vertices: &[BlockVertex],
+        transparent_vertices: &[BlockVertex],
+    ) -> Option<Self> {
+        match (
+            VertexBuffer::new_non_empty(renderer, MemoryState::Immutable(vertices)),
+            TransparentMesh::new_non_empty(renderer, transparent_vertices, |v| {
+                v.iter()
+                    .fold(Point3::default(), |acc, v| acc + v.coords().coords)
+                    .cast()
+                    / v.len() as f32
+            }),
+        ) {
+            (Some(opaque_part), Some(transparent_part)) => Some(Self::Mixed {
+                opaque_part,
+                transparent_part,
+            }),
+            (Some(opaque_part), None) => Some(Self::Opaque(opaque_part)),
+            (None, Some(transparent_part)) => Some(Self::Transparent(transparent_part)),
+            (None, None) => None,
+        }
+    }
+
+    fn opaque_part(&self) -> Option<&VertexBuffer<BlockVertex>> {
+        if let Self::Mixed { opaque_part, .. } | Self::Opaque(opaque_part) = self {
+            Some(opaque_part)
+        } else {
+            None
+        }
+    }
+
+    #[rustfmt::skip]
+    fn transparent_part_mut(&mut self) -> Option<&mut TransparentMesh<Point3<f32>, BlockVertex>> {
+        if let Self::Mixed { transparent_part, .. } | Self::Transparent(transparent_part) = self {
+            Some(transparent_part)
+        } else {
+            None
         }
     }
 }
