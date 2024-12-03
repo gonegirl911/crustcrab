@@ -302,12 +302,16 @@ impl EventHandler for World {
 
 enum ChunkMesh {
     Mixed {
-        opaque_part: VertexBuffer<BlockVertex>,
-        transparent_part: TransparentMesh<Point3<f32>, BlockVertex>,
+        opaque_part: OpaquePart,
+        transparent_part: TransparentPart,
     },
-    Opaque(VertexBuffer<BlockVertex>),
-    Transparent(TransparentMesh<Point3<f32>, BlockVertex>),
+    Opaque(OpaquePart),
+    Transparent(TransparentPart),
 }
+
+type OpaquePart = VertexBuffer<BlockVertex>;
+
+type TransparentPart = TransparentMesh<Point3<f32>, BlockVertex>;
 
 impl ChunkMesh {
     fn new(
@@ -316,8 +320,8 @@ impl ChunkMesh {
         transparent_vertices: &[BlockVertex],
     ) -> Option<Self> {
         match (
-            VertexBuffer::new_non_empty(renderer, MemoryState::Immutable(vertices)),
-            TransparentMesh::new_non_empty(renderer, transparent_vertices, |v| {
+            OpaquePart::new_non_empty(renderer, MemoryState::Immutable(vertices)),
+            TransparentPart::new_non_empty(renderer, transparent_vertices, |v| {
                 v.iter()
                     .fold(Point3::default(), |acc, v| acc + v.coords().coords)
                     .cast()
@@ -334,7 +338,7 @@ impl ChunkMesh {
         }
     }
 
-    fn opaque_part(&self) -> Option<&VertexBuffer<BlockVertex>> {
+    fn opaque_part(&self) -> Option<&OpaquePart> {
         if let Self::Mixed { opaque_part, .. } | Self::Opaque(opaque_part) = self {
             Some(opaque_part)
         } else {
@@ -343,7 +347,7 @@ impl ChunkMesh {
     }
 
     #[rustfmt::skip]
-    fn transparent_part_mut(&mut self) -> Option<&mut TransparentMesh<Point3<f32>, BlockVertex>> {
+    fn transparent_part_mut(&mut self) -> Option<&mut TransparentPart> {
         if let Self::Mixed { transparent_part, .. } | Self::Transparent(transparent_part) = self {
             Some(transparent_part)
         } else {
