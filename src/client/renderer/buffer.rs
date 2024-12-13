@@ -42,7 +42,11 @@ impl<V: Pod> VertexBuffer<V> {
     }
 
     pub fn new_non_empty(renderer: &Renderer, state: MemoryState<[V], usize>) -> Option<Self> {
-        (!state.is_empty()).then(|| Self::new(renderer, state))
+        Some(Self(Buffer::<[_]>::new_non_empty(
+            renderer,
+            state.data(),
+            state.usage(wgpu::BufferUsages::VERTEX),
+        )?))
     }
 }
 
@@ -129,13 +133,18 @@ impl<T: Pod> Buffer<T> {
 }
 
 impl<T: Pod> Buffer<[T]> {
-    fn new(
+    fn new(renderer: &Renderer, data: Result<&[T], usize>, usage: wgpu::BufferUsages) -> Self {
+        Self::new_non_empty(renderer, data, usage).unwrap_or_else(|| unreachable!())
+    }
+
+    fn new_non_empty(
         Renderer { device, .. }: &Renderer,
         data: Result<&[T], usize>,
         usage: wgpu::BufferUsages,
-    ) -> Self {
-        Self {
+    ) -> Option<Self> {
+        Some(Self {
             buffer: match data {
+                Ok([]) | Err(0) => return None,
                 Ok(data) => device.create_buffer_init(&BufferInitDescriptor {
                     label: None,
                     contents: bytemuck::cast_slice(data),
@@ -149,7 +158,7 @@ impl<T: Pod> Buffer<[T]> {
                 }),
             },
             phantom: PhantomData,
-        }
+        })
     }
 }
 
@@ -215,13 +224,6 @@ impl<'a, T> MemoryState<'a, [T], usize> {
         match self {
             Self::Immutable(data) => Ok(data),
             Self::Uninit(len) => Err(len),
-        }
-    }
-
-    fn is_empty(self) -> bool {
-        match self {
-            Self::Immutable(data) => data.is_empty(),
-            Self::Uninit(len) => len == 0,
         }
     }
 }
