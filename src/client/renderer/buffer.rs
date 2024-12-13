@@ -142,6 +142,7 @@ impl<T: Pod> Buffer<[T]> {
         data: Result<&[T], usize>,
         usage: wgpu::BufferUsages,
     ) -> Option<Self> {
+        const { assert!(size_of::<T>() != 0) };
         Some(Self {
             buffer: match data {
                 Ok([]) | Err(0) => return None,
