@@ -100,7 +100,7 @@ impl ImageTexture {
         );
 
         if mip_level_count > 1 {
-            Self::gen_mip_levels(renderer, &texture, mip_level_count);
+            Self::generate_mip_levels(renderer, &texture, mip_level_count);
         }
 
         texture.create_view(&Default::default())
@@ -132,7 +132,7 @@ impl ImageTexture {
             .into_rgba8()
     }
 
-    fn gen_mip_levels(
+    fn generate_mip_levels(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         texture: &wgpu::Texture,
         count: u32,
