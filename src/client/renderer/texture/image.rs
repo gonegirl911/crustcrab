@@ -85,14 +85,14 @@ impl ImageTexture {
         });
 
         queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             &image,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 bytes_per_row: Some(4 * width),
                 ..Default::default()
             },
