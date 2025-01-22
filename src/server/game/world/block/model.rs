@@ -68,6 +68,22 @@ impl ModelData {
     }
 }
 
+impl From<RawModelData> for ModelData {
+    fn from(data: RawModelData) -> Self {
+        Self {
+            diagonal: data.diagonal,
+            has_flat_icon: data.has_flat_icon,
+            side_corner_deltas: iter::zip(
+                Enum::variants(),
+                data.side_corner_deltas
+                    .into_values()
+                    .chain([data.internal_corner_deltas]),
+            )
+            .collect(),
+        }
+    }
+}
+
 #[derive(Clone, Deserialize)]
 #[serde(default)]
 pub struct RawModel {
@@ -126,22 +142,6 @@ struct RawModelData {
     has_flat_icon: bool,
     side_corner_deltas: EnumMap<Side, Box<CornerDeltas>>,
     internal_corner_deltas: Box<CornerDeltas>,
-}
-
-impl From<RawModelData> for ModelData {
-    fn from(data: RawModelData) -> Self {
-        Self {
-            diagonal: data.diagonal,
-            has_flat_icon: data.has_flat_icon,
-            side_corner_deltas: iter::zip(
-                Enum::variants(),
-                data.side_corner_deltas
-                    .into_values()
-                    .chain([data.internal_corner_deltas]),
-            )
-            .collect(),
-        }
-    }
 }
 
 static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
