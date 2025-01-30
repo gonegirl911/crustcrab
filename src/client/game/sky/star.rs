@@ -16,7 +16,11 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, UnitQuaternion, Vector3, point, vector};
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{
+    Rng, SeedableRng,
+    distr::{Distribution, Uniform},
+    rngs::SmallRng,
+};
 use serde::Deserialize;
 use std::f32::consts::{FRAC_PI_2, PI};
 use winit::event::WindowEvent;
@@ -33,8 +37,9 @@ impl StarDome {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let count = CLIENT_CONFIG.sky.star.count;
         let stars = {
-            let mut rng = StdRng::seed_from_u64(6);
-            (0..count).map(|_| Star::new(&mut rng)).collect()
+            let mut rng = SmallRng::seed_from_u64(6);
+            let generator = StarGenerator::default();
+            (0..count).map(|_| generator.generate(&mut rng)).collect()
         };
         let instance_buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
         let program = Program::new(
@@ -105,17 +110,37 @@ struct Star {
 }
 
 impl Star {
-    fn new<R: Rng>(rng: &mut R) -> Self {
+    fn new(theta: f32, phi: f32, rotation: f32) -> Self {
         Self {
-            coords: Self::spherical_coords(rng),
-            rotation: rng.gen_range(0.0..FRAC_PI_2),
+            coords: point![theta.cos() * phi.sin(), phi.cos(), theta.sin() * phi.sin()],
+            rotation,
         }
     }
+}
 
-    fn spherical_coords<R: Rng>(rng: &mut R) -> Point3<f32> {
-        let theta = rng.gen_range(-PI..=PI);
-        let phi = rng.gen_range(-1.0f32..=1.0).acos();
-        point![theta.cos() * phi.sin(), phi.cos(), theta.sin() * phi.sin()]
+struct StarGenerator {
+    theta_uniform: Uniform<f32>,
+    cos_phi_uniform: Uniform<f32>,
+    rotation_uniform: Uniform<f32>,
+}
+
+impl StarGenerator {
+    fn generate<R: Rng>(&self, rng: &mut R) -> Star {
+        Star::new(
+            self.theta_uniform.sample(rng),
+            self.cos_phi_uniform.sample(rng).acos(),
+            self.rotation_uniform.sample(rng),
+        )
+    }
+}
+
+impl Default for StarGenerator {
+    fn default() -> Self {
+        Self {
+            theta_uniform: Uniform::new_inclusive(-PI, PI).unwrap_or_else(|_| unreachable!()),
+            cos_phi_uniform: Uniform::new_inclusive(-1.0, 1.0).unwrap_or_else(|_| unreachable!()),
+            rotation_uniform: Uniform::new(0.0, FRAC_PI_2).unwrap_or_else(|_| unreachable!()),
+        }
     }
 }
 

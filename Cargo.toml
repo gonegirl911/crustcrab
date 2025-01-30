@@ -14,23 +14,26 @@ strip = "symbols"
 
 [dependencies]
 arrayvec = { version = "0.7.6", features = ["serde"] }
-bitfield = "0.17.0"
+bitfield = "0.18.1"
 bitflags = "2.8.0"
 bytemuck = { version = "1.21.0", features = ["derive"] }
 crossbeam-channel = "0.5.14"
 env_logger = "0.11.6"
 generic-array = "1.2.0"
 image = "0.25.5"
-indexmap = "2.7.0"
+indexmap = "2.7.1"
 macros = { path = "macros" }
 nalgebra = { version = "0.33.2", features = ["bytemuck", "serde-serialize"] }
 noise = "0.9.0"
 pollster = "0.4.0"
-rand = "0.8.5"
+rand = { version = "0.9.0", default-features = false, features = [
+    "small_rng",
+    "std",
+] }
 rayon = "1.10.0"
 rustc-hash = "2.1.0"
 serde = { version = "1.0.217", features = ["derive", "rc"] }
 toml = "0.8.19"
 walkdir = "2.5.0"
-wgpu = "24.0.0"
+wgpu = "24.0.1"
 winit = "0.30.8"
