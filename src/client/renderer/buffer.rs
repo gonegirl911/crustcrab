@@ -1,12 +1,6 @@
 use super::Renderer;
 use bytemuck::Pod;
-use std::{
-    marker::PhantomData,
-    mem,
-    num::{NonZero, NonZeroU64},
-    ops::Deref,
-    slice,
-};
+use std::{marker::PhantomData, mem, num::NonZeroU64, ops::Deref, slice};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
@@ -131,7 +125,7 @@ pub struct Buffer<T: ?Sized> {
 
 impl<T: ?Sized> Buffer<T> {
     fn size(&self) -> NonZeroU64 {
-        NonZero::new(self.buffer.size()).unwrap_or_else(|| unreachable!())
+        NonZeroU64::new(self.buffer.size()).unwrap_or_else(|| unreachable!())
     }
 }
 
