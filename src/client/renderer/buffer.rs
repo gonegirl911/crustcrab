@@ -1,6 +1,12 @@
 use super::Renderer;
 use bytemuck::Pod;
-use std::{marker::PhantomData, ops::Deref, slice};
+use std::{
+    marker::PhantomData,
+    mem,
+    num::{NonZero, NonZeroU64},
+    ops::Deref,
+    slice,
+};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
@@ -123,12 +129,28 @@ pub struct Buffer<T: ?Sized> {
     phantom: PhantomData<T>,
 }
 
+impl<T: ?Sized> Buffer<T> {
+    fn size(&self) -> NonZeroU64 {
+        NonZero::new(self.buffer.size()).unwrap_or_else(|| unreachable!())
+    }
+}
+
+impl<T> Buffer<[T]> {
+    pub fn len(&self) -> u32 {
+        (self.buffer.size() / size_of::<T>() as u64) as u32
+    }
+}
+
 impl<T: Pod> Buffer<T> {
     fn new(renderer: &Renderer, value: Option<&T>, usage: wgpu::BufferUsages) -> Self {
         Self {
             buffer: Buffer::<[_]>::new(renderer, value.map(slice::from_ref).ok_or(1), usage).buffer,
             phantom: PhantomData,
         }
+    }
+
+    pub fn set(&self, renderer: &Renderer, value: &T) {
+        Buffer::<[_]>::from_ref(self).write(renderer, slice::from_ref(value));
     }
 }
 
@@ -161,27 +183,16 @@ impl<T: Pod> Buffer<[T]> {
             phantom: PhantomData,
         })
     }
-}
 
-impl<T> Buffer<[T]> {
-    pub fn len(&self) -> u32 {
-        (self.buffer.size() / size_of::<T>() as u64) as u32
+    fn from_ref(buffer: &Buffer<T>) -> &Self {
+        unsafe { mem::transmute(buffer) }
     }
-}
 
-impl<T: Pod> Buffer<T> {
-    pub fn set(&self, Renderer { queue, .. }: &Renderer, value: &T) {
-        queue.write_buffer(
-            &self.buffer,
-            0,
-            bytemuck::cast_slice(slice::from_ref(value)),
-        );
-    }
-}
-
-impl<T: Pod> Buffer<[T]> {
     pub fn write(&self, Renderer { queue, .. }: &Renderer, data: &[T]) {
-        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
+        queue
+            .write_buffer_with(&self.buffer, 0, self.size())
+            .unwrap_or_else(|| unreachable!())
+            .copy_from_slice(bytemuck::cast_slice(data));
     }
 }
 
