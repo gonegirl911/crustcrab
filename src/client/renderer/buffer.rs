@@ -135,12 +135,6 @@ impl<T: ?Sized> Buffer<T> {
     }
 }
 
-impl<T> Buffer<[T]> {
-    pub fn len(&self) -> u32 {
-        (self.buffer.size() / size_of::<T>() as u64) as u32
-    }
-}
-
 impl<T: Pod> Buffer<T> {
     fn new(renderer: &Renderer, value: Option<&T>, usage: wgpu::BufferUsages) -> Self {
         Self {
@@ -151,6 +145,16 @@ impl<T: Pod> Buffer<T> {
 
     pub fn set(&self, renderer: &Renderer, value: &T) {
         Buffer::<[_]>::from_ref(self).write(renderer, slice::from_ref(value));
+    }
+}
+
+impl<T> Buffer<[T]> {
+    fn from_ref(buffer: &Buffer<T>) -> &Self {
+        unsafe { mem::transmute(buffer) }
+    }
+
+    pub fn len(&self) -> u32 {
+        (self.buffer.size() / size_of::<T>() as u64) as u32
     }
 }
 
@@ -182,10 +186,6 @@ impl<T: Pod> Buffer<[T]> {
             },
             phantom: PhantomData,
         })
-    }
-
-    fn from_ref(buffer: &Buffer<T>) -> &Self {
-        unsafe { mem::transmute(buffer) }
     }
 
     pub fn write(&self, Renderer { queue, .. }: &Renderer, data: &[T]) {
