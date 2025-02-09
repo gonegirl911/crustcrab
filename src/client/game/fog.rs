@@ -58,12 +58,15 @@ impl Fog {
             })],
             ..Default::default()
         });
-        self.program.bind(&mut render_pass, [
-            player_bind_group,
-            sky_bind_group,
-            self.texture.bind_group(),
-            depth_bind_group,
-        ]);
+        self.program.bind(
+            &mut render_pass,
+            [
+                player_bind_group,
+                sky_bind_group,
+                self.texture.bind_group(),
+                depth_bind_group,
+            ],
+        );
         render_pass.draw(0..3, 0..1);
     }
 }

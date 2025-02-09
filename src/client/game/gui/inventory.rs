@@ -74,10 +74,10 @@ impl Inventory {
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
         if let Some(buffer) = &self.vertex_buffer {
-            self.program.bind(render_pass, [
-                self.uniform.bind_group(),
-                textures_bind_group,
-            ]);
+            self.program.bind(
+                render_pass,
+                [self.uniform.bind_group(), textures_bind_group],
+            );
             buffer.draw(render_pass);
         }
     }

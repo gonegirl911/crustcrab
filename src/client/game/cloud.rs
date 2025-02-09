@@ -105,10 +105,10 @@ impl CloudLayer {
                 }),
                 ..Default::default()
             });
-            self.program.bind(&mut render_pass, [
-                player_bind_group,
-                self.texture.bind_group(),
-            ]);
+            self.program.bind(
+                &mut render_pass,
+                [player_bind_group, self.texture.bind_group()],
+            );
             self.pc.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }

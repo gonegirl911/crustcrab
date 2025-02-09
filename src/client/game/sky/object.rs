@@ -68,11 +68,14 @@ impl ObjectSet {
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
     ) {
-        self.program.bind(render_pass, [
-            player_bind_group,
-            sky_bind_group,
-            self.textures.bind_group(),
-        ]);
+        self.program.bind(
+            render_pass,
+            [
+                player_bind_group,
+                sky_bind_group,
+                self.textures.bind_group(),
+            ],
+        );
         self.sun_pc.set(render_pass);
         render_pass.draw(0..6, 0..1);
         self.moon_pc.set(render_pass);

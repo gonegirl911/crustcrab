@@ -96,11 +96,10 @@ impl World {
         {
             let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
-            self.program.bind(&mut render_pass, [
-                player_bind_group,
-                sky_bind_group,
-                textures_bind_group,
-            ]);
+            self.program.bind(
+                &mut render_pass,
+                [player_bind_group, sky_bind_group, textures_bind_group],
+            );
 
             for (&coords, (mesh, _)) in &mut self.meshes {
                 if Chunk::bounding_sphere(coords).is_visible(frustum) {
@@ -120,11 +119,10 @@ impl World {
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
 
-        self.program.bind(&mut render_pass, [
-            player_bind_group,
-            sky_bind_group,
-            textures_bind_group,
-        ]);
+        self.program.bind(
+            &mut render_pass,
+            [player_bind_group, sky_bind_group, textures_bind_group],
+        );
 
         transparent_meshes.sort_unstable_by_key(|&(coords, _)| {
             Reverse(utils::magnitude_squared(
