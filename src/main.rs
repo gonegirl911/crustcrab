@@ -9,11 +9,18 @@
     type_alias_impl_trait
 )]
 
-mod app;
 mod client;
 mod server;
 mod shared;
 
+use client::Client;
+use server::Server;
+use std::thread;
+
 fn main() {
-    app::App::new().run();
+    let (client_tx, client_rx) = crossbeam_channel::unbounded();
+    let client = Client::new(client_tx);
+    let server = Server::new(client.create_proxy(), client_rx);
+    thread::spawn(move || server.run());
+    client.run();
 }

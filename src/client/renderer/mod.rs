@@ -22,7 +22,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: &Window) -> Self {
+    pub async fn new(window: Window) -> Self {
         let PhysicalSize { width, height } = window.inner_size();
         let instance = wgpu::Instance::default();
         let surface = instance

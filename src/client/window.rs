@@ -10,6 +10,7 @@ use winit::{
 
 pub use winit::window::Window as RawWindow;
 
+#[derive(Clone)]
 pub struct Window(Arc<RawWindow>);
 
 impl Window {
@@ -78,8 +79,8 @@ impl Deref for Window {
     }
 }
 
-impl From<&Window> for wgpu::SurfaceTarget<'static> {
-    fn from(window: &Window) -> Self {
-        window.0.clone().into()
+impl From<Window> for wgpu::SurfaceTarget<'static> {
+    fn from(window: Window) -> Self {
+        window.0.into()
     }
 }
