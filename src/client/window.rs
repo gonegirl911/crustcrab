@@ -1,6 +1,7 @@
 use super::event_loop::{Event, EventHandler};
 use std::{ops::Deref, sync::Arc};
 use winit::{
+    error::ExternalError,
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
@@ -16,18 +17,20 @@ impl Window {
         Self(
             event_loop
                 .create_window(WindowAttributes::default().with_title("Crustcrab"))
-                .expect("window should be buildable")
+                .expect("window should be creatable")
                 .into(),
         )
     }
 
-    fn set_cursor_grab<M: IntoIterator<Item = CursorGrabMode>>(&self, modes: M) {
+    fn set_cursor_grab<M>(&self, modes: M) -> Result<(), Vec<ExternalError>>
+    where
+        M: IntoIterator<Item = CursorGrabMode>,
+    {
         modes
             .into_iter()
             .map(|mode| self.0.set_cursor_grab(mode).err())
             .collect::<Option<Vec<_>>>()
             .map_or(Ok(()), Err)
-            .expect("cursor should be grabbable");
     }
 }
 
@@ -42,7 +45,8 @@ impl EventHandler for Window {
                     state: ElementState::Pressed,
                     ..
                 } => {
-                    self.set_cursor_grab([CursorGrabMode::Confined, CursorGrabMode::Locked]);
+                    self.set_cursor_grab([CursorGrabMode::Confined, CursorGrabMode::Locked])
+                        .expect("cursor should be grabbable");
                     self.0.set_cursor_visible(false);
                 }
                 WindowEvent::KeyboardInput {
@@ -54,7 +58,8 @@ impl EventHandler for Window {
                         },
                     ..
                 } => {
-                    self.set_cursor_grab([CursorGrabMode::None]);
+                    self.set_cursor_grab([CursorGrabMode::None])
+                        .unwrap_or_else(|_| unreachable!());
                     self.0.set_cursor_visible(true);
                 }
                 _ => {}
@@ -66,9 +71,15 @@ impl EventHandler for Window {
 }
 
 impl Deref for Window {
-    type Target = Arc<RawWindow>;
+    type Target = RawWindow;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl From<&Window> for wgpu::SurfaceTarget<'static> {
+    fn from(window: &Window) -> Self {
+        window.0.clone().into()
     }
 }
