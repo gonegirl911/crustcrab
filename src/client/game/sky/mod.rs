@@ -1,6 +1,6 @@
-mod atmosphere;
-mod object;
-mod star;
+pub mod atmosphere;
+pub mod object;
+pub mod star;
 
 use self::{
     atmosphere::Atmosphere,

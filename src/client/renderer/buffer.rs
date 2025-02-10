@@ -147,6 +147,7 @@ impl<T> Buffer<[T]> {
         unsafe { mem::transmute(buffer) }
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> u32 {
         (self.buffer.size() / size_of::<T>() as u64) as u32
     }
