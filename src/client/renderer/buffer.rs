@@ -118,6 +118,7 @@ impl<T> Deref for UniformBuffer<T> {
     }
 }
 
+#[repr(transparent)]
 pub struct Buffer<T: ?Sized> {
     buffer: wgpu::Buffer,
     phantom: PhantomData<T>,
@@ -138,7 +139,7 @@ impl<T: Pod> Buffer<T> {
 
 impl<T> Buffer<[T]> {
     fn from_ref(buffer: &Buffer<T>) -> &Self {
-        unsafe { mem::transmute(buffer) }
+        unsafe { mem::transmute(&buffer.buffer) }
     }
 
     pub fn len(&self) -> u32 {
