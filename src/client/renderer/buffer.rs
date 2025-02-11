@@ -1,6 +1,6 @@
 use super::Renderer;
 use bytemuck::Pod;
-use std::{marker::PhantomData, mem, num::NonZeroU64, ops::Deref, slice};
+use std::{marker::PhantomData, mem, ops::Deref, slice};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
@@ -123,12 +123,6 @@ pub struct Buffer<T: ?Sized> {
     phantom: PhantomData<T>,
 }
 
-impl<T: ?Sized> Buffer<T> {
-    fn size(&self) -> NonZeroU64 {
-        NonZeroU64::new(self.buffer.size()).unwrap_or_else(|| unreachable!())
-    }
-}
-
 impl<T: Pod> Buffer<T> {
     fn new(renderer: &Renderer, value: Option<&T>, usage: wgpu::BufferUsages) -> Self {
         Self {
@@ -183,10 +177,7 @@ impl<T: Pod> Buffer<[T]> {
     }
 
     pub fn write(&self, Renderer { queue, .. }: &Renderer, data: &[T]) {
-        queue
-            .write_buffer_with(&self.buffer, 0, self.size())
-            .unwrap_or_else(|| unreachable!())
-            .copy_from_slice(bytemuck::cast_slice(data));
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
     }
 }
 
