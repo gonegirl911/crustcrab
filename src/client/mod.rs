@@ -1,9 +1,9 @@
-pub mod app;
-pub mod event_loop;
-pub mod game;
-pub mod renderer;
-pub mod stopwatch;
-pub mod window;
+pub(crate) mod app;
+pub(crate) mod event_loop;
+pub(crate) mod game;
+pub(crate) mod renderer;
+pub(crate) mod stopwatch;
+pub(crate) mod window;
 
 use self::{
     event_loop::{EventLoop, EventLoopProxy},

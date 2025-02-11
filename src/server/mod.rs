@@ -1,6 +1,6 @@
-pub mod event_loop;
-pub mod game;
-pub mod ticker;
+pub(crate) mod event_loop;
+pub(crate) mod game;
+pub(crate) mod ticker;
 
 use self::{
     event_loop::{EventLoop, EventLoopConfig},
