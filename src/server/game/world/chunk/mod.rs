@@ -17,7 +17,7 @@ use std::{
 
 #[derive(Default)]
 pub struct Chunk {
-    blocks: DataStore<Block>,
+    blocks: ChunkDataStore<Block>,
     non_air_count: u16,
     glowing_count: u16,
 }
@@ -29,7 +29,7 @@ impl Chunk {
         let mut non_air_count = 0;
         let mut glowing_count = 0;
         Self {
-            blocks: DataStore::from_fn(|coords| {
+            blocks: ChunkDataStore::from_fn(|coords| {
                 let block = f(coords);
                 non_air_count += (block != Block::AIR) as u16;
                 glowing_count += block.data().is_glowing() as u16;
@@ -101,7 +101,7 @@ impl Index<Point3<u8>> for Chunk {
 
 #[derive(Default)]
 pub struct ChunkLight {
-    lights: DataStore<BlockLight>,
+    lights: ChunkDataStore<BlockLight>,
     non_zero_count: u16,
 }
 
@@ -144,9 +144,9 @@ impl BitOrAssign<BlockLight> for ChunkLight {
 }
 
 #[derive(Default)]
-pub struct DataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
+pub struct ChunkDataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
-impl<T> DataStore<T> {
+impl<T> ChunkDataStore<T> {
     pub fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
@@ -169,7 +169,7 @@ impl<T> DataStore<T> {
     }
 }
 
-impl<T> Index<Point3<u8>> for DataStore<T> {
+impl<T> Index<Point3<u8>> for ChunkDataStore<T> {
     type Output = T;
 
     fn index(&self, coords: Point3<u8>) -> &Self::Output {
@@ -177,7 +177,7 @@ impl<T> Index<Point3<u8>> for DataStore<T> {
     }
 }
 
-impl<T> IndexMut<Point3<u8>> for DataStore<T> {
+impl<T> IndexMut<Point3<u8>> for ChunkDataStore<T> {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
         &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }

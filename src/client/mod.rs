@@ -13,7 +13,7 @@ use crate::{server::game::world::block::Block, shared::utils};
 use app::App;
 use crossbeam_channel::Sender;
 use nalgebra::{Point3, Vector3};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 use winit::event_loop::ControlFlow;
 
@@ -50,6 +50,7 @@ impl Client {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum ClientEvent {
     InitialRenderRequested {
         origin: Point3<f32>,

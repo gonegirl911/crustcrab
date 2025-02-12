@@ -12,7 +12,7 @@ use self::{
         data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
     },
     chunk::{
-        Chunk, DataStore,
+        Chunk, ChunkDataStore,
         area::{ChunkArea, ChunkAreaLight},
         generator::ChunkGenerator,
     },
@@ -37,6 +37,7 @@ use crate::{
 use nalgebra::{Point2, Point3, Vector3, point};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde::{Deserialize, Serialize};
 use std::{
     array,
     collections::hash_map::Entry,
@@ -499,6 +500,7 @@ impl Branch {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ChunkData {
     area: ChunkArea,
     area_light: ChunkAreaLight,
@@ -568,8 +570,8 @@ impl ChunkData {
         &self,
         vertices: &mut Vec<BlockVertex>,
         transparent_vertices: &mut Vec<BlockVertex>,
-    ) -> DataStore<(BlockArea, BlockAreaLight)> {
-        DataStore::from_fn(|coords| {
+    ) -> ChunkDataStore<(BlockArea, BlockAreaLight)> {
+        ChunkDataStore::from_fn(|coords| {
             let area = self.area.block_area(coords);
             let area_light = self.area_light.block_area_light(coords);
             let data = area.block().data();
@@ -593,7 +595,7 @@ impl ChunkData {
     }
 
     fn quads(
-        areas: &DataStore<(BlockArea, BlockAreaLight)>,
+        areas: &ChunkDataStore<(BlockArea, BlockAreaLight)>,
         side: Side,
         mask: Point3<usize>,
         is_negative: bool,
@@ -650,7 +652,7 @@ impl ChunkData {
 
     fn quad(
         cond: bool,
-        areas: &DataStore<(BlockArea, BlockAreaLight)>,
+        areas: &ChunkDataStore<(BlockArea, BlockAreaLight)>,
         side: Side,
         coords: Point3<i8>,
     ) -> Option<Option<Quad>> {
@@ -705,7 +707,7 @@ impl PartialEq for Quad {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct BlockHoverData {
     pub hitbox: Aabb,
     pub brightness: BlockLight,

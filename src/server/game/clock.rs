@@ -7,7 +7,7 @@ use crate::{
     shared::utils::{self, Lerp},
 };
 use nalgebra::{UnitQuaternion, Vector3};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{f32::consts::TAU, ops::Range};
 
 #[derive(Clone, Copy)]
@@ -50,7 +50,7 @@ impl EventHandler<Event> for Clock {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Time {
     ticks: u16,
 }

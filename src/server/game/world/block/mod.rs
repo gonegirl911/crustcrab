@@ -6,10 +6,11 @@ use self::data::{BLOCK_DATA, BlockData};
 use super::action::BlockAction;
 use crate::shared::color::Rgb;
 use bitfield::bitfield;
+use serde::{Deserialize, Serialize};
 use std::{array, ops::Range};
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Default)]
+#[derive(Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct Block(u8);
 
 impl Block {
@@ -48,7 +49,7 @@ impl Block {
 }
 
 bitfield! {
-    #[derive(Clone, Copy, PartialEq, Default)]
+    #[derive(Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
     pub struct BlockLight(u32);
     pub u8, component, set_component: Self::COMPONENT_MAX.ilog2() as usize, 0, Self::LEN;
 }

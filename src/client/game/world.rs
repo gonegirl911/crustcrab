@@ -26,13 +26,14 @@ use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
+use uuid::Uuid;
 use winit::event::WindowEvent;
 
 pub struct World {
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
     program: Program,
     unloaded: FxHashSet<Point3<i32>>,
-    groups: FxHashMap<Instant, Vec<Result<ChunkOutput, Point3<i32>>>>,
+    groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
     group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
     workers: ThreadPool<ChunkInput, ChunkOutput>,
 }

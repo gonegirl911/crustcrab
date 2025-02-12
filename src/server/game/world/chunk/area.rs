@@ -7,10 +7,14 @@ use crate::{
     shared::utils,
 };
 use nalgebra::{Point3, Vector3, point, vector};
-use std::ops::{Index, IndexMut, Range};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    array, iter, mem,
+    ops::{Index, IndexMut, Range},
+};
 
-#[derive(Default)]
-pub struct ChunkArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
+#[derive(Default, Serialize, Deserialize)]
+pub struct ChunkArea(ChunkAreaDataStore<Block>);
 
 impl ChunkArea {
     const DIM: usize = Chunk::DIM + BlockArea::PADDING * 2;
@@ -51,32 +55,24 @@ impl ChunkArea {
             0..Chunk::DIM as u8
         }
     }
-
-    fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
-        delta
-            .map(|c| (c + BlockArea::PADDING as i8) as usize)
-            .into()
-    }
 }
 
 impl Index<Vector3<i8>> for ChunkArea {
     type Output = Block;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = Self::index_unchecked(delta);
-        &self.0[x][y][z]
+        &self.0[delta]
     }
 }
 
 impl IndexMut<Vector3<i8>> for ChunkArea {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = Self::index_unchecked(delta);
-        &mut self.0[x][y][z]
+        &mut self.0[delta]
     }
 }
 
-#[derive(Default)]
-pub struct ChunkAreaLight([[[BlockLight; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
+#[derive(Default, Serialize, Deserialize)]
+pub struct ChunkAreaLight(ChunkAreaDataStore<BlockLight>);
 
 impl ChunkAreaLight {
     pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
@@ -88,14 +84,93 @@ impl Index<Vector3<i8>> for ChunkAreaLight {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        let [x, y, z] = ChunkArea::index_unchecked(delta);
-        &self.0[x][y][z]
+        &self.0[delta]
     }
 }
 
 impl IndexMut<Vector3<i8>> for ChunkAreaLight {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = ChunkArea::index_unchecked(delta);
+        &mut self.0[delta]
+    }
+}
+
+#[derive(Default)]
+struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
+
+impl<T> ChunkAreaDataStore<T> {
+    fn from_fn<F: FnMut(Vector3<i8>) -> T>(mut f: F) -> Self {
+        Self(array::from_fn(|x| {
+            array::from_fn(|y| array::from_fn(|z| f(Self::delta_unchecked([x, y, z]))))
+        }))
+    }
+
+    fn values(&self) -> impl Iterator<Item = &T> {
+        self.0.iter().flatten().flatten()
+    }
+
+    fn delta_unchecked(index: [usize; 3]) -> Vector3<i8> {
+        index.map(|c| c as i8 - ChunkArea::PADDING as i8).into()
+    }
+
+    fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
+        delta
+            .map(|c| (c + BlockArea::PADDING as i8) as usize)
+            .into()
+    }
+}
+
+impl<T> Index<Vector3<i8>> for ChunkAreaDataStore<T> {
+    type Output = T;
+
+    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
+        let [x, y, z] = Self::index_unchecked(delta);
+        &self.0[x][y][z]
+    }
+}
+
+impl<T> IndexMut<Vector3<i8>> for ChunkAreaDataStore<T> {
+    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
+        let [x, y, z] = Self::index_unchecked(delta);
         &mut self.0[x][y][z]
     }
+}
+
+impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(pack_iter(self.values()))
+    }
+}
+
+impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let mut iter = unpack_iter(Vec::deserialize(deserializer)?);
+        Ok(Self::from_fn(|_| {
+            iter.next().unwrap_or_else(|| unreachable!())
+        }))
+    }
+}
+
+fn pack_iter<I>(iter: I) -> impl Iterator<Item = (I::Item, u16)>
+where
+    I: IntoIterator<Item: PartialEq>,
+{
+    let mut prev = None;
+    let mut count = 1;
+    iter.into_iter().filter_map(move |value| {
+        if prev.as_ref() == Some(&value) {
+            count += 1;
+            None
+        } else {
+            Some((prev.replace(value)?, mem::replace(&mut count, 1)))
+        }
+    })
+}
+
+fn unpack_iter<I, T>(iter: I) -> impl Iterator<Item = T>
+where
+    I: IntoIterator<Item = (T, u16)>,
+    T: Clone,
+{
+    iter.into_iter()
+        .flat_map(|(value, count)| iter::repeat_n(value, count as usize))
 }

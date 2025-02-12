@@ -17,11 +17,9 @@ use crate::{
 };
 use crossbeam_channel::Receiver;
 use nalgebra::Point3;
-use serde::Deserialize;
-use std::{
-    sync::{Arc, LazyLock},
-    time::Instant,
-};
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, LazyLock};
+use uuid::Uuid;
 
 pub struct Server {
     event_loop: EventLoop,
@@ -39,6 +37,7 @@ impl Server {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum ServerEvent {
     TimeUpdated(Time),
     ChunkLoaded {
@@ -58,16 +57,16 @@ pub enum ServerEvent {
     BlockHovered(Option<BlockHoverData>),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct GroupId {
-    pub id: Instant,
+    pub id: Uuid,
     pub size: usize,
 }
 
 impl GroupId {
     fn new(size: usize) -> Self {
         Self {
-            id: Instant::now(),
+            id: Uuid::new_v4(),
             size,
         }
     }

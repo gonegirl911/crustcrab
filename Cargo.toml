@@ -31,9 +31,10 @@ rand = { version = "0.9.0", default-features = false, features = [
     "std",
 ] }
 rayon = "1.10.0"
-rustc-hash = "2.1.0"
+rustc-hash = "2.1.1"
 serde = { version = "1.0.217", features = ["derive", "rc"] }
-toml = "0.8.19"
+toml = "0.8.20"
+uuid = { version = "1.13.1", features = ["fast-rng", "serde", "v4"] }
 walkdir = "2.5.0"
 wgpu = "24.0.1"
-winit = "0.30.8"
+winit = "0.30.9"
