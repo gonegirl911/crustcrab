@@ -25,19 +25,17 @@ use std::{
 
 pub struct Server {
     event_loop: EventLoop,
-    game: Game,
 }
 
 impl Server {
     pub fn new(proxy: EventLoopProxy, client_rx: Receiver<ClientEvent>) -> Self {
         Self {
             event_loop: EventLoop::new(proxy, client_rx),
-            game: Default::default(),
         }
     }
 
     pub fn run(self) {
-        self.event_loop.run(self.game);
+        self.event_loop.run(Game::default());
     }
 }
 
