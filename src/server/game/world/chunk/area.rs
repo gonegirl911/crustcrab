@@ -172,10 +172,7 @@ impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T
                 let mut cur = 0;
 
                 while let Some((value, count)) = seq.next_element::<(T, usize)>()? {
-                    for uninit in &mut uninit[cur..cur + count] {
-                        uninit.write(value.clone());
-                    }
-
+                    MaybeUninit::fill(&mut uninit[cur..cur + count], value);
                     cur += count;
                 }
 

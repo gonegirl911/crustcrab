@@ -5,6 +5,7 @@
     impl_trait_in_assoc_type,
     int_roundings,
     let_chains,
+    maybe_uninit_fill,
     trait_alias,
     type_alias_impl_trait
 )]
