@@ -261,12 +261,10 @@ pub enum Component {
 
 pub(super) static BLOCK_DATA: LazyLock<Box<[BlockData]>> = LazyLock::new(|| {
     let mut data = Box::new_uninit_slice(STR_TO_BLOCK.len());
-    unsafe {
-        for (str, &Block(i)) in &*STR_TO_BLOCK {
-            data[i as usize].write(RAW_BLOCK_DATA[str].clone().into());
-        }
-        data.assume_init()
+    for (str, &Block(i)) in &*STR_TO_BLOCK {
+        data[i as usize].write(RAW_BLOCK_DATA[str].clone().into());
     }
+    unsafe { data.assume_init() }
 });
 
 pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(|| {
