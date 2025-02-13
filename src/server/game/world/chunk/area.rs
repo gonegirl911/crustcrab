@@ -133,6 +133,8 @@ impl<T> IndexMut<Vector3<i8>> for ChunkAreaDataStore<T> {
 
 impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        const { assert!(ChunkArea::DIM.pow(3) <= u16::MAX as usize) };
+
         let mut seq = serializer.serialize_seq(None)?;
         let mut values = self.values();
         let mut prev = values.next().unwrap_or_else(|| unreachable!());
