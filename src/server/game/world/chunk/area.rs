@@ -162,7 +162,7 @@ impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T
             type Value = ChunkAreaDataStore<T>;
 
             fn expecting(&self, f: &mut Formatter) -> fmt::Result {
-                write!(f, "a sequence")
+                write!(f, "a sequence of (value, count) pairs")
             }
 
             fn visit_seq<S: SeqAccess<'de>>(self, mut seq: S) -> Result<Self::Value, S::Error> {
