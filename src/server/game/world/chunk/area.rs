@@ -136,7 +136,7 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
         let mut seq = serializer.serialize_seq(None)?;
         let mut values = self.values();
         let mut prev = values.next().unwrap_or_else(|| unreachable!());
-        let mut count = 1;
+        let mut count = 1u16;
 
         for value in values {
             if prev != value {
