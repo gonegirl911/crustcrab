@@ -7,9 +7,15 @@ use crate::{
     shared::utils,
 };
 use nalgebra::{Point3, Vector3, point, vector};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{SeqAccess, Visitor},
+    ser::SerializeSeq,
+};
 use std::{
-    array, iter, mem,
+    fmt::{self, Formatter},
+    marker::PhantomData,
+    mem::{self, MaybeUninit},
     ops::{Index, IndexMut, Range},
 };
 
@@ -98,18 +104,8 @@ impl IndexMut<Vector3<i8>> for ChunkAreaLight {
 struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl<T> ChunkAreaDataStore<T> {
-    fn from_fn<F: FnMut(Vector3<i8>) -> T>(mut f: F) -> Self {
-        Self(array::from_fn(|x| {
-            array::from_fn(|y| array::from_fn(|z| f(Self::delta_unchecked([x, y, z]))))
-        }))
-    }
-
     fn values(&self) -> impl Iterator<Item = &T> {
         self.0.iter().flatten().flatten()
-    }
-
-    fn delta_unchecked(index: [usize; 3]) -> Vector3<i8> {
-        index.map(|c| c as i8 - ChunkArea::PADDING as i8).into()
     }
 
     fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
@@ -137,40 +133,56 @@ impl<T> IndexMut<Vector3<i8>> for ChunkAreaDataStore<T> {
 
 impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_seq(pack_iter(self.values()))
+        let mut seq = serializer.serialize_seq(None)?;
+        let mut values = self.values();
+        let mut prev = values.next().unwrap_or_else(|| unreachable!());
+        let mut count = 1;
+
+        for value in values {
+            if prev != value {
+                seq.serialize_element(&(prev, count))?;
+                prev = value;
+                count = 1;
+            } else {
+                count += 1;
+            }
+        }
+
+        seq.end()
     }
 }
 
 impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let mut iter = unpack_iter(Vec::deserialize(deserializer)?);
-        Ok(Self::from_fn(|_| {
-            iter.next().unwrap_or_else(|| unreachable!())
-        }))
-    }
-}
+        struct SeqVisitor<T>(PhantomData<fn() -> ChunkAreaDataStore<T>>);
 
-fn pack_iter<I>(iter: I) -> impl Iterator<Item = (I::Item, u16)>
-where
-    I: IntoIterator<Item: PartialEq>,
-{
-    let mut prev = None;
-    let mut count = 1;
-    iter.into_iter().filter_map(move |value| {
-        if prev.as_ref() == Some(&value) {
-            count += 1;
-            None
-        } else {
-            Some((prev.replace(value)?, mem::replace(&mut count, 1)))
+        impl<'de, T: Deserialize<'de> + Clone> Visitor<'de> for SeqVisitor<T> {
+            type Value = ChunkAreaDataStore<T>;
+
+            fn expecting(&self, f: &mut Formatter) -> fmt::Result {
+                write!(f, "a sequence")
+            }
+
+            fn visit_seq<S: SeqAccess<'de>>(self, mut seq: S) -> Result<Self::Value, S::Error> {
+                const { assert!(!mem::needs_drop::<T>()) };
+
+                let mut uninit = [const { MaybeUninit::uninit() }; ChunkArea::DIM.pow(3)];
+                let mut cur = 0;
+
+                while let Some((value, count)) = seq.next_element::<(T, usize)>()? {
+                    for uninit in &mut uninit[cur..cur + count] {
+                        uninit.write(value.clone());
+                    }
+
+                    cur += count;
+                }
+
+                assert!(cur == uninit.len());
+
+                Ok(ChunkAreaDataStore(unsafe { mem::transmute_copy(&uninit) }))
+            }
         }
-    })
-}
 
-fn unpack_iter<I, T>(iter: I) -> impl Iterator<Item = T>
-where
-    I: IntoIterator<Item = (T, u16)>,
-    T: Clone,
-{
-    iter.into_iter()
-        .flat_map(|(value, count)| iter::repeat_n(value, count as usize))
+        deserializer.deserialize_seq(SeqVisitor(PhantomData))
+    }
 }
