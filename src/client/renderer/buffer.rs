@@ -139,7 +139,7 @@ impl<T: Pod> Buffer<T> {
 
 impl<T> Buffer<[T]> {
     fn from_ref(buffer: &Buffer<T>) -> &Self {
-        unsafe { mem::transmute(&buffer.buffer) }
+        unsafe { mem::transmute(buffer) }
     }
 
     pub fn len(&self) -> u32 {

@@ -17,6 +17,7 @@ use std::{
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Index, IndexMut, Range},
+    slice,
 };
 
 #[derive(Default, Serialize, Deserialize)]
@@ -104,14 +105,34 @@ impl IndexMut<Vector3<i8>> for ChunkAreaLight {
 struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl<T> ChunkAreaDataStore<T> {
-    fn values(&self) -> impl Iterator<Item = &T> {
-        self.0.iter().flatten().flatten()
+    fn first(&self) -> &T {
+        &self.0[0][0][0]
+    }
+
+    fn values(&self) -> slice::Iter<T> {
+        self.0.as_flattened().as_flattened().iter()
     }
 
     fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
         delta
             .map(|c| (c + BlockArea::PADDING as i8) as usize)
             .into()
+    }
+}
+
+impl<T: PartialEq> ChunkAreaDataStore<T> {
+    fn packed_len(&self) -> usize {
+        let mut prev = self.first();
+        let mut len = 1;
+
+        for value in self.values() {
+            if prev != value {
+                prev = value;
+                len += 1;
+            }
+        }
+
+        len
     }
 }
 
@@ -135,12 +156,11 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         const { assert!(ChunkArea::DIM.pow(3) <= u16::MAX as usize) };
 
-        let mut seq = serializer.serialize_seq(None)?;
-        let mut values = self.values();
-        let mut prev = values.next().unwrap_or_else(|| unreachable!());
-        let mut count = 1u16;
+        let mut seq = serializer.serialize_seq(Some(self.packed_len()))?;
+        let mut prev = self.first();
+        let mut count = 0u16;
 
-        for value in values {
+        for value in self.values() {
             if prev != value {
                 seq.serialize_element(&(prev, count))?;
                 prev = value;
@@ -149,6 +169,8 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
                 count += 1;
             }
         }
+
+        seq.serialize_element(&(prev, count))?;
 
         seq.end()
     }
@@ -171,13 +193,13 @@ impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T
                 let mut uninit = [const { MaybeUninit::uninit() }; ChunkArea::DIM.pow(3)];
                 let mut cur = 0;
 
-                while let Some((value, count)) = seq.next_element::<(T, usize)>()? {
+                while let Some((value, count)) = seq.next_element::<(T, u16)>()? {
+                    let count = count as usize;
                     MaybeUninit::fill(&mut uninit[cur..cur + count], value);
                     cur += count;
                 }
 
                 assert!(cur == uninit.len());
-
                 Ok(ChunkAreaDataStore(unsafe { mem::transmute_copy(&uninit) }))
             }
         }
