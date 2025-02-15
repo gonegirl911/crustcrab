@@ -97,7 +97,11 @@ impl ServerSender {
         match self {
             Self::Proxy(proxy) => proxy.send_event(event).map_err(|e| e.0),
             Self::Sender { priority_tx, tx } => {
-                if event.has_priority() {
+                if matches!(event, ServerEvent::ClientDisconnected) {
+                    _ = priority_tx.send(ServerEvent::ClientDisconnected);
+                    _ = tx.send(ServerEvent::ClientDisconnected);
+                    Ok(())
+                } else if event.has_priority() {
                     priority_tx.send(event).map_err(|e| e.0)
                 } else {
                     tx.send(event).map_err(|e| e.0)

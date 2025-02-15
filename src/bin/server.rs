@@ -20,13 +20,11 @@ fn main() {
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
     let (priority_server_tx, priority_server_rx) = crossbeam_channel::unbounded();
     let (server_tx, server_rx) = crossbeam_channel::unbounded();
-    let server = Server::new(
-        ServerSender::Sender {
-            priority_tx: priority_server_tx,
-            tx: server_tx.clone(),
-        },
-        client_rx,
-    );
+    let server_tx = ServerSender::Sender {
+        priority_tx: priority_server_tx,
+        tx: server_tx,
+    };
+    let server = Server::new(server_tx.clone(), client_rx);
 
     let args = Args::parse();
     let priority_addr = format!("127.0.0.1:{}", args.priority_port);
@@ -86,6 +84,9 @@ fn main() {
                     s.spawn(|| {
                         let mut priority_stream = BufWriter::new(&priority_stream);
                         for event in &priority_server_rx {
+                            if matches!(event, ServerEvent::ClientDisconnected) {
+                                break;
+                            }
                             if let Err(e) = bincode::serialize_into(&mut priority_stream, &event) {
                                 if let bincode::ErrorKind::Io(e) = &*e
                                     && e.kind() == io::ErrorKind::BrokenPipe
@@ -140,7 +141,9 @@ fn main() {
                                         && let io::ErrorKind::ConnectionReset
                                         | io::ErrorKind::UnexpectedEof = e.kind()
                                     {
-                                        _ = server_tx.send(ServerEvent::ClientDisconnected);
+                                        server_tx
+                                            .send(ServerEvent::ClientDisconnected)
+                                            .unwrap_or_else(|_| unreachable!());
                                         break;
                                     }
                                     eprintln!("[{priority_addr}] read client event FAILED: {e}");
