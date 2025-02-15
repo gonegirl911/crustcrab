@@ -1,24 +1,27 @@
-use super::{SERVER_CONFIG, ticker::Ticker};
-use crate::client::{ClientEvent, event_loop::EventLoopProxy};
+use super::{SERVER_CONFIG, ServerSender, ticker::Ticker};
+use crate::client::ClientEvent;
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
 
 pub struct EventLoop {
-    proxy: EventLoopProxy,
+    server_tx: ServerSender,
     client_rx: Receiver<ClientEvent>,
 }
 
 impl EventLoop {
-    pub fn new(proxy: EventLoopProxy, client_rx: Receiver<ClientEvent>) -> Self {
-        Self { proxy, client_rx }
+    pub fn new(server_tx: ServerSender, client_rx: Receiver<ClientEvent>) -> Self {
+        Self {
+            server_tx,
+            client_rx,
+        }
     }
 
     pub fn run<H>(self, mut handler: H)
     where
-        H: for<'a> EventHandler<Event, Context<'a> = &'a EventLoopProxy>,
+        H: for<'a> EventHandler<Event, Context<'a> = &'a ServerSender>,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
-        handler.handle(&Event::Init, &self.proxy);
+        handler.handle(&Event::Init, &self.server_tx);
         loop {
             handler.handle(
                 &match ticker.recv_timeout(&self.client_rx) {
@@ -26,7 +29,7 @@ impl EventLoop {
                     Err(RecvTimeoutError::Timeout) => Event::Tick,
                     Err(RecvTimeoutError::Disconnected) => break,
                 },
-                &self.proxy,
+                &self.server_tx,
             );
         }
     }

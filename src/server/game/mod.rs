@@ -7,15 +7,17 @@ use self::{
     player::Player,
     world::{World, WorldEvent},
 };
-use super::event_loop::{Event, EventHandler};
-use crate::client::event_loop::EventLoopProxy;
+use super::{
+    ServerSender,
+    event_loop::{Event, EventHandler},
+};
 use crossbeam_channel::Sender;
 use std::thread;
 
 pub struct Game {
     player: Player,
     clock: Clock,
-    world_tx: Sender<(WorldEvent, EventLoopProxy)>,
+    world_tx: Sender<(WorldEvent, ServerSender)>,
 }
 
 impl Default for Game {
@@ -26,8 +28,8 @@ impl Default for Game {
 
         thread::spawn(move || {
             let mut world = World::default();
-            for (event, proxy) in world_rx {
-                world.handle(&event, &proxy);
+            for (event, server_tx) in world_rx {
+                world.handle(&event, &server_tx);
             }
         });
 
@@ -40,15 +42,15 @@ impl Default for Game {
 }
 
 impl EventHandler<Event> for Game {
-    type Context<'a> = &'a EventLoopProxy;
+    type Context<'a> = &'a ServerSender;
 
-    fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, ());
-        self.clock.handle(event, proxy);
+        self.clock.handle(event, server_tx);
 
         if let Some(event) = WorldEvent::new(event, &self.player) {
             self.world_tx
-                .send((event, proxy.clone()))
+                .send((event, server_tx.clone()))
                 .unwrap_or_else(|_| unreachable!());
         }
     }

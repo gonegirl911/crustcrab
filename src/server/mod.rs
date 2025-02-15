@@ -15,7 +15,7 @@ use crate::{
     client::{ClientEvent, event_loop::EventLoopProxy},
     shared::utils,
 };
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use nalgebra::Point3;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
@@ -26,9 +26,9 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(proxy: EventLoopProxy, client_rx: Receiver<ClientEvent>) -> Self {
+    pub fn new(server_tx: ServerSender, client_rx: Receiver<ClientEvent>) -> Self {
         Self {
-            event_loop: EventLoop::new(proxy, client_rx),
+            event_loop: EventLoop::new(server_tx, client_rx),
         }
     }
 
@@ -68,6 +68,21 @@ impl GroupId {
         Self {
             id: Uuid::new_v4(),
             size,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ServerSender {
+    Proxy(EventLoopProxy),
+    Sender(Sender<ServerEvent>),
+}
+
+impl ServerSender {
+    pub fn send(&self, event: ServerEvent) -> Result<(), ServerEvent> {
+        match self {
+            Self::Proxy(proxy) => proxy.send_event(event).map_err(|e| e.0),
+            Self::Sender(tx) => tx.send(event).map_err(|e| e.0),
         }
     }
 }

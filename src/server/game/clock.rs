@@ -1,7 +1,7 @@
 use crate::{
-    client::{ClientEvent, event_loop::EventLoopProxy},
+    client::ClientEvent,
     server::{
-        SERVER_CONFIG, ServerEvent,
+        SERVER_CONFIG, ServerEvent, ServerSender,
         event_loop::{Event, EventHandler},
     },
     shared::utils::{self, Lerp},
@@ -16,8 +16,8 @@ pub struct Clock {
 }
 
 impl Clock {
-    fn send(self, proxy: &EventLoopProxy) {
-        _ = proxy.send_event(ServerEvent::TimeUpdated(self.time()));
+    fn send(self, server_tx: &ServerSender) {
+        _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
     }
 
     fn time(self) -> Time {
@@ -34,16 +34,16 @@ impl Default for Clock {
 }
 
 impl EventHandler<Event> for Clock {
-    type Context<'a> = &'a EventLoopProxy;
+    type Context<'a> = &'a ServerSender;
 
-    fn handle(&mut self, event: &Event, proxy: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         match event {
             Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
-                self.send(proxy);
+                self.send(server_tx);
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
-                self.send(proxy);
+                self.send(server_tx);
             }
             _ => {}
         }

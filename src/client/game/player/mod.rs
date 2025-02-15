@@ -78,13 +78,11 @@ impl EventHandler for Player {
 
         match event {
             Event::Resumed => {
-                client_tx
-                    .send(ClientEvent::InitialRenderRequested {
-                        origin: self.view.origin,
-                        dir: self.view.forward,
-                        render_distance: CLIENT_CONFIG.player.render_distance,
-                    })
-                    .unwrap_or_else(|_| unreachable!());
+                _ = client_tx.send(ClientEvent::InitialRenderRequested {
+                    origin: self.view.origin,
+                    dir: self.view.forward,
+                    render_distance: CLIENT_CONFIG.player.render_distance,
+                });
             }
             Event::WindowEvent {
                 event: WindowEvent::RedrawRequested,
@@ -93,19 +91,15 @@ impl EventHandler for Player {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
 
                 if changes.contains(Changes::MOVED) {
-                    client_tx
-                        .send(ClientEvent::PlayerPositionChanged {
-                            origin: self.view.origin,
-                        })
-                        .unwrap_or_else(|_| unreachable!());
+                    _ = client_tx.send(ClientEvent::PlayerPositionChanged {
+                        origin: self.view.origin,
+                    });
                 }
 
                 if changes.contains(Changes::ROTATED) {
-                    client_tx
-                        .send(ClientEvent::PlayerOrientationChanged {
-                            dir: self.view.forward,
-                        })
-                        .unwrap_or_else(|_| unreachable!());
+                    _ = client_tx.send(ClientEvent::PlayerOrientationChanged {
+                        dir: self.view.forward,
+                    });
                 }
 
                 if renderer.is_resized {
@@ -114,14 +108,10 @@ impl EventHandler for Player {
 
                 if changes.contains(Changes::BLOCK_PLACED) {
                     if let Some(block) = gui.selected_block() {
-                        client_tx
-                            .send(ClientEvent::BlockPlaced { block })
-                            .unwrap_or_else(|_| unreachable!());
+                        _ = client_tx.send(ClientEvent::BlockPlaced { block });
                     }
                 } else if changes.contains(Changes::BLOCK_DESTROYED) {
-                    client_tx
-                        .send(ClientEvent::BlockDestroyed)
-                        .unwrap_or_else(|_| unreachable!());
+                    _ = client_tx.send(ClientEvent::BlockDestroyed);
                 }
 
                 if changes.intersects(Changes::VIEW) || renderer.is_resized {
