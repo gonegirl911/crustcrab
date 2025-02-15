@@ -67,6 +67,8 @@ pub enum ClientEvent {
         block: Block,
     },
     BlockDestroyed,
+    #[serde(skip)]
+    ServerDisconnected,
 }
 
 #[derive(Deserialize)]

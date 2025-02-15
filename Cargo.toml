@@ -14,7 +14,6 @@ panic = "abort"
 strip = "symbols"
 
 [dependencies]
-anyhow = "1.0.95"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 bincode = "1.3.3"
 bitfield = "0.18.1"

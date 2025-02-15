@@ -55,6 +55,17 @@ pub enum ServerEvent {
         group_id: Option<GroupId>,
     },
     BlockHovered(Option<BlockHoverData>),
+    #[serde(skip)]
+    ClientDisconnected,
+}
+
+impl ServerEvent {
+    fn has_priority(&self) -> bool {
+        !matches!(
+            self,
+            Self::ChunkLoaded { .. } | Self::ChunkUnloaded { .. } | Self::ChunkUpdated { .. }
+        )
+    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -75,14 +86,23 @@ impl GroupId {
 #[derive(Clone)]
 pub enum ServerSender {
     Proxy(EventLoopProxy),
-    Sender(Sender<ServerEvent>),
+    Sender {
+        priority_tx: Sender<ServerEvent>,
+        tx: Sender<ServerEvent>,
+    },
 }
 
 impl ServerSender {
     pub fn send(&self, event: ServerEvent) -> Result<(), ServerEvent> {
         match self {
             Self::Proxy(proxy) => proxy.send_event(event).map_err(|e| e.0),
-            Self::Sender(tx) => tx.send(event).map_err(|e| e.0),
+            Self::Sender { priority_tx, tx } => {
+                if event.has_priority() {
+                    priority_tx.send(event).map_err(|e| e.0)
+                } else {
+                    tx.send(event).map_err(|e| e.0)
+                }
+            }
         }
     }
 }
