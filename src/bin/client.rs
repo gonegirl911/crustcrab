@@ -53,12 +53,12 @@ fn main() {
 
     thread::scope(|s| {
         s.spawn(|| {
-            let mut priority_stream = BufWriter::new(&priority_stream);
+            let mut priority_writer = BufWriter::new(&priority_stream);
             for event in client_rx {
                 if matches!(event, ClientEvent::ServerDisconnected) {
                     break;
                 }
-                if let Err(e) = bincode::serialize_into(&mut priority_stream, &event) {
+                if let Err(e) = bincode::serialize_into(&mut priority_writer, &event) {
                     if let bincode::ErrorKind::Io(e) = &*e
                         && e.kind() == io::ErrorKind::BrokenPipe
                     {
@@ -67,7 +67,7 @@ fn main() {
                     eprintln!("[{priority_addr}] write client event FAILED: {e}");
                     continue;
                 }
-                if let Err(e) = priority_stream.flush() {
+                if let Err(e) = priority_writer.flush() {
                     if e.kind() == io::ErrorKind::BrokenPipe {
                         break;
                     }
@@ -78,9 +78,9 @@ fn main() {
         });
 
         s.spawn(|| {
-            let mut priority_stream = BufReader::new(&priority_stream);
+            let mut priority_reader = BufReader::new(&priority_stream);
             loop {
-                let event = match bincode::deserialize_from(&mut priority_stream) {
+                let event = match bincode::deserialize_from(&mut priority_reader) {
                     Ok(event) => event,
                     Err(e) => {
                         if let bincode::ErrorKind::Io(e) = &*e
@@ -100,9 +100,9 @@ fn main() {
         });
 
         s.spawn(|| {
-            let mut stream = BufReader::new(&stream);
+            let mut reader = BufReader::new(&stream);
             loop {
-                let event = match bincode::deserialize_from(&mut stream) {
+                let event = match bincode::deserialize_from(&mut reader) {
                     Ok(event) => event,
                     Err(e) => {
                         if let bincode::ErrorKind::Io(e) = &*e

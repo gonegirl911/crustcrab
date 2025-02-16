@@ -31,14 +31,20 @@ impl App {
 
 impl ApplicationHandler<ServerEvent> for App {
     fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
-        if let Some(instance) = &mut self.instance {
-            instance.handle(&Event::NewEvents(cause), &self.client_tx);
+        if cause == StartCause::Init {
+            assert!(self.instance.is_none());
+        } else {
+            self.instance
+                .as_mut()
+                .unwrap_or_else(|| unreachable!())
+                .handle(&Event::NewEvents(cause), &self.client_tx);
         }
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        assert!(self.instance.is_none());
         self.instance
-            .get_or_insert_with(|| pollster::block_on(Instance::new(event_loop)))
+            .insert(pollster::block_on(Instance::new(event_loop)))
             .handle(&Event::Resumed, &self.client_tx);
     }
 

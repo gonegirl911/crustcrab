@@ -13,11 +13,14 @@ use std::{f32::consts::TAU, ops::Range};
 #[derive(Clone, Copy)]
 pub struct Clock {
     ticks: u16,
+    is_client_connected: bool,
 }
 
 impl Clock {
     fn send(self, server_tx: &ServerSender) {
-        _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
+        if self.is_client_connected {
+            _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
+        }
     }
 
     fn time(self) -> Time {
@@ -29,6 +32,7 @@ impl Default for Clock {
     fn default() -> Self {
         Self {
             ticks: SERVER_CONFIG.clock.starting_ticks(),
+            is_client_connected: false,
         }
     }
 }
@@ -39,11 +43,15 @@ impl EventHandler<Event> for Clock {
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         match event {
             Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
+                self.is_client_connected = true;
                 self.send(server_tx);
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
                 self.send(server_tx);
+            }
+            Event::Client(ClientEvent::Disconnected) => {
+                self.is_client_connected = false;
             }
             _ => {}
         }

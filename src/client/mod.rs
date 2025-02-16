@@ -68,6 +68,8 @@ pub enum ClientEvent {
     },
     BlockDestroyed,
     #[serde(skip)]
+    Disconnected,
+    #[serde(skip)]
     ServerDisconnected,
 }
 
