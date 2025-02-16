@@ -71,7 +71,7 @@ fn main() {
                     if e.kind() == io::ErrorKind::BrokenPipe {
                         break;
                     }
-                    eprintln!("[{priority_addr}] flush buffered stream FAILED: {e}");
+                    eprintln!("[{priority_addr}] write client event FAILED: {e}");
                 }
             }
             eprintln!("[{priority_addr}] writing CLOSED");
