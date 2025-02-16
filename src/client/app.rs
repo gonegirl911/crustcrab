@@ -43,9 +43,10 @@ impl ApplicationHandler<ServerEvent> for App {
     }
 
     fn user_event(&mut self, _: &ActiveEventLoop, event: ServerEvent) {
-        if let Some(instance) = &mut self.instance {
-            instance.handle(&Event::UserEvent(event), &self.client_tx);
-        }
+        self.instance
+            .as_mut()
+            .unwrap_or_else(|| unreachable!())
+            .handle(&Event::UserEvent(event), &self.client_tx);
     }
 
     fn window_event(
@@ -67,33 +68,35 @@ impl ApplicationHandler<ServerEvent> for App {
     }
 
     fn device_event(&mut self, _: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
-        if let Some(instance) = &mut self.instance {
-            instance.handle(&Event::DeviceEvent { device_id, event }, &self.client_tx);
-        }
+        self.instance
+            .as_mut()
+            .unwrap_or_else(|| unreachable!())
+            .handle(&Event::DeviceEvent { device_id, event }, &self.client_tx);
     }
 
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
-        if let Some(instance) = &mut self.instance {
-            instance.handle(&Event::AboutToWait, &self.client_tx);
-        }
+        self.instance
+            .as_mut()
+            .unwrap_or_else(|| unreachable!())
+            .handle(&Event::AboutToWait, &self.client_tx);
     }
 
     fn suspended(&mut self, _: &ActiveEventLoop) {
-        if let Some(mut instance) = self.instance.take() {
-            instance.handle(&Event::Suspended, &self.client_tx);
-        }
+        unreachable!();
     }
 
     fn exiting(&mut self, _: &ActiveEventLoop) {
-        if let Some(instance) = &mut self.instance {
-            instance.handle(&Event::LoopExiting, &self.client_tx);
-        }
+        self.instance
+            .as_mut()
+            .unwrap_or_else(|| unreachable!())
+            .handle(&Event::LoopExiting, &self.client_tx);
     }
 
     fn memory_warning(&mut self, _: &ActiveEventLoop) {
-        if let Some(instance) = &mut self.instance {
-            instance.handle(&Event::MemoryWarning, &self.client_tx);
-        }
+        self.instance
+            .as_mut()
+            .unwrap_or_else(|| unreachable!())
+            .handle(&Event::MemoryWarning, &self.client_tx);
     }
 }
 
