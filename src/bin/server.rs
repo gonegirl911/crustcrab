@@ -29,149 +29,153 @@ fn main() {
     };
     let server = Server::new(server_tx.clone(), client_rx.clone());
 
-    let args = Args::parse();
-    let priority_addr = format!("127.0.0.1:{}", args.priority_port);
-    let priority_listener = match TcpListener::bind(&priority_addr) {
-        Ok(listener) => {
-            eprintln!("[{priority_addr}] create TCP listener SUCCEDED");
-            listener
-        }
-        Err(e) => {
-            eprintln!("[{priority_addr}] create TCP listener FAILED: {e}");
-            return;
-        }
-    };
-    let addr = format!("127.0.0.1:{}", args.port);
-    let listener = match TcpListener::bind(&addr) {
-        Ok(listener) => {
-            eprintln!("[{addr}] create TCP listener SUCCEDED");
-            listener
-        }
-        Err(e) => {
-            eprintln!("[{addr}] create TCP listener FAILED: {e}");
-            return;
-        }
-    };
+    thread::spawn(move || {
+        let args = Args::parse();
+        let priority_addr = format!("127.0.0.1:{}", args.priority_port);
+        let priority_listener = match TcpListener::bind(&priority_addr) {
+            Ok(listener) => {
+                eprintln!("[{priority_addr}] create TCP listener SUCCEDED");
+                listener
+            }
+            Err(e) => {
+                eprintln!("[{priority_addr}] create TCP listener FAILED: {e}");
+                return;
+            }
+        };
+        let addr = format!("127.0.0.1:{}", args.port);
+        let listener = match TcpListener::bind(&addr) {
+            Ok(listener) => {
+                eprintln!("[{addr}] create TCP listener SUCCEDED");
+                listener
+            }
+            Err(e) => {
+                eprintln!("[{addr}] create TCP listener FAILED: {e}");
+                return;
+            }
+        };
 
-    thread::scope(|s| {
-        s.spawn(|| {
-            for (priority_stream, stream) in priority_listener.incoming().zip(listener.incoming()) {
-                let priority_stream = match priority_stream {
-                    Ok(stream) => {
-                        eprintln!("[{priority_addr}] open TCP connection SUCCEDED");
-                        stream
-                    }
-                    Err(e) => {
-                        eprintln!("[{priority_addr}] open TCP connection FAILED: {e}");
-                        continue;
-                    }
-                };
-                if let Err(e) = priority_stream.set_nodelay(true) {
-                    eprintln!("[{priority_addr}] disable Nagle algorithm FAILED: {e}");
+        for (priority_stream, stream) in priority_listener.incoming().zip(listener.incoming()) {
+            let priority_stream = match priority_stream {
+                Ok(stream) => {
+                    eprintln!("[{priority_addr}] open TCP connection SUCCEDED");
+                    stream
                 }
-                let stream = match stream {
-                    Ok(stream) => {
-                        eprintln!("[{addr}] open TCP connection SUCCEDED");
-                        stream
-                    }
-                    Err(e) => {
-                        eprintln!("[{addr}] open TCP connection FAILED: {e}");
-                        continue;
-                    }
-                };
-                if let Err(e) = stream.set_nodelay(true) {
-                    eprintln!("[{addr}] disable Nagle algorithm FAILED: {e}");
+                Err(e) => {
+                    eprintln!("[{priority_addr}] open TCP connection FAILED: {e}");
+                    continue;
                 }
+            };
+            if let Err(e) = priority_stream.set_nodelay(true) {
+                eprintln!("[{priority_addr}] disable Nagle algorithm FAILED: {e}");
+            }
+            let stream = match stream {
+                Ok(stream) => {
+                    eprintln!("[{addr}] open TCP connection SUCCEDED");
+                    stream
+                }
+                Err(e) => {
+                    eprintln!("[{addr}] open TCP connection FAILED: {e}");
+                    continue;
+                }
+            };
+            if let Err(e) = stream.set_nodelay(true) {
+                eprintln!("[{addr}] disable Nagle algorithm FAILED: {e}");
+            }
 
-                thread::scope(|s| {
-                    s.spawn(|| {
-                        let mut priority_reader = BufReader::new(&priority_stream);
-                        loop {
-                            let event = match bincode::deserialize_from(&mut priority_reader) {
-                                Ok(event) => event,
-                                Err(e) => {
-                                    if let bincode::ErrorKind::Io(e) = &*e
-                                        && let io::ErrorKind::ConnectionReset
-                                        | io::ErrorKind::UnexpectedEof = e.kind()
-                                    {
-                                        client_rx.try_iter().for_each(drop);
-                                        _ = client_tx.send(ClientEvent::Disconnected);
-                                        server_tx
-                                            .send(ServerEvent::ClientDisconnected)
-                                            .unwrap_or_else(|_| unreachable!());
+            thread::scope(|s| {
+                s.spawn(|| {
+                    let mut priority_reader = BufReader::new(&priority_stream);
+                    loop {
+                        let event = match bincode::deserialize_from(&mut priority_reader) {
+                            Ok(event) => event,
+                            Err(e) => {
+                                if let bincode::ErrorKind::Io(e) = &*e
+                                    && let io::ErrorKind::ConnectionReset
+                                    | io::ErrorKind::UnexpectedEof = e.kind()
+                                {
+                                    client_rx.try_iter().for_each(drop);
+                                    _ = client_tx.send(ClientEvent::Disconnected);
+                                    server_tx
+                                        .send(ServerEvent::ClientDisconnected)
+                                        .unwrap_or_else(|_| unreachable!());
+                                    break;
+                                }
+                                eprintln!("[{priority_addr}] read client event FAILED: {e}");
+                                continue;
+                            }
+                        };
+
+                        if matches!(event, ClientEvent::InitialRenderRequested { .. }) {
+                            priority_server_rx.try_iter().for_each(drop);
+
+                            s.spawn(|| {
+                                let mut priority_writer = BufWriter::new(&priority_stream);
+                                for event in &priority_server_rx {
+                                    if matches!(event, ServerEvent::ClientDisconnected) {
                                         break;
                                     }
-                                    eprintln!("[{priority_addr}] read client event FAILED: {e}");
-                                    continue;
+                                    if let Err(e) =
+                                        bincode::serialize_into(&mut priority_writer, &event)
+                                    {
+                                        if let bincode::ErrorKind::Io(e) = &*e
+                                            && e.kind() == io::ErrorKind::BrokenPipe
+                                        {
+                                            break;
+                                        }
+                                        eprintln!(
+                                            "[{priority_addr}] write server event FAILED: {e}"
+                                        );
+                                        continue;
+                                    }
+                                    if let Err(e) = priority_writer.flush() {
+                                        if e.kind() == io::ErrorKind::BrokenPipe {
+                                            break;
+                                        }
+                                        eprintln!(
+                                            "[{priority_addr}] flush buffered stream FAILED: {e}"
+                                        );
+                                    }
                                 }
-                            };
+                                eprintln!("[{priority_addr}] writing CLOSED");
+                            });
 
-                            if matches!(event, ClientEvent::InitialRenderRequested { .. }) {
-                                priority_server_rx.try_iter().for_each(drop);
+                            server_rx.try_iter().for_each(drop);
 
-                                s.spawn(|| {
-                                    let mut priority_writer = BufWriter::new(&priority_stream);
-                                    for event in &priority_server_rx {
-                                        if matches!(event, ServerEvent::ClientDisconnected) {
+                            s.spawn(|| {
+                                let mut writer = BufWriter::new(&stream);
+                                for event in &server_rx {
+                                    if matches!(event, ServerEvent::ClientDisconnected) {
+                                        break;
+                                    }
+                                    if let Err(e) = bincode::serialize_into(&mut writer, &event) {
+                                        if let bincode::ErrorKind::Io(e) = &*e
+                                            && e.kind() == io::ErrorKind::BrokenPipe
+                                        {
                                             break;
                                         }
-                                        if let Err(e) = bincode::serialize_into(&mut priority_writer, &event) {
-                                            if let bincode::ErrorKind::Io(e) = &*e
-                                                && e.kind() == io::ErrorKind::BrokenPipe
-                                            {
-                                                break;
-                                            }
-                                            eprintln!("[{priority_addr}] write server event FAILED: {e}");
-                                            continue;
-                                        }
-                                        if let Err(e) = priority_writer.flush() {
-                                            if e.kind() == io::ErrorKind::BrokenPipe {
-                                                break;
-                                            }
-                                            eprintln!("[{priority_addr}] flush buffered stream FAILED: {e}");
-                                        }
+                                        eprintln!("[{addr}] write server event FAILED: {e}");
+                                        continue;
                                     }
-                                    eprintln!("[{priority_addr}] writing CLOSED");
-                                });
-
-                                server_rx.try_iter().for_each(drop);
-
-                                s.spawn(|| {
-                                    let mut writer = BufWriter::new(&stream);
-                                    for event in &server_rx {
-                                        if matches!(event, ServerEvent::ClientDisconnected) {
+                                    if let Err(e) = writer.flush() {
+                                        if e.kind() == io::ErrorKind::BrokenPipe {
                                             break;
                                         }
-                                        if let Err(e) = bincode::serialize_into(&mut writer, &event) {
-                                            if let bincode::ErrorKind::Io(e) = &*e
-                                                && e.kind() == io::ErrorKind::BrokenPipe
-                                            {
-                                                break;
-                                            }
-                                            eprintln!("[{addr}] write server event FAILED: {e}");
-                                            continue;
-                                        }
-                                        if let Err(e) = writer.flush() {
-                                            if e.kind() == io::ErrorKind::BrokenPipe {
-                                                break;
-                                            }
-                                            eprintln!("[{addr}] flush buffered stream FAILED: {e}");
-                                        }
+                                        eprintln!("[{addr}] flush buffered stream FAILED: {e}");
                                     }
-                                    eprintln!("[{addr}] writing CLOSED");
-                                });
-                            }
-
-                            if client_tx.send(event).is_err() {
-                                break;
-                            }
+                                }
+                                eprintln!("[{addr}] writing CLOSED");
+                            });
                         }
-                        eprintln!("[{priority_addr}] reading CLOSED");
-                    });
-                });
-            }
-        });
 
-        server.run();
+                        if client_tx.send(event).is_err() {
+                            break;
+                        }
+                    }
+                    eprintln!("[{priority_addr}] reading CLOSED");
+                });
+            });
+        }
     });
+
+    server.run();
 }
