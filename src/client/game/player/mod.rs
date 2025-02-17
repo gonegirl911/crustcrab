@@ -108,7 +108,7 @@ impl EventHandler for Player {
 
                 if changes.contains(Changes::BLOCK_PLACED) {
                     if let Some(block) = gui.selected_block() {
-                        _ = client_tx.send(ClientEvent::BlockPlaced { block });
+                        _ = client_tx.send(ClientEvent::BlockPlaced(block));
                     }
                 } else if changes.contains(Changes::BLOCK_DESTROYED) {
                     _ = client_tx.send(ClientEvent::BlockDestroyed);

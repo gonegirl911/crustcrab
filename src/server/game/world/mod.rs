@@ -768,7 +768,7 @@ impl WorldEvent {
             Event::Client(ClientEvent::PlayerOrientationChanged { .. }) => {
                 Some(Self::BlockHoverRequested { ray })
             }
-            Event::Client(ClientEvent::BlockPlaced { block }) => Some(Self::BlockPlaced {
+            Event::Client(ClientEvent::BlockPlaced(block)) => Some(Self::BlockPlaced {
                 block,
                 area: cur,
                 ray,

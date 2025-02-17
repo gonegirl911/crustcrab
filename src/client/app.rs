@@ -99,10 +99,7 @@ impl ApplicationHandler<ServerEvent> for App {
     }
 
     fn memory_warning(&mut self, _: &ActiveEventLoop) {
-        self.instance
-            .as_mut()
-            .unwrap_or_else(|| unreachable!())
-            .handle(&Event::MemoryWarning, &self.client_tx);
+        unreachable!();
     }
 }
 

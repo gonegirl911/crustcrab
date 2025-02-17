@@ -66,9 +66,7 @@ pub enum ClientEvent {
     PlayerOrientationChanged {
         dir: Vector3<f32>,
     },
-    BlockPlaced {
-        block: Block,
-    },
+    BlockPlaced(Block),
     BlockDestroyed,
     #[serde(skip)]
     Connected(Box<ServerSender>),
