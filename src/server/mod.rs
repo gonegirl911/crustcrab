@@ -86,7 +86,6 @@ impl GroupId {
 #[derive(Clone)]
 pub enum ServerSender {
     Proxy(EventLoopProxy),
-    Disconnected,
     Sender {
         priority_tx: Sender<ServerEvent>,
         tx: Sender<ServerEvent>,
@@ -94,10 +93,15 @@ pub enum ServerSender {
 }
 
 impl ServerSender {
+    pub fn disconnected() -> Self {
+        let (priority_tx, _) = crossbeam_channel::unbounded();
+        let (tx, _) = crossbeam_channel::unbounded();
+        Self::Sender { priority_tx, tx }
+    }
+
     pub fn send(&self, event: ServerEvent) -> Result<(), ServerEvent> {
         match self {
             Self::Proxy(proxy) => proxy.send_event(event).map_err(|e| e.0),
-            Self::Disconnected => Err(event),
             Self::Sender { priority_tx, tx } => {
                 if matches!(event, ServerEvent::ClientDisconnected) {
                     _ = priority_tx.send(ServerEvent::ClientDisconnected);

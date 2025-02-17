@@ -21,7 +21,7 @@ struct Args {
 
 fn main() {
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
-    let mut server = Server::new(ServerSender::Disconnected, client_rx);
+    let mut server = Server::new(ServerSender::disconnected(), client_rx);
 
     thread::spawn(move || {
         let args = Args::parse();
