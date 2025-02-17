@@ -53,6 +53,29 @@ fn main() {
 
     thread::scope(|s| {
         s.spawn(|| {
+            let mut priority_reader = BufReader::new(&priority_stream);
+            loop {
+                let event = match bincode::deserialize_from(&mut priority_reader) {
+                    Ok(event) => event,
+                    Err(e) => {
+                        if let bincode::ErrorKind::Io(e) = &*e
+                            && e.kind() == io::ErrorKind::UnexpectedEof
+                        {
+                            _ = client_tx.send(ClientEvent::ServerDisconnected);
+                            break;
+                        }
+                        eprintln!("[{priority_addr}] read server event FAILED: {e}");
+                        continue;
+                    }
+                };
+                if proxy.send_event(event).is_err() {
+                    break;
+                }
+            }
+            eprintln!("[{priority_addr}] reading CLOSED");
+        });
+
+        s.spawn(|| {
             let mut priority_writer = BufWriter::new(&priority_stream);
             for event in client_rx {
                 if matches!(event, ClientEvent::ServerDisconnected) {
@@ -78,28 +101,6 @@ fn main() {
         });
 
         s.spawn(|| {
-            let mut priority_reader = BufReader::new(&priority_stream);
-            loop {
-                let event = match bincode::deserialize_from(&mut priority_reader) {
-                    Ok(event) => event,
-                    Err(e) => {
-                        if let bincode::ErrorKind::Io(e) = &*e
-                            && e.kind() == io::ErrorKind::UnexpectedEof
-                        {
-                            break;
-                        }
-                        eprintln!("[{priority_addr}] read server event FAILED: {e}");
-                        continue;
-                    }
-                };
-                if proxy.send_event(event).is_err() {
-                    break;
-                }
-            }
-            eprintln!("[{priority_addr}] reading CLOSED");
-        });
-
-        s.spawn(|| {
             let mut reader = BufReader::new(&stream);
             loop {
                 let event = match bincode::deserialize_from(&mut reader) {
@@ -108,7 +109,6 @@ fn main() {
                         if let bincode::ErrorKind::Io(e) = &*e
                             && e.kind() == io::ErrorKind::UnexpectedEof
                         {
-                            _ = client_tx.send(ClientEvent::ServerDisconnected);
                             break;
                         }
                         eprintln!("[{addr}] read server event FAILED: {e}");

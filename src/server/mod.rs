@@ -32,7 +32,7 @@ impl Server {
         }
     }
 
-    pub fn run(self) {
+    pub fn run(&mut self) {
         self.event_loop.run(Game::default());
     }
 }
@@ -86,6 +86,7 @@ impl GroupId {
 #[derive(Clone)]
 pub enum ServerSender {
     Proxy(EventLoopProxy),
+    Disconnected,
     Sender {
         priority_tx: Sender<ServerEvent>,
         tx: Sender<ServerEvent>,
@@ -96,6 +97,7 @@ impl ServerSender {
     pub fn send(&self, event: ServerEvent) -> Result<(), ServerEvent> {
         match self {
             Self::Proxy(proxy) => proxy.send_event(event).map_err(|e| e.0),
+            Self::Disconnected => Err(event),
             Self::Sender { priority_tx, tx } => {
                 if matches!(event, ServerEvent::ClientDisconnected) {
                     _ = priority_tx.send(ServerEvent::ClientDisconnected);

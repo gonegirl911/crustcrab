@@ -9,7 +9,10 @@ use self::{
     event_loop::{EventLoop, EventLoopProxy},
     game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig},
 };
-use crate::{server::game::world::block::Block, shared::utils};
+use crate::{
+    server::{ServerSender, game::world::block::Block},
+    shared::utils,
+};
 use app::App;
 use crossbeam_channel::Sender;
 use nalgebra::{Point3, Vector3};
@@ -68,7 +71,7 @@ pub enum ClientEvent {
     },
     BlockDestroyed,
     #[serde(skip)]
-    Disconnected,
+    Connected(Box<ServerSender>),
     #[serde(skip)]
     ServerDisconnected,
 }

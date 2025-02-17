@@ -16,7 +16,7 @@ impl EventLoop {
         }
     }
 
-    pub fn run<H>(self, mut handler: H)
+    pub fn run<H>(&mut self, mut handler: H)
     where
         H: for<'a> EventHandler<Event, Context<'a> = &'a ServerSender>,
     {
@@ -25,6 +25,10 @@ impl EventLoop {
         loop {
             handler.handle(
                 &match ticker.recv_timeout(&self.client_rx) {
+                    Ok(ClientEvent::Connected(server_tx)) => {
+                        self.server_tx = *server_tx;
+                        continue;
+                    }
                     Ok(event) => Event::Client(event),
                     Err(RecvTimeoutError::Timeout) => Event::Tick,
                     Err(RecvTimeoutError::Disconnected) => break,

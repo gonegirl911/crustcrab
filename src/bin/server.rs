@@ -21,13 +21,7 @@ struct Args {
 
 fn main() {
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
-    let (priority_server_tx, priority_server_rx) = crossbeam_channel::unbounded();
-    let (server_tx, server_rx) = crossbeam_channel::unbounded();
-    let server_tx = ServerSender::Sender {
-        priority_tx: priority_server_tx,
-        tx: server_tx,
-    };
-    let server = Server::new(server_tx.clone(), client_rx.clone());
+    let mut server = Server::new(ServerSender::Disconnected, client_rx);
 
     thread::spawn(move || {
         let args = Args::parse();
@@ -82,6 +76,16 @@ fn main() {
                 eprintln!("[{addr}] disable Nagle algorithm FAILED: {e}");
             }
 
+            let (priority_server_tx, priority_server_rx) = crossbeam_channel::unbounded();
+            let (server_tx, server_rx) = crossbeam_channel::unbounded();
+            let server_tx = ServerSender::Sender {
+                priority_tx: priority_server_tx,
+                tx: server_tx,
+            };
+            client_tx
+                .send(ClientEvent::Connected(server_tx.clone().into()))
+                .unwrap_or_else(|_| unreachable!());
+
             thread::scope(|s| {
                 let mut priority_reader = BufReader::new(&priority_stream);
                 loop {
@@ -92,8 +96,6 @@ fn main() {
                                 && let io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof =
                                     e.kind()
                             {
-                                client_rx.try_iter().for_each(drop);
-                                _ = client_tx.send(ClientEvent::Disconnected);
                                 server_tx
                                     .send(ServerEvent::ClientDisconnected)
                                     .unwrap_or_else(|_| unreachable!());
@@ -105,8 +107,6 @@ fn main() {
                     };
 
                     if matches!(event, ClientEvent::InitialRenderRequested { .. }) {
-                        priority_server_rx.try_iter().for_each(drop);
-
                         s.spawn(|| {
                             let mut priority_writer = BufWriter::new(&priority_stream);
                             for event in &priority_server_rx {
@@ -133,8 +133,6 @@ fn main() {
                             }
                             eprintln!("[{priority_addr}] writing CLOSED");
                         });
-
-                        server_rx.try_iter().for_each(drop);
 
                         s.spawn(|| {
                             let mut writer = BufWriter::new(&stream);
