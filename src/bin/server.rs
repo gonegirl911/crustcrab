@@ -87,6 +87,56 @@ fn main() {
                 .unwrap_or_else(|_| unreachable!());
 
             thread::scope(|s| {
+                s.spawn(|| {
+                    let mut priority_writer = BufWriter::new(&priority_stream);
+                    for event in &priority_server_rx {
+                        if matches!(event, ServerEvent::ClientDisconnected) {
+                            break;
+                        }
+                        if let Err(e) = bincode::serialize_into(&mut priority_writer, &event) {
+                            if let bincode::ErrorKind::Io(e) = &*e
+                                && e.kind() == io::ErrorKind::BrokenPipe
+                            {
+                                break;
+                            }
+                            eprintln!("[{priority_addr}] write server event FAILED: {e}");
+                            continue;
+                        }
+                        if let Err(e) = priority_writer.flush() {
+                            if e.kind() == io::ErrorKind::BrokenPipe {
+                                break;
+                            }
+                            eprintln!("[{priority_addr}] write server event FAILED: {e}");
+                        }
+                    }
+                    eprintln!("[{priority_addr}] writing CLOSED");
+                });
+
+                s.spawn(|| {
+                    let mut writer = BufWriter::new(&stream);
+                    for event in &server_rx {
+                        if matches!(event, ServerEvent::ClientDisconnected) {
+                            break;
+                        }
+                        if let Err(e) = bincode::serialize_into(&mut writer, &event) {
+                            if let bincode::ErrorKind::Io(e) = &*e
+                                && e.kind() == io::ErrorKind::BrokenPipe
+                            {
+                                break;
+                            }
+                            eprintln!("[{addr}] write server event FAILED: {e}");
+                            continue;
+                        }
+                        if let Err(e) = writer.flush() {
+                            if e.kind() == io::ErrorKind::BrokenPipe {
+                                break;
+                            }
+                            eprintln!("[{addr}] write server event FAILED: {e}");
+                        }
+                    }
+                    eprintln!("[{addr}] writing CLOSED");
+                });
+
                 let mut priority_reader = BufReader::new(&priority_stream);
                 loop {
                     let event = match bincode::deserialize_from(&mut priority_reader) {
@@ -105,61 +155,6 @@ fn main() {
                             continue;
                         }
                     };
-
-                    if matches!(event, ClientEvent::InitialRenderRequested { .. }) {
-                        s.spawn(|| {
-                            let mut priority_writer = BufWriter::new(&priority_stream);
-                            for event in &priority_server_rx {
-                                if matches!(event, ServerEvent::ClientDisconnected) {
-                                    break;
-                                }
-                                if let Err(e) =
-                                    bincode::serialize_into(&mut priority_writer, &event)
-                                {
-                                    if let bincode::ErrorKind::Io(e) = &*e
-                                        && e.kind() == io::ErrorKind::BrokenPipe
-                                    {
-                                        break;
-                                    }
-                                    eprintln!("[{priority_addr}] write server event FAILED: {e}");
-                                    continue;
-                                }
-                                if let Err(e) = priority_writer.flush() {
-                                    if e.kind() == io::ErrorKind::BrokenPipe {
-                                        break;
-                                    }
-                                    eprintln!("[{priority_addr}] write server event FAILED: {e}");
-                                }
-                            }
-                            eprintln!("[{priority_addr}] writing CLOSED");
-                        });
-
-                        s.spawn(|| {
-                            let mut writer = BufWriter::new(&stream);
-                            for event in &server_rx {
-                                if matches!(event, ServerEvent::ClientDisconnected) {
-                                    break;
-                                }
-                                if let Err(e) = bincode::serialize_into(&mut writer, &event) {
-                                    if let bincode::ErrorKind::Io(e) = &*e
-                                        && e.kind() == io::ErrorKind::BrokenPipe
-                                    {
-                                        break;
-                                    }
-                                    eprintln!("[{addr}] write server event FAILED: {e}");
-                                    continue;
-                                }
-                                if let Err(e) = writer.flush() {
-                                    if e.kind() == io::ErrorKind::BrokenPipe {
-                                        break;
-                                    }
-                                    eprintln!("[{addr}] write server event FAILED: {e}");
-                                }
-                            }
-                            eprintln!("[{addr}] writing CLOSED");
-                        });
-                    }
-
                     if client_tx.send(event).is_err() {
                         break;
                     }
