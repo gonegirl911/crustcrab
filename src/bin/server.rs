@@ -6,7 +6,7 @@ use crustcrab::{
     server::{Server, ServerEvent, ServerSender},
 };
 use std::{
-    io::{self, BufReader, BufWriter, Write},
+    io::{self, BufReader, BufWriter, prelude::*},
     net::TcpListener,
     thread,
 };

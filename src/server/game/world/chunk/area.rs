@@ -10,7 +10,7 @@ use nalgebra::{Point3, Vector3, point, vector};
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{SeqAccess, Visitor},
-    ser::SerializeSeq,
+    ser::SerializeSeq as _,
 };
 use std::{
     fmt::{self, Formatter},
@@ -161,12 +161,12 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
         let mut count = 0u16;
 
         for value in self.values() {
-            if prev != value {
+            if prev == value {
+                count += 1;
+            } else {
                 seq.serialize_element(&(prev, count))?;
                 prev = value;
                 count = 1;
-            } else {
-                count += 1;
             }
         }
 

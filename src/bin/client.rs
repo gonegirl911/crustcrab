@@ -3,7 +3,7 @@
 use clap::Parser;
 use crustcrab::client::{Client, ClientEvent};
 use std::{
-    io::{self, BufReader, BufWriter, Write},
+    io::{self, BufReader, BufWriter, prelude::*},
     net::{Shutdown, TcpStream},
     thread,
 };
