@@ -1,6 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point3, Vector3};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use std::{
     array,
     iter::Sum,
@@ -66,19 +66,19 @@ impl<T: Add + Copy> Add for Rgb<T> {
     }
 }
 
-impl<T: Mul + Copy> Mul for Rgb<T> {
-    type Output = Rgb<T::Output>;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        self.zip_map(rhs, Mul::mul)
-    }
-}
-
 impl<T: Mul + Copy> Mul<T> for Rgb<T> {
     type Output = Rgb<T::Output>;
 
     fn mul(self, rhs: T) -> Self::Output {
         self.map(|c| c * rhs)
+    }
+}
+
+impl<T: Mul + Copy> Mul for Rgb<T> {
+    type Output = Rgb<T::Output>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.zip_map(rhs, Mul::mul)
     }
 }
 
@@ -91,18 +91,19 @@ impl<T> IntoIterator for Rgb<T> {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(from = "[T; 4]")]
 pub struct Rgba<T> {
     pub rgb: Rgb<T>,
     pub a: T,
 }
 
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Rgba<T> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let [r, g, b, a] = Deserialize::deserialize(deserializer)?;
-        Ok(Self {
+impl<T> From<[T; 4]> for Rgba<T> {
+    fn from([r, g, b, a]: [T; 4]) -> Self {
+        Self {
             rgb: Rgb::new(r, g, b),
             a,
-        })
+        }
     }
 }
 
