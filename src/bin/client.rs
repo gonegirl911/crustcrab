@@ -61,7 +61,6 @@ fn main() {
                         if let bincode::ErrorKind::Io(e) = &*e
                             && e.kind() == io::ErrorKind::UnexpectedEof
                         {
-                            _ = client_tx.send(ClientEvent::ServerDisconnected);
                             break;
                         }
                         eprintln!("[{priority_addr}] read server event FAILED: {e}");
@@ -72,6 +71,7 @@ fn main() {
                     break;
                 }
             }
+            _ = client_tx.send(ClientEvent::ServerDisconnected);
             eprintln!("[{priority_addr}] reading CLOSED");
         });
 

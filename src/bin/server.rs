@@ -155,9 +155,7 @@ fn main() {
                             continue;
                         }
                     };
-                    if client_tx.send(event).is_err() {
-                        break;
-                    }
+                    client_tx.send(event).unwrap_or_else(|_| unreachable!());
                 }
                 eprintln!("[{priority_addr}] reading CLOSED");
             });
