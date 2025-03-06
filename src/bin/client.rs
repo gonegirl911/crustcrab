@@ -10,10 +10,10 @@ use std::{
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long, default_value_t = 8008)]
-    priority_port: u16,
-    #[arg(long, default_value_t = 8009)]
-    port: u16,
+    #[arg(long, default_value = "localhost:8008")]
+    priority_addr: String,
+    #[arg(long, default_value = "localhost:8009")]
+    addr: String,
 }
 
 fn main() {
@@ -21,8 +21,10 @@ fn main() {
     let client = Client::new(client_tx.clone());
     let proxy = client.create_proxy();
 
-    let args = Args::parse();
-    let priority_addr = format!("127.0.0.1:{}", args.priority_port);
+    let Args {
+        priority_addr,
+        addr,
+    } = Parser::parse();
     let priority_stream = match TcpStream::connect(&priority_addr) {
         Ok(stream) => {
             eprintln!("[{priority_addr}] open TCP connection SUCCEDED");
@@ -36,7 +38,6 @@ fn main() {
     if let Err(e) = priority_stream.set_nodelay(true) {
         eprintln!("[{priority_addr}] disable Nagle algorithm FAILED: {e}");
     }
-    let addr = format!("127.0.0.1:{}", args.port);
     let stream = match TcpStream::connect(&addr) {
         Ok(stream) => {
             eprintln!("[{addr}] open TCP connection SUCCEDED");

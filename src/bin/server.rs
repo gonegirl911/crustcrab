@@ -13,10 +13,10 @@ use std::{
 
 #[derive(Parser)]
 struct Args {
-    #[arg(long, default_value_t = 8008)]
-    priority_port: u16,
-    #[arg(long, default_value_t = 8009)]
-    port: u16,
+    #[arg(long, default_value = "localhost:8008")]
+    priority_addr: String,
+    #[arg(long, default_value = "localhost:8009")]
+    addr: String,
 }
 
 fn main() {
@@ -24,8 +24,10 @@ fn main() {
     let mut server = Server::new(ServerSender::disconnected(), client_rx);
 
     thread::spawn(move || {
-        let args = Args::parse();
-        let priority_addr = format!("127.0.0.1:{}", args.priority_port);
+        let Args {
+            priority_addr,
+            addr,
+        } = Parser::parse();
         let priority_listener = match TcpListener::bind(&priority_addr) {
             Ok(listener) => {
                 eprintln!("[{priority_addr}] create TCP listener SUCCEDED");
@@ -36,7 +38,6 @@ fn main() {
                 return;
             }
         };
-        let addr = format!("127.0.0.1:{}", args.port);
         let listener = match TcpListener::bind(&addr) {
             Ok(listener) => {
                 eprintln!("[{addr}] create TCP listener SUCCEDED");
