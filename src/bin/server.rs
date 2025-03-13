@@ -1,9 +1,10 @@
-#![feature(let_chains)]
+#![feature(if_let_guard, let_chains)]
 
 use clap::Parser;
 use crustcrab::{
     client::ClientEvent,
     server::{Server, ServerEvent, ServerSender},
+    shared::bincode,
 };
 use std::{
     io::{self, BufReader, BufWriter, prelude::*},
@@ -94,9 +95,9 @@ fn main() {
                         if matches!(event, ServerEvent::ClientDisconnected) {
                             break;
                         }
-                        if let Err(e) = bincode::serialize_into(&mut priority_writer, &event) {
-                            if let bincode::ErrorKind::Io(e) = &*e
-                                && e.kind() == io::ErrorKind::BrokenPipe
+                        if let Err(e) = bincode::serialize_into(event, &mut priority_writer) {
+                            if let bincode::SerializeError::Io { inner, .. } = &e
+                                && inner.kind() == io::ErrorKind::BrokenPipe
                             {
                                 break;
                             }
@@ -119,9 +120,9 @@ fn main() {
                         if matches!(event, ServerEvent::ClientDisconnected) {
                             break;
                         }
-                        if let Err(e) = bincode::serialize_into(&mut writer, &event) {
-                            if let bincode::ErrorKind::Io(e) = &*e
-                                && e.kind() == io::ErrorKind::BrokenPipe
+                        if let Err(e) = bincode::serialize_into(event, &mut writer) {
+                            if let bincode::SerializeError::Io { inner, .. } = &e
+                                && inner.kind() == io::ErrorKind::BrokenPipe
                             {
                                 break;
                             }
@@ -142,16 +143,16 @@ fn main() {
                 loop {
                     let event = match bincode::deserialize_from(&mut priority_reader) {
                         Ok(event) => event,
+                        Err(bincode::DeserializeError::Io { inner, .. })
+                            if let io::ErrorKind::ConnectionReset
+                            | io::ErrorKind::UnexpectedEof = inner.kind() =>
+                        {
+                            server_tx
+                                .send(ServerEvent::ClientDisconnected)
+                                .unwrap_or_else(|_| unreachable!());
+                            break;
+                        }
                         Err(e) => {
-                            if let bincode::ErrorKind::Io(e) = &*e
-                                && let io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof =
-                                    e.kind()
-                            {
-                                server_tx
-                                    .send(ServerEvent::ClientDisconnected)
-                                    .unwrap_or_else(|_| unreachable!());
-                                break;
-                            }
                             eprintln!("[{priority_addr}] read client event FAILED: {e}");
                             continue;
                         }

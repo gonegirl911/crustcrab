@@ -12,4 +12,4 @@
 
 pub mod client;
 pub mod server;
-mod shared;
+pub mod shared;

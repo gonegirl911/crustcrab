@@ -1,7 +1,10 @@
 #![feature(let_chains)]
 
 use clap::Parser;
-use crustcrab::client::{Client, ClientEvent};
+use crustcrab::{
+    client::{Client, ClientEvent},
+    shared::bincode,
+};
 use std::{
     io::{self, BufReader, BufWriter, prelude::*},
     net::{Shutdown, TcpStream},
@@ -58,12 +61,12 @@ fn main() {
             loop {
                 let event = match bincode::deserialize_from(&mut priority_reader) {
                     Ok(event) => event,
+                    Err(bincode::DeserializeError::Io { inner, .. })
+                        if inner.kind() == io::ErrorKind::UnexpectedEof =>
+                    {
+                        break;
+                    }
                     Err(e) => {
-                        if let bincode::ErrorKind::Io(e) = &*e
-                            && e.kind() == io::ErrorKind::UnexpectedEof
-                        {
-                            break;
-                        }
                         eprintln!("[{priority_addr}] read server event FAILED: {e}");
                         continue;
                     }
@@ -82,9 +85,9 @@ fn main() {
                 if matches!(event, ClientEvent::ServerDisconnected) {
                     break;
                 }
-                if let Err(e) = bincode::serialize_into(&mut priority_writer, &event) {
-                    if let bincode::ErrorKind::Io(e) = &*e
-                        && e.kind() == io::ErrorKind::BrokenPipe
+                if let Err(e) = bincode::serialize_into(event, &mut priority_writer) {
+                    if let bincode::SerializeError::Io { inner, .. } = &e
+                        && inner.kind() == io::ErrorKind::BrokenPipe
                     {
                         break;
                     }
@@ -106,12 +109,12 @@ fn main() {
             loop {
                 let event = match bincode::deserialize_from(&mut reader) {
                     Ok(event) => event,
+                    Err(bincode::DeserializeError::Io { inner, .. })
+                        if inner.kind() == io::ErrorKind::UnexpectedEof =>
+                    {
+                        break;
+                    }
                     Err(e) => {
-                        if let bincode::ErrorKind::Io(e) = &*e
-                            && e.kind() == io::ErrorKind::UnexpectedEof
-                        {
-                            break;
-                        }
                         eprintln!("[{addr}] read server event FAILED: {e}");
                         continue;
                     }
