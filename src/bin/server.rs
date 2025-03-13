@@ -91,7 +91,7 @@ fn main() {
             thread::scope(|s| {
                 s.spawn(|| {
                     let mut priority_writer = BufWriter::new(&priority_stream);
-                    for event in &priority_server_rx {
+                    for event in priority_server_rx {
                         if matches!(event, ServerEvent::ClientDisconnected) {
                             break;
                         }
@@ -115,8 +115,8 @@ fn main() {
                 });
 
                 s.spawn(|| {
-                    let mut writer = BufWriter::new(&stream);
-                    for event in &server_rx {
+                    let mut writer = BufWriter::new(stream);
+                    for event in server_rx {
                         if matches!(event, ServerEvent::ClientDisconnected) {
                             break;
                         }
