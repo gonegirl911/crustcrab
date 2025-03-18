@@ -79,7 +79,6 @@ impl World {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn draw<F: FnOnce(&mut wgpu::CommandEncoder)>(
         &mut self,
         renderer: &Renderer,

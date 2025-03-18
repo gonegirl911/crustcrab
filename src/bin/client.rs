@@ -6,7 +6,7 @@ use crustcrab::{
     shared::bincode,
 };
 use std::{
-    io::{self, BufReader, BufWriter, prelude::*},
+    io::{self, BufReader, BufWriter, Write as _},
     net::{Shutdown, TcpStream},
     thread,
 };

@@ -244,7 +244,7 @@ impl<E: Enum, T> Drop for Guard<'_, E, T> {
     }
 }
 
-#[allow(clippy::missing_safety_doc)]
+#[expect(clippy::missing_safety_doc)]
 pub unsafe trait Enum: Copy {
     type Length: ArrayLength;
 
@@ -258,6 +258,7 @@ pub unsafe trait Enum: Copy {
 
     fn to_index(self) -> usize;
 
+    #[define_opaque(Variants)]
     fn variants() -> Variants<Self> {
         (0..Self::LEN).map(|i| unsafe { Self::from_index_unchecked(i) })
     }

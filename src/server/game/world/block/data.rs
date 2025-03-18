@@ -398,7 +398,6 @@ static SIDE_CORNER_DELTAS: LazyLock<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>>
         })
     });
 
-#[allow(clippy::type_complexity)]
 pub static SIDE_CORNER_COMPONENT_DELTAS: LazyLock<
     EnumMap<Side, EnumMap<Corner, EnumMap<Component, Vector3<i8>>>>,
 > = LazyLock::new(|| {

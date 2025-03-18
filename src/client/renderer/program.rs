@@ -5,7 +5,6 @@ use std::slice;
 pub struct Program(wgpu::RenderPipeline);
 
 impl Program {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         Renderer { device, .. }: &Renderer,
         shader_desc: wgpu::ShaderModuleDescriptor,
