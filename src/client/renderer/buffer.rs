@@ -1,7 +1,7 @@
 use super::Renderer;
 use bytemuck::Pod;
 use std::{marker::PhantomData, mem, ops::Deref, slice};
-use wgpu::util::{BufferInitDescriptor, DeviceExt as _};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
 

@@ -10,7 +10,7 @@ use nalgebra::{Point3, Vector3, point, vector};
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{SeqAccess, Visitor},
-    ser::SerializeSeq as _,
+    ser::SerializeSeq,
 };
 use std::{
     fmt::{self, Formatter},

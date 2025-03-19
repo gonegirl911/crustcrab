@@ -1,6 +1,6 @@
 use crate::client::renderer::{
     Renderer,
-    effect::{Blit, Effect as _},
+    effect::{Blit, Effect},
 };
 use image::{ImageReader, RgbaImage};
 use std::{num::NonZeroU32, path::Path};

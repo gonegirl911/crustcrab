@@ -10,7 +10,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
-            effect::{Blit, Effect as _, PostProcessor},
+            effect::{Blit, Effect, PostProcessor},
         },
     },
     server::game::world::block::Block,

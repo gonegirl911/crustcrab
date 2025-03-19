@@ -4,7 +4,7 @@ use crate::{
     shared::utils,
 };
 use nalgebra::Point3;
-use noise::{NoiseFn as _, Simplex};
+use noise::{NoiseFn, Simplex};
 
 #[derive(Default)]
 pub struct ChunkGenerator(Simplex);

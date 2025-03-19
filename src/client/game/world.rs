@@ -1,4 +1,4 @@
-use super::player::frustum::{Cullable as _, Frustum};
+use super::player::frustum::{Cullable, Frustum};
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
@@ -21,7 +21,7 @@ use crate::{
     },
     shared::{pool::ThreadPool, utils},
 };
-use bitfield::{BitRange as _, BitRangeMut as _};
+use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};

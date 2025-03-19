@@ -1,8 +1,8 @@
 use generic_array::{
     ArrayLength, GenericArray, GenericArrayIter,
-    functional::FunctionalSequence as _,
-    sequence::GenericSequence as _,
-    typenum::{Add1, Unsigned as _, bit::B1},
+    functional::FunctionalSequence,
+    sequence::GenericSequence,
+    typenum::{Add1, Unsigned, bit::B1},
 };
 use serde::{
     Deserialize, Deserializer,

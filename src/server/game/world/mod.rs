@@ -29,8 +29,8 @@ use crate::{
     shared::{
         bound::Aabb,
         enum_map::{Enum, EnumMap},
-        ray::{BlockIntersection, Intersectable as _, Ray},
-        utils::{self, ParallelIteratorExt as _},
+        ray::{BlockIntersection, Intersectable, Ray},
+        utils::{self, ParallelIteratorExt},
     },
 };
 use nalgebra::{Point2, Point3, Vector3, point};

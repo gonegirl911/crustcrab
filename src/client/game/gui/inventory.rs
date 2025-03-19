@@ -6,7 +6,7 @@ use crate::{
         game::world::BlockVertex,
         renderer::{
             Renderer,
-            buffer::{MemoryState, Vertex as _, VertexBuffer},
+            buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
             program::Program,
             texture::screen::DepthBuffer,

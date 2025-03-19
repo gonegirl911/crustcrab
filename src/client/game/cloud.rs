@@ -5,7 +5,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
-            buffer::{Instance, InstanceBuffer, MemoryState, Vertex as _, VertexBuffer},
+            buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
             effect::{Blender, PostProcessor},
             program::{Program, PushConstants},
             texture::{image::ImageTexture, screen::DepthBuffer},
