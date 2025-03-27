@@ -11,6 +11,7 @@ use std::{array, ops::Range};
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(try_from = "u8")]
 pub struct Block(u8);
 
 impl Block {
@@ -45,6 +46,15 @@ impl Block {
             (Self::AIR, BlockAction::Place(_)) | (_, BlockAction::Destroy) => true,
             (_, BlockAction::Place(_)) => false,
         }
+    }
+}
+
+impl TryFrom<u8> for Block {
+    type Error = !;
+
+    fn try_from(index: u8) -> Result<Self, Self::Error> {
+        assert!((index as usize) < BLOCK_DATA.len());
+        Ok(Self(index))
     }
 }
 

@@ -6,6 +6,7 @@
     int_roundings,
     let_chains,
     maybe_uninit_fill,
+    never_type,
     trait_alias,
     type_alias_impl_trait
 )]
