@@ -142,7 +142,7 @@ impl EventHandler for Inventory {
 
                         self.vertex_buffer = self.selected_block().and_then(|block| {
                             let data = block.data();
-                            VertexBuffer::new_non_empty(
+                            VertexBuffer::try_new(
                                 renderer,
                                 MemoryState::Immutable(&if let Some(vertices) = data.flat_icon() {
                                     is_flat = true;

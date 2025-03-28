@@ -41,8 +41,8 @@ impl<V: Pod> VertexBuffer<V> {
         ))
     }
 
-    pub fn new_non_empty(renderer: &Renderer, state: MemoryState<[V], usize>) -> Option<Self> {
-        Some(Self(Buffer::<[_]>::new_non_empty(
+    pub fn try_new(renderer: &Renderer, state: MemoryState<[V], usize>) -> Option<Self> {
+        Some(Self(Buffer::<[_]>::try_new(
             renderer,
             state.data(),
             state.usage(wgpu::BufferUsages::VERTEX),
@@ -149,10 +149,10 @@ impl<T> Buffer<[T]> {
 
 impl<T: Pod> Buffer<[T]> {
     fn new(renderer: &Renderer, data: Result<&[T], usize>, usage: wgpu::BufferUsages) -> Self {
-        Self::new_non_empty(renderer, data, usage).unwrap_or_else(|| unreachable!())
+        Self::try_new(renderer, data, usage).unwrap_or_else(|| unreachable!())
     }
 
-    fn new_non_empty(
+    fn try_new(
         Renderer { device, .. }: &Renderer,
         data: Result<&[T], usize>,
         usage: wgpu::BufferUsages,

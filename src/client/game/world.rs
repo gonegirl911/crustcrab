@@ -318,8 +318,8 @@ impl ChunkMesh {
         transparent_vertices: &[BlockVertex],
     ) -> Option<Self> {
         match (
-            OpaquePart::new_non_empty(renderer, MemoryState::Immutable(vertices)),
-            TransparentPart::new_non_empty(renderer, transparent_vertices, |v| {
+            OpaquePart::try_new(renderer, MemoryState::Immutable(vertices)),
+            TransparentPart::try_new(renderer, transparent_vertices, |v| {
                 v.iter()
                     .fold(Point3::default(), |acc, v| acc + v.coords().coords)
                     .cast()

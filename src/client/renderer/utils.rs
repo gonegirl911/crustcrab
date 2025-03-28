@@ -12,13 +12,13 @@ pub struct TransparentMesh<C, V> {
 }
 
 impl<C, V: Pod> TransparentMesh<C, V> {
-    pub fn new_non_empty<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Option<Self>
+    pub fn try_new<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Option<Self>
     where
         F: FnMut(&[V]) -> C,
     {
         assert_eq!(vertices.len() % 6, 0);
         Some(Self {
-            buffer: VertexBuffer::new_non_empty(renderer, MemoryState::Uninit(vertices.len()))?,
+            buffer: VertexBuffer::try_new(renderer, MemoryState::Uninit(vertices.len()))?,
             data: vertices.array_chunks().map(|v| (coords(v), *v)).collect(),
             vertices: Vec::with_capacity(vertices.len()),
         })
