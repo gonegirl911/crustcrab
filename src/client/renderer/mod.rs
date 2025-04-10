@@ -37,19 +37,16 @@ impl Renderer {
             .await
             .expect("adapter should be available");
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::PUSH_CONSTANTS
-                        | wgpu::Features::TEXTURE_BINDING_ARRAY
-                        | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
-                    required_limits: wgpu::Limits {
-                        max_push_constant_size: 68,
-                        ..Default::default()
-                    },
+            .request_device(&wgpu::DeviceDescriptor {
+                required_features: wgpu::Features::PUSH_CONSTANTS
+                    | wgpu::Features::TEXTURE_BINDING_ARRAY
+                    | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
+                required_limits: wgpu::Limits {
+                    max_push_constant_size: 68,
                     ..Default::default()
                 },
-                None,
-            )
+                ..Default::default()
+            })
             .await
             .expect("device should be available");
         let config = surface
