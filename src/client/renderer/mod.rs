@@ -42,6 +42,7 @@ impl Renderer {
                     | wgpu::Features::TEXTURE_BINDING_ARRAY
                     | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
                 required_limits: wgpu::Limits {
+                    max_binding_array_elements_per_shader_stage: 6,
                     max_push_constant_size: 68,
                     ..Default::default()
                 },
