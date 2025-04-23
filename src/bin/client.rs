@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 use clap::Parser;
 use crustcrab::{
     client::{Client, ClientEvent},

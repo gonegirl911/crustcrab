@@ -4,7 +4,6 @@
     generic_arg_infer,
     impl_trait_in_assoc_type,
     int_roundings,
-    let_chains,
     maybe_uninit_fill,
     never_type,
     trait_alias,
