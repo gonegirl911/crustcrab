@@ -126,15 +126,15 @@ fn main() {
 
         client.run();
 
-        if let Err(e) = priority_stream.shutdown(Shutdown::Both) {
-            if e.kind() != io::ErrorKind::NotConnected {
-                eprintln!("[{priority_addr}] gracefull shutdown FAILED: {e}");
-            }
+        if let Err(e) = priority_stream.shutdown(Shutdown::Both)
+            && e.kind() != io::ErrorKind::NotConnected
+        {
+            eprintln!("[{priority_addr}] gracefull shutdown FAILED: {e}");
         }
-        if let Err(e) = stream.shutdown(Shutdown::Both) {
-            if e.kind() != io::ErrorKind::NotConnected {
-                eprintln!("[{addr}] gracefull shutdown FAILED: {e}");
-            }
+        if let Err(e) = stream.shutdown(Shutdown::Both)
+            && e.kind() != io::ErrorKind::NotConnected
+        {
+            eprintln!("[{addr}] gracefull shutdown FAILED: {e}");
         }
     });
 }
