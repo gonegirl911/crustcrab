@@ -144,7 +144,7 @@ fn main() {
                         Err(bincode::DeserializeError::Io { inner, .. })
                             if matches!(
                                 inner.kind(),
-                                io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof
+                                io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof,
                             ) =>
                         {
                             server_tx
