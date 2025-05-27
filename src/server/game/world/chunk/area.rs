@@ -105,10 +105,6 @@ impl IndexMut<Vector3<i8>> for ChunkAreaLight {
 struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl<T> ChunkAreaDataStore<T> {
-    fn first(&self) -> &T {
-        &self.0[0][0][0]
-    }
-
     fn values(&self) -> slice::Iter<T> {
         self.0.as_flattened().as_flattened().iter()
     }
@@ -122,12 +118,13 @@ impl<T> ChunkAreaDataStore<T> {
 
 impl<T: PartialEq> ChunkAreaDataStore<T> {
     fn packed_len(&self) -> usize {
-        let mut prev = self.first();
+        let mut values = self.values();
+        let mut prev = values.next().unwrap_or_else(|| unreachable!());
         let mut len = 1;
 
-        for value in self.values() {
-            if prev != value {
-                prev = value;
+        for cur in values {
+            if prev != cur {
+                prev = cur;
                 len += 1;
             }
         }
@@ -157,15 +154,16 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
         const { assert!(ChunkArea::DIM.pow(3) <= u16::MAX as usize) };
 
         let mut seq = serializer.serialize_seq(Some(self.packed_len()))?;
-        let mut prev = self.first();
-        let mut count = 0u16;
+        let mut values = self.values();
+        let mut prev = values.next().unwrap_or_else(|| unreachable!());
+        let mut count = 1u16;
 
-        for value in self.values() {
-            if prev == value {
+        for cur in values {
+            if prev == cur {
                 count += 1;
             } else {
                 seq.serialize_element(&(prev, count))?;
-                prev = value;
+                prev = cur;
                 count = 1;
             }
         }

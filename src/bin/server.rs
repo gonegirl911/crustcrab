@@ -1,5 +1,3 @@
-#![feature(if_let_guard)]
-
 use clap::Parser;
 use crustcrab::{
     client::ClientEvent,
@@ -144,8 +142,10 @@ fn main() {
                     let event = match bincode::deserialize_from(&mut priority_reader) {
                         Ok(event) => event,
                         Err(bincode::DeserializeError::Io { inner, .. })
-                            if let io::ErrorKind::ConnectionReset
-                            | io::ErrorKind::UnexpectedEof = inner.kind() =>
+                            if matches!(
+                                inner.kind(),
+                                io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof
+                            ) =>
                         {
                             server_tx
                                 .send(ServerEvent::ClientDisconnected)
