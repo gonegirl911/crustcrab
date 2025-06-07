@@ -1,15 +1,17 @@
 pub mod camera;
 pub mod frustum;
 
-use self::{
-    camera::{Changes, Controller, Projection, View},
-    frustum::Frustum,
-};
-use super::gui::Gui;
 use crate::{
     client::{
         CLIENT_CONFIG, ClientEvent,
         event_loop::{Event, EventHandler},
+        game::{
+            gui::Gui,
+            player::{
+                camera::{Changes, Controller, Projection, View},
+                frustum::Frustum,
+            },
+        },
         renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
     },
     server::game::world::chunk::Chunk,
@@ -84,10 +86,7 @@ impl EventHandler for Player {
                     render_distance: CLIENT_CONFIG.player.render_distance,
                 });
             }
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
 
                 if changes.contains(Changes::MOVED) {

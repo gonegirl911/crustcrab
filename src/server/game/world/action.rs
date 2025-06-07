@@ -1,5 +1,4 @@
-use super::block::Block;
-use crate::shared::utils;
+use crate::{server::game::world::block::Block, shared::utils};
 use nalgebra::Point3;
 use rustc_hash::FxHashMap;
 

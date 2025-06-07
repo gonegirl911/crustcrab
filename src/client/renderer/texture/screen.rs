@@ -6,6 +6,7 @@ use std::{
     array,
     ops::{Deref, DerefMut},
 };
+use winit::event::WindowEvent;
 
 pub struct ScreenTexture(ScreenTextureArray<1>);
 
@@ -150,8 +151,9 @@ impl ScreenTextureArray<2> {
 impl<const N: usize> EventHandler for ScreenTextureArray<N> {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, _: &Event, renderer: Self::Context<'_>) {
-        if renderer.is_resized {
+    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) && renderer.is_resized
+        {
             self.views = Self::create_views(renderer, self.format);
             self.bind_groups = Self::create_bind_groups(
                 renderer,

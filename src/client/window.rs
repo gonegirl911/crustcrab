@@ -1,4 +1,4 @@
-use super::event_loop::{Event, EventHandler};
+use crate::client::event_loop::{Event, EventHandler};
 use std::{ops::Deref, sync::Arc};
 use winit::{
     error::ExternalError,
@@ -40,7 +40,7 @@ impl EventHandler for Window {
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
-            Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent(event) => match event {
                 WindowEvent::MouseInput {
                     button: MouseButton::Left,
                     state: ElementState::Pressed,

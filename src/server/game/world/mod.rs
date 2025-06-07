@@ -4,27 +4,29 @@ pub mod chunk;
 pub mod height;
 pub mod light;
 
-use self::{
-    action::{ActionStore, BlockAction},
-    block::{
-        Block, BlockLight,
-        area::{BlockArea, BlockAreaLight},
-        data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
-    },
-    chunk::{
-        Chunk, ChunkDataStore,
-        area::{ChunkArea, ChunkAreaLight},
-        generator::ChunkGenerator,
-    },
-    height::HeightMap,
-    light::WorldLight,
-};
-use super::player::{Player, WorldArea};
 use crate::{
     client::{ClientEvent, game::world::BlockVertex},
     server::{
         GroupId, SERVER_CONFIG, ServerEvent, ServerSender,
         event_loop::{Event, EventHandler},
+        game::{
+            player::{Player, WorldArea},
+            world::{
+                action::{ActionStore, BlockAction},
+                block::{
+                    Block, BlockLight,
+                    area::{BlockArea, BlockAreaLight},
+                    data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
+                },
+                chunk::{
+                    Chunk, ChunkDataStore,
+                    area::{ChunkArea, ChunkAreaLight},
+                    generator::ChunkGenerator,
+                },
+                height::HeightMap,
+                light::WorldLight,
+            },
+        },
     },
     shared::{
         bound::Aabb,

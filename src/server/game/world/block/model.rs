@@ -1,8 +1,10 @@
-use super::data::{Corner, Side, TEX_PATHS};
-use crate::shared::{
-    bound::Aabb,
-    enum_map::{Enum, EnumMap},
-    toml,
+use crate::{
+    server::game::world::block::data::{Corner, Side, TEX_PATHS},
+    shared::{
+        bound::Aabb,
+        enum_map::{Enum, EnumMap},
+        toml,
+    },
 };
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashMap;

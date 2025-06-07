@@ -1,8 +1,8 @@
-use super::world::BlockVertex;
 use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
+        game::world::BlockVertex,
         renderer::{
             Renderer,
             buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
@@ -144,15 +144,12 @@ impl EventHandler for CloudLayer {
 
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
+            Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
                 let stage = time.stage();
                 self.pc.update_color(stage);
                 self.opacity = Self::opacity(stage);
             }
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 self.pc.update_offset(dt);
             }
             _ => {}

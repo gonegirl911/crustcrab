@@ -1,13 +1,13 @@
 pub mod crosshair;
 pub mod inventory;
 
-use self::{
-    crosshair::{Crosshair, CrosshairConfig},
-    inventory::{Inventory, InventoryConfig},
-};
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
+        game::gui::{
+            crosshair::{Crosshair, CrosshairConfig},
+            inventory::{Inventory, InventoryConfig},
+        },
         renderer::{
             Renderer,
             effect::{Blit, Effect, PostProcessor},

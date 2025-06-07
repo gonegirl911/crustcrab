@@ -5,11 +5,11 @@ pub(crate) mod renderer;
 pub(crate) mod stopwatch;
 pub(crate) mod window;
 
-use self::{
-    event_loop::{EventLoop, EventLoopProxy},
-    game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig},
-};
 use crate::{
+    client::{
+        event_loop::{EventLoop, EventLoopProxy},
+        game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig},
+    },
     server::{ServerSender, game::world::block::Block},
     shared::toml,
 };

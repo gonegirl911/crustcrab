@@ -1,13 +1,15 @@
 pub mod area;
 pub mod generator;
 
-use super::{
-    action::BlockAction,
-    block::{Block, BlockLight},
-};
-use crate::shared::{
-    bound::{Aabb, BoundingSphere},
-    utils,
+use crate::{
+    server::game::world::{
+        action::BlockAction,
+        block::{Block, BlockLight},
+    },
+    shared::{
+        bound::{Aabb, BoundingSphere},
+        utils,
+    },
 };
 use nalgebra::{Point3, Vector3, point};
 use std::{

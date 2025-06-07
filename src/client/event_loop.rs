@@ -1,6 +1,6 @@
 use crate::server::ServerEvent;
 use winit::{
-    event::Event as RawEvent,
+    event::{DeviceEvent, WindowEvent},
     event_loop::{EventLoop as RawEventLoop, EventLoopProxy as RawEventLoopProxy},
 };
 
@@ -12,6 +12,12 @@ pub trait EventHandler {
     fn handle(&mut self, event: &Event, cx: Self::Context<'_>);
 }
 
-pub type Event = RawEvent<ServerEvent>;
+pub enum Event {
+    Resumed,
+    ServerEvent(ServerEvent),
+    WindowEvent(WindowEvent),
+    DeviceEvent(DeviceEvent),
+    AboutToWait,
+}
 
 pub type EventLoopProxy = RawEventLoopProxy<ServerEvent>;

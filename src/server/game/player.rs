@@ -1,7 +1,9 @@
-use super::world::World;
 use crate::{
     client::ClientEvent,
-    server::event_loop::{Event, EventHandler},
+    server::{
+        event_loop::{Event, EventHandler},
+        game::world::World,
+    },
     shared::{ray::Ray, utils},
 };
 use nalgebra::{Point2, Point3, point};

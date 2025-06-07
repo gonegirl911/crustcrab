@@ -2,9 +2,13 @@ pub mod area;
 pub mod data;
 pub mod model;
 
-use self::data::{BLOCK_DATA, BlockData};
-use super::action::BlockAction;
-use crate::shared::color::Rgb;
+use crate::{
+    server::game::world::{
+        action::BlockAction,
+        block::data::{BLOCK_DATA, BlockData},
+    },
+    shared::color::Rgb,
+};
 use bitfield::bitfield;
 use serde::{Deserialize, Serialize};
 use std::{array, ops::Range};

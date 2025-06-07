@@ -81,14 +81,11 @@ impl EventHandler for StarDome {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
+            Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
                 self.pc = StarPushConstants::new(time.stage());
                 self.updated_rotation = Some(time.sky_rotation());
             }
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 if let Some(instances) = self.instances() {
                     self.instance_buffer
                         .write(renderer, &instances.collect::<Vec<_>>());

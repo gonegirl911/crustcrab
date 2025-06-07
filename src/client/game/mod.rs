@@ -205,10 +205,7 @@ impl EventHandler for Game {
         self.depth.handle(event, renderer);
         self.processor.handle(event, renderer);
 
-        if let Event::WindowEvent {
-            event: WindowEvent::RedrawRequested,
-            ..
-        } = event
+        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested))
         {
             match surface.get_current_texture() {
                 Ok(texture) => {

@@ -1,4 +1,4 @@
-use super::ray::{Intersectable, Ray};
+use crate::shared::ray::{Intersectable, Ray};
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::{Deserialize, Serialize};
 

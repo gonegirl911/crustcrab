@@ -1,9 +1,11 @@
-use super::{
-    Renderer,
-    program::{Program, PushConstants},
-    texture::screen::ScreenTextureArray,
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::{
+        Renderer,
+        program::{Program, PushConstants},
+        texture::screen::ScreenTextureArray,
+    },
 };
-use crate::client::event_loop::{Event, EventHandler};
 use bytemuck::{Pod, Zeroable};
 
 pub struct PostProcessor {

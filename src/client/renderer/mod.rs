@@ -5,7 +5,7 @@ pub mod texture;
 pub mod uniform;
 pub mod utils;
 
-use super::{
+use crate::client::{
     event_loop::{Event, EventHandler},
     window::{RawWindow, Window},
 };
@@ -87,17 +87,14 @@ impl EventHandler for Renderer {
     type Context<'a> = &'a RawWindow;
 
     fn handle(&mut self, event: &Event, window: Self::Context<'_>) {
-        self.is_resized = false;
-
-        if let Event::WindowEvent { event, .. } = event {
+        if let Event::WindowEvent(event) = event {
             match event {
                 WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                     self.should_resize = true;
                 }
                 WindowEvent::RedrawRequested => {
-                    if mem::take(&mut self.should_resize) {
-                        self.is_resized = self.resize(window.inner_size());
-                    }
+                    self.is_resized =
+                        mem::take(&mut self.should_resize) && self.resize(window.inner_size());
                 }
                 _ => {}
             }

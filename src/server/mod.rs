@@ -2,17 +2,17 @@ pub(crate) mod event_loop;
 pub(crate) mod game;
 pub(crate) mod ticker;
 
-use self::{
-    event_loop::{EventLoop, EventLoopConfig},
-    game::{
-        Game,
-        clock::{ClockState, Time},
-        player::PlayerConfig,
-        world::{BlockHoverData, ChunkData},
-    },
-};
 use crate::{
     client::{ClientEvent, event_loop::EventLoopProxy},
+    server::{
+        event_loop::{EventLoop, EventLoopConfig},
+        game::{
+            Game,
+            clock::{ClockState, Time},
+            player::PlayerConfig,
+            world::{BlockHoverData, ChunkData},
+        },
+    },
     shared::toml,
 };
 use crossbeam_channel::{Receiver, Sender};

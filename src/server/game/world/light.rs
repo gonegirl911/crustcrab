@@ -1,18 +1,20 @@
-use super::{
-    ChunkStore, World,
-    action::BlockAction,
-    block::{
-        Block, BlockLight,
-        area::BlockAreaLight,
-        data::{BlockData, SIDE_DELTAS, Side},
+use crate::{
+    server::game::world::{
+        ChunkStore, World,
+        action::BlockAction,
+        block::{
+            Block, BlockLight,
+            area::BlockAreaLight,
+            data::{BlockData, SIDE_DELTAS, Side},
+        },
+        chunk::{
+            Chunk, ChunkLight,
+            area::{ChunkArea, ChunkAreaLight},
+        },
+        height::HeightMap,
     },
-    chunk::{
-        Chunk, ChunkLight,
-        area::{ChunkArea, ChunkAreaLight},
-    },
-    height::HeightMap,
+    shared::utils,
 };
-use crate::shared::utils;
 use nalgebra::Point3;
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};

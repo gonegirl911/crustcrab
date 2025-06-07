@@ -1,4 +1,4 @@
-use super::event_loop::{Event, EventHandler};
+use crate::client::event_loop::{Event, EventHandler};
 use std::time::{Duration, Instant};
 use winit::event::WindowEvent;
 
@@ -20,11 +20,7 @@ impl EventHandler for Stopwatch {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::WindowEvent {
-            event: WindowEvent::RedrawRequested,
-            ..
-        } = event
-        {
+        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) {
             let now = Instant::now();
             self.dt = now - self.prev;
             self.prev = now;

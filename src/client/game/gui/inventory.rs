@@ -1,9 +1,8 @@
-use super::Gui;
 use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
-        game::world::BlockVertex,
+        game::{gui::Gui, world::BlockVertex},
         renderer::{
             Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},
@@ -119,7 +118,7 @@ impl EventHandler for Inventory {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        if let Event::WindowEvent { event, .. } = event {
+        if let Event::WindowEvent(event) = event {
             match *event {
                 WindowEvent::KeyboardInput {
                     event:

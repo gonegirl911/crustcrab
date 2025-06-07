@@ -1,7 +1,7 @@
-use super::player::frustum::{Cullable, Frustum};
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
+        game::player::frustum::{Cullable, Frustum},
         renderer::{
             Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},
@@ -259,7 +259,7 @@ impl EventHandler for World {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::UserEvent(event) => match event {
+            Event::ServerEvent(event) => match event {
                 ServerEvent::ChunkLoaded {
                     coords,
                     data,
@@ -268,9 +268,9 @@ impl EventHandler for World {
                     self.unloaded.remove(coords);
                     self.send((*coords, data.clone(), Instant::now()), *group_id);
                 }
-                ServerEvent::ChunkUnloaded { coords, group_id } => {
-                    self.unloaded.insert(*coords);
-                    self.process_output(renderer, Err(*coords), *group_id);
+                &ServerEvent::ChunkUnloaded { coords, group_id } => {
+                    self.unloaded.insert(coords);
+                    self.process_output(renderer, Err(coords), group_id);
                 }
                 ServerEvent::ChunkUpdated {
                     coords,
@@ -281,10 +281,7 @@ impl EventHandler for World {
                 }
                 _ => {}
             },
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 while let Ok((output, group_id)) = self.group_workers.try_recv() {
                     self.process_output(renderer, Ok(output), Some(group_id));
                 }

@@ -2,15 +2,15 @@ pub mod atmosphere;
 pub mod object;
 pub mod star;
 
-use self::{
-    atmosphere::Atmosphere,
-    object::{ObjectConfig, ObjectSet},
-    star::{StarConfig, StarDome},
-};
 use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
+        game::sky::{
+            atmosphere::Atmosphere,
+            object::{ObjectConfig, ObjectSet},
+            star::{StarConfig, StarDome},
+        },
         renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
     },
     server::{ServerEvent, game::clock::Time},
@@ -106,13 +106,10 @@ impl EventHandler for Sky {
         self.objects.handle(event, ());
 
         match *event {
-            Event::UserEvent(ServerEvent::TimeUpdated(time)) => {
+            Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
                 self.updated_time = Some(time);
             }
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 if let Some(time) = self.updated_time.take() {
                     self.uniform.set(renderer, &CLIENT_CONFIG.sky.data(time));
                 }

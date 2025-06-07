@@ -1,12 +1,14 @@
-use super::{
-    ClientEvent,
-    event_loop::{Event, EventHandler},
-    game::Game,
-    renderer::Renderer,
-    stopwatch::Stopwatch,
-    window::Window,
+use crate::{
+    client::{
+        ClientEvent,
+        event_loop::{Event, EventHandler},
+        game::Game,
+        renderer::Renderer,
+        stopwatch::Stopwatch,
+        window::Window,
+    },
+    server::ServerEvent,
 };
-use crate::server::ServerEvent;
 use crossbeam_channel::Sender;
 use winit::{
     application::ApplicationHandler,
@@ -34,10 +36,7 @@ impl ApplicationHandler<ServerEvent> for App {
         if cause == StartCause::Init {
             assert!(self.instance.is_none());
         } else {
-            self.instance
-                .as_mut()
-                .unwrap_or_else(|| unreachable!())
-                .handle(&Event::NewEvents(cause), &self.client_tx);
+            assert!(self.instance.is_some());
         }
     }
 
@@ -52,32 +51,27 @@ impl ApplicationHandler<ServerEvent> for App {
         self.instance
             .as_mut()
             .unwrap_or_else(|| unreachable!())
-            .handle(&Event::UserEvent(event), &self.client_tx);
+            .handle(&Event::ServerEvent(event), &self.client_tx);
     }
 
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        window_id: WindowId,
-        event: WindowEvent,
-    ) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         let should_exit = event == WindowEvent::CloseRequested;
 
         self.instance
             .as_mut()
             .unwrap_or_else(|| unreachable!())
-            .handle(&Event::WindowEvent { window_id, event }, &self.client_tx);
+            .handle(&Event::WindowEvent(event), &self.client_tx);
 
         if should_exit {
             event_loop.exit();
         }
     }
 
-    fn device_event(&mut self, _: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
+    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
         self.instance
             .as_mut()
             .unwrap_or_else(|| unreachable!())
-            .handle(&Event::DeviceEvent { device_id, event }, &self.client_tx);
+            .handle(&Event::DeviceEvent(event), &self.client_tx);
     }
 
     fn about_to_wait(&mut self, _: &ActiveEventLoop) {
@@ -92,10 +86,7 @@ impl ApplicationHandler<ServerEvent> for App {
     }
 
     fn exiting(&mut self, _: &ActiveEventLoop) {
-        self.instance
-            .as_mut()
-            .unwrap_or_else(|| unreachable!())
-            .handle(&Event::LoopExiting, &self.client_tx);
+        assert!(self.instance.is_some());
     }
 
     fn memory_warning(&mut self, _: &ActiveEventLoop) {

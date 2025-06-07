@@ -180,14 +180,11 @@ impl EventHandler for Controller {
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
-            &Event::DeviceEvent {
-                event: DeviceEvent::MouseMotion { delta: (dx, dy) },
-                ..
-            } => {
+            &Event::DeviceEvent(DeviceEvent::MouseMotion { delta: (dx, dy) }) => {
                 self.dx += dx as f32;
                 self.dy += dy as f32;
             }
-            Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent(event) => match event {
                 WindowEvent::KeyboardInput {
                     event:
                         KeyEvent {
