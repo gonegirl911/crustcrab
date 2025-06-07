@@ -101,7 +101,7 @@ impl EventHandler for Player {
                     });
                 }
 
-                if renderer.is_resized {
+                if renderer.is_surface_resized {
                     self.projection.aspect = renderer.aspect();
                 }
 
@@ -113,7 +113,7 @@ impl EventHandler for Player {
                     _ = client_tx.send(ClientEvent::BlockDestroyed);
                 }
 
-                if changes.intersects(Changes::VIEW) || renderer.is_resized {
+                if changes.intersects(Changes::VIEW) || renderer.is_surface_resized {
                     self.uniform.set(
                         renderer,
                         &PlayerUniformData::new(

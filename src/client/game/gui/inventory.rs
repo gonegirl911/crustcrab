@@ -134,7 +134,7 @@ impl EventHandler for Inventory {
                     }
                 }
                 WindowEvent::RedrawRequested => {
-                    let mut is_resized = renderer.is_resized;
+                    let mut is_transform_outdated = renderer.is_surface_resized;
 
                     if mem::take(&mut self.is_updated) {
                         let mut is_flat = false;
@@ -154,11 +154,11 @@ impl EventHandler for Inventory {
                         });
 
                         if mem::replace(&mut self.is_flat, is_flat) != is_flat {
-                            is_resized = true;
+                            is_transform_outdated = true;
                         }
                     }
 
-                    if is_resized {
+                    if is_transform_outdated {
                         self.uniform.set(
                             renderer,
                             &InventoryUniformData::new(self.transform(renderer)),

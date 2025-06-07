@@ -205,8 +205,7 @@ impl EventHandler for Game {
         self.depth.handle(event, renderer);
         self.processor.handle(event, renderer);
 
-        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested))
-        {
+        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) {
             match surface.get_current_texture() {
                 Ok(texture) => {
                     let view = texture.texture.create_view(&Default::default());

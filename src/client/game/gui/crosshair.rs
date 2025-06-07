@@ -10,7 +10,6 @@ use crate::client::{
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector2};
 use serde::Deserialize;
-use winit::event::WindowEvent;
 
 pub struct Crosshair {
     uniform: Uniform<CrosshairUniformData>,
@@ -66,9 +65,8 @@ impl Crosshair {
 impl EventHandler for Crosshair {
     type Context<'a> = &'a Renderer;
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) && renderer.is_resized
-        {
+    fn handle(&mut self, _: &Event, renderer: Self::Context<'_>) {
+        if renderer.is_surface_resized {
             self.uniform
                 .set(renderer, &CrosshairUniformData::new(renderer));
         }
