@@ -5,7 +5,7 @@ use winit::{
     event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
-    window::{CursorGrabMode, WindowAttributes},
+    window::CursorGrabMode,
 };
 
 pub use winit::window::Window as RawWindow;
@@ -17,7 +17,7 @@ impl Window {
     pub fn new(event_loop: &ActiveEventLoop) -> Self {
         Self(
             event_loop
-                .create_window(WindowAttributes::default().with_title("Crustcrab"))
+                .create_window(RawWindow::default_attributes().with_title("Crustcrab"))
                 .expect("window should be creatable")
                 .into(),
         )
