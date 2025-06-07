@@ -12,7 +12,7 @@ use crate::{
         color::Rgb,
         enum_map::{Enum, EnumMap},
         indexmap::FxIndexSet,
-        utils,
+        toml,
     },
 };
 use nalgebra::{Point2, Point3, Vector3, point};
@@ -292,8 +292,7 @@ pub static TEX_PATHS: LazyLock<FxIndexSet<Arc<str>>> = LazyLock::new(|| {
 });
 
 static RAW_BLOCK_DATA: LazyLock<FxHashMap<Arc<str>, RawBlockData>> = LazyLock::new(|| {
-    let data =
-        utils::deserialize::<_, FxHashMap<Arc<_>, RawBlockData>>("assets/config/blocks.toml");
+    let data = toml::deserialize::<_, FxHashMap<Arc<_>, RawBlockData>>("assets/config/blocks.toml");
 
     assert!(
         data.len() <= Block::MAX_COUNT,

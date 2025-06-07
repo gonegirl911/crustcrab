@@ -13,7 +13,7 @@ use self::{
 };
 use crate::{
     client::{ClientEvent, event_loop::EventLoopProxy},
-    shared::utils,
+    shared::toml,
 };
 use crossbeam_channel::{Receiver, Sender};
 use nalgebra::Point3;
@@ -125,4 +125,4 @@ struct ServerConfig {
 }
 
 static SERVER_CONFIG: LazyLock<ServerConfig> =
-    LazyLock::new(|| utils::deserialize("assets/config/server.toml"));
+    LazyLock::new(|| toml::deserialize("assets/config/server.toml"));

@@ -2,7 +2,7 @@ use super::data::{Corner, Side, TEX_PATHS};
 use crate::shared::{
     bound::Aabb,
     enum_map::{Enum, EnumMap},
-    utils,
+    toml,
 };
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashMap;
@@ -166,7 +166,7 @@ static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
                     .to_str()
                     .unwrap_or_else(|| panic!("{path:?} should have a valid UTF-8 stem"))
                     .into(),
-                utils::deserialize(path),
+                toml::deserialize(path),
             )
         })
         .collect::<FxHashMap<_, _>>();

@@ -11,7 +11,7 @@ use self::{
 };
 use crate::{
     server::{ServerSender, game::world::block::Block},
-    shared::utils,
+    shared::toml,
 };
 use app::App;
 use crossbeam_channel::Sender;
@@ -83,4 +83,4 @@ struct ClientConfig {
 }
 
 static CLIENT_CONFIG: LazyLock<ClientConfig> =
-    LazyLock::new(|| utils::deserialize("assets/config/client.toml"));
+    LazyLock::new(|| toml::deserialize("assets/config/client.toml"));

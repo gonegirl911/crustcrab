@@ -200,11 +200,11 @@ impl CloudPushConstants {
     }
 
     fn dims() -> Point2<u32> {
-        ImageReader::open(TEX_PATH)
-            .expect("file should exist")
+        let (width, height) = ImageReader::open(TEX_PATH)
+            .unwrap_or_else(|e| panic!("failed to open {TEX_PATH}: {e}"))
             .into_dimensions()
-            .map(|(width, height)| point![width, height])
-            .expect("format should be valid")
+            .unwrap_or_else(|e| panic!("failed to read dimensions of {TEX_PATH}: {e}"));
+        point![width, height]
     }
 
     fn scale_factor() -> Vector3<f32> {
