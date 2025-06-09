@@ -3,7 +3,7 @@ use crate::client::renderer::{
     effect::{Blit, Effect},
 };
 use image::{ImageReader, RgbaImage};
-use std::{num::NonZeroU32, path::Path};
+use std::{num::NonZero, path::Path};
 
 pub struct ImageTexture {
     bind_group_layout: wgpu::BindGroupLayout,
@@ -282,7 +282,7 @@ impl ImageTextureArray {
                         view_dimension: wgpu::TextureViewDimension::D2,
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     },
-                    count: NonZeroU32::new(views.len() as u32),
+                    count: NonZero::new(views.len() as u32),
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,

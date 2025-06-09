@@ -24,7 +24,7 @@ use std::{
         VecDeque,
         hash_map::{Entry, VacantEntry},
     },
-    num::NonZeroUsize,
+    num::NonZero,
     ops::Range,
 };
 
@@ -173,8 +173,8 @@ impl WorldLight {
         !(Self::is_exposed(index, coords, value) && side == target) as u8
     }
 
-    fn chunk_size(len: usize) -> Option<NonZeroUsize> {
-        NonZeroUsize::new(len.div_ceil(rayon::current_num_threads()))
+    fn chunk_size(len: usize) -> Option<NonZero<usize>> {
+        NonZero::new(len.div_ceil(rayon::current_num_threads()))
     }
 
     fn node<'a>(
