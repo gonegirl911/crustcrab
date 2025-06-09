@@ -1,24 +1,20 @@
 pub mod camera;
 pub mod frustum;
 
+use super::gui::Gui;
 use crate::{
     client::{
         CLIENT_CONFIG, ClientEvent,
         event_loop::{Event, EventHandler},
-        game::{
-            gui::Gui,
-            player::{
-                camera::{Changes, Controller, Projection, View},
-                frustum::Frustum,
-            },
-        },
         renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
     },
     server::game::world::chunk::Chunk,
     shared::color::Float3,
 };
 use bytemuck::{Pod, Zeroable};
+use camera::{Changes, Controller, Projection, View};
 use crossbeam_channel::Sender;
+use frustum::Frustum;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
 use std::{f32::consts::SQRT_2, time::Duration};

@@ -1,8 +1,9 @@
+use super::Gui;
 use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
-        game::{gui::Gui, world::BlockVertex},
+        game::world::BlockVertex,
         renderer::{
             Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},

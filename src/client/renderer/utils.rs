@@ -1,7 +1,5 @@
-use crate::client::renderer::{
-    Renderer,
-    buffer::{MemoryState, VertexBuffer},
-};
+use super::{Renderer, buffer::VertexBuffer};
+use crate::client::renderer::buffer::MemoryState;
 use bytemuck::Pod;
 use std::cmp::{Ordering, Reverse};
 

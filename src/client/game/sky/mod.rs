@@ -6,11 +6,6 @@ use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
-        game::sky::{
-            atmosphere::Atmosphere,
-            object::{ObjectConfig, ObjectSet},
-            star::{StarConfig, StarDome},
-        },
         renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
     },
     server::{ServerEvent, game::clock::Time},
@@ -19,9 +14,12 @@ use crate::{
         utils,
     },
 };
+use atmosphere::Atmosphere;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;
+use object::{ObjectConfig, ObjectSet};
 use serde::Deserialize;
+use star::{StarConfig, StarDome};
 use winit::event::WindowEvent;
 
 pub struct Sky {

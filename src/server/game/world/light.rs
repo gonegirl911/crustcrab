@@ -1,22 +1,20 @@
-use crate::{
-    server::game::world::{
-        ChunkStore, World,
-        action::BlockAction,
-        block::{
-            Block, BlockLight,
-            area::BlockAreaLight,
-            data::{BlockData, SIDE_DELTAS, Side},
-        },
-        chunk::{
-            Chunk, ChunkLight,
-            area::{ChunkArea, ChunkAreaLight},
-        },
-        height::HeightMap,
+use super::{
+    ChunkStore, World,
+    action::BlockAction,
+    block::{
+        Block, BlockLight,
+        area::BlockAreaLight,
+        data::{BlockData, SIDE_DELTAS, Side},
     },
-    shared::utils,
+    chunk::{
+        Chunk, ChunkLight,
+        area::{ChunkArea, ChunkAreaLight},
+    },
+    height::HeightMap,
 };
+use crate::shared::utils;
 use nalgebra::Point3;
-use rayon::prelude::*;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp::Ordering,

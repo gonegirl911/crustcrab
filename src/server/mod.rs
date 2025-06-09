@@ -4,18 +4,16 @@ pub(crate) mod ticker;
 
 use crate::{
     client::{ClientEvent, event_loop::EventLoopProxy},
-    server::{
-        event_loop::{EventLoop, EventLoopConfig},
-        game::{
-            Game,
-            clock::{ClockState, Time},
-            player::PlayerConfig,
-            world::{BlockHoverData, ChunkData},
-        },
-    },
     shared::toml,
 };
 use crossbeam_channel::{Receiver, Sender};
+use event_loop::{EventLoop, EventLoopConfig};
+use game::{
+    Game,
+    clock::{ClockState, Time},
+    player::PlayerConfig,
+    world::{BlockHoverData, ChunkData},
+};
 use nalgebra::Point3;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};

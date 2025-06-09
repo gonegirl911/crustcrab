@@ -1,4 +1,4 @@
-use crate::client::renderer::{
+use super::{
     Renderer,
     buffer::{MemoryState, UniformBuffer},
 };

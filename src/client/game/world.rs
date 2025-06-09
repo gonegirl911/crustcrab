@@ -1,7 +1,7 @@
+use super::player::frustum::{Cullable, Frustum};
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        game::player::frustum::{Cullable, Frustum},
         renderer::{
             Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},

@@ -25,8 +25,8 @@ arrayvec = { version = "0.7.6", features = ["serde"] }
 bincode = { version = "2.0.1", features = ["serde"] }
 bitfield = "0.19.1"
 bitflags = "2.9.1"
-bytemuck = { version = "1.23.0", features = ["derive"] }
-clap = { version = "4.5.39", features = ["derive"] }
+bytemuck = { version = "1.23.1", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive"] }
 crossbeam-channel = "0.5.15"
 env_logger = "0.11.8"
 generic-array = "1.2.0"
@@ -43,7 +43,7 @@ rand = { version = "0.9.1", default-features = false, features = [
 rayon = "1.10.0"
 rustc-hash = "2.1.1"
 serde = { version = "1.0.219", features = ["derive", "rc"] }
-toml = "0.8.22"
+toml = "0.8.23"
 uuid = { version = "1.17.0", features = ["fast-rng", "serde", "v4"] }
 walkdir = "2.5.0"
 wgpu = "25.0.2"

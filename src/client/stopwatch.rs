@@ -1,4 +1,4 @@
-use crate::client::event_loop::{Event, EventHandler};
+use super::event_loop::{Event, EventHandler};
 use std::time::{Duration, Instant};
 use winit::event::WindowEvent;
 

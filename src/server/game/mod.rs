@@ -2,17 +2,15 @@ pub mod clock;
 pub mod player;
 pub mod world;
 
-use crate::server::{
+use super::{
     ServerSender,
     event_loop::{Event, EventHandler},
-    game::{
-        clock::Clock,
-        player::Player,
-        world::{World, WorldEvent},
-    },
 };
+use clock::Clock;
 use crossbeam_channel::Sender;
+use player::Player;
 use std::thread;
+use world::{World, WorldEvent};
 
 pub struct Game {
     player: Player,

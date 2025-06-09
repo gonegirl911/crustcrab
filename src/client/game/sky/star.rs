@@ -16,7 +16,11 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, UnitQuaternion, Vector3, point, vector};
-use rand::{distr::Uniform, prelude::*};
+use rand::{
+    Rng, SeedableRng,
+    distr::{Distribution, Uniform},
+    rngs::SmallRng,
+};
 use serde::Deserialize;
 use std::f32::consts::{FRAC_PI_2, PI};
 use winit::event::WindowEvent;

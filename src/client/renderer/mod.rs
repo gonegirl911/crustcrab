@@ -5,7 +5,7 @@ pub mod texture;
 pub mod uniform;
 pub mod utils;
 
-use crate::client::{
+use super::{
     event_loop::{Event, EventHandler},
     window::{RawWindow, Window},
 };

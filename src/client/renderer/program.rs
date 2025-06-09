@@ -1,4 +1,4 @@
-use crate::client::renderer::Renderer;
+use super::Renderer;
 use bytemuck::Pod;
 use std::slice;
 

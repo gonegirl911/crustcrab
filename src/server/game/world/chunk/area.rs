@@ -1,10 +1,8 @@
+use super::Chunk;
 use crate::{
-    server::game::world::{
-        block::{
-            Block, BlockLight,
-            area::{BlockArea, BlockAreaLight},
-        },
-        chunk::Chunk,
+    server::game::world::block::{
+        Block, BlockLight,
+        area::{BlockArea, BlockAreaLight},
     },
     shared::utils,
 };

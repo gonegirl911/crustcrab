@@ -1,6 +1,6 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
-use rayon::prelude::*;
+use rayon::iter::ParallelIterator;
 use std::{
     collections::linked_list,
     iter::{self, Flatten},

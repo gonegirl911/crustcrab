@@ -6,15 +6,13 @@ pub(crate) mod stopwatch;
 pub(crate) mod window;
 
 use crate::{
-    client::{
-        event_loop::{EventLoop, EventLoopProxy},
-        game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig},
-    },
     server::{ServerSender, game::world::block::Block},
     shared::toml,
 };
 use app::App;
 use crossbeam_channel::Sender;
+use event_loop::{EventLoop, EventLoopProxy};
+use game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig};
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;

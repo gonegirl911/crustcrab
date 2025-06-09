@@ -1,14 +1,12 @@
+use super::{
+    Block, BlockLight,
+    area::{BlockArea, BlockAreaLight},
+    model::{Model, RawModel},
+};
 use crate::{
     client::game::world::BlockVertex,
     enum_map,
-    server::game::world::{
-        block::{
-            Block, BlockLight,
-            area::{BlockArea, BlockAreaLight},
-            model::{Model, RawModel},
-        },
-        chunk::Chunk,
-    },
+    server::game::world::chunk::Chunk,
     shared::{
         bound::Aabb,
         color::Rgb,

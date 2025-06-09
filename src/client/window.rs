@@ -1,4 +1,4 @@
-use crate::client::event_loop::{Event, EventHandler};
+use super::event_loop::{Event, EventHandler};
 use std::{ops::Deref, sync::Arc};
 use winit::{
     error::ExternalError,

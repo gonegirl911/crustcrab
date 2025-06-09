@@ -1,13 +1,11 @@
+use super::world::World;
 use crate::{
     client::ClientEvent,
-    server::{
-        event_loop::{Event, EventHandler},
-        game::world::World,
-    },
+    server::event_loop::{Event, EventHandler},
     shared::{ray::Ray, utils},
 };
 use nalgebra::{Point2, Point3, point};
-use rayon::prelude::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Deserialize;
 use std::ops::Range;
 

@@ -1,11 +1,8 @@
-use crate::{
-    enum_map,
-    server::game::world::block::{
-        Block, BlockLight,
-        data::{Component, Corner, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS, Side},
-    },
-    shared::enum_map::EnumMap,
+use super::{
+    Block, BlockLight,
+    data::{Component, Corner, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS, Side},
 };
+use crate::{enum_map, shared::enum_map::EnumMap};
 use nalgebra::{Vector3, vector};
 use std::{
     array,

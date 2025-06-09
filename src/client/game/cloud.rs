@@ -1,8 +1,8 @@
+use super::world::BlockVertex;
 use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
-        game::world::BlockVertex,
         renderer::{
             Renderer,
             buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},

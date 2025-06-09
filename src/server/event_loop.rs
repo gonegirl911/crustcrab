@@ -1,7 +1,5 @@
-use crate::{
-    client::ClientEvent,
-    server::{SERVER_CONFIG, ServerSender, ticker::Ticker},
-};
+use super::{SERVER_CONFIG, ServerSender, ticker::Ticker};
+use crate::client::ClientEvent;
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
 

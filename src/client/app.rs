@@ -1,14 +1,12 @@
-use crate::{
-    client::{
-        ClientEvent,
-        event_loop::{Event, EventHandler},
-        game::Game,
-        renderer::Renderer,
-        stopwatch::Stopwatch,
-        window::Window,
-    },
-    server::ServerEvent,
+use super::{
+    ClientEvent,
+    event_loop::{Event, EventHandler},
+    game::Game,
+    renderer::Renderer,
+    stopwatch::Stopwatch,
+    window::Window,
 };
+use crate::server::ServerEvent;
 use crossbeam_channel::Sender;
 use winit::{
     application::ApplicationHandler,

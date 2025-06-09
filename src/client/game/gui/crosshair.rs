@@ -1,7 +1,7 @@
+use super::Gui;
 use crate::client::{
     CLIENT_CONFIG,
     event_loop::{Event, EventHandler},
-    game::gui::Gui,
     renderer::{
         Renderer, buffer::MemoryState, effect::PostProcessor, program::Program,
         texture::image::ImageTexture, uniform::Uniform,

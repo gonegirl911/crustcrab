@@ -4,10 +4,6 @@ pub mod inventory;
 use crate::{
     client::{
         event_loop::{Event, EventHandler},
-        game::gui::{
-            crosshair::{Crosshair, CrosshairConfig},
-            inventory::{Inventory, InventoryConfig},
-        },
         renderer::{
             Renderer,
             effect::{Blit, Effect, PostProcessor},
@@ -15,6 +11,8 @@ use crate::{
     },
     server::game::world::block::Block,
 };
+use crosshair::{Crosshair, CrosshairConfig};
+use inventory::{Inventory, InventoryConfig};
 use nalgebra::{Matrix4, Vector2, vector};
 use serde::Deserialize;
 

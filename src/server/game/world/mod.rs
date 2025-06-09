@@ -4,29 +4,12 @@ pub mod chunk;
 pub mod height;
 pub mod light;
 
+use super::player::{Player, WorldArea};
 use crate::{
     client::{ClientEvent, game::world::BlockVertex},
     server::{
         GroupId, SERVER_CONFIG, ServerEvent, ServerSender,
         event_loop::{Event, EventHandler},
-        game::{
-            player::{Player, WorldArea},
-            world::{
-                action::{ActionStore, BlockAction},
-                block::{
-                    Block, BlockLight,
-                    area::{BlockArea, BlockAreaLight},
-                    data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
-                },
-                chunk::{
-                    Chunk, ChunkDataStore,
-                    area::{ChunkArea, ChunkAreaLight},
-                    generator::ChunkGenerator,
-                },
-                height::HeightMap,
-                light::WorldLight,
-            },
-        },
     },
     shared::{
         bound::Aabb,
@@ -35,8 +18,24 @@ use crate::{
         utils::{self, ParallelIteratorExt},
     },
 };
+use action::{ActionStore, BlockAction};
+use block::{
+    Block, BlockLight,
+    area::{BlockArea, BlockAreaLight},
+    data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
+};
+use chunk::{
+    Chunk, ChunkDataStore,
+    area::{ChunkArea, ChunkAreaLight},
+    generator::ChunkGenerator,
+};
+use height::HeightMap;
+use light::WorldLight;
 use nalgebra::{Point2, Point3, Vector3, point};
-use rayon::prelude::*;
+use rayon::{
+    iter::{IntoParallelIterator, ParallelIterator},
+    slice::ParallelSliceMut,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::{

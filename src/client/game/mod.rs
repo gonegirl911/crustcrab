@@ -6,10 +6,6 @@ pub mod player;
 pub mod sky;
 pub mod world;
 
-use self::{
-    cloud::CloudLayer, fog::Fog, gui::Gui, hover::BlockHover, player::Player, sky::Sky,
-    world::World,
-};
 use super::{
     ClientEvent,
     event_loop::{Event, EventHandler},
@@ -21,9 +17,16 @@ use super::{
     window::RawWindow,
 };
 use crate::server::game::world::block::data::TEX_PATHS;
+use cloud::CloudLayer;
 use crossbeam_channel::Sender;
+use fog::Fog;
+use gui::Gui;
+use hover::BlockHover;
+use player::Player;
+use sky::Sky;
 use std::{ops::Deref, time::Duration};
 use winit::event::WindowEvent;
+use world::World;
 
 pub struct Game {
     sky: Sky,
