@@ -92,7 +92,7 @@ impl WorldLight {
         self.lights.get(&coords)
     }
 
-    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, ChunkLight> {
+    fn entry(&mut self, coords: Point3<i32>) -> Entry<'_, Point3<i32>, ChunkLight> {
         self.lights.entry(coords)
     }
 
@@ -442,7 +442,7 @@ impl Branch {
     fn entry(
         &mut self,
         coords: Point3<i32>,
-    ) -> Entry<Point3<i32>, FxHashMap<Point3<u8>, BlockLight>> {
+    ) -> Entry<'_, Point3<i32>, FxHashMap<Point3<u8>, BlockLight>> {
         self.0.entry(coords)
     }
 

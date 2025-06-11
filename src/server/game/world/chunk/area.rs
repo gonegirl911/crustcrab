@@ -105,7 +105,7 @@ impl IndexMut<Vector3<i8>> for ChunkAreaLight {
 struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl<T> ChunkAreaDataStore<T> {
-    fn values(&self) -> slice::Iter<T> {
+    fn values(&self) -> slice::Iter<'_, T> {
         self.0.as_flattened().as_flattened().iter()
     }
 

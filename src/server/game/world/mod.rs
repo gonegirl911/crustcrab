@@ -358,7 +358,7 @@ impl ChunkStore {
         assert!(self.0.insert(coords, chunk).is_none());
     }
 
-    fn entry(&mut self, coords: Point3<i32>) -> Entry<Point3<i32>, Box<Chunk>> {
+    fn entry(&mut self, coords: Point3<i32>) -> Entry<'_, Point3<i32>, Box<Chunk>> {
         self.0.entry(coords)
     }
 }
