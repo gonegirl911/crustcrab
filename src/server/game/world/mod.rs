@@ -343,7 +343,7 @@ impl ChunkStore {
 
     fn block(&self, coords: Point3<i64>) -> Block {
         self.get(utils::chunk_coords(coords))
-            .map_or(Block::AIR, |chunk| chunk[utils::block_coords(coords)])
+            .map_or_default(|chunk| chunk[utils::block_coords(coords)])
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {

@@ -19,7 +19,7 @@ use nalgebra::{Point2, Point3, Vector3, point};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
 use std::{
-    array, iter,
+    array,
     ops::Deref,
     sync::{Arc, LazyLock},
 };
@@ -146,15 +146,6 @@ impl From<RawBlockData> for BlockData {
             requires_blending: data.requires_blending,
             valid_surface: data.valid_surface.as_deref().map(|str| STR_TO_BLOCK[str]),
         }
-    }
-}
-
-impl IntoIterator for BlockData {
-    type Item = (u8, bool);
-    type IntoIter = impl Iterator<Item = Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        iter::zip(self.luminance, self.light_filter)
     }
 }
 

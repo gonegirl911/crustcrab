@@ -63,9 +63,8 @@ impl WorldLight {
         heights: &HeightMap,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
-        Self::chunk_size(points.len()).map_or(vec![], |size| {
-            self.par_insert_many_chunks(chunks, heights, points, size.get())
-        })
+        Self::chunk_size(points.len())
+            .map_or_default(|size| self.par_insert_many_chunks(chunks, heights, points, size.get()))
     }
 
     pub fn apply(
@@ -98,7 +97,7 @@ impl WorldLight {
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
         self.get(utils::chunk_coords(coords))
-            .map_or_else(Default::default, |light| light[utils::block_coords(coords)])
+            .map_or_default(|light| light[utils::block_coords(coords)])
     }
 
     fn par_insert_many_chunks(
@@ -263,7 +262,10 @@ impl Branch {
             self.place_filter(chunks, light, coords, i, 0, f);
         }
 
-        for (i, (c, f)) in BlockLight::TORCHLIGHT_RANGE.zip(data) {
+        for ((i, f), c) in BlockLight::TORCHLIGHT_RANGE
+            .zip(data.light_filter)
+            .zip(data.luminance)
+        {
             self.place_filter(chunks, light, coords, i, c, f);
             self.place_component(chunks, light, coords, i, c);
         }
@@ -543,13 +545,11 @@ impl<'a> Node<'a> {
     }
 
     fn block(&self) -> Block {
-        self.chunk
-            .map_or(Block::AIR, |chunk| chunk[self.block_coords])
+        self.chunk.map_or_default(|chunk| chunk[self.block_coords])
     }
 
     fn block_light(&self) -> BlockLight {
-        self.light
-            .map_or_else(Default::default, |light| light[self.block_coords])
+        self.light.map_or_default(|light| light[self.block_coords])
     }
 
     fn with_value(&self, value: u8) -> Self {

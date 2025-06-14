@@ -5,6 +5,7 @@
     int_roundings,
     maybe_uninit_fill,
     never_type,
+    result_option_map_or_default,
     trait_alias,
     type_alias_impl_trait
 )]
