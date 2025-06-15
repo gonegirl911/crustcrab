@@ -571,10 +571,11 @@ impl<'a> Node<'a> {
         side: Side,
     ) -> Self {
         let chunk_coords = utils::chunk_coords(coords);
+        let block_coords = utils::block_coords(coords);
         let value = Self::value(coords, index, side, self.value);
         if self.chunk_coords == chunk_coords {
             Self {
-                block_coords: utils::block_coords(coords),
+                block_coords,
                 coords,
                 value,
                 ..*self
@@ -584,7 +585,7 @@ impl<'a> Node<'a> {
                 chunk: chunks.get(chunk_coords),
                 light: light.get(chunk_coords),
                 chunk_coords,
-                block_coords: utils::block_coords(coords),
+                block_coords,
                 coords,
                 value,
             }
