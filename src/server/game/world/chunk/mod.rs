@@ -135,9 +135,8 @@ impl Index<Point3<u8>> for ChunkLight {
 
 impl BitOrAssign<BlockLight> for ChunkLight {
     fn bitor_assign(&mut self, value: BlockLight) {
-        self.lights.apply(|light| light.0 |= value.0);
-
-        if value != Default::default() {
+        if value.0 != 0 {
+            self.lights.apply(|light| light.0 |= value.0);
             self.non_zero_count = Chunk::DIM.pow(3) as u16;
         }
     }
