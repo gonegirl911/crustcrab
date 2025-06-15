@@ -220,7 +220,7 @@ pub enum Side {
 }
 
 impl Side {
-    pub fn points(self) -> impl Iterator<Item = (Point3<u8>, Point3<u8>)> {
+    pub fn block_points(self) -> impl Iterator<Item = (Point3<u8>, Point3<u8>)> {
         let masks = SIDE_MASKS[self];
         (0..Chunk::DIM as u8).flat_map(move |x| {
             (0..Chunk::DIM as u8).map(move |y| {

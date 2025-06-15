@@ -22,7 +22,6 @@ use std::{
         VecDeque,
         hash_map::{Entry, VacantEntry},
     },
-    num::NonZero,
     ops::Range,
 };
 
@@ -63,8 +62,61 @@ impl WorldLight {
         heights: &HeightMap,
         points: &[Point3<i32>],
     ) -> Vec<Point3<i64>> {
-        Self::chunk_size(points.len())
-            .map_or_default(|size| self.par_insert_many_chunks(chunks, heights, points, size.get()))
+        if points.is_empty() {
+            return vec![];
+        }
+
+        for coords in points {
+            self.lights.remove(coords);
+        }
+
+        let points_per_branch = points.len().div_ceil(rayon::current_num_threads());
+
+        points
+            .par_iter()
+            .fold_chunks(
+                points_per_branch,
+                LazyBranch::default,
+                |mut branch, &chunk_coords| {
+                    let chunk = &chunks[chunk_coords];
+                    let light = self.get(chunk_coords);
+
+                    if chunk.is_glowing() {
+                        for (block_coords, block) in chunk.blocks() {
+                            let node = Self::node(chunk, light, chunk_coords, block_coords);
+                            for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
+                                branch.insert(i, node.with_value(c));
+                            }
+                        }
+                    }
+
+                    for (side, delta) in *SIDE_DELTAS {
+                        if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
+                            let skylight_range = Self::skylight_range(heights, chunk_coords, side);
+                            for (block_coords, neighbor_block_coords) in side.block_points() {
+                                let node = Self::node(chunk, light, chunk_coords, block_coords);
+                                let filter = node.block().data().light_filter;
+                                let coords = utils::coords((chunk_coords, block_coords));
+                                let neighbor_value = neighbor[neighbor_block_coords];
+                                skylight_range
+                                    .clone()
+                                    .chain(BlockLight::TORCHLIGHT_RANGE)
+                                    .filter(|i| filter[i % 3])
+                                    .map(|i| (i, neighbor_value.component(i)))
+                                    .for_each(|(i, c)| {
+                                        let value = Self::value(coords, i, side, c);
+                                        branch.insert(i, node.with_value(value));
+                                    });
+                            }
+                        }
+                    }
+
+                    branch
+                },
+            )
+            .map(|branch| branch.evaluate(chunks, self))
+            .reduce(Default::default, Branch::sup)
+            .merge(self)
     }
 
     pub fn apply(
@@ -100,61 +152,11 @@ impl WorldLight {
             .map_or_default(|light| light[utils::block_coords(coords)])
     }
 
-    fn par_insert_many_chunks(
-        &mut self,
-        chunks: &ChunkStore,
-        heights: &HeightMap,
-        points: &[Point3<i32>],
-        size: usize,
-    ) -> Vec<Point3<i64>> {
-        for coords in points {
-            self.lights.remove(coords);
-        }
-
-        points
-            .par_iter()
-            .fold_chunks(size, LazyBranch::default, |mut branch, &chunk_coords| {
-                let chunk = &chunks[chunk_coords];
-                let light = self.get(chunk_coords);
-
-                if chunk.is_glowing() {
-                    for (block_coords, block) in chunk.blocks() {
-                        let node = Self::node(chunk, light, chunk_coords, block_coords);
-                        for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
-                            branch.insert(i, node.with_value(c));
-                        }
-                    }
-                }
-
-                for (side, delta) in *SIDE_DELTAS {
-                    if let Some(neighbor) = self.get(chunk_coords + delta.cast()) {
-                        let indices = Self::indices(side, chunk_coords, heights);
-                        for (block_coords, opp) in side.points() {
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            let value = neighbor[opp];
-                            let opp = utils::coords((chunk_coords, opp));
-                            let filter = node.block().data().light_filter;
-                            for (i, c) in indices.clone().map(|i| (i, value.component(i))) {
-                                if filter[i % 3] {
-                                    branch.insert(i, node.with_value(Self::value(i, opp, side, c)));
-                                }
-                            }
-                        }
-                    }
-                }
-
-                branch
-            })
-            .map(|branch| branch.evaluate(chunks, self))
-            .reduce(Default::default, Branch::sup)
-            .merge(self)
-    }
-
     fn flood(&self, coords: Point3<i64>) -> BlockLight {
         Self::adjacent_points(coords)
-            .map(|(side, coords)| {
-                self.block_light(coords)
-                    .map(|i, c| Self::value(i, coords, side, c))
+            .map(|(side, neighbor_coords)| {
+                self.block_light(neighbor_coords)
+                    .map(|i, c| Self::value(coords, i, side, c))
             })
             .reduce(BlockLight::sup)
             .unwrap_or_else(|| unreachable!())
@@ -166,12 +168,13 @@ impl WorldLight {
             .map(move |(side, delta)| (side, coords + delta.cast()))
     }
 
-    fn absorption(index: usize, coords: Point3<i64>, value: u8, side: Side, target: Side) -> u8 {
-        !(Self::is_exposed(index, coords, value) && side == target) as u8
-    }
-
-    fn chunk_size(len: usize) -> Option<NonZero<usize>> {
-        NonZero::new(len.div_ceil(rayon::current_num_threads()))
+    fn absorption(
+        coords: Point3<i64>,
+        index: usize,
+        is_neighbor_on_top: bool,
+        neighbor_value: u8,
+    ) -> u8 {
+        !Self::is_exposed(coords, index, is_neighbor_on_top, neighbor_value) as u8
     }
 
     fn node<'a>(
@@ -190,33 +193,36 @@ impl WorldLight {
         }
     }
 
-    fn indices(
-        side: Side,
-        coords: Point3<i32>,
-        heights: &HeightMap,
-    ) -> impl Iterator<Item = usize> + Clone {
-        Self::skylight_range(side, coords, heights).chain(BlockLight::TORCHLIGHT_RANGE)
-    }
-
-    fn value(index: usize, coords: Point3<i64>, side: Side, value: u8) -> u8 {
-        value.saturating_sub(Self::absorption(index, coords, value, side, Side::Top))
-    }
-
-    fn is_exposed(index: usize, coords: Point3<i64>, value: u8) -> bool {
-        BlockLight::SKYLIGHT_RANGE.contains(&index)
-            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64
-            && value == BlockLight::COMPONENT_MAX
-    }
-
-    fn skylight_range(side: Side, coords: Point3<i32>, heights: &HeightMap) -> Range<usize> {
-        if Self::includes_skylight(side, coords, heights) {
+    fn skylight_range(heights: &HeightMap, coords: Point3<i32>, side: Side) -> Range<usize> {
+        if Self::includes_skylight(heights, coords, side) {
             BlockLight::SKYLIGHT_RANGE
         } else {
             0..0
         }
     }
 
-    fn includes_skylight(side: Side, coords: Point3<i32>, heights: &HeightMap) -> bool {
+    fn value(coords: Point3<i64>, index: usize, neighbor_side: Side, neighbor_value: u8) -> u8 {
+        neighbor_value.saturating_sub(Self::absorption(
+            coords,
+            index,
+            neighbor_side == Side::Top,
+            neighbor_value,
+        ))
+    }
+
+    fn is_exposed(
+        coords: Point3<i64>,
+        index: usize,
+        is_neighbor_on_top: bool,
+        neighbor_value: u8,
+    ) -> bool {
+        BlockLight::SKYLIGHT_RANGE.contains(&index)
+            && neighbor_value == BlockLight::COMPONENT_MAX
+            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64 - 1
+            && is_neighbor_on_top
+    }
+
+    fn includes_skylight(heights: &HeightMap, coords: Point3<i32>, side: Side) -> bool {
         match side {
             Side::Top => coords.y == heights[coords.xz()],
             Side::Bottom => false,
@@ -565,11 +571,12 @@ impl<'a> Node<'a> {
         side: Side,
     ) -> Self {
         let chunk_coords = utils::chunk_coords(coords);
+        let value = Self::value(coords, index, side, self.value);
         if self.chunk_coords == chunk_coords {
             Self {
                 block_coords: utils::block_coords(coords),
                 coords,
-                value: self.value(index, side),
+                value,
                 ..*self
             }
         } else {
@@ -579,13 +586,13 @@ impl<'a> Node<'a> {
                 chunk_coords,
                 block_coords: utils::block_coords(coords),
                 coords,
-                value: self.value(index, side),
+                value,
             }
         }
     }
 
-    fn value(&self, index: usize, side: Side) -> u8 {
-        self.value - WorldLight::absorption(index, self.coords, self.value, side, Side::Bottom)
+    fn value(coords: Point3<i64>, index: usize, side: Side, neighbor_value: u8) -> u8 {
+        neighbor_value - WorldLight::absorption(coords, index, side == Side::Bottom, neighbor_value)
     }
 }
 

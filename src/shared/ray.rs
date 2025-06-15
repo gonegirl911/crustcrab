@@ -12,7 +12,7 @@ impl Ray {
     where
         R: RangeBounds<f32>,
     {
-        let values = self.origin.coords.zip_map(&self.dir, |o, d| {
+        let calcs = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap_or_else(|| unreachable!()) {
                 Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
                 Ordering::Equal => (0, 1.0, f32::INFINITY),
@@ -20,9 +20,9 @@ impl Ray {
             }
         });
         let mut coords = self.origin.map(|c| c.floor() as i64);
-        let step = values.map(|c| c.0);
-        let t_delta = values.map(|c| c.2);
-        let mut t_max = values.map(|c| c.1 * c.2);
+        let step = calcs.map(|c| c.0);
+        let t_delta = calcs.map(|c| c.2);
+        let mut t_max = calcs.map(|c| c.1 * c.2);
         iter::successors(
             Some(BlockIntersection::new(coords, Vector3::zeros())),
             move |_| {
