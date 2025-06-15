@@ -49,6 +49,7 @@ impl Block {
     }
 }
 
+#[expect(clippy::infallible_try_from)]
 impl TryFrom<u8> for Block {
     type Error = !;
 
