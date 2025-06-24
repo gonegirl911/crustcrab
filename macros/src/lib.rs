@@ -50,14 +50,14 @@ fn derive_enum2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
 
             unsafe fn from_index_unchecked(index: ::core::primitive::usize) -> Self {
                 match index {
-                    #(#from_index_unchecked_arms),*,
+                    #(#from_index_unchecked_arms,)*
                     _ => unsafe { ::core::hint::unreachable_unchecked() },
                 }
             }
 
             fn to_index(self) -> ::core::primitive::usize {
                 match self {
-                    #(#to_index_arms),*,
+                    #(#to_index_arms,)*
                 }
             }
         }
