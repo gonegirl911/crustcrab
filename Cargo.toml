@@ -26,7 +26,7 @@ bincode = { version = "2.0.1", features = ["serde"] }
 bitfield = "0.19.1"
 bitflags = "2.9.1"
 bytemuck = { version = "1.23.1", features = ["derive"] }
-clap = { version = "4.5.40", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
 crossbeam-channel = "0.5.15"
 env_logger = "0.11.8"
 generic-array = "1.2.0"
@@ -46,5 +46,5 @@ serde = { version = "1.0.219", features = ["derive", "rc"] }
 toml = "0.9.0"
 uuid = { version = "1.17.0", features = ["fast-rng", "serde", "v4"] }
 walkdir = "2.5.0"
-wgpu = "25.0.2"
+wgpu = "26.0.0"
 winit = "0.30.11"
