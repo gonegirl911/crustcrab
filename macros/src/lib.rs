@@ -10,7 +10,7 @@ pub fn derive_enum(input: TokenStream) -> TokenStream {
         .into()
 }
 
-fn derive_enum2(input: &DeriveInput) -> Result<TokenStream2, syn::Error> {
+fn derive_enum2(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let Data::Enum(DataEnum { variants, .. }) = &input.data else {
         return Err(syn::Error::new(
             Span::call_site(),
