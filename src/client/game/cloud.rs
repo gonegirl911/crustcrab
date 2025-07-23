@@ -13,7 +13,10 @@ use crate::{
     },
     server::{
         ServerEvent,
-        game::{clock::Stage, world::block::Block},
+        game::{
+            clock::Stage,
+            world::block::{Block, area::BlockArea},
+        },
     },
     shared::color::{Float3, Rgb, Rgba},
 };
@@ -119,7 +122,11 @@ impl CloudLayer {
     fn vertices() -> Vec<BlockVertex> {
         Block::SAND
             .data()
-            .mesh(Default::default(), Block::SAND.into(), &Default::default())
+            .mesh(
+                Default::default(),
+                &BlockArea::default().with_kernel(Block::SAND),
+                &Default::default(),
+            )
             .collect()
     }
 

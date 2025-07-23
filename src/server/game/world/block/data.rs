@@ -24,7 +24,6 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-#[derive(Clone, Copy)]
 pub struct BlockData {
     model: Model,
     pub luminance: Rgb<u8>,
@@ -35,7 +34,7 @@ pub struct BlockData {
 
 impl BlockData {
     pub fn vertices(
-        self,
+        &self,
         side: Option<Side>,
         coords: Point3<u8>,
         dims: Point3<u8>,
@@ -62,14 +61,14 @@ impl BlockData {
     }
 
     pub fn mesh(
-        self,
+        &self,
         coords: Point3<u8>,
-        area: BlockArea,
+        area: &BlockArea,
         area_light: &BlockAreaLight,
     ) -> impl Iterator<Item = BlockVertex> {
         let is_externally_lit = self.is_externally_lit();
         Enum::variants()
-            .filter(move |&side| area.is_side_visible(side))
+            .filter(|&side| area.is_side_visible(side))
             .flat_map(move |side| {
                 self.vertices(
                     side,
@@ -82,15 +81,15 @@ impl BlockData {
             })
     }
 
-    pub fn tex_index(self) -> u8 {
+    pub fn tex_index(&self) -> u8 {
         self.model.tex_index
     }
 
-    pub fn hitbox(self, coords: Point3<i64>) -> Aabb {
+    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
         self.model.hitbox(coords)
     }
 
-    pub fn flat_icon(self) -> Option<impl Iterator<Item = BlockVertex>> {
+    pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex>> {
         let tex_idx = self.model.flat_icon()?;
         let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
         Some(CORNERS.into_iter().map(move |corner| {
@@ -105,19 +104,19 @@ impl BlockData {
         }))
     }
 
-    pub fn is_glowing(self) -> bool {
+    pub fn is_glowing(&self) -> bool {
         self.luminance != Default::default()
     }
 
-    pub fn is_transparent(self) -> bool {
+    pub fn is_transparent(&self) -> bool {
         self.light_filter != Default::default() || self.requires_blending
     }
 
-    pub fn is_opaque(self) -> bool {
+    pub fn is_opaque(&self) -> bool {
         !self.is_transparent()
     }
 
-    pub fn is_externally_lit(self) -> bool {
+    pub fn is_externally_lit(&self) -> bool {
         !self.is_glowing() && self.light_filter == Default::default()
     }
 
@@ -388,6 +387,7 @@ static SIDE_CORNER_DELTAS: LazyLock<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>>
         })
     });
 
+#[expect(clippy::type_complexity)]
 pub static SIDE_CORNER_COMPONENT_DELTAS: LazyLock<
     EnumMap<Side, EnumMap<Corner, EnumMap<Component, Vector3<i8>>>>,
 > = LazyLock::new(|| {

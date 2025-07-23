@@ -63,7 +63,6 @@ impl View {
     }
 }
 
-#[derive(Clone, Copy)]
 pub struct Projection {
     pub fovy: f32,
     pub aspect: f32,
@@ -81,7 +80,7 @@ impl Projection {
         }
     }
 
-    pub fn mat(self) -> Matrix4<f32> {
+    pub fn mat(&self) -> Matrix4<f32> {
         let h = 1.0 / (self.fovy * 0.5).tan();
         let w = h / self.aspect;
         let r = self.zfar / (self.zfar - self.znear);

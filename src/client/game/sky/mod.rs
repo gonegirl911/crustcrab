@@ -220,13 +220,13 @@ struct StageConfig {
     light_intensity: Rgb<f32>,
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Deserialize)]
 struct GlowConfig {
     colors: [Rgb<f32>; 2],
 }
 
 impl GlowConfig {
-    fn color(self, progress: f32) -> Rgb<f32> {
+    fn color(&self, progress: f32) -> Rgb<f32> {
         utils::lerp(self.colors[0], self.colors[1], progress)
     }
 }

@@ -114,7 +114,7 @@ impl World {
             .chain(Self::block_area_points(block_updates).map(utils::chunk_coords))
             .filter(|coords| {
                 area.client_contains(*coords)
-                    && self.chunks.contains(*coords)
+                    && self.chunks.0.contains_key(coords)
                     && !loads.contains(coords)
                     && !unloads.contains(coords)
             })
@@ -185,7 +185,7 @@ impl World {
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
-        if self.chunks.contains(coords) {
+        if self.chunks.0.contains_key(&coords) {
             None
         } else {
             let mut chunk = Box::new(self.generator.generate(coords));
@@ -247,7 +247,7 @@ impl EventHandler<WorldEvent> for World {
 
                 let mut loads = area
                     .client_points()
-                    .filter(|&coords| self.chunks.contains(coords))
+                    .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect::<Vec<_>>();
 
                 loads.par_sort_unstable_by_key(|&coords| {
@@ -263,11 +263,11 @@ impl EventHandler<WorldEvent> for World {
                 let block_updates = self.par_light_up(&inserts);
                 let loads = cur
                     .exclusive_client_points(prev)
-                    .filter(|&coords| self.chunks.contains(coords))
+                    .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect();
                 let unloads = prev
                     .exclusive_client_points(cur)
-                    .filter(|&coords| self.chunks.contains(coords))
+                    .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect();
                 let updates = self.updates(inserts, block_updates, cur, &loads, &unloads);
 
@@ -293,7 +293,7 @@ impl EventHandler<WorldEvent> for World {
                         |BlockIntersection { coords, .. }| {
                             BlockHoverData::new(
                                 coords,
-                                self.chunks.block_area(coords),
+                                &self.chunks.block_area(coords),
                                 &self.light.block_area_light(coords),
                             )
                         },
@@ -350,16 +350,8 @@ impl ChunkStore {
         self.0.get(&coords).map(|v| &**v)
     }
 
-    fn contains(&self, coords: Point3<i32>) -> bool {
-        self.0.contains_key(&coords)
-    }
-
     fn insert(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) {
         assert!(self.0.insert(coords, chunk).is_none());
-    }
-
-    fn entry(&mut self, coords: Point3<i32>) -> Entry<'_, Point3<i32>, Box<Chunk>> {
-        self.0.entry(coords)
     }
 }
 
@@ -372,7 +364,9 @@ impl Index<Point3<i32>> for ChunkStore {
 }
 
 #[derive(Default)]
-struct Branch(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
+struct Branch {
+    actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
+}
 
 type Changes = (
     Vec<Point3<i64>>,
@@ -411,8 +405,8 @@ impl Branch {
         let mut inserts = FxHashSet::default();
         let mut removals = FxHashSet::default();
 
-        for (chunk_coords, actions) in self.0 {
-            match chunks.entry(chunk_coords) {
+        for (chunk_coords, actions) in self.actions {
+            match chunks.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let chunk = entry.get_mut();
                     for (block_coords, action) in actions {
@@ -491,7 +485,7 @@ impl Branch {
     }
 
     fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
-        self.0
+        self.actions
             .entry(utils::chunk_coords(coords))
             .or_default()
             .entry(utils::block_coords(coords))
@@ -574,10 +568,10 @@ impl ChunkData {
         ChunkDataStore::from_fn(|coords| {
             let area = self.area.block_area(coords);
             let area_light = self.area_light.block_area_light(coords);
-            let data = area.block().data();
+            let data = area.kernel().data();
 
             if data.requires_blending {
-                transparent_vertices.extend(data.mesh(coords, area, &area_light));
+                transparent_vertices.extend(data.mesh(coords, &area, &area_light));
             } else {
                 let is_externally_lit = data.is_externally_lit();
                 vertices.extend(data.vertices(
@@ -586,7 +580,7 @@ impl ChunkData {
                     point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(None, is_externally_lit),
-                    area_light.corner_lights(None, area),
+                    area_light.corner_lights(None, &area),
                 ));
             }
 
@@ -670,14 +664,14 @@ struct Quad {
 
 impl Quad {
     fn new(side: Side, (area, area_light): &(BlockArea, BlockAreaLight)) -> Option<Self> {
-        let block = area.block();
+        let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
         (!data.requires_blending && area.is_side_visible(Some(side))).then(|| Self {
             block,
             tex_index: data.tex_index(),
             corner_aos: area.corner_aos(Some(side), is_externally_lit),
-            corner_lights: area_light.corner_lights(Some(side), *area),
+            corner_lights: area_light.corner_lights(Some(side), area),
         })
     }
 
@@ -714,15 +708,15 @@ pub struct BlockHoverData {
 }
 
 impl BlockHoverData {
-    fn new(coords: Point3<i64>, area: BlockArea, area_light: &BlockAreaLight) -> Self {
-        let data = area.block().data();
+    fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
+        let data = area.kernel().data();
         Self {
             hitbox: data.hitbox(coords),
             brightness: Self::brightness(area, area_light),
         }
     }
 
-    fn brightness(area: BlockArea, area_light: &BlockAreaLight) -> BlockLight {
+    fn brightness(area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         Enum::variants()
             .flat_map(|side| area_light.corner_lights(side, area).into_values())
             .max_by(|a, b| a.lum().total_cmp(&b.lum()))
@@ -763,12 +757,10 @@ impl WorldEvent {
             Event::Client(ClientEvent::PlayerPositionChanged { .. }) if cur != prev => {
                 Some(Self::WorldAreaChanged { prev, cur, ray })
             }
-            Event::Client(ClientEvent::PlayerPositionChanged { .. }) => {
-                Some(Self::BlockHoverRequested { ray })
-            }
-            Event::Client(ClientEvent::PlayerOrientationChanged { .. }) => {
-                Some(Self::BlockHoverRequested { ray })
-            }
+            Event::Client(
+                ClientEvent::PlayerPositionChanged { .. }
+                | ClientEvent::PlayerOrientationChanged { .. },
+            ) => Some(Self::BlockHoverRequested { ray }),
             Event::Client(ClientEvent::BlockPlaced(block)) => Some(Self::BlockPlaced {
                 block,
                 area: cur,

@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{Data, DataEnum, DeriveInput, Fields, parse_macro_input};
+use syn::{Data, DataEnum, DeriveInput, Fields, Variant, parse_macro_input};
 
 #[proc_macro_derive(Enum)]
 pub fn derive_enum(input: TokenStream) -> TokenStream {
@@ -29,20 +29,21 @@ fn derive_enum2(input: &DeriveInput) -> syn::Result<TokenStream2> {
     }
 
     let ident = &input.ident;
-
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
     let len = variants.len();
-
-    let from_index_unchecked_arms = variants.iter().enumerate().map(|(i, variant)| {
-        let ident = &variant.ident;
-        quote! { #i => Self::#ident }
-    });
-
-    let to_index_arms = variants.iter().enumerate().map(|(i, variant)| {
-        let ident = &variant.ident;
-        quote! { Self::#ident => #i }
-    });
+    let from_index_unchecked_arms =
+        variants
+            .iter()
+            .enumerate()
+            .map(|(i, Variant { ident, .. })| {
+                quote! { #i => Self::#ident }
+            });
+    let to_index_arms = variants
+        .iter()
+        .enumerate()
+        .map(|(i, Variant { ident, .. })| {
+            quote! { Self::#ident => #i }
+        });
 
     Ok(quote! {
         unsafe impl #impl_generics crate::shared::enum_map::Enum for #ident #ty_generics #where_clause {

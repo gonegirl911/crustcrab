@@ -9,7 +9,7 @@ use std::{
     ops::{Index, IndexMut, Range},
 };
 
-#[derive(Clone, Copy, Default)]
+#[derive(Default)]
 pub struct BlockArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl BlockArea {
@@ -23,14 +23,19 @@ impl BlockArea {
         }))
     }
 
-    pub fn is_side_visible(self, side: Option<Side>) -> bool {
+    pub fn with_kernel(mut self, kernel: Block) -> Self {
+        *self.kernel_mut() = kernel;
+        self
+    }
+
+    pub fn is_side_visible(&self, side: Option<Side>) -> bool {
         side.is_none_or(|side| {
             let neighbor = self[SIDE_DELTAS[side]];
-            neighbor != self.block() && neighbor.data().is_transparent()
+            neighbor != self.kernel() && neighbor.data().is_transparent()
         })
     }
 
-    pub fn corner_aos(self, side: Option<Side>, is_externally_lit: bool) -> EnumMap<Corner, u8> {
+    pub fn corner_aos(&self, side: Option<Side>, is_externally_lit: bool) -> EnumMap<Corner, u8> {
         if is_externally_lit && let Some(side) = side {
             enum_map! { corner => self.ao(side, corner) }
         } else {
@@ -38,23 +43,19 @@ impl BlockArea {
         }
     }
 
-    pub fn block(self) -> Block {
+    pub fn kernel(&self) -> Block {
         self[Default::default()]
     }
 
-    fn block_mut(&mut self) -> &mut Block {
+    fn kernel_mut(&mut self) -> &mut Block {
         &mut self[Default::default()]
     }
 
-    fn ao(self, side: Side, corner: Corner) -> u8 {
+    fn ao(&self, side: Side, corner: Corner) -> u8 {
         let components = self.components(side, corner);
-
-        let [edge1, edge2, corner] = [
-            components[Component::Edge1],
-            components[Component::Edge2],
-            components[Component::Corner],
-        ];
-
+        let edge1 = components[Component::Edge1];
+        let edge2 = components[Component::Edge2];
+        let corner = components[Component::Corner];
         if edge1 && edge2 {
             0
         } else {
@@ -62,7 +63,7 @@ impl BlockArea {
         }
     }
 
-    fn components(self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
+    fn components(&self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self[delta].data().is_opaque())
     }
 
@@ -78,14 +79,6 @@ impl BlockArea {
 
     fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
         delta.map(|c| (c + Self::PADDING as i8) as usize).into()
-    }
-}
-
-impl From<Block> for BlockArea {
-    fn from(block: Block) -> Self {
-        let mut value = Self::default();
-        *value.block_mut() = block;
-        value
     }
 }
 
@@ -118,9 +111,9 @@ impl BlockAreaLight {
     pub fn corner_lights(
         &self,
         side: Option<Side>,
-        area: BlockArea,
+        area: &BlockArea,
     ) -> EnumMap<Corner, BlockLight> {
-        let light = self.block_light();
+        let light = self.kernel();
         if let Some(side) = side {
             SIDE_CORNER_COMPONENT_DELTAS[side].map(|_, component_deltas| {
                 self.smooth_lighting(side, area, component_deltas)
@@ -131,14 +124,14 @@ impl BlockAreaLight {
         }
     }
 
-    fn block_light(&self) -> BlockLight {
+    fn kernel(&self) -> BlockLight {
         self[Default::default()]
     }
 
     fn smooth_lighting(
         &self,
         side: Side,
-        area: BlockArea,
+        area: &BlockArea,
         component_deltas: EnumMap<Component, Vector3<i8>>,
     ) -> BlockLight {
         let (count, sum) = component_deltas

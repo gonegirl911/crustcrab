@@ -13,7 +13,7 @@ use crate::{
             uniform::Uniform,
         },
     },
-    server::game::world::block::{Block, data::STR_TO_BLOCK},
+    server::game::world::block::{Block, area::BlockArea, data::STR_TO_BLOCK},
 };
 use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
@@ -82,23 +82,6 @@ impl Inventory {
         }
     }
 
-    fn transform(&self, renderer: &Renderer) -> Matrix4<f32> {
-        let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
-        Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44))
-            * if self.is_flat {
-                Matrix4::identity()
-            } else {
-                let diagonal = 3.0f32.sqrt();
-                let rot_x = -FRAC_PI_6;
-                let theta = (1.0 / diagonal).acos() + rot_x;
-                Matrix4::new_rotation(Vector3::x() * rot_x)
-                    .append_scaling(1.0 / diagonal / theta.cos())
-                    .append_translation(&vector![0.5, 0.5, 0.545])
-                    * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
-                        .prepend_translation(&Vector3::repeat(-0.5))
-            }
-    }
-
     fn index(keycode: KeyCode) -> Option<usize> {
         match keycode {
             KeyCode::Digit1 => Some(0),
@@ -148,8 +131,12 @@ impl EventHandler for Inventory {
                                     is_flat = true;
                                     vertices.collect::<Vec<_>>()
                                 } else {
-                                    data.mesh(Default::default(), block.into(), &Default::default())
-                                        .collect()
+                                    data.mesh(
+                                        Default::default(),
+                                        &BlockArea::default().with_kernel(block),
+                                        &Default::default(),
+                                    )
+                                    .collect()
                                 }),
                             )
                         });
@@ -160,10 +147,8 @@ impl EventHandler for Inventory {
                     }
 
                     if is_transform_outdated {
-                        self.uniform.set(
-                            renderer,
-                            &InventoryUniformData::new(self.transform(renderer)),
-                        );
+                        self.uniform
+                            .set(renderer, &InventoryUniformData::new(renderer, self.is_flat));
                     }
                 }
                 _ => {}
@@ -179,8 +164,24 @@ struct InventoryUniformData {
 }
 
 impl InventoryUniformData {
-    fn new(transform: Matrix4<f32>) -> Self {
-        Self { transform }
+    fn new(renderer: &Renderer, is_flat: bool) -> Self {
+        let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
+        let transform = Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44));
+        Self {
+            transform: if is_flat {
+                transform
+            } else {
+                let diagonal = 3.0f32.sqrt();
+                let rot_x = -FRAC_PI_6;
+                let theta = (1.0 / diagonal).acos() + rot_x;
+                transform
+                    * Matrix4::new_rotation(Vector3::x() * rot_x)
+                        .append_scaling(1.0 / diagonal / theta.cos())
+                        .append_translation(&vector![0.5, 0.5, 0.545])
+                    * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
+                        .prepend_translation(&Vector3::repeat(-0.5))
+            },
+        }
     }
 }
 

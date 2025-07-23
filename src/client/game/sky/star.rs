@@ -116,17 +116,17 @@ impl Star {
 }
 
 struct StarGenerator {
-    theta_uniform: Uniform<f32>,
-    cos_phi_uniform: Uniform<f32>,
-    rotation_uniform: Uniform<f32>,
+    theta: Uniform<f32>,
+    cos_phi: Uniform<f32>,
+    rotation: Uniform<f32>,
 }
 
 impl StarGenerator {
     fn generate<R: Rng>(&self, rng: &mut R) -> Star {
         Star::new(
-            self.theta_uniform.sample(rng),
-            self.cos_phi_uniform.sample(rng).acos(),
-            self.rotation_uniform.sample(rng),
+            self.theta.sample(rng),
+            self.cos_phi.sample(rng).acos(),
+            self.rotation.sample(rng),
         )
     }
 }
@@ -134,9 +134,9 @@ impl StarGenerator {
 impl Default for StarGenerator {
     fn default() -> Self {
         Self {
-            theta_uniform: Uniform::new_inclusive(-PI, PI).unwrap_or_else(|_| unreachable!()),
-            cos_phi_uniform: Uniform::new_inclusive(-1.0, 1.0).unwrap_or_else(|_| unreachable!()),
-            rotation_uniform: Uniform::new(0.0, FRAC_PI_2).unwrap_or_else(|_| unreachable!()),
+            theta: Uniform::new_inclusive(-PI, PI).unwrap_or_else(|_| unreachable!()),
+            cos_phi: Uniform::new_inclusive(-1.0, 1.0).unwrap_or_else(|_| unreachable!()),
+            rotation: Uniform::new(0.0, FRAC_PI_2).unwrap_or_else(|_| unreachable!()),
         }
     }
 }

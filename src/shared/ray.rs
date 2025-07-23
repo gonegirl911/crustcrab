@@ -24,7 +24,10 @@ impl Ray {
         let t_delta = calcs.map(|c| c.2);
         let mut t_max = calcs.map(|c| c.1 * c.2);
         iter::successors(
-            Some(BlockIntersection::new(coords, Vector3::zeros())),
+            Some(BlockIntersection {
+                coords,
+                normal: Vector3::zeros(),
+            }),
             move |_| {
                 let i = t_max.imin();
                 reach.contains(&t_max[i]).then(|| {
@@ -32,23 +35,17 @@ impl Ray {
                     coords[i] += step[i];
                     t_max[i] += t_delta[i];
                     normal[i] -= step[i];
-                    BlockIntersection::new(coords, normal)
+                    BlockIntersection { coords, normal }
                 })
             },
         )
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub struct BlockIntersection {
     pub coords: Point3<i64>,
     pub normal: Vector3<i64>,
-}
-
-impl BlockIntersection {
-    fn new(coords: Point3<i64>, normal: Vector3<i64>) -> Self {
-        Self { coords, normal }
-    }
 }
 
 pub trait Intersectable {

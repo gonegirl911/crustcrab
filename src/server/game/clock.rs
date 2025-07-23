@@ -10,17 +10,16 @@ use nalgebra::{UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 use std::{f32::consts::TAU, ops::Range};
 
-#[derive(Clone, Copy)]
 pub struct Clock {
     ticks: u16,
 }
 
 impl Clock {
-    fn send(self, server_tx: &ServerSender) {
+    fn send(&self, server_tx: &ServerSender) {
         _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
     }
 
-    fn time(self) -> Time {
+    fn time(&self) -> Time {
         Time { ticks: self.ticks }
     }
 }
@@ -106,15 +105,15 @@ impl Default for Stage {
     }
 }
 
-#[derive(Clone, Copy, Deserialize)]
-pub struct ClockState {
+#[derive(Deserialize)]
+pub struct ClockConfig {
     ticks_per_day: u16,
     twilight_duration: u16,
     starting_stage: StartingStage,
 }
 
-impl ClockState {
-    fn starting_ticks(self) -> u16 {
+impl ClockConfig {
+    fn starting_ticks(&self) -> u16 {
         match self.starting_stage {
             StartingStage::Dawn => 0,
             StartingStage::Day => self.day_start(),
@@ -123,11 +122,11 @@ impl ClockState {
         }
     }
 
-    fn time(self, ticks: u16) -> f32 {
+    fn time(&self, ticks: u16) -> f32 {
         (ticks as i16 - self.horizon() as i16) as f32 / self.ticks_per_day as f32
     }
 
-    fn stage(self, ticks: u16) -> Stage {
+    fn stage(&self, ticks: u16) -> Stage {
         if self.dawn_range().contains(&ticks) {
             Stage::Dawn {
                 progress: Self::inv_lerp(self.dawn_range(), ticks),
@@ -143,51 +142,51 @@ impl ClockState {
         }
     }
 
-    fn is_am(self, ticks: u16) -> bool {
+    fn is_am(&self, ticks: u16) -> bool {
         !self.is_pm(ticks)
     }
 
-    fn is_pm(self, ticks: u16) -> bool {
+    fn is_pm(&self, ticks: u16) -> bool {
         self.pm_range().contains(&ticks)
     }
 
-    fn dawn_range(self) -> Range<u16> {
+    fn dawn_range(&self) -> Range<u16> {
         0..self.day_start()
     }
 
-    fn day_range(self) -> Range<u16> {
+    fn day_range(&self) -> Range<u16> {
         self.day_start()..self.dusk_start()
     }
 
-    fn dusk_range(self) -> Range<u16> {
+    fn dusk_range(&self) -> Range<u16> {
         self.dusk_start()..self.night_start()
     }
 
-    fn pm_range(self) -> Range<u16> {
+    fn pm_range(&self) -> Range<u16> {
         self.noon()..self.midnight()
     }
 
-    fn horizon(self) -> u16 {
+    fn horizon(&self) -> u16 {
         self.twilight_duration / 2
     }
 
-    fn day_start(self) -> u16 {
+    fn day_start(&self) -> u16 {
         self.twilight_duration
     }
 
-    fn noon(self) -> u16 {
+    fn noon(&self) -> u16 {
         self.horizon() + self.ticks_per_day / 4
     }
 
-    fn dusk_start(self) -> u16 {
+    fn dusk_start(&self) -> u16 {
         self.ticks_per_day / 2
     }
 
-    fn night_start(self) -> u16 {
+    fn night_start(&self) -> u16 {
         self.dusk_start() + self.twilight_duration
     }
 
-    fn midnight(self) -> u16 {
+    fn midnight(&self) -> u16 {
         self.noon() + self.ticks_per_day / 2
     }
 

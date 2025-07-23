@@ -79,6 +79,7 @@ impl World {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn draw<F: FnOnce(&mut wgpu::CommandEncoder)>(
         &mut self,
         renderer: &Renderer,
@@ -316,8 +317,8 @@ impl ChunkMesh {
         transparent_vertices: &[BlockVertex],
     ) -> Option<Self> {
         match (
-            OpaquePart::try_new(renderer, MemoryState::Immutable(vertices)),
-            TransparentPart::try_new(renderer, transparent_vertices, |v| {
+            VertexBuffer::try_new(renderer, MemoryState::Immutable(vertices)),
+            TransparentMesh::try_new(renderer, transparent_vertices, |v| {
                 v.iter()
                     .fold(Point3::default(), |acc, v| acc + v.coords().coords)
                     .cast()

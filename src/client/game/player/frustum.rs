@@ -15,6 +15,7 @@ pub struct Frustum {
 }
 
 impl Frustum {
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         origin: Point3<f32>,
         forward: Vector3<f32>,

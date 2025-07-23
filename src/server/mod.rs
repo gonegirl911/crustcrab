@@ -10,7 +10,7 @@ use crossbeam_channel::{Receiver, Sender};
 use event_loop::{EventLoop, EventLoopConfig};
 use game::{
     Game,
-    clock::{ClockState, Time},
+    clock::{ClockConfig, Time},
     player::PlayerConfig,
     world::{BlockHoverData, ChunkData},
 };
@@ -119,7 +119,7 @@ impl ServerSender {
 struct ServerConfig {
     event_loop: EventLoopConfig,
     player: PlayerConfig,
-    clock: ClockState,
+    clock: ClockConfig,
 }
 
 static SERVER_CONFIG: LazyLock<ServerConfig> =

@@ -14,22 +14,21 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 
-#[derive(Clone, Copy)]
 pub struct Model {
     data: &'static ModelData,
     pub tex_index: u8,
 }
 
 impl Model {
-    pub fn corner_deltas(self, side: Option<Side>) -> &'static CornerDeltas {
+    pub fn corner_deltas(&self, side: Option<Side>) -> &'static CornerDeltas {
         self.data.corner_deltas(side)
     }
 
-    pub fn hitbox(self, coords: Point3<i64>) -> Aabb {
+    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
         self.data.hitbox(coords)
     }
 
-    pub fn flat_icon(self) -> Option<u8> {
+    pub fn flat_icon(&self) -> Option<u8> {
         self.data.has_flat_icon.then_some(self.tex_index)
     }
 }
@@ -164,7 +163,7 @@ static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
                 path.file_stem()
                     .unwrap_or_else(|| unreachable!())
                     .to_str()
-                    .unwrap_or_else(|| panic!("{path:?} should have a valid UTF-8 stem"))
+                    .unwrap_or_else(|| panic!("{} should have a valid UTF-8 stem", path.display()))
                     .into(),
                 toml::deserialize(path),
             )

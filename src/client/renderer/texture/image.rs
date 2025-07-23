@@ -126,9 +126,9 @@ impl ImageTexture {
     fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
         let path = path.as_ref();
         ImageReader::open(path)
-            .unwrap_or_else(|e| panic!("failed to open {path:?}: {e}"))
+            .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
             .decode()
-            .unwrap_or_else(|e| panic!("failed to decode {path:?}: {e}"))
+            .unwrap_or_else(|e| panic!("failed to decode {}: {e}", path.display()))
             .into_rgba8()
     }
 

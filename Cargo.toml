@@ -1,17 +1,10 @@
 [workspace]
 members = ["macros"]
 
-[workspace.lints.clippy]
-too_many_arguments = "allow"
-type_complexity = "allow"
-
 [package]
 name = "crustcrab"
 edition = "2024"
 default-run = "crustcrab"
-
-[lints]
-workspace = true
 
 [profile.lto]
 inherits = "release"

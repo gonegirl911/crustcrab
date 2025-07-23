@@ -1,6 +1,6 @@
 use super::Renderer;
 use bytemuck::Pod;
-use std::{marker::PhantomData, mem, ops::Deref, slice};
+use std::{marker::PhantomData, ops::Deref, ptr, slice};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct VertexBuffer<V>(Buffer<[V]>);
@@ -139,7 +139,7 @@ impl<T: Pod> Buffer<T> {
 
 impl<T> Buffer<[T]> {
     fn from_ref(buffer: &Buffer<T>) -> &Self {
-        unsafe { mem::transmute(buffer) }
+        unsafe { &*ptr::from_ref(&buffer.buffer).cast::<Self>() }
     }
 
     pub fn len(&self) -> u32 {

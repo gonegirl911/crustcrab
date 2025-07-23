@@ -20,8 +20,8 @@ impl Block {
     pub const AIR: Self = Self(0);
     pub const SAND: Self = Self(1);
 
-    pub fn data(self) -> BlockData {
-        unsafe { *BLOCK_DATA.get_unchecked(self.0 as usize) }
+    pub fn data(self) -> &'static BlockData {
+        unsafe { BLOCK_DATA.get_unchecked(self.0 as usize) }
     }
 
     pub fn apply(&mut self, action: BlockAction) -> bool {
@@ -83,15 +83,15 @@ impl BlockLight {
         value
     }
 
+    pub fn with_component(mut self, index: usize, value: u8) -> Self {
+        self.set_component(index, value);
+        self
+    }
+
     pub fn lum(self) -> f32 {
         (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
             .saturate()
             .lum()
-    }
-
-    pub fn with_component(mut self, index: usize, value: u8) -> Self {
-        self.set_component(index, value);
-        self
     }
 
     pub fn sup(self, other: Self) -> Self {
