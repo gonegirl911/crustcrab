@@ -44,5 +44,5 @@ color = [0.06, 0.06, 0.1, 0.85]
 size = 1.0
 
 [gui.inventory]
-content = ["glowstone", "glass_magenta", "glass_cyan", "dead_bush"]
+contents = ["glowstone", "glass_magenta", "glass_cyan", "dead_bush"]
 size = 3.6

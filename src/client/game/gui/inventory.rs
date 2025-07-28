@@ -15,7 +15,6 @@ use crate::{
     },
     server::game::world::block::{Block, area::BlockArea, data::STR_TO_BLOCK},
 };
-use arrayvec::ArrayVec;
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
 use serde::{Deserialize, Deserializer};
@@ -68,8 +67,9 @@ impl Inventory {
         }
     }
 
+    #[rustfmt::skip]
     pub fn selected_block(&self) -> Option<Block> {
-        CLIENT_CONFIG.gui.inventory.content.get(self.index).copied()
+        CLIENT_CONFIG.gui.inventory.contents.get(self.index).copied()
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
@@ -188,16 +188,18 @@ impl InventoryUniformData {
 #[derive(Deserialize)]
 pub struct InventoryConfig {
     #[serde(deserialize_with = "InventoryConfig::deserialize_content")]
-    content: ArrayVec<Block, 9>,
+    contents: Vec<Block>,
     size: f32,
 }
 
 impl InventoryConfig {
-    fn deserialize_content<'de, D>(deserializer: D) -> Result<ArrayVec<Block, 9>, D::Error>
+    fn deserialize_content<'de, D>(deserializer: D) -> Result<Vec<Block>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        ArrayVec::<String, 9>::deserialize(deserializer)?
+        let contents = Vec::<String>::deserialize(deserializer)?;
+        assert!(contents.len() <= 9, "inventory has only 9 available slots");
+        contents
             .into_iter()
             .map(|str| {
                 STR_TO_BLOCK.get(&*str).copied().ok_or_else(|| {
