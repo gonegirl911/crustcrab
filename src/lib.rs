@@ -1,5 +1,4 @@
 #![feature(
-    array_chunks,
     impl_trait_in_assoc_type,
     int_roundings,
     maybe_uninit_fill,

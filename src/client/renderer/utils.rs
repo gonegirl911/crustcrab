@@ -4,7 +4,7 @@ use bytemuck::Pod;
 use std::cmp::{Ordering, Reverse};
 
 pub struct TransparentMesh<C, V> {
-    data: Vec<(C, [V; 6])>,
+    faces: Vec<(C, [V; 6])>,
     vertices: Vec<V>,
     buffer: VertexBuffer<V>,
 }
@@ -14,14 +14,17 @@ impl<C, V: Pod> TransparentMesh<C, V> {
     where
         F: FnMut(&[V]) -> C,
     {
-        assert_eq!(vertices.len() % 6, 0);
+        let (faces, []) = vertices.as_chunks() else {
+            unreachable!();
+        };
         Some(Self {
             buffer: VertexBuffer::try_new(renderer, MemoryState::Uninit(vertices.len()))?,
-            data: vertices.array_chunks().map(|v| (coords(v), *v)).collect(),
+            faces: faces.iter().map(|f| (coords(f), *f)).collect(),
             vertices: Vec::with_capacity(vertices.len()),
         })
     }
 
+    #[rustfmt::skip]
     pub fn draw<D, F>(
         &mut self,
         renderer: &Renderer,
@@ -31,9 +34,9 @@ impl<C, V: Pod> TransparentMesh<C, V> {
         D: Ord,
         F: FnMut(&C) -> D,
     {
-        self.data.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
+        self.faces.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
         self.vertices.clear();
-        self.vertices.extend(self.data.iter().flat_map(|&(_, v)| v));
+        self.vertices.extend(self.faces.iter().flat_map(|&(_, v)| v));
         self.buffer.write(renderer, &self.vertices);
         self.buffer.draw(render_pass);
     }
