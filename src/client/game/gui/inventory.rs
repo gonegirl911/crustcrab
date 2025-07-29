@@ -187,13 +187,13 @@ impl InventoryUniformData {
 
 #[derive(Deserialize)]
 pub struct InventoryConfig {
-    #[serde(deserialize_with = "InventoryConfig::deserialize_content")]
+    #[serde(deserialize_with = "InventoryConfig::deserialize_contents")]
     contents: Vec<Block>,
     size: f32,
 }
 
 impl InventoryConfig {
-    fn deserialize_content<'de, D>(deserializer: D) -> Result<Vec<Block>, D::Error>
+    fn deserialize_contents<'de, D>(deserializer: D) -> Result<Vec<Block>, D::Error>
     where
         D: Deserializer<'de>,
     {
