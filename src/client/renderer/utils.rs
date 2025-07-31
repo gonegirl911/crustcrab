@@ -19,7 +19,7 @@ impl<C, V: Pod> TransparentMesh<C, V> {
         };
         Some(Self {
             buffer: VertexBuffer::try_new(renderer, MemoryState::Uninit(vertices.len()))?,
-            faces: faces.iter().map(|face| (coords(face), *face)).collect(),
+            faces: faces.iter().map(|v| (coords(v), *v)).collect(),
             vertices: Vec::with_capacity(vertices.len()),
         })
     }
