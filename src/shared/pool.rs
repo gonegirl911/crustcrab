@@ -1,5 +1,5 @@
 use crossbeam_channel::{self, Receiver, SendError, Sender, TryRecvError};
-use std::{sync::LazyLock, thread};
+use std::{num::NonZero, sync::LazyLock, thread};
 
 pub struct ThreadPool<I, O> {
     in_tx: Sender<I>,
@@ -38,4 +38,4 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
 }
 
 static NUM_CPUS: LazyLock<usize> =
-    LazyLock::new(|| thread::available_parallelism().map_or(1, Into::into));
+    LazyLock::new(|| thread::available_parallelism().map_or(1, NonZero::get));
