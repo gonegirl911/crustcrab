@@ -1,4 +1,6 @@
-use crate::client::renderer::{Renderer, effect::PostProcessor, program::Program};
+use crate::client::renderer::{
+    Renderer, effect::PostProcessor, program::Program, utils::read_wgsl,
+};
 
 pub struct Atmosphere(Program);
 
@@ -10,7 +12,7 @@ impl Atmosphere {
     ) -> Self {
         Self(Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/atmosphere.wgsl"),
+            read_wgsl("assets/shaders/atmosphere.wgsl"),
             &[],
             &[player_bind_group_layout, sky_bind_group_layout],
             &[],

@@ -11,6 +11,7 @@ use crate::{
             program::Program,
             texture::screen::DepthBuffer,
             uniform::Uniform,
+            utils::read_wgsl,
         },
     },
     server::game::world::block::{Block, area::BlockArea, data::STR_TO_BLOCK},
@@ -42,7 +43,7 @@ impl Inventory {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/inventory.wgsl"),
+            read_wgsl("assets/shaders/inventory.wgsl"),
             &[BlockVertex::desc()],
             &[uniform.bind_group_layout(), textures_bind_group_layout],
             &[],

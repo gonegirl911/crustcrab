@@ -8,7 +8,7 @@ use crate::{
             effect::PostProcessor,
             program::{Program, PushConstants},
             texture::screen::DepthBuffer,
-            utils::{TotalOrd, TransparentMesh},
+            utils::{TotalOrd, TransparentMesh, read_wgsl},
         },
     },
     server::{
@@ -53,7 +53,7 @@ impl World {
             meshes: Default::default(),
             program: Program::new(
                 renderer,
-                wgpu::include_wgsl!("../../../assets/shaders/block.wgsl"),
+                read_wgsl("assets/shaders/block.wgsl"),
                 &[BlockVertex::desc()],
                 &[
                     player_bind_group_layout,

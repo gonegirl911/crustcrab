@@ -7,6 +7,7 @@ use crate::{
             effect::PostProcessor,
             program::{Program, PushConstants},
             texture::image::ImageTextureArray,
+            utils::read_wgsl,
         },
     },
     server::{ServerEvent, game::clock::Time},
@@ -40,7 +41,7 @@ impl ObjectSet {
         );
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/object.wgsl"),
+            read_wgsl("assets/shaders/object.wgsl"),
             &[],
             &[
                 player_bind_group_layout,

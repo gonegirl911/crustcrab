@@ -4,7 +4,7 @@ use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
         Renderer, buffer::MemoryState, effect::PostProcessor, program::Program,
-        texture::image::ImageTexture, uniform::Uniform,
+        texture::image::ImageTexture, uniform::Uniform, utils::read_wgsl,
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -29,7 +29,7 @@ impl Crosshair {
         );
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/crosshair.wgsl"),
+            read_wgsl("assets/shaders/crosshair.wgsl"),
             &[],
             &[
                 uniform.bind_group_layout(),

@@ -2,6 +2,7 @@ use super::{
     Renderer,
     program::{Program, PushConstants},
     texture::screen::ScreenTextureArray,
+    utils::read_wgsl,
 };
 use crate::client::event_loop::{Event, EventHandler};
 use bytemuck::{Pod, Zeroable};
@@ -105,7 +106,7 @@ impl Blit {
     ) -> Self {
         Self(Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/blit.wgsl"),
+            read_wgsl("assets/shaders/blit.wgsl"),
             &[],
             &[input_bind_group_layout],
             &[],
@@ -134,7 +135,7 @@ impl Blender {
     ) -> Self {
         Self(Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/blender.wgsl"),
+            read_wgsl("assets/shaders/blender.wgsl"),
             &[],
             &[input_bind_group_layout],
             &[wgpu::PushConstantRange {
@@ -204,7 +205,7 @@ impl Aces {
     ) -> Self {
         Self(Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/aces.wgsl"),
+            read_wgsl("assets/shaders/aces.wgsl"),
             &[],
             &[input_bind_group_layout],
             &[],

@@ -7,6 +7,7 @@ use crate::{
             buffer::{Instance, InstanceBuffer, MemoryState},
             effect::PostProcessor,
             program::{Program, PushConstants},
+            utils::read_wgsl,
         },
     },
     server::{
@@ -44,7 +45,7 @@ impl StarDome {
         let instance_buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../../assets/shaders/star.wgsl"),
+            read_wgsl("assets/shaders/star.wgsl"),
             &[StarInstance::desc()],
             &[player_bind_group_layout],
             &[StarPushConstants::range()],

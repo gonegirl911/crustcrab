@@ -9,6 +9,7 @@ use crate::{
             effect::{Blender, PostProcessor},
             program::{Program, PushConstants},
             texture::{image::ImageTexture, screen::DepthBuffer},
+            utils::read_wgsl,
         },
     },
     server::{
@@ -51,7 +52,7 @@ impl CloudLayer {
         let texture = ImageTexture::new(renderer, TEX_PATH, 1, false, wgpu::AddressMode::Repeat);
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/cloud.wgsl"),
+            read_wgsl("assets/shaders/cloud.wgsl"),
             &[BlockVertex::desc(), CloudInstance::desc()],
             &[player_bind_group_layout, texture.bind_group_layout()],
             &[CloudPushConstants::range()],

@@ -1,6 +1,9 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
-    renderer::{Renderer, effect::PostProcessor, program::Program, texture::screen::ScreenTexture},
+    renderer::{
+        Renderer, effect::PostProcessor, program::Program, texture::screen::ScreenTexture,
+        utils::read_wgsl,
+    },
 };
 
 pub struct Fog {
@@ -18,7 +21,7 @@ impl Fog {
         let texture = ScreenTexture::new(renderer, PostProcessor::FORMAT);
         let program = Program::new(
             renderer,
-            wgpu::include_wgsl!("../../../assets/shaders/fog.wgsl"),
+            read_wgsl("assets/shaders/fog.wgsl"),
             &[],
             &[
                 player_bind_group_layout,

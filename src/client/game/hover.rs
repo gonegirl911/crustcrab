@@ -8,6 +8,7 @@ use crate::{
             effect::PostProcessor,
             program::{Program, PushConstants},
             texture::screen::DepthBuffer,
+            utils::read_wgsl,
         },
     },
     server::{
@@ -108,7 +109,7 @@ impl BlockHighlight {
             index_buffer: IndexBuffer::new(renderer, MemoryState::Immutable(&INDICES)),
             program: Program::new(
                 renderer,
-                wgpu::include_wgsl!("../../../assets/shaders/highlight.wgsl"),
+                read_wgsl("assets/shaders/highlight.wgsl"),
                 &[BlockHighlightVertex::desc()],
                 &[player_bind_group_layout, sky_bind_group_layout],
                 &[BlockHighlightPushConstants::range()],
