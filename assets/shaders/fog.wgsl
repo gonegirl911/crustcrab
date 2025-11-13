@@ -69,9 +69,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 fn linearize(depth: f32) -> f32 {
-    let znear = player.znear;
-    let zfar = player.zfar;
-    return znear * zfar / (zfar - depth * (zfar - znear));
+    return 1.0 / mix(depth, 1.0, player.zfar / player.znear);
 }
 
 fn pow2(n: f32) -> f32 {
