@@ -3,7 +3,7 @@ struct VertexInput {
 }
 
 struct CrosshairUniform {
-    transform: mat4x4<f32>, 
+    transform: mat4x4<f32>,
 }
 
 struct VertexOutput {
@@ -13,7 +13,7 @@ struct VertexOutput {
 }
 
 @group(0) @binding(0)
-var<uniform> crosshair: CrosshairUniform; 
+var<uniform> crosshair: CrosshairUniform;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {

@@ -64,12 +64,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let fog_factor = exp2(-pow2(max((distance - fog_start) / 16.0, 0.0)));
     let glow_factor = max(mix(1.0, -1.0, acos(dot(player.forward, sky.sun_dir)) * FRAC_1_PI), 0.0) * sky.glow_color.a;
     let fog_color = mix(sky.horizon_color, sky.glow_color.rgb, glow_factor);
-    let color = textureSample(t_input, s_input, in.input_coords);
-    return mix(vec4(fog_color, 1.0), color, fog_factor) * f32(color.a != 0.0);
+    let bg_color = textureSample(t_input, s_input, in.input_coords);
+    return mix(vec4(fog_color, 1.0), bg_color, fog_factor) * f32(bg_color.a != 0.0);
 }
 
 fn linearize(depth: f32) -> f32 {
-    return 1.0 / mix(depth, 1.0, player.zfar / player.znear);
+    let znear = player.znear;
+    let zfar = player.zfar;
+    return znear * zfar / (zfar - depth * (zfar - znear));
 }
 
 fn pow2(n: f32) -> f32 {

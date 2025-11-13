@@ -11,7 +11,8 @@ struct VertexOutput {
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32((vertex.index << 1u) & 2u);
     let y = f32(vertex.index & 2u);
-    return VertexOutput(-1.0 + vec4(x, y, 0.5, 1.0) * 2.0, vec2(x, 1.0 - y));
+    let coords = -1.0 + vec2(x, y) * 2.0;
+    return VertexOutput(vec4(coords, 0.0, 1.0), vec2(x, 1.0 - y));
 }
 
 struct PushConstants {
