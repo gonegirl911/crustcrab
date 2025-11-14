@@ -35,7 +35,6 @@ impl ObjectSet {
                 "assets/textures/sky/sun.png",
                 "assets/textures/sky/moon.png",
             ])
-            .mip_level_count(1)
             .is_srgb(true)
             .build();
         let program = Program::builder()

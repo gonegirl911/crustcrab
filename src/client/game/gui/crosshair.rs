@@ -23,7 +23,6 @@ impl Crosshair {
         let texture = ImageTexture::builder()
             .renderer(renderer)
             .path("assets/textures/gui/crosshair.png")
-            .mip_level_count(1)
             .is_srgb(false)
             .build();
         let program = Program::builder()

@@ -52,7 +52,6 @@ impl CloudLayer {
         let texture = ImageTexture::builder()
             .renderer(renderer)
             .path(TEX_PATH)
-            .mip_level_count(1)
             .is_srgb(false)
             .address_mode(wgpu::AddressMode::Repeat)
             .build();

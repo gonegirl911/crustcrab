@@ -17,7 +17,7 @@ impl ImageTexture {
     pub fn new<P: AsRef<Path>>(
         renderer @ Renderer { device, .. }: &Renderer,
         path: P,
-        mip_level_count: u32,
+        #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
@@ -224,7 +224,7 @@ impl ImageTextureArray {
     pub fn new<P: IntoIterator<Item: AsRef<Path>>>(
         renderer @ Renderer { device, .. }: &Renderer,
         paths: P,
-        mip_level_count: u32,
+        #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
