@@ -41,23 +41,22 @@ pub struct Inventory {
 impl Inventory {
     pub fn new(renderer: &Renderer, textures_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
-        let program = Program::new(
-            renderer,
-            read_wgsl("assets/shaders/inventory.wgsl"),
-            &[BlockVertex::desc()],
-            &[uniform.bind_group_layout(), textures_bind_group_layout],
-            &[],
-            Some(wgpu::Face::Back),
-            Some(wgpu::DepthStencilState {
+        let program = Program::builder()
+            .renderer(renderer)
+            .shader_desc(read_wgsl("assets/shaders/inventory.wgsl"))
+            .buffers(&[BlockVertex::desc()])
+            .bind_group_layouts(&[uniform.bind_group_layout(), textures_bind_group_layout])
+            .cull_mode(wgpu::Face::Back)
+            .depth_stencil(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: Default::default(),
                 bias: Default::default(),
-            }),
-            PostProcessor::FORMAT,
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-        );
+            })
+            .format(PostProcessor::FORMAT)
+            .blend(wgpu::BlendState::ALPHA_BLENDING)
+            .build();
         Self {
             vertex_buffer: None,
             uniform,

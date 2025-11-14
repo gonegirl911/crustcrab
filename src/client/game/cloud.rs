@@ -49,24 +49,28 @@ impl CloudLayer {
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
         );
-        let texture = ImageTexture::new(renderer, TEX_PATH, 1, false, wgpu::AddressMode::Repeat);
-        let program = Program::new(
-            renderer,
-            read_wgsl("assets/shaders/cloud.wgsl"),
-            &[BlockVertex::desc(), CloudInstance::desc()],
-            &[player_bind_group_layout, texture.bind_group_layout()],
-            &[CloudPushConstants::range()],
-            None,
-            Some(wgpu::DepthStencilState {
+        let texture = ImageTexture::builder()
+            .renderer(renderer)
+            .path(TEX_PATH)
+            .mip_level_count(1)
+            .is_srgb(false)
+            .address_mode(wgpu::AddressMode::Repeat)
+            .build();
+        let program = Program::builder()
+            .renderer(renderer)
+            .shader_desc(read_wgsl("assets/shaders/cloud.wgsl"))
+            .buffers(&[BlockVertex::desc(), CloudInstance::desc()])
+            .bind_group_layouts(&[player_bind_group_layout, texture.bind_group_layout()])
+            .push_constant_ranges(&[CloudPushConstants::range()])
+            .depth_stencil(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::LessEqual,
                 stencil: Default::default(),
                 bias: Default::default(),
-            }),
-            PostProcessor::FORMAT,
-            None,
-        );
+            })
+            .format(PostProcessor::FORMAT)
+            .build();
         let blender = Blender::new(renderer, spare_bind_group_layout, PostProcessor::FORMAT);
         Self {
             vertex_buffer,

@@ -1,17 +1,19 @@
 use super::Renderer;
+use bon::bon;
 use bytemuck::Pod;
 use std::slice;
 
 pub struct Program(wgpu::RenderPipeline);
 
+#[bon]
 impl Program {
-    #[expect(clippy::too_many_arguments)]
+    #[builder]
     pub fn new(
-        Renderer { device, .. }: &Renderer,
-        shader_desc: wgpu::ShaderModuleDescriptor,
-        buffers: &[wgpu::VertexBufferLayout],
-        bind_group_layouts: &[&wgpu::BindGroupLayout],
-        push_constant_ranges: &[wgpu::PushConstantRange],
+        #[expect(unused)] renderer @ Renderer { device, .. }: &Renderer,
+        shader_desc: wgpu::ShaderModuleDescriptor<'_>,
+        #[builder(default)] buffers: &[wgpu::VertexBufferLayout<'_>],
+        #[builder(default)] bind_group_layouts: &[&wgpu::BindGroupLayout],
+        #[builder(default)] push_constant_ranges: &[wgpu::PushConstantRange],
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
         format: wgpu::TextureFormat,

@@ -229,13 +229,15 @@ struct BlockTextureArray(ImageTextureArray);
 
 impl BlockTextureArray {
     fn new(renderer: &Renderer) -> Self {
-        Self(ImageTextureArray::new(
-            renderer,
-            Self::tex_paths(),
-            4,
-            true,
-            wgpu::AddressMode::Repeat,
-        ))
+        Self(
+            ImageTextureArray::builder()
+                .renderer(renderer)
+                .paths(Self::tex_paths())
+                .mip_level_count(4)
+                .is_srgb(true)
+                .address_mode(wgpu::AddressMode::Repeat)
+                .build(),
+        )
     }
 
     fn tex_paths() -> impl Iterator<Item = String> {

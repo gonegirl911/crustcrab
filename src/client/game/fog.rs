@@ -19,22 +19,18 @@ impl Fog {
         depth_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let texture = ScreenTexture::new(renderer, PostProcessor::FORMAT);
-        let program = Program::new(
-            renderer,
-            read_wgsl("assets/shaders/fog.wgsl"),
-            &[],
-            &[
+        let program = Program::builder()
+            .renderer(renderer)
+            .shader_desc(read_wgsl("assets/shaders/fog.wgsl"))
+            .bind_group_layouts(&[
                 player_bind_group_layout,
                 sky_bind_group_layout,
                 texture.bind_group_layout(),
                 depth_bind_group_layout,
-            ],
-            &[],
-            None,
-            None,
-            PostProcessor::FORMAT,
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-        );
+            ])
+            .format(PostProcessor::FORMAT)
+            .blend(wgpu::BlendState::ALPHA_BLENDING)
+            .build();
         Self { texture, program }
     }
 

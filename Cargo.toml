@@ -17,6 +17,7 @@ strip = "symbols"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitfield = "0.19.3"
 bitflags = "2.9.4"
+bon = "3.8.1"
 bytemuck = { version = "1.24.0", features = ["derive"] }
 clap = { version = "4.5.48", features = ["derive"] }
 crossbeam-channel = "0.5.15"

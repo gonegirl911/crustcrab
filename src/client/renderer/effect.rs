@@ -104,17 +104,14 @@ impl Blit {
         input_bind_group_layout: &wgpu::BindGroupLayout,
         format: wgpu::TextureFormat,
     ) -> Self {
-        Self(Program::new(
-            renderer,
-            read_wgsl("assets/shaders/blit.wgsl"),
-            &[],
-            &[input_bind_group_layout],
-            &[],
-            None,
-            None,
-            format,
-            None,
-        ))
+        Self(
+            Program::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("assets/shaders/blit.wgsl"))
+                .bind_group_layouts(&[input_bind_group_layout])
+                .format(format)
+                .build(),
+        )
     }
 }
 
@@ -133,20 +130,19 @@ impl Blender {
         input_bind_group_layout: &wgpu::BindGroupLayout,
         format: wgpu::TextureFormat,
     ) -> Self {
-        Self(Program::new(
-            renderer,
-            read_wgsl("assets/shaders/blender.wgsl"),
-            &[],
-            &[input_bind_group_layout],
-            &[wgpu::PushConstantRange {
-                stages: wgpu::ShaderStages::FRAGMENT,
-                range: 0..size_of::<BlenderPushConstants>() as u32,
-            }],
-            None,
-            None,
-            format,
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-        ))
+        Self(
+            Program::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("assets/shaders/blender.wgsl"))
+                .bind_group_layouts(&[input_bind_group_layout])
+                .push_constant_ranges(&[wgpu::PushConstantRange {
+                    stages: wgpu::ShaderStages::FRAGMENT,
+                    range: 0..size_of::<BlenderPushConstants>() as u32,
+                }])
+                .format(format)
+                .blend(wgpu::BlendState::ALPHA_BLENDING)
+                .build(),
+        )
     }
 
     pub fn draw(
@@ -203,17 +199,14 @@ impl Aces {
         input_bind_group_layout: &wgpu::BindGroupLayout,
         format: wgpu::TextureFormat,
     ) -> Self {
-        Self(Program::new(
-            renderer,
-            read_wgsl("assets/shaders/aces.wgsl"),
-            &[],
-            &[input_bind_group_layout],
-            &[],
-            None,
-            None,
-            format,
-            None,
-        ))
+        Self(
+            Program::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("assets/shaders/aces.wgsl"))
+                .bind_group_layouts(&[input_bind_group_layout])
+                .format(format)
+                .build(),
+        )
     }
 }
 

@@ -107,23 +107,23 @@ impl BlockHighlight {
                 MemoryState::Immutable(&DELTAS.map(BlockHighlightVertex::new)),
             ),
             index_buffer: IndexBuffer::new(renderer, MemoryState::Immutable(&INDICES)),
-            program: Program::new(
-                renderer,
-                read_wgsl("assets/shaders/highlight.wgsl"),
-                &[BlockHighlightVertex::desc()],
-                &[player_bind_group_layout, sky_bind_group_layout],
-                &[BlockHighlightPushConstants::range()],
-                Some(wgpu::Face::Back),
-                Some(wgpu::DepthStencilState {
+            program: Program::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("assets/shaders/highlight.wgsl"))
+                .buffers(&[BlockHighlightVertex::desc()])
+                .bind_group_layouts(&[player_bind_group_layout, sky_bind_group_layout])
+                .push_constant_ranges(&[BlockHighlightPushConstants::range()])
+                .cull_mode(wgpu::Face::Back)
+                .depth_stencil(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
                     depth_write_enabled: false,
                     depth_compare: wgpu::CompareFunction::LessEqual,
                     stencil: Default::default(),
                     bias: Default::default(),
-                }),
-                PostProcessor::FORMAT,
-                Some(wgpu::BlendState::ALPHA_BLENDING),
-            ),
+                })
+                .format(PostProcessor::FORMAT)
+                .blend(wgpu::BlendState::ALPHA_BLENDING)
+                .build(),
         }
     }
 

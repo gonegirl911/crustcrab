@@ -10,17 +10,14 @@ impl Atmosphere {
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        Self(Program::new(
-            renderer,
-            read_wgsl("assets/shaders/atmosphere.wgsl"),
-            &[],
-            &[player_bind_group_layout, sky_bind_group_layout],
-            &[],
-            None,
-            None,
-            PostProcessor::FORMAT,
-            None,
-        ))
+        Self(
+            Program::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("assets/shaders/atmosphere.wgsl"))
+                .bind_group_layouts(&[player_bind_group_layout, sky_bind_group_layout])
+                .format(PostProcessor::FORMAT)
+                .build(),
+        )
     }
 
     #[rustfmt::skip]

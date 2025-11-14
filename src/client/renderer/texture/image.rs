@@ -2,6 +2,7 @@ use crate::client::renderer::{
     Renderer,
     effect::{Blit, Effect},
 };
+use bon::bon;
 use image::{ImageReader, RgbaImage};
 use std::{num::NonZero, path::Path};
 
@@ -10,13 +11,15 @@ pub struct ImageTexture {
     bind_group: wgpu::BindGroup,
 }
 
+#[bon]
 impl ImageTexture {
+    #[builder]
     pub fn new<P: AsRef<Path>>(
         renderer @ Renderer { device, .. }: &Renderer,
         path: P,
         mip_level_count: u32,
         is_srgb: bool,
-        address_mode: wgpu::AddressMode,
+        #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
         let view = Self::create_view(renderer, path, mip_level_count, is_srgb);
         let sampler = Self::create_sampler(renderer, address_mode, mip_level_count);
@@ -215,13 +218,15 @@ pub struct ImageTextureArray {
     bind_group: wgpu::BindGroup,
 }
 
+#[bon]
 impl ImageTextureArray {
+    #[builder]
     pub fn new<P: IntoIterator<Item: AsRef<Path>>>(
         renderer @ Renderer { device, .. }: &Renderer,
         paths: P,
         mip_level_count: u32,
         is_srgb: bool,
-        address_mode: wgpu::AddressMode,
+        #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
         let views = Self::create_views(renderer, paths, mip_level_count, is_srgb);
         let sampler = ImageTexture::create_sampler(renderer, address_mode, mip_level_count);

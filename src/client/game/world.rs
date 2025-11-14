@@ -51,27 +51,27 @@ impl World {
     ) -> Self {
         Self {
             meshes: Default::default(),
-            program: Program::new(
-                renderer,
-                read_wgsl("assets/shaders/block.wgsl"),
-                &[BlockVertex::desc()],
-                &[
+            program: Program::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("assets/shaders/block.wgsl"))
+                .buffers(&[BlockVertex::desc()])
+                .bind_group_layouts(&[
                     player_bind_group_layout,
                     sky_bind_group_layout,
                     textures_bind_group_layout,
-                ],
-                &[BlockPushConstants::range()],
-                Some(wgpu::Face::Back),
-                Some(wgpu::DepthStencilState {
+                ])
+                .push_constant_ranges(&[BlockPushConstants::range()])
+                .cull_mode(wgpu::Face::Back)
+                .depth_stencil(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
                     depth_write_enabled: true,
                     depth_compare: wgpu::CompareFunction::Less,
                     stencil: Default::default(),
                     bias: Default::default(),
-                }),
-                PostProcessor::FORMAT,
-                Some(wgpu::BlendState::ALPHA_BLENDING),
-            ),
+                })
+                .format(PostProcessor::FORMAT)
+                .blend(wgpu::BlendState::ALPHA_BLENDING)
+                .build(),
             unloaded: Default::default(),
             groups: Default::default(),
             group_workers: ThreadPool::new(|(input, group_id)| (Self::vertices(input), group_id)),

@@ -29,31 +29,26 @@ impl ObjectSet {
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let textures = ImageTextureArray::new(
-            renderer,
-            [
+        let textures = ImageTextureArray::builder()
+            .renderer(renderer)
+            .paths([
                 "assets/textures/sky/sun.png",
                 "assets/textures/sky/moon.png",
-            ],
-            1,
-            true,
-            Default::default(),
-        );
-        let program = Program::new(
-            renderer,
-            read_wgsl("assets/shaders/object.wgsl"),
-            &[],
-            &[
+            ])
+            .mip_level_count(1)
+            .is_srgb(true)
+            .build();
+        let program = Program::builder()
+            .renderer(renderer)
+            .shader_desc(read_wgsl("assets/shaders/object.wgsl"))
+            .bind_group_layouts(&[
                 player_bind_group_layout,
                 sky_bind_group_layout,
                 textures.bind_group_layout(),
-            ],
-            &[ObjectPushConstants::range()],
-            None,
-            None,
-            PostProcessor::FORMAT,
-            None,
-        );
+            ])
+            .push_constant_ranges(&[ObjectPushConstants::range()])
+            .format(PostProcessor::FORMAT)
+            .build();
         let (sun_pc, moon_pc) = Self::pc(Default::default());
         Self {
             textures,

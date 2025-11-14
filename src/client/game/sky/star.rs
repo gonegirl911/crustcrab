@@ -43,17 +43,15 @@ impl StarDome {
             (0..count).map(|_| generator.generate(&mut rng)).collect()
         };
         let instance_buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
-        let program = Program::new(
-            renderer,
-            read_wgsl("assets/shaders/star.wgsl"),
-            &[StarInstance::desc()],
-            &[player_bind_group_layout],
-            &[StarPushConstants::range()],
-            None,
-            None,
-            PostProcessor::FORMAT,
-            Some(wgpu::BlendState::ALPHA_BLENDING),
-        );
+        let program = Program::builder()
+            .renderer(renderer)
+            .shader_desc(read_wgsl("assets/shaders/star.wgsl"))
+            .buffers(&[StarInstance::desc()])
+            .bind_group_layouts(&[player_bind_group_layout])
+            .push_constant_ranges(&[StarPushConstants::range()])
+            .format(PostProcessor::FORMAT)
+            .blend(wgpu::BlendState::ALPHA_BLENDING)
+            .build();
         Self {
             stars,
             instance_buffer,
