@@ -1,11 +1,7 @@
 use super::{Renderer, buffer::VertexBuffer};
 use crate::client::renderer::buffer::MemoryState;
 use bytemuck::Pod;
-use std::{
-    cmp::{Ordering, Reverse},
-    fs,
-    path::Path,
-};
+use std::cmp::{Ordering, Reverse};
 
 pub struct TransparentMesh<C, V> {
     faces: Vec<(C, [V; 6])>,
@@ -65,19 +61,5 @@ impl PartialOrd for TotalOrd {
 impl Ord for TotalOrd {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.total_cmp(&other.0)
-    }
-}
-
-// ------------------------------------------------------------------------------------------------
-
-pub fn read_wgsl<P: AsRef<Path>>(path: P) -> wgpu::ShaderModuleDescriptor<'static> {
-    let path = path.as_ref();
-    wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(
-            fs::read_to_string(path)
-                .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
-                .into(),
-        ),
     }
 }

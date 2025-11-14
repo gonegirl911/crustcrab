@@ -1,8 +1,8 @@
 use super::{
     Renderer,
     program::{Program, PushConstants},
+    shader::read_wgsl,
     texture::screen::ScreenTextureArray,
-    utils::read_wgsl,
 };
 use crate::client::event_loop::{Event, EventHandler};
 use bytemuck::{Pod, Zeroable};

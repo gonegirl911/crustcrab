@@ -7,8 +7,8 @@ use crate::{
             buffer::{IndexBuffer, MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
             program::{Program, PushConstants},
+            shader::read_wgsl,
             texture::screen::DepthBuffer,
-            utils::read_wgsl,
         },
     },
     server::{

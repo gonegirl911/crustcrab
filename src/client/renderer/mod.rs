@@ -1,6 +1,7 @@
 pub mod buffer;
 pub mod effect;
 pub mod program;
+pub mod shader;
 pub mod texture;
 pub mod uniform;
 pub mod utils;

@@ -7,8 +7,9 @@ use crate::{
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
             program::{Program, PushConstants},
+            shader::read_wgsl,
             texture::screen::DepthBuffer,
-            utils::{TotalOrd, TransparentMesh, read_wgsl},
+            utils::{TotalOrd, TransparentMesh},
         },
     },
     server::{

@@ -8,8 +8,8 @@ use crate::{
             buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
             effect::{Blender, PostProcessor},
             program::{Program, PushConstants},
+            shader::read_wgsl,
             texture::{image::ImageTexture, screen::DepthBuffer},
-            utils::read_wgsl,
         },
     },
     server::{

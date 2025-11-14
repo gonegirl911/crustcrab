@@ -3,8 +3,8 @@ use crate::client::{
     CLIENT_CONFIG,
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer, buffer::MemoryState, effect::PostProcessor, program::Program,
-        texture::image::ImageTexture, uniform::Uniform, utils::read_wgsl,
+        Renderer, buffer::MemoryState, effect::PostProcessor, program::Program, shader::read_wgsl,
+        texture::image::ImageTexture, uniform::Uniform,
     },
 };
 use bytemuck::{Pod, Zeroable};

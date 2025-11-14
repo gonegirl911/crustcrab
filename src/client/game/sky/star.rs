@@ -7,7 +7,7 @@ use crate::{
             buffer::{Instance, InstanceBuffer, MemoryState},
             effect::PostProcessor,
             program::{Program, PushConstants},
-            utils::read_wgsl,
+            shader::read_wgsl,
         },
     },
     server::{
