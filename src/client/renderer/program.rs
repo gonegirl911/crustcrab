@@ -8,12 +8,12 @@ pub struct Program(wgpu::RenderPipeline);
 #[bon]
 impl Program {
     #[builder]
-    pub fn new(
-        #[expect(unused)] renderer @ Renderer { device, .. }: &Renderer,
-        shader_desc: wgpu::ShaderModuleDescriptor<'_>,
-        #[builder(default)] buffers: &[wgpu::VertexBufferLayout<'_>],
-        #[builder(default)] bind_group_layouts: &[&wgpu::BindGroupLayout],
-        #[builder(default)] push_constant_ranges: &[wgpu::PushConstantRange],
+    pub fn new<'a>(
+        #[expect(unused)] renderer @ Renderer { device, .. }: &'a Renderer,
+        shader_desc: wgpu::ShaderModuleDescriptor<'a>,
+        #[builder(default)] buffers: &'a [wgpu::VertexBufferLayout<'a>],
+        #[builder(default)] bind_group_layouts: &'a [&'a wgpu::BindGroupLayout],
+        #[builder(default)] push_constant_ranges: &'a [wgpu::PushConstantRange],
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
         format: wgpu::TextureFormat,
