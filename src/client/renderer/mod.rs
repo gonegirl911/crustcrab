@@ -24,7 +24,7 @@ pub struct Renderer {
 
 impl Renderer {
     pub async fn new(window: Window) -> Self {
-        let PhysicalSize { width, height } = window.inner_size();
+        let PhysicalSize { width, height } = window.surface_size();
         let instance = wgpu::Instance::default();
         let surface = instance
             .create_surface(window)
@@ -92,12 +92,12 @@ impl EventHandler for Renderer {
 
         if let Event::WindowEvent(event) = event {
             match event {
-                WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
+                WindowEvent::SurfaceResized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                     self.should_resize_surface = true;
                 }
                 WindowEvent::RedrawRequested => {
                     self.is_surface_resized = mem::take(&mut self.should_resize_surface)
-                        && self.resize_surface(window.inner_size());
+                        && self.resize_surface(window.surface_size());
                 }
                 _ => {}
             }

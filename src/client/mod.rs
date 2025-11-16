@@ -6,11 +6,11 @@ pub(crate) mod stopwatch;
 pub(crate) mod window;
 
 use crate::{
-    server::{ServerSender, game::world::block::Block},
+    server::{ServerEvent, ServerSender, game::world::block::Block},
     shared::toml,
 };
 use app::App;
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Receiver, Sender};
 use event_loop::{EventLoop, EventLoopProxy};
 use game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig};
 use nalgebra::{Point3, Vector3};
@@ -20,34 +20,32 @@ use winit::event_loop::ControlFlow;
 
 pub struct Client {
     event_loop: EventLoop,
-    client_tx: Sender<ClientEvent>,
 }
 
 impl Client {
-    pub fn new(client_tx: Sender<ClientEvent>) -> Self {
+    pub fn create_proxy(&self) -> (EventLoopProxy, Receiver<ServerEvent>) {
+        let (server_tx, server_rx) = crossbeam_channel::unbounded();
+        (
+            EventLoopProxy::new(self.event_loop.create_proxy(), server_tx),
+            server_rx,
+        )
+    }
+
+    pub fn run(self, client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) {
+        let app = App::new(client_tx, server_rx);
+        self.event_loop
+            .run_app(app)
+            .expect("event loop should be runnable");
+    }
+}
+
+impl Default for Client {
+    fn default() -> Self {
         env_logger::init();
 
-        let event_loop = EventLoop::with_user_event()
-            .build()
-            .expect("event loop should be buildable");
-
+        let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
-
-        Self {
-            event_loop,
-            client_tx,
-        }
-    }
-
-    pub fn create_proxy(&self) -> EventLoopProxy {
-        self.event_loop.create_proxy()
-    }
-
-    pub fn run(self) {
-        let mut app = App::new(self.client_tx);
-        self.event_loop
-            .run_app(&mut app)
-            .expect("event loop should be runnable");
+        Self { event_loop }
     }
 }
 

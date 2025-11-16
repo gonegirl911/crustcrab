@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 use winit::{
-    event::{DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
+    event::{ButtonSource, DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
 
@@ -179,7 +179,7 @@ impl EventHandler for Controller {
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
-            &Event::DeviceEvent(DeviceEvent::MouseMotion { delta: (dx, dy) }) => {
+            &Event::DeviceEvent(DeviceEvent::PointerMotion { delta: (dx, dy) }) => {
                 self.dx += dx as f32;
                 self.dy += dy as f32;
             }
@@ -218,8 +218,8 @@ impl EventHandler for Controller {
                         }
                     }
                 }
-                WindowEvent::MouseInput {
-                    button,
+                WindowEvent::PointerButton {
+                    button: ButtonSource::Mouse(button),
                     state: ElementState::Pressed,
                     ..
                 } => match button {

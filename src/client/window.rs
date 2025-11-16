@@ -1,29 +1,27 @@
 use super::event_loop::{Event, EventHandler};
 use std::{ops::Deref, sync::Arc};
 use winit::{
-    error::ExternalError,
-    event::{ElementState, KeyEvent, MouseButton, WindowEvent},
+    error::RequestError,
+    event::{ButtonSource, ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
-    window::CursorGrabMode,
+    window::{CursorGrabMode, WindowAttributes as RawWindowAttributes},
 };
-
-pub use winit::window::Window as RawWindow;
 
 #[derive(Clone)]
 pub struct Window(Arc<RawWindow>);
 
 impl Window {
-    pub fn new(event_loop: &ActiveEventLoop) -> Self {
+    pub fn new(event_loop: &dyn ActiveEventLoop) -> Self {
         Self(
             event_loop
-                .create_window(RawWindow::default_attributes().with_title("Crustcrab"))
+                .create_window(RawWindowAttributes::default().with_title("Crustcrab"))
                 .expect("window should be creatable")
                 .into(),
         )
     }
 
-    fn set_cursor_grab<M>(&self, modes: M) -> Result<(), Vec<ExternalError>>
+    fn set_cursor_grab<M>(&self, modes: M) -> Result<(), Vec<RequestError>>
     where
         M: IntoIterator<Item = CursorGrabMode>,
     {
@@ -41,8 +39,8 @@ impl EventHandler for Window {
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
             Event::WindowEvent(event) => match event {
-                WindowEvent::MouseInput {
-                    button: MouseButton::Left,
+                WindowEvent::PointerButton {
+                    button: ButtonSource::Mouse(MouseButton::Left),
                     state: ElementState::Pressed,
                     ..
                 } => {
@@ -75,7 +73,7 @@ impl Deref for Window {
     type Target = RawWindow;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &*self.0
     }
 }
 
@@ -84,3 +82,5 @@ impl From<Window> for wgpu::SurfaceTarget<'static> {
         window.0.into()
     }
 }
+
+pub type RawWindow = dyn winit::window::Window;

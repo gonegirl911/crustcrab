@@ -7,7 +7,7 @@ use super::{
     window::Window,
 };
 use crate::server::ServerEvent;
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Receiver, Sender};
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -17,20 +17,22 @@ use winit::{
 
 pub struct App {
     client_tx: Sender<ClientEvent>,
+    server_rx: Receiver<ServerEvent>,
     instance: Option<Instance>,
 }
 
 impl App {
-    pub fn new(client_tx: Sender<ClientEvent>) -> Self {
+    pub fn new(client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) -> Self {
         Self {
             client_tx,
+            server_rx,
             instance: None,
         }
     }
 }
 
-impl ApplicationHandler<ServerEvent> for App {
-    fn new_events(&mut self, _: &ActiveEventLoop, cause: StartCause) {
+impl ApplicationHandler for App {
+    fn new_events(&mut self, _: &dyn ActiveEventLoop, cause: StartCause) {
         if cause == StartCause::Init {
             assert!(self.instance.is_none());
         } else {
@@ -38,21 +40,23 @@ impl ApplicationHandler<ServerEvent> for App {
         }
     }
 
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         assert!(self.instance.is_none());
         self.instance
             .insert(pollster::block_on(Instance::new(event_loop)))
             .handle(&Event::Resumed, &self.client_tx);
     }
 
-    fn user_event(&mut self, _: &ActiveEventLoop, event: ServerEvent) {
-        self.instance
-            .as_mut()
-            .unwrap_or_else(|| unreachable!())
-            .handle(&Event::ServerEvent(event), &self.client_tx);
+    fn proxy_wake_up(&mut self, _: &dyn ActiveEventLoop) {
+        for event in self.server_rx.try_iter() {
+            self.instance
+                .as_mut()
+                .unwrap_or_else(|| unreachable!())
+                .handle(&Event::ServerEvent(event), &self.client_tx);
+        }
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
         let should_exit = event == WindowEvent::CloseRequested;
 
         self.instance
@@ -65,29 +69,25 @@ impl ApplicationHandler<ServerEvent> for App {
         }
     }
 
-    fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
+    fn device_event(&mut self, _: &dyn ActiveEventLoop, _: Option<DeviceId>, event: DeviceEvent) {
         self.instance
             .as_mut()
             .unwrap_or_else(|| unreachable!())
             .handle(&Event::DeviceEvent(event), &self.client_tx);
     }
 
-    fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
         self.instance
             .as_mut()
             .unwrap_or_else(|| unreachable!())
             .handle(&Event::AboutToWait, &self.client_tx);
     }
 
-    fn suspended(&mut self, _: &ActiveEventLoop) {
+    fn destroy_surfaces(&mut self, _: &dyn ActiveEventLoop) {
         unreachable!();
     }
 
-    fn exiting(&mut self, _: &ActiveEventLoop) {
-        assert!(self.instance.is_some());
-    }
-
-    fn memory_warning(&mut self, _: &ActiveEventLoop) {
+    fn memory_warning(&mut self, _: &dyn ActiveEventLoop) {
         unreachable!();
     }
 }
@@ -100,7 +100,7 @@ struct Instance {
 }
 
 impl Instance {
-    async fn new(event_loop: &ActiveEventLoop) -> Self {
+    async fn new(event_loop: &dyn ActiveEventLoop) -> Self {
         let stopwatch = Stopwatch::start();
         let window = Window::new(event_loop);
         let renderer = Renderer::new(window.clone()).await;
@@ -120,10 +120,10 @@ impl EventHandler for Instance {
     fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
-        self.renderer.handle(event, &self.window);
+        self.renderer.handle(event, &*self.window);
         self.game.handle(
             event,
-            (client_tx, &self.window, &self.renderer, self.stopwatch.dt),
+            (client_tx, &*self.window, &self.renderer, self.stopwatch.dt),
         );
     }
 }
