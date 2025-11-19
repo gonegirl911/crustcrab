@@ -103,7 +103,7 @@ impl Instance {
     async fn new(event_loop: &dyn ActiveEventLoop) -> Self {
         let stopwatch = Stopwatch::start();
         let window = Window::new(event_loop);
-        let renderer = Renderer::new(window.clone()).await;
+        let renderer = Renderer::new(window.to_owned_raw()).await;
         let game = Game::new(&renderer);
         Self {
             stopwatch,
@@ -120,10 +120,15 @@ impl EventHandler for Instance {
     fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
-        self.renderer.handle(event, &*self.window);
+        self.renderer.handle(event, self.window.as_raw());
         self.game.handle(
             event,
-            (client_tx, &*self.window, &self.renderer, self.stopwatch.dt),
+            (
+                client_tx,
+                self.window.as_raw(),
+                &self.renderer,
+                self.stopwatch.dt,
+            ),
         );
     }
 }

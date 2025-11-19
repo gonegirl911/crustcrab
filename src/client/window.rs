@@ -1,5 +1,5 @@
 use super::event_loop::{Event, EventHandler};
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 use winit::{
     error::RequestError,
     event::{ButtonSource, ElementState, KeyEvent, MouseButton, WindowEvent},
@@ -19,6 +19,14 @@ impl Window {
                 .expect("window should be creatable")
                 .into(),
         )
+    }
+
+    pub fn as_raw(&self) -> &RawWindow {
+        &*self.0
+    }
+
+    pub fn to_owned_raw(&self) -> Arc<RawWindow> {
+        self.0.clone()
     }
 
     fn set_cursor_grab<M>(&self, modes: M) -> Result<(), Vec<RequestError>>
@@ -66,20 +74,6 @@ impl EventHandler for Window {
             Event::AboutToWait => self.0.request_redraw(),
             _ => {}
         }
-    }
-}
-
-impl Deref for Window {
-    type Target = RawWindow;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.0
-    }
-}
-
-impl From<Window> for wgpu::SurfaceTarget<'static> {
-    fn from(window: Window) -> Self {
-        window.0.into()
     }
 }
 

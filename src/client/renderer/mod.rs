@@ -8,9 +8,9 @@ pub mod utils;
 
 use super::{
     event_loop::{Event, EventHandler},
-    window::{RawWindow, Window},
+    window::RawWindow,
 };
-use std::mem;
+use std::{mem, sync::Arc};
 use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Renderer {
@@ -23,7 +23,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: Window) -> Self {
+    pub async fn new(window: Arc<RawWindow>) -> Self {
         let PhysicalSize { width, height } = window.surface_size();
         let instance = wgpu::Instance::default();
         let surface = instance
