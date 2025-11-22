@@ -36,7 +36,7 @@ impl Window {
         modes
             .into_iter()
             .map(|mode| self.0.set_cursor_grab(mode).err())
-            .collect::<Option<Vec<_>>>()
+            .collect::<Option<_>>()
             .map_or(Ok(()), Err)
     }
 }
