@@ -128,11 +128,14 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send(points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
-            coords,
-            data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-            group_id: Some(group_id),
-        }))
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkLoaded {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: Some(group_id),
+            })
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
@@ -140,16 +143,15 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send(
-            points
-                .into_par_iter()
-                .map(|coords| ServerEvent::ChunkLoaded {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
-                })
-                .into_seq_iter(),
-        )
+        points
+            .into_par_iter()
+            .map(|coords| ServerEvent::ChunkLoaded {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: None,
+            })
+            .into_seq_iter()
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
@@ -158,11 +160,14 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send(points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
-            coords,
-            data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-            group_id: Some(group_id),
-        }))
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkUpdated {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: Some(group_id),
+            })
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
@@ -170,16 +175,15 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send(
-            points
-                .into_par_iter()
-                .map(|coords| ServerEvent::ChunkUpdated {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
-                })
-                .into_seq_iter(),
-        )
+        points
+            .into_par_iter()
+            .map(|coords| ServerEvent::ChunkUpdated {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: None,
+            })
+            .into_seq_iter()
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -199,11 +203,10 @@ impl World {
         group_id: Option<GroupId>,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send(
-            points
-                .into_iter()
-                .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id }),
-        )
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id })
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point3<i32>>
@@ -279,7 +282,7 @@ impl EventHandler<WorldEvent> for World {
                 );
 
                 if mem::replace(&mut self.hover, hover) != hover {
-                    _ = server_tx.send([ServerEvent::BlockHovered(hover.map(
+                    _ = server_tx.send(ServerEvent::BlockHovered(hover.map(
                         |BlockIntersection { coords, .. }| {
                             BlockHoverData::new(
                                 coords,
@@ -287,7 +290,7 @@ impl EventHandler<WorldEvent> for World {
                                 &self.light.block_area_light(coords),
                             )
                         },
-                    ))]);
+                    )));
                 }
             }
             WorldEvent::BlockPlaced { block, area, ray } => {

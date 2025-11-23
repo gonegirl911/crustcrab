@@ -98,27 +98,20 @@ impl ServerSender {
         Self::Sender { priority_tx, tx }
     }
 
-    pub fn send<E>(&self, events: E) -> Result<(), SendError<ServerEvent>>
-    where
-        E: IntoIterator<Item = ServerEvent>,
-    {
+    pub fn send(&self, event: ServerEvent) -> Result<(), SendError<ServerEvent>> {
         match self {
             Self::Proxy { tx, proxy } => {
-                for event in events {
-                    tx.send(event)?;
-                }
+                tx.send(event)?;
                 proxy.wake_up();
             }
             Self::Sender { priority_tx, tx } => {
-                for event in events {
-                    if matches!(event, ServerEvent::ClientDisconnected) {
-                        priority_tx.send(ServerEvent::ClientDisconnected)?;
-                        tx.send(ServerEvent::ClientDisconnected)?;
-                    } else if event.has_priority() {
-                        priority_tx.send(event)?;
-                    } else {
-                        tx.send(event)?;
-                    }
+                if matches!(event, ServerEvent::ClientDisconnected) {
+                    priority_tx.send(ServerEvent::ClientDisconnected)?;
+                    tx.send(ServerEvent::ClientDisconnected)?;
+                } else if event.has_priority() {
+                    priority_tx.send(event)?;
+                } else {
+                    tx.send(event)?;
                 }
             }
         }

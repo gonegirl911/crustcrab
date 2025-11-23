@@ -68,7 +68,7 @@ fn main() {
                         continue;
                     }
                 };
-                if server_tx.send([event]).is_err() {
+                if server_tx.send(event).is_err() {
                     break;
                 }
             }
@@ -116,7 +116,7 @@ fn main() {
                         continue;
                     }
                 };
-                if server_tx.send([event]).is_err() {
+                if server_tx.send(event).is_err() {
                     break;
                 }
             }
