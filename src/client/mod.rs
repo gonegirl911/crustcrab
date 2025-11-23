@@ -20,32 +20,34 @@ use winit::event_loop::ControlFlow;
 
 pub struct Client {
     event_loop: EventLoop,
+    client_tx: Sender<ClientEvent>,
+    server_rx: Option<Receiver<ServerEvent>>,
 }
 
 impl Client {
-    pub fn create_proxy(&self) -> (EventLoopProxy, Receiver<ServerEvent>) {
-        let (server_tx, server_rx) = crossbeam_channel::unbounded();
-        (
-            EventLoopProxy::new(self.event_loop.create_proxy(), server_tx),
-            server_rx,
-        )
-    }
-
-    pub fn run(self, client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) {
-        let app = App::new(client_tx, server_rx);
-        self.event_loop
-            .run_app(app)
-            .expect("event loop should be runnable");
-    }
-}
-
-impl Default for Client {
-    fn default() -> Self {
+    pub fn new(client_tx: Sender<ClientEvent>) -> Self {
         env_logger::init();
 
         let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
-        Self { event_loop }
+        Self {
+            event_loop,
+            client_tx,
+            server_rx: None,
+        }
+    }
+
+    pub fn create_proxy(&mut self) -> EventLoopProxy {
+        let (server_tx, server_rx) = crossbeam_channel::unbounded();
+        self.server_rx = Some(server_rx);
+        EventLoopProxy::new(self.event_loop.create_proxy(), server_tx)
+    }
+
+    pub fn run(self) {
+        let app = App::new(self.client_tx, self.server_rx);
+        self.event_loop
+            .run_app(app)
+            .expect("event loop should be runnable");
     }
 }
 

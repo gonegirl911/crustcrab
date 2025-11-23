@@ -19,8 +19,8 @@ struct Args {
 
 fn main() {
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
-    let client = Client::default();
-    let (proxy, server_rx) = client.create_proxy();
+    let mut client = Client::new(client_tx.clone());
+    let proxy = client.create_proxy();
 
     let Args {
         priority_addr,
@@ -124,7 +124,7 @@ fn main() {
             eprintln!("[{addr}] reading CLOSED");
         });
 
-        client.run(client_tx.clone(), server_rx);
+        client.run();
 
         if let Err(e) = priority_stream.shutdown(Shutdown::Both)
             && e.kind() != io::ErrorKind::NotConnected

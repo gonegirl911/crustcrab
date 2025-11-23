@@ -17,12 +17,12 @@ use winit::{
 
 pub struct App {
     client_tx: Sender<ClientEvent>,
-    server_rx: Receiver<ServerEvent>,
+    server_rx: Option<Receiver<ServerEvent>>,
     instance: Option<Instance>,
 }
 
 impl App {
-    pub fn new(client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) -> Self {
+    pub fn new(client_tx: Sender<ClientEvent>, server_rx: Option<Receiver<ServerEvent>>) -> Self {
         Self {
             client_tx,
             server_rx,
@@ -48,7 +48,11 @@ impl ApplicationHandler for App {
     }
 
     fn proxy_wake_up(&mut self, _: &dyn ActiveEventLoop) {
-        for event in self.server_rx.try_iter() {
+        let Some(server_rx) = &self.server_rx else {
+            return;
+        };
+
+        for event in server_rx.try_iter() {
             self.instance
                 .as_mut()
                 .unwrap_or_else(|| unreachable!())
