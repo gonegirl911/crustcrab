@@ -279,14 +279,15 @@ impl EventHandler<WorldEvent> for World {
                 );
 
                 if mem::replace(&mut self.hover, hover) != hover {
-                    let data = hover.map(|BlockIntersection { coords, .. }| {
-                        BlockHoverData::new(
-                            coords,
-                            &self.chunks.block_area(coords),
-                            &self.light.block_area_light(coords),
-                        )
-                    });
-                    _ = server_tx.send([ServerEvent::BlockHovered(data)]);
+                    _ = server_tx.send([ServerEvent::BlockHovered(hover.map(
+                        |BlockIntersection { coords, .. }| {
+                            BlockHoverData::new(
+                                coords,
+                                &self.chunks.block_area(coords),
+                                &self.light.block_area_light(coords),
+                            )
+                        },
+                    ))]);
                 }
             }
             WorldEvent::BlockPlaced { block, area, ray } => {
