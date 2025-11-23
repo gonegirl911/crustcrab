@@ -147,9 +147,7 @@ fn main() {
                                 io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof,
                             ) =>
                         {
-                            server_tx
-                                .send(ServerEvent::ClientDisconnected)
-                                .unwrap_or_else(|_| unreachable!());
+                            _ = server_tx.send([ServerEvent::ClientDisconnected]);
                             break;
                         }
                         Err(e) => {

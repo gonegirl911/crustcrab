@@ -11,36 +11,39 @@ use crate::{
 };
 use app::App;
 use crossbeam_channel::{Receiver, Sender};
-use event_loop::{EventLoop, EventLoopProxy};
 use game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig};
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
-use winit::event_loop::ControlFlow;
+use winit::event_loop::{ControlFlow, EventLoop};
 
 pub struct Client {
     event_loop: EventLoop,
     client_tx: Sender<ClientEvent>,
-    server_rx: Option<Receiver<ServerEvent>>,
+    server_rx: Receiver<ServerEvent>,
 }
 
 impl Client {
-    pub fn new(client_tx: Sender<ClientEvent>) -> Self {
+    pub fn new(client_tx: Sender<ClientEvent>) -> (Self, ServerSender) {
         env_logger::init();
 
         let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
-        Self {
-            event_loop,
-            client_tx,
-            server_rx: None,
-        }
-    }
 
-    pub fn create_proxy(&mut self) -> EventLoopProxy {
         let (server_tx, server_rx) = crossbeam_channel::unbounded();
-        self.server_rx = Some(server_rx);
-        EventLoopProxy::new(self.event_loop.create_proxy(), server_tx)
+        let proxy = event_loop.create_proxy();
+
+        (
+            Self {
+                event_loop,
+                client_tx,
+                server_rx,
+            },
+            ServerSender::Proxy {
+                tx: server_tx,
+                proxy,
+            },
+        )
     }
 
     pub fn run(self) {

@@ -16,7 +16,7 @@ pub struct Clock {
 
 impl Clock {
     fn send(&self, server_tx: &ServerSender) {
-        _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
+        _ = server_tx.send([ServerEvent::TimeUpdated(self.time())]);
     }
 
     fn time(&self) -> Time {

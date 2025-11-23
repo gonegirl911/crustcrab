@@ -19,8 +19,7 @@ struct Args {
 
 fn main() {
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
-    let mut client = Client::new(client_tx.clone());
-    let proxy = client.create_proxy();
+    let (client, server_tx) = Client::new(client_tx.clone());
 
     let Args {
         priority_addr,
@@ -69,7 +68,7 @@ fn main() {
                         continue;
                     }
                 };
-                if proxy.send_event(event).is_err() {
+                if server_tx.send([event]).is_err() {
                     break;
                 }
             }
@@ -117,7 +116,7 @@ fn main() {
                         continue;
                     }
                 };
-                if proxy.send_event(event).is_err() {
+                if server_tx.send([event]).is_err() {
                     break;
                 }
             }

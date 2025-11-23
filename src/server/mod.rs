@@ -2,11 +2,8 @@ pub(crate) mod event_loop;
 pub(crate) mod game;
 pub(crate) mod ticker;
 
-use crate::{
-    client::{ClientEvent, event_loop::EventLoopProxy},
-    shared::toml,
-};
-use crossbeam_channel::{Receiver, Sender};
+use crate::{client::ClientEvent, shared::toml};
+use crossbeam_channel::{Receiver, SendError, Sender};
 use event_loop::{EventLoop, EventLoopConfig};
 use game::{
     Game,
@@ -18,6 +15,7 @@ use nalgebra::Point3;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
+use winit::event_loop::EventLoopProxy;
 
 pub struct Server {
     event_loop: EventLoop,
@@ -83,7 +81,10 @@ impl GroupId {
 
 #[derive(Clone)]
 pub enum ServerSender {
-    Proxy(EventLoopProxy),
+    Proxy {
+        tx: Sender<ServerEvent>,
+        proxy: EventLoopProxy,
+    },
     Sender {
         priority_tx: Sender<ServerEvent>,
         tx: Sender<ServerEvent>,
@@ -97,21 +98,31 @@ impl ServerSender {
         Self::Sender { priority_tx, tx }
     }
 
-    pub fn send(&self, event: ServerEvent) -> Result<(), ServerEvent> {
+    pub fn send<E>(&self, events: E) -> Result<(), SendError<ServerEvent>>
+    where
+        E: IntoIterator<Item = ServerEvent>,
+    {
         match self {
-            Self::Proxy(proxy) => proxy.send_event(event).map_err(|e| e.0),
+            Self::Proxy { tx, proxy } => {
+                for event in events {
+                    tx.send(event)?;
+                }
+                proxy.wake_up();
+            }
             Self::Sender { priority_tx, tx } => {
-                if matches!(event, ServerEvent::ClientDisconnected) {
-                    _ = priority_tx.send(ServerEvent::ClientDisconnected);
-                    _ = tx.send(ServerEvent::ClientDisconnected);
-                    Ok(())
-                } else if event.has_priority() {
-                    priority_tx.send(event).map_err(|e| e.0)
-                } else {
-                    tx.send(event).map_err(|e| e.0)
+                for event in events {
+                    if matches!(event, ServerEvent::ClientDisconnected) {
+                        priority_tx.send(ServerEvent::ClientDisconnected)?;
+                        tx.send(ServerEvent::ClientDisconnected)?;
+                    } else if event.has_priority() {
+                        priority_tx.send(event)?;
+                    } else {
+                        tx.send(event)?;
+                    }
                 }
             }
         }
+        Ok(())
     }
 }
 
