@@ -9,17 +9,17 @@ pub struct Ray {
 
 impl Ray {
     pub fn cast(self, reach: f32) -> impl Iterator<Item = BlockIntersection> {
-        let calcs = self.origin.coords.zip_map(&self.dir, |o, d| {
+        let precalcs = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap_or_else(|| unreachable!()) {
                 Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
                 Ordering::Equal => (0, 1.0, f32::INFINITY),
                 Ordering::Greater => (1, if o % 1.0 == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
             }
         });
-        let step = calcs.map(|c| c.0);
-        let t_delta = calcs.map(|c| c.2);
+        let step = precalcs.map(|c| c.0);
+        let t_delta = precalcs.map(|c| c.2);
         let mut coords = self.origin.map(|c| c.floor() as i64);
-        let mut t_max = calcs.map(|c| c.1 * c.2);
+        let mut t_max = precalcs.map(|c| c.1 * c.2);
         iter::successors(
             Some(BlockIntersection {
                 coords,
