@@ -7,7 +7,6 @@ use crate::{
 use nalgebra::{Point2, Point3, point};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Deserialize;
-use std::ops::Range;
 
 #[derive(Default)]
 pub struct Player {
@@ -121,5 +120,5 @@ impl WorldArea {
 
 #[derive(Deserialize)]
 pub struct PlayerConfig {
-    pub reach: Range<f32>,
+    pub reach: f32,
 }

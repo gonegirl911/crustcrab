@@ -45,11 +45,12 @@ impl Aabb {
 
 impl Intersectable for Aabb {
     fn intersect(&self, ray: Ray) -> Option<f32> {
-        let (t_min, t_max) = (0..3).fold((f32::MIN, f32::MAX), |(t_min, t_max), i| {
-            let t1 = (self.min[i] - ray.origin[i]) / ray.dir[i];
-            let t2 = (self.max[i] - ray.origin[i]) / ray.dir[i];
-            (t_min.max(t1.min(t2)), t_max.min(t1.max(t2)))
-        });
+        let (t_min, t_max) =
+            (0..3).fold((f32::NEG_INFINITY, f32::INFINITY), |(t_min, t_max), i| {
+                let t1 = (self.min[i] - ray.origin[i]) / ray.dir[i];
+                let t2 = (self.max[i] - ray.origin[i]) / ray.dir[i];
+                (t_min.max(t1.min(t2)), t_max.min(t1.max(t2)))
+            });
         (t_min <= t_max).then_some(t_min)
     }
 }

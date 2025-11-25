@@ -271,7 +271,7 @@ impl EventHandler<WorldEvent> for World {
                 _ = self.par_send_updates(updates, server_tx);
             }
             WorldEvent::BlockHoverRequested { ray } => {
-                let hover = ray.cast(SERVER_CONFIG.player.reach.clone()).find(
+                let hover = ray.cast(SERVER_CONFIG.player.reach).find(
                     |&BlockIntersection { coords, .. }| {
                         self.chunks
                             .block(coords)

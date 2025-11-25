@@ -2,7 +2,7 @@
 ticks_per_second = 20
 
 [player]
-reach = { start = 0.0, end = 4.5 }
+reach = 4.5
 
 [clock]
 ticks_per_day = 24000
