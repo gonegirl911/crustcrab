@@ -23,18 +23,16 @@ impl EventLoop {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
         handler.handle(&Event::Init, &self.server_tx);
         loop {
-            handler.handle(
-                &match ticker.recv_timeout(&self.client_rx) {
-                    Ok(ClientEvent::Connected(server_tx)) => {
-                        self.server_tx = *server_tx;
-                        continue;
-                    }
-                    Ok(event) => Event::Client(event),
-                    Err(RecvTimeoutError::Timeout) => Event::Tick,
-                    Err(RecvTimeoutError::Disconnected) => break,
-                },
-                &self.server_tx,
-            );
+            let event = match ticker.recv_timeout(&self.client_rx) {
+                Ok(ClientEvent::Connected(server_tx)) => {
+                    self.server_tx = *server_tx;
+                    continue;
+                }
+                Ok(event) => Event::Client(event),
+                Err(RecvTimeoutError::Timeout) => Event::Tick,
+                Err(RecvTimeoutError::Disconnected) => break,
+            };
+            handler.handle(&event, &self.server_tx);
         }
     }
 }
