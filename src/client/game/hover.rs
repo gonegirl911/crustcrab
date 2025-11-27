@@ -169,13 +169,9 @@ struct BlockHighlightPushConstants {
 impl BlockHighlightPushConstants {
     fn new(hitbox: Aabb, brightness: BlockLight) -> Self {
         Self {
-            m: Self::m(hitbox),
+            m: hitbox.pad(CLIENT_CONFIG.cloud.padding).to_homogeneous(),
             brightness: brightness.0,
         }
-    }
-
-    fn m(hitbox: Aabb) -> Matrix4<f32> {
-        hitbox.pad(CLIENT_CONFIG.cloud.padding).to_homogeneous()
     }
 }
 

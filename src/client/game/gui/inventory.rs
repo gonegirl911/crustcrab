@@ -125,20 +125,18 @@ impl EventHandler for Inventory {
 
                         self.vertex_buffer = self.selected_block().and_then(|block| {
                             let data = block.data();
-                            VertexBuffer::try_new(
-                                renderer,
-                                MemoryState::Immutable(&if let Some(vertices) = data.flat_icon() {
-                                    is_flat = true;
-                                    vertices.collect::<Vec<_>>()
-                                } else {
-                                    data.mesh(
-                                        Default::default(),
-                                        &BlockArea::default().with_kernel(block),
-                                        &Default::default(),
-                                    )
-                                    .collect()
-                                }),
-                            )
+                            let vertices = if let Some(vertices) = data.flat_icon() {
+                                is_flat = true;
+                                vertices.collect::<Vec<_>>()
+                            } else {
+                                data.mesh(
+                                    Default::default(),
+                                    &BlockArea::default().with_kernel(block),
+                                    &Default::default(),
+                                )
+                                .collect()
+                            };
+                            VertexBuffer::try_new(renderer, MemoryState::Immutable(&vertices))
                         });
 
                         if mem::replace(&mut self.is_flat, is_flat) != is_flat {
