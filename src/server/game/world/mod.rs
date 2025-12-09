@@ -440,7 +440,7 @@ impl Branch {
             hits.into_iter()
                 .inspect(|&(coords, action)| actions.insert(coords, action))
                 .flat_map(|(coords, action)| {
-                    iter::once(coords).chain(light.apply(chunks, coords, action))
+                    iter::chain([coords], light.apply(chunks, coords, action))
                 })
                 .collect(),
             inserts,

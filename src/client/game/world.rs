@@ -26,7 +26,7 @@ use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cmp::Reverse, collections::hash_map::Entry, sync::Arc, time::Instant};
+use std::{cmp::Reverse, collections::hash_map::Entry, iter, sync::Arc, time::Instant};
 use uuid::Uuid;
 use winit::event::WindowEvent;
 
@@ -171,7 +171,7 @@ impl World {
             Entry::Occupied(mut entry) => {
                 let group = entry.get_mut();
                 if group.len() == group_size - 1 {
-                    for output in entry.remove().into_iter().chain([output]) {
+                    for output in iter::chain(entry.remove(), [output]) {
                         self.apply_output(renderer, output);
                     }
                 } else {
