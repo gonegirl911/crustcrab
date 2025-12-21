@@ -34,13 +34,13 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     return VertexOutput(player.vp * m * vec4(x - 0.5, y - 0.5, 0.0, 1.0));
 }
 
-struct PushConstants {
+struct Immediates {
     opacity: f32,
 }
 
-var<push_constant> pc: PushConstants;
+var<immediate> imm: Immediates;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4(vec3(1.0), pc.opacity);
+    return vec4(vec3(1.0), imm.opacity);
 }

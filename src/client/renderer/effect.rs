@@ -1,6 +1,6 @@
 use super::{
     Renderer,
-    program::{Program, PushConstants},
+    program::{Immediates, Program},
     shader::read_wgsl,
     texture::screen::ScreenTextureArray,
 };
@@ -135,10 +135,7 @@ impl Blender {
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/blender.wgsl"))
                 .bind_group_layouts(&[input_bind_group_layout])
-                .push_constant_ranges(&[wgpu::PushConstantRange {
-                    stages: wgpu::ShaderStages::FRAGMENT,
-                    range: 0..size_of::<BlenderPushConstants>() as u32,
-                }])
+                .immediate_size(BlenderImmediates::SIZE)
                 .format(format)
                 .blend(wgpu::BlendState::ALPHA_BLENDING)
                 .build(),
@@ -170,26 +167,24 @@ impl Blender {
             ..Default::default()
         });
         self.0.bind(&mut render_pass, [input_bind_group]);
-        BlenderPushConstants::new(opacity).set(&mut render_pass);
+        BlenderImmediates::new(opacity).set(&mut render_pass);
         render_pass.draw(0..3, 0..1);
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlenderPushConstants {
+struct BlenderImmediates {
     opacity: f32,
 }
 
-impl BlenderPushConstants {
+impl BlenderImmediates {
     fn new(opacity: f32) -> Self {
         Self { opacity }
     }
 }
 
-impl PushConstants for BlenderPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::FRAGMENT;
-}
+impl Immediates for BlenderImmediates {}
 
 pub struct Aces(Program);
 

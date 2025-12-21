@@ -39,12 +39,12 @@ impl Renderer {
             .expect("adapter should be available");
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                required_features: wgpu::Features::PUSH_CONSTANTS
-                    | wgpu::Features::TEXTURE_BINDING_ARRAY
-                    | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING,
+                required_features: wgpu::Features::IMMEDIATES
+                    | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
+                    | wgpu::Features::TEXTURE_BINDING_ARRAY,
                 required_limits: wgpu::Limits {
                     max_binding_array_elements_per_shader_stage: 6,
-                    max_push_constant_size: 68,
+                    max_immediate_size: 68,
                     ..Default::default()
                 },
                 ..Default::default()

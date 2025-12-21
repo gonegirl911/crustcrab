@@ -44,8 +44,8 @@ impl Inventory {
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/inventory.wgsl"))
-            .buffers(&[BlockVertex::desc()])
             .bind_group_layouts(&[uniform.bind_group_layout(), textures_bind_group_layout])
+            .buffers(&[BlockVertex::desc()])
             .cull_mode(wgpu::Face::Back)
             .depth_stencil(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,

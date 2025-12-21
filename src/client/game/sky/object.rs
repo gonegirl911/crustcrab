@@ -5,7 +5,7 @@ use crate::{
         renderer::{
             Renderer,
             effect::PostProcessor,
-            program::{Program, PushConstants},
+            program::{Immediates, Program},
             shader::read_wgsl,
             texture::image::ImageTextureArray,
         },
@@ -19,8 +19,8 @@ use serde::Deserialize;
 pub struct ObjectSet {
     textures: ImageTextureArray,
     program: Program,
-    sun_pc: ObjectPushConstants,
-    moon_pc: ObjectPushConstants,
+    sun_imm: ObjectImmediates,
+    moon_imm: ObjectImmediates,
 }
 
 impl ObjectSet {
@@ -45,15 +45,15 @@ impl ObjectSet {
                 sky_bind_group_layout,
                 textures.bind_group_layout(),
             ])
-            .push_constant_ranges(&[ObjectPushConstants::range()])
+            .immediate_size(ObjectImmediates::SIZE)
             .format(PostProcessor::FORMAT)
             .build();
-        let (sun_pc, moon_pc) = Self::pc(Default::default());
+        let (sun_imm, moon_imm) = Self::imm(Default::default());
         Self {
             textures,
             program,
-            sun_pc,
-            moon_pc,
+            sun_imm,
+            moon_imm,
         }
     }
 
@@ -71,18 +71,18 @@ impl ObjectSet {
                 self.textures.bind_group(),
             ],
         );
-        self.sun_pc.set(render_pass);
+        self.sun_imm.set(render_pass);
         render_pass.draw(0..6, 0..1);
-        self.moon_pc.set(render_pass);
+        self.moon_imm.set(render_pass);
         render_pass.draw(0..6, 0..1);
     }
 
-    fn pc(time: Time) -> (ObjectPushConstants, ObjectPushConstants) {
+    fn imm(time: Time) -> (ObjectImmediates, ObjectImmediates) {
         let sun_dir = time.sky_rotation() * Vector3::x();
         let is_am = time.is_am();
         (
-            ObjectPushConstants::new(sun_dir, 0, is_am),
-            ObjectPushConstants::new(-sun_dir, 1, is_am),
+            ObjectImmediates::new(sun_dir, 0, is_am),
+            ObjectImmediates::new(-sun_dir, 1, is_am),
         )
     }
 }
@@ -92,19 +92,19 @@ impl EventHandler for ObjectSet {
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         if let Event::ServerEvent(ServerEvent::TimeUpdated(time)) = *event {
-            (self.sun_pc, self.moon_pc) = Self::pc(time);
+            (self.sun_imm, self.moon_imm) = Self::imm(time);
         }
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct ObjectPushConstants {
+struct ObjectImmediates {
     m: Matrix4<f32>,
     tex_index: u32,
 }
 
-impl ObjectPushConstants {
+impl ObjectImmediates {
     fn new(dir: Vector3<f32>, tex_index: u32, is_am: bool) -> Self {
         let size = CLIENT_CONFIG.sky.object.size;
         Self {
@@ -119,9 +119,7 @@ impl ObjectPushConstants {
     }
 }
 
-impl PushConstants for ObjectPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX_FRAGMENT;
-}
+impl Immediates for ObjectImmediates {}
 
 #[derive(Deserialize)]
 pub struct ObjectConfig {

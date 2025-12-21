@@ -7,7 +7,7 @@ use crate::{
             Renderer,
             buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
             effect::{Blender, PostProcessor},
-            program::{Program, PushConstants},
+            program::{Immediates, Program},
             shader::read_wgsl,
             texture::{image::ImageTexture, screen::DepthBuffer},
         },
@@ -34,7 +34,7 @@ pub struct CloudLayer {
     texture: ImageTexture,
     program: Program,
     blender: Blender,
-    pc: CloudPushConstants,
+    imm: CloudImmediates,
     opacity: f32,
 }
 
@@ -58,9 +58,9 @@ impl CloudLayer {
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/cloud.wgsl"))
-            .buffers(&[BlockVertex::desc(), CloudInstance::desc()])
             .bind_group_layouts(&[player_bind_group_layout, texture.bind_group_layout()])
-            .push_constant_ranges(&[CloudPushConstants::range()])
+            .immediate_size(CloudImmediates::SIZE)
+            .buffers(&[BlockVertex::desc(), CloudInstance::desc()])
             .depth_stencil(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
                 depth_write_enabled: true,
@@ -77,7 +77,7 @@ impl CloudLayer {
             texture,
             program,
             blender,
-            pc: Default::default(),
+            imm: Default::default(),
             opacity: Self::opacity(Default::default()),
         }
     }
@@ -117,7 +117,7 @@ impl CloudLayer {
                 &mut render_pass,
                 [player_bind_group, self.texture.bind_group()],
             );
-            self.pc.set(&mut render_pass);
+            self.imm.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
         self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
@@ -158,11 +158,11 @@ impl EventHandler for CloudLayer {
         match event {
             Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
                 let stage = time.stage();
-                self.pc.update_color(stage);
+                self.imm.update_color(stage);
                 self.opacity = Self::opacity(stage);
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
-                self.pc.update_offset(dt);
+                self.imm.update_offset(dt);
             }
             _ => {}
         }
@@ -189,7 +189,7 @@ impl Instance for CloudInstance {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct CloudPushConstants {
+struct CloudImmediates {
     dims: Point2<f32>,
     size: Point2<f32>,
     scale_factor: Float3,
@@ -198,7 +198,7 @@ struct CloudPushConstants {
     padding: [f32; 2],
 }
 
-impl CloudPushConstants {
+impl CloudImmediates {
     fn update_color(&mut self, stage: Stage) {
         self.color = Self::color(stage).into();
     }
@@ -230,7 +230,7 @@ impl CloudPushConstants {
     }
 }
 
-impl Default for CloudPushConstants {
+impl Default for CloudImmediates {
     fn default() -> Self {
         Self {
             dims: Self::dims().cast(),
@@ -243,9 +243,7 @@ impl Default for CloudPushConstants {
     }
 }
 
-impl PushConstants for CloudPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX_FRAGMENT;
-}
+impl Immediates for CloudImmediates {}
 
 #[derive(Deserialize)]
 pub struct CloudConfig {

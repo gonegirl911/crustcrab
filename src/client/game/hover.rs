@@ -6,7 +6,7 @@ use crate::{
             Renderer,
             buffer::{IndexBuffer, MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            program::{Program, PushConstants},
+            program::{Immediates, Program},
             shader::read_wgsl,
             texture::screen::DepthBuffer,
         },
@@ -73,7 +73,7 @@ impl BlockHover {
                 }),
                 player_bind_group,
                 sky_bind_group,
-                &BlockHighlightPushConstants::new(hitbox, brightness),
+                &BlockHighlightImmediates::new(hitbox, brightness),
             );
         }
     }
@@ -110,9 +110,9 @@ impl BlockHighlight {
             program: Program::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/highlight.wgsl"))
-                .buffers(&[BlockHighlightVertex::desc()])
                 .bind_group_layouts(&[player_bind_group_layout, sky_bind_group_layout])
-                .push_constant_ranges(&[BlockHighlightPushConstants::range()])
+                .immediate_size(BlockHighlightImmediates::SIZE)
+                .buffers(&[BlockHighlightVertex::desc()])
                 .cull_mode(wgpu::Face::Back)
                 .depth_stencil(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
@@ -133,10 +133,10 @@ impl BlockHighlight {
         render_pass: &mut wgpu::RenderPass,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        pc: &BlockHighlightPushConstants,
+        imm: &BlockHighlightImmediates,
     ) {
         self.program.bind(render_pass, [player_bind_group, sky_bind_group]);
-        pc.set(render_pass);
+        imm.set(render_pass);
         self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
     }
 }
@@ -161,12 +161,12 @@ impl Vertex for BlockHighlightVertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockHighlightPushConstants {
+struct BlockHighlightImmediates {
     m: Matrix4<f32>,
     brightness: u32,
 }
 
-impl BlockHighlightPushConstants {
+impl BlockHighlightImmediates {
     fn new(hitbox: Aabb, brightness: BlockLight) -> Self {
         Self {
             m: hitbox.pad(CLIENT_CONFIG.cloud.padding).to_homogeneous(),
@@ -175,9 +175,7 @@ impl BlockHighlightPushConstants {
     }
 }
 
-impl PushConstants for BlockHighlightPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
-}
+impl Immediates for BlockHighlightImmediates {}
 
 const DELTAS: [Vector3<f32>; 8] = [
     vector![0.0, 0.0, 0.0],

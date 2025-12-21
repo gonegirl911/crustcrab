@@ -16,7 +16,7 @@ struct PlayerUniform {
     zfar: f32,
 }
 
-struct PushConstants {
+struct Immediates {
     dims: vec2<f32>,
     size: vec2<f32>,
     scale_factor: vec3<f32>,
@@ -33,7 +33,7 @@ struct VertexOutput {
 @group(0) @binding(0)
 var<uniform> player: PlayerUniform;
 
-var<push_constant> pc: PushConstants;
+var<immediate> imm: Immediates;
 
 @vertex
 fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -43,11 +43,11 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
         f32(extractBits(vertex.data[0], 10u, 5u)),
     );
     let face = extractBits(vertex.data[0], 23u, 2u);
-    let offset = instance.offset - rem_euclid(player.origin.xz - pc.offset, pc.size.x);
+    let offset = instance.offset - rem_euclid(player.origin.xz - imm.offset, imm.size.x);
     let light_factor = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
     return VertexOutput(
-        player.vp * vec4(vec3(pc.size, pc.size.x) * ((-0.5 + coords) * pc.scale_factor + 0.5) + vec3(offset.x, -player.origin.y + 192.0, offset.y), 1.0),
-        (player.origin.xz + instance.offset - pc.offset) / pc.size.x / pc.dims,
+        player.vp * vec4(vec3(imm.size, imm.size.x) * ((-0.5 + coords) * imm.scale_factor + 0.5) + vec3(offset.x, -player.origin.y + 192.0, offset.y), 1.0),
+        (player.origin.xz + instance.offset - imm.offset) / imm.size.x / imm.dims,
         light_factor,
     );
 }
@@ -66,7 +66,7 @@ var s_clouds: sampler;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if textureSample(t_clouds, s_clouds, in.tex_coords).a == 1.0 {
-        return vec4(pc.color * in.light_factor, 1.0);
+        return vec4(imm.color * in.light_factor, 1.0);
     } else {
         discard;
     }

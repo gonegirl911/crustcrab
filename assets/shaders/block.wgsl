@@ -22,7 +22,7 @@ struct SkyUniform {
     light_intensity: vec3<f32>,
 }
 
-struct PushConstants {
+struct Immediates {
     chunk_coords: vec3<f32>,
 }
 
@@ -39,11 +39,11 @@ var<uniform> player: PlayerUniform;
 @group(1) @binding(0)
 var<uniform> sky: SkyUniform;
 
-var<push_constant> pc: PushConstants;
+var<immediate> imm: Immediates;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-    let coords = pc.chunk_coords * 16.0 + vec3(
+    let coords = imm.chunk_coords * 16.0 + vec3(
         f32(extractBits(vertex.data[0], 0u, 5u)),
         f32(extractBits(vertex.data[0], 5u, 5u)),
         f32(extractBits(vertex.data[0], 10u, 5u)),

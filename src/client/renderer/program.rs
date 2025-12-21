@@ -11,9 +11,9 @@ impl Program {
     pub fn new<'a>(
         #[expect(unused)] renderer @ Renderer { device, .. }: &'a Renderer,
         shader_desc: wgpu::ShaderModuleDescriptor<'a>,
-        #[builder(default)] buffers: &'a [wgpu::VertexBufferLayout<'a>],
         #[builder(default)] bind_group_layouts: &'a [&'a wgpu::BindGroupLayout],
-        #[builder(default)] push_constant_ranges: &'a [wgpu::PushConstantRange],
+        #[builder(default)] immediate_size: u32,
+        #[builder(default)] buffers: &'a [wgpu::VertexBufferLayout<'a>],
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
         format: wgpu::TextureFormat,
@@ -23,7 +23,7 @@ impl Program {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts,
-            push_constant_ranges,
+            immediate_size,
         });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
@@ -50,7 +50,7 @@ impl Program {
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
         Self(render_pipeline)
@@ -67,21 +67,14 @@ impl Program {
     }
 }
 
-pub trait PushConstants: Pod {
-    const STAGES: wgpu::ShaderStages;
+pub trait Immediates: Pod {
+    const SIZE: u32 = {
+        let size = size_of::<Self>();
+        assert!(usize::BITS < u32::BITS || size_of::<Self>() < u32::MAX as usize);
+        size as u32
+    };
 
     fn set(&self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_push_constants(
-            Self::STAGES,
-            0,
-            bytemuck::cast_slice(slice::from_ref(self)),
-        );
-    }
-
-    fn range() -> wgpu::PushConstantRange {
-        wgpu::PushConstantRange {
-            stages: Self::STAGES,
-            range: 0..size_of::<Self>() as u32,
-        }
+        render_pass.set_immediates(0, bytemuck::cast_slice(slice::from_ref(self)));
     }
 }

@@ -118,9 +118,9 @@ impl ImageTexture {
             address_mode_u: address_mode,
             address_mode_v: address_mode,
             mipmap_filter: if mip_level_count > 1 {
-                wgpu::FilterMode::Linear
+                wgpu::MipmapFilterMode::Linear
             } else {
-                wgpu::FilterMode::Nearest
+                wgpu::MipmapFilterMode::Nearest
             },
             ..Default::default()
         })
@@ -198,7 +198,7 @@ impl ImageTexture {
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            load: wgpu::LoadOp::Clear(Default::default()),
                             store: wgpu::StoreOp::Store,
                         },
                     })],

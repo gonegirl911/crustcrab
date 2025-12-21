@@ -15,7 +15,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     return VertexOutput(vec4(coords, 0.0, 1.0), vec2(x, 1.0 - y));
 }
 
-struct PushConstants {
+struct Immediates {
     opacity: f32,
 }
 
@@ -25,9 +25,9 @@ var t_input: texture_2d<f32>;
 @group(0) @binding(1)
 var s_input: sampler;
 
-var<push_constant> pc: PushConstants;
+var<immediate> imm: Immediates;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_input, s_input, in.input_coords) * vec4(vec3(1.0), pc.opacity);
+    return textureSample(t_input, s_input, in.input_coords) * vec4(vec3(1.0), imm.opacity);
 }

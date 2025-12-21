@@ -6,7 +6,7 @@ use crate::{
             Renderer,
             buffer::{Instance, InstanceBuffer, MemoryState},
             effect::PostProcessor,
-            program::{Program, PushConstants},
+            program::{Immediates, Program},
             shader::read_wgsl,
         },
     },
@@ -30,7 +30,7 @@ pub struct StarDome {
     stars: Box<[Star]>,
     instance_buffer: InstanceBuffer<StarInstance>,
     program: Program,
-    pc: StarPushConstants,
+    imm: StarImmediates,
     updated_rotation: Option<UnitQuaternion<f32>>,
 }
 
@@ -46,9 +46,9 @@ impl StarDome {
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/star.wgsl"))
-            .buffers(&[StarInstance::desc()])
             .bind_group_layouts(&[player_bind_group_layout])
-            .push_constant_ranges(&[StarPushConstants::range()])
+            .immediate_size(StarImmediates::SIZE)
+            .buffers(&[StarInstance::desc()])
             .format(PostProcessor::FORMAT)
             .blend(wgpu::BlendState::ALPHA_BLENDING)
             .build();
@@ -56,15 +56,15 @@ impl StarDome {
             stars,
             instance_buffer,
             program,
-            pc: Default::default(),
+            imm: Default::default(),
             updated_rotation: Some(Time::default().sky_rotation()),
         }
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, player_bind_group: &wgpu::BindGroup) {
-        if self.pc.opacity != 0.0 {
+        if self.imm.opacity != 0.0 {
             self.program.bind(render_pass, [player_bind_group]);
-            self.pc.set(render_pass);
+            self.imm.set(render_pass);
             render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
             render_pass.draw(0..6, 0..self.instance_buffer.len());
         }
@@ -85,7 +85,7 @@ impl EventHandler for StarDome {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
-                self.pc = StarPushConstants::new(time.stage());
+                self.imm = StarImmediates::new(time.stage());
                 self.updated_rotation = Some(time.sky_rotation());
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
@@ -164,11 +164,11 @@ impl Instance for StarInstance {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct StarPushConstants {
+struct StarImmediates {
     opacity: f32,
 }
 
-impl StarPushConstants {
+impl StarImmediates {
     fn new(stage: Stage) -> Self {
         let brightness = CLIENT_CONFIG.sky.star.brightness;
         Self {
@@ -177,15 +177,13 @@ impl StarPushConstants {
     }
 }
 
-impl Default for StarPushConstants {
+impl Default for StarImmediates {
     fn default() -> Self {
         Self::new(Default::default())
     }
 }
 
-impl PushConstants for StarPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::FRAGMENT;
-}
+impl Immediates for StarImmediates {}
 
 #[derive(Deserialize)]
 pub struct StarConfig {

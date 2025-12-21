@@ -22,7 +22,7 @@ struct SkyUniform {
     light_intensity: vec3<f32>,
 }
 
-struct PushConstants {
+struct Immediates {
     m: mat4x4<f32>,
     brightness: u32,
 }
@@ -38,24 +38,24 @@ var<uniform> player: PlayerUniform;
 @group(1) @binding(0)
 var<uniform> sky: SkyUniform;
 
-var<push_constant> pc: PushConstants;
+var<immediate> imm: Immediates;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let skylight = vec3(
-        f32(extractBits(pc.brightness, 0u, 4u)),
-        f32(extractBits(pc.brightness, 4u, 4u)),
-        f32(extractBits(pc.brightness, 8u, 4u)),
+        f32(extractBits(imm.brightness, 0u, 4u)),
+        f32(extractBits(imm.brightness, 4u, 4u)),
+        f32(extractBits(imm.brightness, 8u, 4u)),
     );
     let torchlight = vec3(
-        f32(extractBits(pc.brightness, 12u, 4u)),
-        f32(extractBits(pc.brightness, 16u, 4u)),
-        f32(extractBits(pc.brightness, 20u, 4u)),
+        f32(extractBits(imm.brightness, 12u, 4u)),
+        f32(extractBits(imm.brightness, 16u, 4u)),
+        f32(extractBits(imm.brightness, 20u, 4u)),
     );
     let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
     let local_light = pow(vec3(0.8), (15.0 - torchlight));
     return VertexOutput(
-        player.vp * (vec4(-player.origin, 0.0) + pc.m * vec4(vertex.coords, 1.0)),
+        player.vp * (vec4(-player.origin, 0.0) + imm.m * vec4(vertex.coords, 1.0)),
         0.1 * luminance(saturate(global_light + local_light)),
     );
 }

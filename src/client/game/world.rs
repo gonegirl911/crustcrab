@@ -6,7 +6,7 @@ use crate::{
             Renderer,
             buffer::{MemoryState, Vertex, VertexBuffer},
             effect::PostProcessor,
-            program::{Program, PushConstants},
+            program::{Immediates, Program},
             shader::read_wgsl,
             texture::screen::DepthBuffer,
             utils::{TotalOrd, TransparentMesh},
@@ -55,13 +55,13 @@ impl World {
             program: Program::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/block.wgsl"))
-                .buffers(&[BlockVertex::desc()])
                 .bind_group_layouts(&[
                     player_bind_group_layout,
                     sky_bind_group_layout,
                     textures_bind_group_layout,
                 ])
-                .push_constant_ranges(&[BlockPushConstants::range()])
+                .immediate_size(BlockImmediates::SIZE)
+                .buffers(&[BlockVertex::desc()])
                 .cull_mode(wgpu::Face::Back)
                 .depth_stencil(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
@@ -106,7 +106,7 @@ impl World {
             for (&coords, (mesh, _)) in &mut self.meshes {
                 if Chunk::bounding_sphere(coords).is_visible(frustum) {
                     if let Some(opaque_part) = mesh.opaque_part() {
-                        BlockPushConstants::new(coords).set(&mut render_pass);
+                        BlockImmediates::new(coords).set(&mut render_pass);
                         opaque_part.draw(&mut render_pass);
                     }
 
@@ -135,7 +135,7 @@ impl World {
 
         for (coords, mesh) in transparent_meshes {
             let delta = coords.cast() * Chunk::DIM as f32 - frustum.origin;
-            BlockPushConstants::new(coords).set(&mut render_pass);
+            BlockImmediates::new(coords).set(&mut render_pass);
             mesh.draw(renderer, &mut render_pass, |&coords| {
                 TotalOrd((coords.coords + delta).magnitude_squared())
             });
@@ -397,11 +397,11 @@ impl Vertex for BlockVertex {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct BlockPushConstants {
+struct BlockImmediates {
     chunk_coords: Point3<f32>,
 }
 
-impl BlockPushConstants {
+impl BlockImmediates {
     fn new(chunk_coords: Point3<i32>) -> Self {
         Self {
             chunk_coords: chunk_coords.cast(),
@@ -409,6 +409,4 @@ impl BlockPushConstants {
     }
 }
 
-impl PushConstants for BlockPushConstants {
-    const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::VERTEX;
-}
+impl Immediates for BlockImmediates {}
