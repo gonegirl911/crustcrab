@@ -1,4 +1,4 @@
-use bincode::config::Config;
+use bincode::config::{self, Config};
 use serde::{Serialize, de::DeserializeOwned};
 use std::io::{Read, Write};
 
@@ -11,7 +11,7 @@ pub fn deserialize_from<T: DeserializeOwned, R: Read>(mut src: R) -> Result<T, D
 }
 
 const fn config() -> impl Config {
-    bincode::config::standard()
+    config::standard()
 }
 
 pub type SerializeError = bincode::error::EncodeError;
