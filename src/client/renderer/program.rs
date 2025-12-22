@@ -70,7 +70,7 @@ impl Program {
 pub trait Immediates: Pod {
     const SIZE: u32 = {
         let size = size_of::<Self>();
-        assert!(usize::BITS <= u32::BITS || size < u32::MAX as usize);
+        assert!(usize::BITS <= u32::BITS || size <= u32::MAX as usize);
         size as u32
     };
 
