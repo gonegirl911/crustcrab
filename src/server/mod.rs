@@ -56,16 +56,16 @@ pub enum ServerEvent {
 }
 
 impl ServerEvent {
+    fn is_special(&self) -> bool {
+        matches!(self, ServerEvent::ClientDisconnected)
+    }
+
     fn has_priority(&self) -> bool {
         assert!(!self.is_special());
         !matches!(
             self,
             Self::ChunkLoaded { .. } | Self::ChunkUnloaded { .. } | Self::ChunkUpdated { .. }
         )
-    }
-
-    fn is_special(&self) -> bool {
-        matches!(self, ServerEvent::ClientDisconnected)
     }
 }
 
