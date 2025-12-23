@@ -18,11 +18,7 @@ use crate::{
 use nalgebra::{Point2, Point3, Vector3, point};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
-use std::{
-    array,
-    ops::Deref,
-    sync::{Arc, LazyLock},
-};
+use std::{array, ops::Deref, sync::LazyLock};
 
 pub struct BlockData {
     model: Model,
@@ -157,11 +153,11 @@ struct RawBlockData {
     #[serde(deserialize_with = "RawBlockData::deserialize_light_filter")]
     light_filter: Rgb<bool>,
     requires_blending: bool,
-    valid_surface: Option<Arc<str>>,
+    valid_surface: Option<String>,
 }
 
 impl RawBlockData {
-    fn tex_path(&self) -> &Arc<str> {
+    fn tex_path(&self) -> &str {
         &self.model.tex_path
     }
 
@@ -251,19 +247,19 @@ pub enum Component {
 
 pub(super) static BLOCK_DATA: LazyLock<Box<[BlockData]>> = LazyLock::new(|| {
     let mut data = Box::new_uninit_slice(STR_TO_BLOCK.len());
-    for (str, &Block(i)) in &*STR_TO_BLOCK {
+    for (&str, &Block(i)) in &*STR_TO_BLOCK {
         data[i as usize].write(RAW_BLOCK_DATA[str].clone().into());
     }
     unsafe { data.assume_init() }
 });
 
-pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(|| {
+pub static STR_TO_BLOCK: LazyLock<FxHashMap<&'static str, Block>> = LazyLock::new(|| {
     let mut idx = Block::HARD_CODED_VALUES.len() as u8;
     RAW_BLOCK_DATA
         .keys()
-        .cloned()
+        .map(Deref::deref)
         .map(|str| {
-            if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|&s| *s == *str) {
+            if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|&s| s == str) {
                 (str, Block(i as u8))
             } else {
                 let entry = (str, Block(idx));
@@ -274,15 +270,15 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<Arc<str>, Block>> = LazyLock::new(||
         .collect()
 });
 
-pub static TEX_PATHS: LazyLock<FxIndexSet<Arc<str>>> = LazyLock::new(|| {
+pub static TEX_PATHS: LazyLock<FxIndexSet<&'static str>> = LazyLock::new(|| {
     RAW_BLOCK_DATA
         .values()
-        .map(|data| data.tex_path().clone())
+        .map(RawBlockData::tex_path)
         .collect()
 });
 
-static RAW_BLOCK_DATA: LazyLock<FxHashMap<Arc<str>, RawBlockData>> = LazyLock::new(|| {
-    let data = toml::deserialize::<_, FxHashMap<Arc<_>, RawBlockData>>("assets/config/blocks.toml");
+static RAW_BLOCK_DATA: LazyLock<FxHashMap<String, RawBlockData>> = LazyLock::new(|| {
+    let data = toml::deserialize::<_, FxHashMap<_, RawBlockData>>("assets/config/blocks.toml");
 
     assert!(
         data.len() <= Block::MAX_COUNT,

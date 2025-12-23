@@ -7,11 +7,7 @@ use crate::shared::{
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
-use std::{
-    iter,
-    ops::Deref,
-    sync::{Arc, LazyLock},
-};
+use std::{iter, ops::Deref, sync::LazyLock};
 use walkdir::{DirEntry, WalkDir};
 
 pub struct Model {
@@ -87,23 +83,23 @@ impl From<RawModelData> for ModelData {
 #[serde(default)]
 pub struct RawModel {
     #[serde(rename = "model", deserialize_with = "RawModel::deserialize_variant")]
-    variant: Arc<str>,
+    variant: String,
     #[serde(rename = "texture")]
-    pub tex_path: Arc<str>,
+    pub tex_path: String,
 }
 
 impl RawModel {
     fn tex_index(&self) -> u8 {
         TEX_PATHS
-            .get_index_of(&self.tex_path)
+            .get_index_of(self.tex_path.as_str())
             .unwrap_or_else(|| unreachable!()) as u8
     }
 
-    fn deserialize_variant<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
+    fn deserialize_variant<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let variant = Arc::deserialize(deserializer)?;
+        let variant = Deserialize::deserialize(deserializer)?;
         if MODEL_DATA.contains_key(&variant) {
             Ok(variant)
         } else {
@@ -124,12 +120,11 @@ impl RawModel {
 
 impl Default for RawModel {
     fn default() -> Self {
-        static DEFAULT_TEX_PATH: LazyLock<Arc<str>> =
-            LazyLock::new(|| "missing_texture.png".into());
+        const DEFAULT_TEX_PATH: &str = "missing_texture.png";
 
         Self {
-            variant: DEFAULT_VARIANT.clone(),
-            tex_path: DEFAULT_TEX_PATH.clone(),
+            variant: DEFAULT_VARIANT.into(),
+            tex_path: DEFAULT_TEX_PATH.into(),
         }
     }
 }
@@ -143,7 +138,7 @@ struct RawModelData {
     internal_corner_deltas: Box<CornerDeltas>,
 }
 
-static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
+static MODEL_DATA: LazyLock<FxHashMap<String, ModelData>> = LazyLock::new(|| {
     fn is_hidden(entry: &DirEntry) -> bool {
         entry
             .file_name()
@@ -171,12 +166,11 @@ static MODEL_DATA: LazyLock<FxHashMap<Arc<str>, ModelData>> = LazyLock::new(|| {
         .collect::<FxHashMap<_, _>>();
 
     assert!(
-        data.contains_key(&*DEFAULT_VARIANT),
-        "{} model must be configured",
-        *DEFAULT_VARIANT,
+        data.contains_key(DEFAULT_VARIANT),
+        "{DEFAULT_VARIANT} model must be configured",
     );
 
     data
 });
 
-static DEFAULT_VARIANT: LazyLock<Arc<str>> = LazyLock::new(|| "cube".into());
+const DEFAULT_VARIANT: &str = "cube";
