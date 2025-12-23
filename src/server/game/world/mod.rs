@@ -97,9 +97,9 @@ impl World {
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-            _ = self.send_updates(server_tx, updates, group_id);
-            _ = Self::send_unloads(server_tx, removals, Some(group_id));
-            _ = self.send_loads(server_tx, inserts, group_id);
+            _ = self.send_updates(updates, server_tx, group_id);
+            _ = Self::send_unloads(removals, server_tx, Some(group_id));
+            _ = self.send_loads(inserts, server_tx, group_id);
         }
     }
 
@@ -124,12 +124,11 @@ impl World {
 
     fn send_loads<P: IntoIterator<Item = Point3<i32>>>(
         &self,
-        server_tx: &ServerSender,
         points: P,
+        server_tx: &ServerSender,
         group_id: GroupId,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
-            server_tx,
             points
                 .into_iter()
                 .map(move |coords| ServerEvent::ChunkLoaded {
@@ -137,17 +136,17 @@ impl World {
                     data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                     group_id: Some(group_id),
                 }),
+            server_tx,
         )
     }
 
     #[expect(clippy::result_large_err)]
     fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
-        server_tx: &ServerSender,
         points: P,
+        server_tx: &ServerSender,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
-            server_tx,
             points
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkLoaded {
@@ -156,17 +155,17 @@ impl World {
                     group_id: None,
                 })
                 .into_seq_iter(),
+            server_tx,
         )
     }
 
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
         &self,
-        server_tx: &ServerSender,
         points: P,
+        server_tx: &ServerSender,
         group_id: GroupId,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
-            server_tx,
             points
                 .into_iter()
                 .map(move |coords| ServerEvent::ChunkUpdated {
@@ -174,17 +173,17 @@ impl World {
                     data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                     group_id: Some(group_id),
                 }),
+            server_tx,
         )
     }
 
     #[expect(clippy::result_large_err)]
     fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
-        server_tx: &ServerSender,
         points: P,
+        server_tx: &ServerSender,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
-            server_tx,
             points
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkUpdated {
@@ -193,6 +192,7 @@ impl World {
                     group_id: None,
                 })
                 .into_seq_iter(),
+            server_tx,
         )
     }
 
@@ -209,15 +209,15 @@ impl World {
     }
 
     fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(
-        server_tx: &ServerSender,
         points: P,
+        server_tx: &ServerSender,
         group_id: Option<GroupId>,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
-            server_tx,
             points
                 .into_iter()
                 .map(move |coords| ServerEvent::ChunkUnloaded { coords, group_id }),
+            server_tx,
         )
     }
 
@@ -240,8 +240,8 @@ impl World {
     }
 
     fn send_events<E: IntoIterator<Item = ServerEvent>>(
-        server_tx: &ServerSender,
         events: E,
+        server_tx: &ServerSender,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         let mut events = events.into_iter();
         events
@@ -271,7 +271,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-                _ = self.par_send_loads(server_tx, loads);
+                _ = self.par_send_loads(loads, server_tx);
             }
             WorldEvent::WorldAreaChanged { prev, cur, ray } => {
                 let inserts = self.par_insert_many(cur.par_exclusive_server_points(prev));
@@ -288,9 +288,9 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-                _ = Self::send_unloads(server_tx, unloads, None);
-                _ = self.par_send_loads(server_tx, loads);
-                _ = self.par_send_updates(server_tx, updates);
+                _ = Self::send_unloads(unloads, server_tx, None);
+                _ = self.par_send_loads(loads, server_tx);
+                _ = self.par_send_updates(updates, server_tx);
             }
             WorldEvent::BlockHoverRequested { ray } => {
                 let hover = ray.cast(SERVER_CONFIG.player.reach).find(
