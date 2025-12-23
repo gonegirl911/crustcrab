@@ -5,7 +5,7 @@ use crustcrab::{
     shared::bincode,
 };
 use std::{
-    io::{self, BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter, ErrorKind, Write},
     net::TcpListener,
     thread,
 };
@@ -97,7 +97,7 @@ fn main() {
                         }
                         if let Err(e) = bincode::serialize_into(event, &mut priority_writer) {
                             if let bincode::SerializeError::Io { inner, .. } = &e
-                                && inner.kind() == io::ErrorKind::BrokenPipe
+                                && inner.kind() == ErrorKind::BrokenPipe
                             {
                                 break;
                             }
@@ -105,7 +105,7 @@ fn main() {
                             continue;
                         }
                         if let Err(e) = priority_writer.flush() {
-                            if e.kind() == io::ErrorKind::BrokenPipe {
+                            if e.kind() == ErrorKind::BrokenPipe {
                                 break;
                             }
                             eprintln!("[{priority_addr}] write server event FAILED: {e}");
@@ -122,7 +122,7 @@ fn main() {
                         }
                         if let Err(e) = bincode::serialize_into(event, &mut writer) {
                             if let bincode::SerializeError::Io { inner, .. } = &e
-                                && inner.kind() == io::ErrorKind::BrokenPipe
+                                && inner.kind() == ErrorKind::BrokenPipe
                             {
                                 break;
                             }
@@ -130,7 +130,7 @@ fn main() {
                             continue;
                         }
                         if let Err(e) = writer.flush() {
-                            if e.kind() == io::ErrorKind::BrokenPipe {
+                            if e.kind() == ErrorKind::BrokenPipe {
                                 break;
                             }
                             eprintln!("[{addr}] write server event FAILED: {e}");
@@ -146,7 +146,7 @@ fn main() {
                         Err(bincode::DeserializeError::Io { inner, .. })
                             if matches!(
                                 inner.kind(),
-                                io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof,
+                                ErrorKind::ConnectionReset | ErrorKind::UnexpectedEof,
                             ) =>
                         {
                             _ = priority_server_tx.send(ServerEvent::ClientDisconnected);

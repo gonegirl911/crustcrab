@@ -4,7 +4,7 @@ use crustcrab::{
     shared::bincode,
 };
 use std::{
-    io::{self, BufReader, BufWriter, Write},
+    io::{BufReader, BufWriter, ErrorKind, Write},
     net::{Shutdown, TcpStream},
     thread,
 };
@@ -59,7 +59,7 @@ fn main() {
                 let event = match bincode::deserialize_from(&mut priority_reader) {
                     Ok(event) => event,
                     Err(bincode::DeserializeError::Io { inner, .. })
-                        if inner.kind() == io::ErrorKind::UnexpectedEof =>
+                        if inner.kind() == ErrorKind::UnexpectedEof =>
                     {
                         break;
                     }
@@ -84,7 +84,7 @@ fn main() {
                 }
                 if let Err(e) = bincode::serialize_into(event, &mut priority_writer) {
                     if let bincode::SerializeError::Io { inner, .. } = &e
-                        && inner.kind() == io::ErrorKind::BrokenPipe
+                        && inner.kind() == ErrorKind::BrokenPipe
                     {
                         break;
                     }
@@ -92,7 +92,7 @@ fn main() {
                     continue;
                 }
                 if let Err(e) = priority_writer.flush() {
-                    if e.kind() == io::ErrorKind::BrokenPipe {
+                    if e.kind() == ErrorKind::BrokenPipe {
                         break;
                     }
                     eprintln!("[{priority_addr}] write client event FAILED: {e}");
@@ -107,7 +107,7 @@ fn main() {
                 let event = match bincode::deserialize_from(&mut reader) {
                     Ok(event) => event,
                     Err(bincode::DeserializeError::Io { inner, .. })
-                        if inner.kind() == io::ErrorKind::UnexpectedEof =>
+                        if inner.kind() == ErrorKind::UnexpectedEof =>
                     {
                         break;
                     }
@@ -126,12 +126,12 @@ fn main() {
         client.run();
 
         if let Err(e) = priority_stream.shutdown(Shutdown::Both)
-            && e.kind() != io::ErrorKind::NotConnected
+            && e.kind() != ErrorKind::NotConnected
         {
             eprintln!("[{priority_addr}] gracefull shutdown FAILED: {e}");
         }
         if let Err(e) = stream.shutdown(Shutdown::Both)
-            && e.kind() != io::ErrorKind::NotConnected
+            && e.kind() != ErrorKind::NotConnected
         {
             eprintln!("[{addr}] gracefull shutdown FAILED: {e}");
         }
