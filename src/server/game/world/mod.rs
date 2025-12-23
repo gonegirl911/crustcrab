@@ -85,9 +85,9 @@ impl World {
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
+        server_tx: &ServerSender,
         area: WorldArea,
         ray: Ray,
-        server_tx: &ServerSender,
     ) {
         let mut branch = Branch::default();
         if branch.apply(&self.chunks, coords, normal, action) {
@@ -97,9 +97,9 @@ impl World {
 
             self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-            _ = self.send_updates(updates, server_tx, group_id);
-            _ = Self::send_unloads(removals, server_tx, Some(group_id));
-            _ = self.send_loads(inserts, server_tx, group_id);
+            _ = self.send_updates(updates, group_id, server_tx);
+            _ = Self::send_unloads(removals, Some(group_id), server_tx);
+            _ = self.send_loads(inserts, group_id, server_tx);
         }
     }
 
@@ -125,8 +125,8 @@ impl World {
     fn send_loads<P: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: P,
-        server_tx: &ServerSender,
         group_id: GroupId,
+        server_tx: &ServerSender,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
             points
@@ -162,8 +162,8 @@ impl World {
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: P,
-        server_tx: &ServerSender,
         group_id: GroupId,
+        server_tx: &ServerSender,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
             points
@@ -210,8 +210,8 @@ impl World {
 
     fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(
         points: P,
-        server_tx: &ServerSender,
         group_id: Option<GroupId>,
+        server_tx: &ServerSender,
     ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
         Self::send_events(
             points
@@ -288,7 +288,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
-                _ = Self::send_unloads(unloads, server_tx, None);
+                _ = Self::send_unloads(unloads, None, server_tx);
                 _ = self.par_send_loads(loads, server_tx);
                 _ = self.par_send_updates(updates, server_tx);
             }
@@ -321,15 +321,15 @@ impl EventHandler<WorldEvent> for World {
                         coords + normal,
                         normal,
                         BlockAction::Place(block),
+                        server_tx,
                         area,
                         ray,
-                        server_tx,
                     );
                 }
             }
             WorldEvent::BlockDestroyed { area, ray } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hover {
-                    self.apply(coords, normal, BlockAction::Destroy, area, ray, server_tx);
+                    self.apply(coords, normal, BlockAction::Destroy, server_tx, area, ray);
                 }
             }
         }
