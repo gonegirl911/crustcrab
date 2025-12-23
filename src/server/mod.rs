@@ -57,10 +57,15 @@ pub enum ServerEvent {
 
 impl ServerEvent {
     fn has_priority(&self) -> bool {
+        assert!(!self.is_special());
         !matches!(
             self,
             Self::ChunkLoaded { .. } | Self::ChunkUnloaded { .. } | Self::ChunkUpdated { .. }
         )
+    }
+
+    fn is_special(&self) -> bool {
+        matches!(self, ServerEvent::ClientDisconnected)
     }
 }
 
@@ -85,6 +90,7 @@ pub enum ServerSender {
         tx: Sender<ServerEvent>,
         proxy: EventLoopProxy,
     },
+    Disconnected,
     Sender {
         priority_tx: Sender<ServerEvent>,
         tx: Sender<ServerEvent>,
@@ -92,23 +98,18 @@ pub enum ServerSender {
 }
 
 impl ServerSender {
-    pub fn disconnected() -> Self {
-        let (priority_tx, _) = crossbeam_channel::unbounded();
-        let (tx, _) = crossbeam_channel::unbounded();
-        Self::Sender { priority_tx, tx }
-    }
-
     pub fn send(&self, event: ServerEvent) -> Result<(), SendError<ServerEvent>> {
+        assert!(!event.is_special());
         match self {
             Self::Proxy { tx, proxy } => {
                 tx.send(event)?;
                 proxy.wake_up();
             }
+            Self::Disconnected => {
+                return Err(SendError(event));
+            }
             Self::Sender { priority_tx, tx } => {
-                if matches!(event, ServerEvent::ClientDisconnected) {
-                    priority_tx.send(ServerEvent::ClientDisconnected)?;
-                    tx.send(ServerEvent::ClientDisconnected)?;
-                } else if event.has_priority() {
+                if event.has_priority() {
                     priority_tx.send(event)?;
                 } else {
                     tx.send(event)?;

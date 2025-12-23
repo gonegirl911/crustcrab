@@ -20,7 +20,7 @@ struct Args {
 
 fn main() {
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
-    let mut server = Server::new(ServerSender::disconnected(), client_rx);
+    let mut server = Server::new(ServerSender::Disconnected, client_rx);
 
     thread::spawn(move || {
         let Args {
@@ -78,12 +78,14 @@ fn main() {
 
             let (priority_server_tx, priority_server_rx) = crossbeam_channel::unbounded();
             let (server_tx, server_rx) = crossbeam_channel::unbounded();
-            let server_tx = ServerSender::Sender {
-                priority_tx: priority_server_tx,
-                tx: server_tx,
-            };
             client_tx
-                .send(ClientEvent::Connected(server_tx.clone().into()))
+                .send(ClientEvent::Connected(
+                    ServerSender::Sender {
+                        priority_tx: priority_server_tx.clone(),
+                        tx: server_tx.clone(),
+                    }
+                    .into(),
+                ))
                 .unwrap_or_else(|_| unreachable!());
 
             thread::scope(|s| {
@@ -147,6 +149,7 @@ fn main() {
                                 io::ErrorKind::ConnectionReset | io::ErrorKind::UnexpectedEof,
                             ) =>
                         {
+                            _ = priority_server_tx.send(ServerEvent::ClientDisconnected);
                             _ = server_tx.send(ServerEvent::ClientDisconnected);
                             break;
                         }
