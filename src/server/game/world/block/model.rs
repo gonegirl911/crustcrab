@@ -7,7 +7,7 @@ use crate::shared::{
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
-use std::{iter, ops::Deref, sync::LazyLock};
+use std::{borrow::Cow, iter, ops::Deref, sync::LazyLock};
 use walkdir::{DirEntry, WalkDir};
 
 pub struct Model {
@@ -32,7 +32,7 @@ impl Model {
 impl From<RawModel> for Model {
     fn from(model: RawModel) -> Self {
         Self {
-            data: &MODEL_DATA[&model.variant],
+            data: &MODEL_DATA[&*model.variant],
             tex_index: model.tex_index(),
         }
     }
@@ -83,24 +83,24 @@ impl From<RawModelData> for ModelData {
 #[serde(default)]
 pub struct RawModel {
     #[serde(rename = "model", deserialize_with = "RawModel::deserialize_variant")]
-    variant: String,
+    variant: Cow<'static, str>,
     #[serde(rename = "texture")]
-    pub tex_path: String,
+    pub tex_path: Cow<'static, str>,
 }
 
 impl RawModel {
     fn tex_index(&self) -> u8 {
         TEX_PATHS
-            .get_index_of(&self.tex_path[..])
+            .get_index_of(&*self.tex_path)
             .unwrap_or_else(|| unreachable!()) as u8
     }
 
-    fn deserialize_variant<'de, D>(deserializer: D) -> Result<String, D::Error>
+    fn deserialize_variant<'de, D>(deserializer: D) -> Result<Cow<'static, str>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let variant = Deserialize::deserialize(deserializer)?;
-        if MODEL_DATA.contains_key(&variant) {
+        let variant = Cow::deserialize(deserializer)?;
+        if MODEL_DATA.contains_key(&*variant) {
             Ok(variant)
         } else {
             Err(serde::de::Error::invalid_value(
