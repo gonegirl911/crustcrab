@@ -4,10 +4,10 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
-            buffer::{Instance, InstanceBuffer, MemoryState},
+            buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::{Immediates, Program},
-            shader::read_wgsl,
+            program::Program,
+            utils::{Immediates, Vertex, read_wgsl},
         },
     },
     server::{
@@ -28,7 +28,7 @@ use winit::event::WindowEvent;
 
 pub struct StarDome {
     stars: Box<[Star]>,
-    instance_buffer: InstanceBuffer<StarInstance>,
+    instance_buffer: VertexBuffer<StarInstance>,
     program: Program,
     imm: StarImmediates,
     updated_rotation: Option<UnitQuaternion<f32>>,
@@ -42,7 +42,7 @@ impl StarDome {
             let generator = StarGenerator::default();
             (0..count).map(|_| generator.generate(&mut rng)).collect()
         };
-        let instance_buffer = InstanceBuffer::new(renderer, MemoryState::Uninit(count));
+        let instance_buffer = VertexBuffer::new(renderer, MemoryState::Uninit(count));
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/star.wgsl"))
@@ -157,7 +157,8 @@ impl StarInstance {
     }
 }
 
-impl Instance for StarInstance {
+impl Vertex for StarInstance {
+    const STEP_MODE: wgpu::VertexStepMode = wgpu::VertexStepMode::Instance;
     const ATTRIBS: &[wgpu::VertexAttribute] =
         &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4, 2 => Float32x4, 3 => Float32x4];
 }

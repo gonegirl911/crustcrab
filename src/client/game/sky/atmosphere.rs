@@ -1,5 +1,5 @@
 use crate::client::renderer::{
-    Renderer, effect::PostProcessor, program::Program, shader::read_wgsl,
+    Renderer, effect::PostProcessor, program::Program, utils::read_wgsl,
 };
 
 pub struct Atmosphere(Program);

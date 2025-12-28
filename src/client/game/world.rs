@@ -4,12 +4,11 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
-            buffer::{MemoryState, Vertex, VertexBuffer},
+            buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::{Immediates, Program},
-            shader::read_wgsl,
+            program::Program,
             texture::screen::DepthBuffer,
-            utils::{TotalOrd, TransparentMesh},
+            utils::{Immediates, TotalOrd, TransparentMesh, Vertex, read_wgsl},
         },
     },
     server::{

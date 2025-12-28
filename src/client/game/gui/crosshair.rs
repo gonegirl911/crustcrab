@@ -3,8 +3,13 @@ use crate::client::{
     CLIENT_CONFIG,
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer, buffer::MemoryState, effect::PostProcessor, program::Program, shader::read_wgsl,
-        texture::image::ImageTexture, uniform::Uniform,
+        Renderer,
+        buffer::MemoryState,
+        effect::PostProcessor,
+        program::Program,
+        texture::image::ImageTexture,
+        uniform::Uniform,
+        utils::{load_rgba, read_wgsl},
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -22,7 +27,7 @@ impl Crosshair {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::builder()
             .renderer(renderer)
-            .path("assets/textures/gui/crosshair.png")
+            .image(load_rgba("assets/textures/gui/crosshair.png"))
             .is_srgb(false)
             .build();
         let program = Program::builder()

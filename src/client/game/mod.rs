@@ -16,12 +16,13 @@ use super::{
     },
     window::RawWindow,
 };
-use crate::server::game::world::block::data::TEX_PATHS;
+use crate::{client::renderer::utils::load_rgba, server::game::world::block::data::TEX_PATHS};
 use cloud::CloudLayer;
 use crossbeam_channel::Sender;
 use fog::Fog;
 use gui::Gui;
 use hover::BlockHover;
+use image::RgbaImage;
 use player::Player;
 use sky::Sky;
 use std::{ops::Deref, time::Duration};
@@ -232,7 +233,7 @@ impl BlockTextureArray {
         Self(
             ImageTextureArray::builder()
                 .renderer(renderer)
-                .paths(Self::tex_paths())
+                .images(Self::images())
                 .mip_level_count(4)
                 .is_srgb(true)
                 .address_mode(wgpu::AddressMode::Repeat)
@@ -240,10 +241,10 @@ impl BlockTextureArray {
         )
     }
 
-    fn tex_paths() -> impl Iterator<Item = String> {
+    fn images() -> impl Iterator<Item = RgbaImage> {
         TEX_PATHS
             .iter()
-            .map(|path| format!("assets/textures/blocks/{path}"))
+            .map(|path| load_rgba(format!("assets/textures/blocks/{path}")))
     }
 }
 

@@ -4,7 +4,7 @@ use crate::client::renderer::{
 };
 use bon::bon;
 use image::RgbaImage;
-use std::{num::NonZero, path::Path};
+use std::num::NonZero;
 
 pub struct ImageTexture {
     bind_group_layout: wgpu::BindGroupLayout,
@@ -14,14 +14,14 @@ pub struct ImageTexture {
 #[bon]
 impl ImageTexture {
     #[builder]
-    pub fn new<P: AsRef<Path>>(
+    pub fn new<R: AsRgbaImage>(
         renderer @ Renderer { device, .. }: &Renderer,
-        path: P,
+        image: R,
         #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
-        let view = Self::create_view(renderer, path, mip_level_count, is_srgb);
+        let view = Self::create_view(renderer, image, mip_level_count, is_srgb);
         let sampler = Self::create_sampler(renderer, address_mode, mip_level_count);
         let bind_group_layout = ImageTextureArray::create_bind_group_layout(renderer, &[]);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -52,18 +52,18 @@ impl ImageTexture {
         &self.bind_group
     }
 
-    fn create_view<P: AsRef<Path>>(
+    fn create_view<R: AsRgbaImage>(
         renderer @ Renderer {
             device,
             queue,
             config,
             ..
         }: &Renderer,
-        path: P,
+        image: R,
         mip_level_count: u32,
         is_srgb: bool,
     ) -> wgpu::TextureView {
-        let image = Self::load_rgba(path);
+        let image = image.as_rgba_image();
         let (width, height) = image.dimensions();
         let size = wgpu::Extent3d {
             width,
@@ -94,7 +94,7 @@ impl ImageTexture {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &image,
+            image,
             wgpu::TexelCopyBufferLayout {
                 bytes_per_row: Some(4 * width),
                 ..Default::default()
@@ -124,13 +124,6 @@ impl ImageTexture {
             },
             ..Default::default()
         })
-    }
-
-    fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
-        let path = path.as_ref();
-        image::open(path)
-            .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
-            .into_rgba8()
     }
 
     fn generate_mip_levels(
@@ -219,14 +212,14 @@ pub struct ImageTextureArray {
 #[bon]
 impl ImageTextureArray {
     #[builder]
-    pub fn new<P: IntoIterator<Item: AsRef<Path>>>(
+    pub fn new<R: IntoIterator<Item: AsRgbaImage>>(
         renderer @ Renderer { device, .. }: &Renderer,
-        paths: P,
+        images: R,
         #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
-        let views = Self::create_views(renderer, paths, mip_level_count, is_srgb);
+        let views = Self::create_views(renderer, images, mip_level_count, is_srgb);
         let sampler = ImageTexture::create_sampler(renderer, address_mode, mip_level_count);
         let bind_group_layout = Self::create_bind_group_layout(renderer, &views);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -259,15 +252,15 @@ impl ImageTextureArray {
         &self.bind_group
     }
 
-    fn create_views<P: IntoIterator<Item: AsRef<Path>>>(
+    fn create_views<R: IntoIterator<Item: AsRgbaImage>>(
         renderer: &Renderer,
-        paths: P,
+        images: R,
         mip_level_count: u32,
         is_srgb: bool,
     ) -> Vec<wgpu::TextureView> {
-        paths
+        images
             .into_iter()
-            .map(|path| ImageTexture::create_view(renderer, path, mip_level_count, is_srgb))
+            .map(|image| ImageTexture::create_view(renderer, image, mip_level_count, is_srgb))
             .collect()
     }
 
@@ -296,5 +289,21 @@ impl ImageTextureArray {
                 },
             ],
         })
+    }
+}
+
+pub trait AsRgbaImage {
+    fn as_rgba_image(&self) -> &RgbaImage;
+}
+
+impl AsRgbaImage for RgbaImage {
+    fn as_rgba_image(&self) -> &RgbaImage {
+        self
+    }
+}
+
+impl AsRgbaImage for &RgbaImage {
+    fn as_rgba_image(&self) -> &RgbaImage {
+        self
     }
 }

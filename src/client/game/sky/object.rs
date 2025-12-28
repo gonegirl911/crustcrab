@@ -5,9 +5,9 @@ use crate::{
         renderer::{
             Renderer,
             effect::PostProcessor,
-            program::{Immediates, Program},
-            shader::read_wgsl,
+            program::Program,
             texture::image::ImageTextureArray,
+            utils::{Immediates, load_rgba, read_wgsl},
         },
     },
     server::{ServerEvent, game::clock::Time},
@@ -31,9 +31,9 @@ impl ObjectSet {
     ) -> Self {
         let textures = ImageTextureArray::builder()
             .renderer(renderer)
-            .paths([
-                "assets/textures/sky/sun.png",
-                "assets/textures/sky/moon.png",
+            .images([
+                load_rgba("assets/textures/sky/sun.png"),
+                load_rgba("assets/textures/sky/moon.png"),
             ])
             .is_srgb(true)
             .build();

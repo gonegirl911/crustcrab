@@ -4,11 +4,11 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
-            buffer::{IndexBuffer, MemoryState, Vertex, VertexBuffer},
+            buffer::{IndexBuffer, MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::{Immediates, Program},
-            shader::read_wgsl,
+            program::Program,
             texture::screen::DepthBuffer,
+            utils::{Immediates, Vertex, read_wgsl},
         },
     },
     server::{

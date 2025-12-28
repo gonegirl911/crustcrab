@@ -5,11 +5,11 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
-            buffer::{Instance, InstanceBuffer, MemoryState, Vertex, VertexBuffer},
+            buffer::{MemoryState, VertexBuffer},
             effect::{Blender, PostProcessor},
-            program::{Immediates, Program},
-            shader::read_wgsl,
+            program::Program,
             texture::{image::ImageTexture, screen::DepthBuffer},
+            utils::{Immediates, Vertex, load_rgba, read_wgsl},
         },
     },
     server::{
@@ -29,7 +29,7 @@ use winit::event::WindowEvent;
 
 pub struct CloudLayer {
     vertex_buffer: VertexBuffer<BlockVertex>,
-    instance_buffer: InstanceBuffer<CloudInstance>,
+    instance_buffer: VertexBuffer<CloudInstance>,
     texture: ImageTexture,
     program: Program,
     blender: Blender,
@@ -44,13 +44,14 @@ impl CloudLayer {
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&Self::vertices()));
-        let instance_buffer = InstanceBuffer::new(
+        let instance_buffer = VertexBuffer::new(
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
         );
+        let image = load_rgba("assets/textures/clouds.png");
         let texture = ImageTexture::builder()
             .renderer(renderer)
-            .path(TEX_PATH)
+            .image(&image)
             .is_srgb(false)
             .address_mode(wgpu::AddressMode::Repeat)
             .build();
@@ -76,7 +77,7 @@ impl CloudLayer {
             texture,
             program,
             blender,
-            imm: Default::default(),
+            imm: CloudImmediates::new(image.dimensions()),
             opacity: Self::opacity(Default::default()),
         }
     }
@@ -182,7 +183,8 @@ impl CloudInstance {
     }
 }
 
-impl Instance for CloudInstance {
+impl Vertex for CloudInstance {
+    const STEP_MODE: wgpu::VertexStepMode = wgpu::VertexStepMode::Instance;
     const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![1 => Float32x2];
 }
 
@@ -198,6 +200,17 @@ struct CloudImmediates {
 }
 
 impl CloudImmediates {
+    fn new((width, height): (u32, u32)) -> Self {
+        Self {
+            dims: point![width, height].cast(),
+            size: CLIENT_CONFIG.cloud.size.cast(),
+            scale_factor: Self::scale_factor().into(),
+            color: Self::color(Default::default()).into(),
+            offset: Default::default(),
+            padding: Default::default(),
+        }
+    }
+
     fn update_color(&mut self, stage: Stage) {
         self.color = Self::color(stage).into();
     }
@@ -205,12 +218,6 @@ impl CloudImmediates {
     fn update_offset(&mut self, dt: Duration) {
         self.offset.x -= CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
         self.offset.x %= self.size.x * self.dims.x;
-    }
-
-    fn dims() -> Point2<u32> {
-        let (width, height) = image::image_dimensions(TEX_PATH)
-            .unwrap_or_else(|e| panic!("failed to read dimensions of {TEX_PATH}: {e}"));
-        point![width, height]
     }
 
     fn scale_factor() -> Vector3<f32> {
@@ -224,19 +231,6 @@ impl CloudImmediates {
             CLIENT_CONFIG.cloud.day.color.rgb,
             CLIENT_CONFIG.cloud.night.color.rgb,
         )
-    }
-}
-
-impl Default for CloudImmediates {
-    fn default() -> Self {
-        Self {
-            dims: Self::dims().cast(),
-            size: CLIENT_CONFIG.cloud.size.cast(),
-            scale_factor: Self::scale_factor().into(),
-            color: Self::color(Default::default()).into(),
-            offset: Default::default(),
-            padding: Default::default(),
-        }
     }
 }
 
@@ -255,5 +249,3 @@ pub struct CloudConfig {
 struct StageConfig {
     color: Rgba<f32>,
 }
-
-const TEX_PATH: &str = "assets/textures/clouds.png";

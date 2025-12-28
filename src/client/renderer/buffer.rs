@@ -24,7 +24,7 @@ impl<V> VertexBuffer<V> {
     pub fn draw_instanced<E>(
         &self,
         render_pass: &mut wgpu::RenderPass,
-        instance_buffer: &InstanceBuffer<E>,
+        instance_buffer: &VertexBuffer<E>,
     ) {
         render_pass.set_vertex_buffer(0, self.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
@@ -72,26 +72,6 @@ impl<I: Pod> IndexBuffer<I> {
 
 impl<I> Deref for IndexBuffer<I> {
     type Target = Buffer<[I]>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-pub struct InstanceBuffer<E>(Buffer<[E]>);
-
-impl<E: Pod> InstanceBuffer<E> {
-    pub fn new(renderer: &Renderer, state: MemoryState<[E], usize>) -> Self {
-        Self(Buffer::<[_]>::new(
-            renderer,
-            state.data(),
-            state.usage(wgpu::BufferUsages::VERTEX),
-        ))
-    }
-}
-
-impl<E> Deref for InstanceBuffer<E> {
-    type Target = Buffer<[E]>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -237,18 +217,6 @@ impl<T: ?Sized, U: Clone> Clone for MemoryState<'_, T, U> {
 
 impl<T: ?Sized, U: Copy> Copy for MemoryState<'_, T, U> {}
 
-pub trait Vertex: Pod {
-    const ATTRIBS: &[wgpu::VertexAttribute];
-
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: Self::ATTRIBS,
-        }
-    }
-}
-
 pub trait Index: Pod {
     const FORMAT: wgpu::IndexFormat;
 }
@@ -259,16 +227,4 @@ impl Index for u16 {
 
 impl Index for u32 {
     const FORMAT: wgpu::IndexFormat = wgpu::IndexFormat::Uint32;
-}
-
-pub trait Instance: Pod {
-    const ATTRIBS: &[wgpu::VertexAttribute];
-
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: Self::ATTRIBS,
-        }
-    }
 }

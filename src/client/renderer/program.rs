@@ -1,7 +1,5 @@
 use super::Renderer;
 use bon::bon;
-use bytemuck::Pod;
-use std::slice;
 
 pub struct Program(wgpu::RenderPipeline);
 
@@ -64,17 +62,5 @@ impl Program {
         for (i, bind_group) in (0..).zip(bind_groups) {
             render_pass.set_bind_group(i, bind_group, &[]);
         }
-    }
-}
-
-pub trait Immediates: Pod {
-    const SIZE: u32 = {
-        let size = size_of::<Self>();
-        assert!(usize::BITS <= u32::BITS || size <= u32::MAX as usize);
-        size as u32
-    };
-
-    fn set(&self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_immediates(0, bytemuck::cast_slice(slice::from_ref(self)));
     }
 }

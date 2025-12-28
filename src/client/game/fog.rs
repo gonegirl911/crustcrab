@@ -1,8 +1,8 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer, effect::PostProcessor, program::Program, shader::read_wgsl,
-        texture::screen::ScreenTexture,
+        Renderer, effect::PostProcessor, program::Program, texture::screen::ScreenTexture,
+        utils::read_wgsl,
     },
 };
 
