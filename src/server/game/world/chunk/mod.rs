@@ -143,10 +143,10 @@ impl BitOrAssign<BlockLight> for ChunkLight {
 }
 
 #[derive(Default)]
-pub struct ChunkDataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
+struct ChunkDataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
 impl<T> ChunkDataStore<T> {
-    pub fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
+    fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
