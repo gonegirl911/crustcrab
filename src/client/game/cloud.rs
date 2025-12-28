@@ -22,7 +22,6 @@ use crate::{
     shared::color::{Float3, Rgb, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
-use image::ImageReader;
 use nalgebra::{Point2, Vector2, Vector3, point, vector};
 use serde::Deserialize;
 use std::time::Duration;
@@ -209,9 +208,7 @@ impl CloudImmediates {
     }
 
     fn dims() -> Point2<u32> {
-        let (width, height) = ImageReader::open(TEX_PATH)
-            .unwrap_or_else(|e| panic!("failed to open {TEX_PATH}: {e}"))
-            .into_dimensions()
+        let (width, height) = image::image_dimensions(TEX_PATH)
             .unwrap_or_else(|e| panic!("failed to read dimensions of {TEX_PATH}: {e}"));
         point![width, height]
     }

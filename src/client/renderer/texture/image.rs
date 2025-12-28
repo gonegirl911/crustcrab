@@ -3,7 +3,7 @@ use crate::client::renderer::{
     effect::{Blit, Effect},
 };
 use bon::bon;
-use image::{ImageReader, RgbaImage};
+use image::RgbaImage;
 use std::{num::NonZero, path::Path};
 
 pub struct ImageTexture {
@@ -128,10 +128,8 @@ impl ImageTexture {
 
     fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
         let path = path.as_ref();
-        ImageReader::open(path)
+        image::open(path)
             .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
-            .decode()
-            .unwrap_or_else(|e| panic!("failed to decode {}: {e}", path.display()))
             .into_rgba8()
     }
 
