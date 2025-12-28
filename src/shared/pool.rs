@@ -21,7 +21,7 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
         let (in_tx, in_rx) = crossbeam_channel::unbounded();
         let (out_tx, out_rx) = crossbeam_channel::unbounded();
 
-        for _ in 0..*NUM_CPUS {
+        for _ in 0..NUM_CPUS.get() {
             let in_rx = in_rx.clone();
             let out_tx = out_tx.clone();
             thread::spawn(move || {
@@ -37,5 +37,5 @@ impl<I: Send + 'static, O: Send + 'static> ThreadPool<I, O> {
     }
 }
 
-static NUM_CPUS: LazyLock<usize> =
-    LazyLock::new(|| thread::available_parallelism().map_or(1, NonZero::get));
+static NUM_CPUS: LazyLock<NonZero<usize>> =
+    LazyLock::new(|| thread::available_parallelism().unwrap_or(const { NonZero::new(1).unwrap() }));

@@ -11,6 +11,7 @@ use crate::{
     server::game::world::chunk::Chunk,
     shared::color::Float3,
 };
+use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 use camera::{Changes, Controller, Projection, View};
 use crossbeam_channel::Sender;
@@ -168,6 +169,8 @@ pub struct PlayerConfig {
     speed: f32,
     sensitivity: f32,
     render_distance: u32,
+    #[serde(default)]
+    features: PlayerFeatures,
 }
 
 impl PlayerConfig {
@@ -177,5 +180,12 @@ impl PlayerConfig {
 
     fn zfar(&self) -> f32 {
         1000.0 + SQRT_2 * ((self.render_distance + 1) as u64 * Chunk::DIM as u64) as f32
+    }
+}
+
+bitflags! {
+    #[derive(Default, Deserialize)]
+    struct PlayerFeatures: u8 {
+        const DRAWING_MODE = 1 << 0;
     }
 }

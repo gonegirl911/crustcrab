@@ -1,9 +1,12 @@
-use crate::client::event_loop::{Event, EventHandler};
+use super::PlayerFeatures;
+use crate::client::{
+    CLIENT_CONFIG,
+    event_loop::{Event, EventHandler},
+};
 use bitflags::bitflags;
 use nalgebra::{Matrix4, Point3, Vector3, matrix, vector};
 use std::{
     f32::consts::{FRAC_PI_2, TAU},
-    mem,
     time::Duration,
 };
 use winit::{
@@ -99,8 +102,8 @@ pub struct Controller {
     dy: f32,
     relevant_keys: Keys,
     key_history: Keys,
-    block_placed: bool,
-    block_destroyed: bool,
+    relevant_buttons: MouseButtons,
+    button_history: MouseButtons,
     speed: f32,
     sensitivity: f32,
 }
@@ -114,6 +117,7 @@ impl Controller {
         }
     }
 
+    #[rustfmt::skip]
     pub fn apply_updates(&mut self, view: &mut View, dt: Duration) -> Changes {
         let mut changes = Changes::empty();
 
@@ -129,10 +133,16 @@ impl Controller {
             changes.insert(Changes::MOVED);
         }
 
-        if mem::take(&mut self.block_placed) {
+        if self.relevant_buttons.contains(MouseButtons::RIGHT) {
             changes.insert(Changes::BLOCK_PLACED);
-        } else if mem::take(&mut self.block_destroyed) {
+        } else if self.relevant_buttons.contains(MouseButtons::LEFT) {
             changes.insert(Changes::BLOCK_DESTROYED);
+        }
+
+        if !CLIENT_CONFIG.player.features.contains(PlayerFeatures::DRAWING_MODE) {
+            let block_action_buttons = MouseButtons::LEFT | MouseButtons::RIGHT;
+            self.relevant_buttons.remove(block_action_buttons);
+            self.button_history.remove(block_action_buttons);
         }
 
         changes
@@ -220,13 +230,30 @@ impl EventHandler for Controller {
                 }
                 WindowEvent::PointerButton {
                     button: ButtonSource::Mouse(button),
-                    state: ElementState::Pressed,
+                    state,
                     ..
-                } => match button {
-                    MouseButton::Left => self.block_destroyed = true,
-                    MouseButton::Right => self.block_placed = true,
-                    _ => {}
-                },
+                } => {
+                    let (button, opp) = match button {
+                        MouseButton::Left => (MouseButtons::LEFT, MouseButtons::RIGHT),
+                        MouseButton::Right => (MouseButtons::RIGHT, MouseButtons::LEFT),
+                        _ => return,
+                    };
+
+                    match state {
+                        ElementState::Pressed => {
+                            self.relevant_buttons.insert(button);
+                            self.relevant_buttons.remove(opp);
+                            self.button_history.insert(button);
+                        }
+                        ElementState::Released => {
+                            self.relevant_buttons.remove(button);
+                            if self.button_history.contains(opp) {
+                                self.relevant_buttons.insert(opp);
+                            }
+                            self.button_history.remove(button);
+                        }
+                    }
+                }
                 _ => {}
             },
             _ => {}
@@ -251,5 +278,11 @@ bitflags! {
         const D = 1 << 3;
         const SPACE = 1 << 4;
         const LSHIFT = 1 << 5;
+    }
+
+    #[derive(Clone, Copy, Default)]
+    struct MouseButtons: u8 {
+        const LEFT = 1 << 0;
+        const RIGHT = 1 << 1;
     }
 }

@@ -16,7 +16,7 @@ strip = "symbols"
 [dependencies]
 bincode = { version = "2.0.1", features = ["serde"] }
 bitfield = "0.19.4"
-bitflags = "2.10.0"
+bitflags = { version = "2.10.0", features = ["serde"] }
 bon = "3.8.1"
 bytemuck = { version = "1.24.0", features = ["derive"] }
 clap = { version = "4.5.53", features = ["derive"] }
