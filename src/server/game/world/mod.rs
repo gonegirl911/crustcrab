@@ -25,7 +25,7 @@ use block::{
     data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
 };
 use chunk::{
-    Chunk, ChunkDataStore,
+    Chunk,
     area::{ChunkArea, ChunkAreaLight},
     generator::ChunkGenerator,
 };
@@ -526,7 +526,31 @@ impl ChunkData {
     pub fn vertices(&self) -> (Vec<BlockVertex>, Vec<BlockVertex>) {
         let mut vertices = vec![];
         let mut transparent_vertices = vec![];
-        let areas = self.block_areas(&mut vertices, &mut transparent_vertices);
+
+        for x in 0..Chunk::DIM as u8 {
+            for y in 0..Chunk::DIM as u8 {
+                for z in 0..Chunk::DIM as u8 {
+                    let coords = point![x, y, z];
+                    let area = self.area.block_area(coords);
+                    let area_light = self.area_light.block_area_light(coords);
+                    let data = area.kernel().data();
+
+                    if data.requires_blending {
+                        transparent_vertices.extend(data.mesh(coords, &area, &area_light));
+                    } else {
+                        let is_externally_lit = data.is_externally_lit();
+                        vertices.extend(data.vertices(
+                            None,
+                            coords,
+                            point![1, 1, 1],
+                            point![1, 1],
+                            area.corner_aos(None, is_externally_lit),
+                            area_light.corner_lights(None, &area),
+                        ));
+                    }
+                }
+            }
+        }
 
         for side in Enum::variants() {
             let mask = SIDE_MASKS[side].map(|c| c.0);
@@ -535,7 +559,13 @@ impl ChunkData {
             let abs_delta = delta.map(i8::abs);
 
             for axis in 0..=Chunk::DIM as i8 {
-                let mut quads = Self::quads(&areas, side, mask, is_negative, abs_delta, axis - 1);
+                let mut quads = array::from_fn(|i| {
+                    let axis = axis - 1;
+                    let secondary = i / Chunk::DIM;
+                    let main = i % Chunk::DIM;
+                    let coords = mask.map(|i| [axis, axis, main as i8, secondary as i8][i]);
+                    self.quad(side, is_negative, abs_delta, axis, coords)
+                });
                 let mut cur = 0;
 
                 for secondary in 0..Chunk::DIM {
@@ -575,56 +605,33 @@ impl ChunkData {
         (vertices, transparent_vertices)
     }
 
-    fn block_areas(
+    fn quad(
         &self,
-        vertices: &mut Vec<BlockVertex>,
-        transparent_vertices: &mut Vec<BlockVertex>,
-    ) -> ChunkDataStore<(BlockArea, BlockAreaLight)> {
-        ChunkDataStore::from_fn(|coords| {
-            let area = self.area.block_area(coords);
-            let area_light = self.area_light.block_area_light(coords);
-            let data = area.kernel().data();
-
-            if data.requires_blending {
-                transparent_vertices.extend(data.mesh(coords, &area, &area_light));
-            } else {
-                let is_externally_lit = data.is_externally_lit();
-                vertices.extend(data.vertices(
-                    None,
-                    coords,
-                    point![1, 1, 1],
-                    point![1, 1],
-                    area.corner_aos(None, is_externally_lit),
-                    area_light.corner_lights(None, &area),
-                ));
-            }
-
-            (area, area_light)
-        })
-    }
-
-    fn quads(
-        areas: &ChunkDataStore<(BlockArea, BlockAreaLight)>,
         side: Side,
-        mask: Point3<usize>,
         is_negative: bool,
         abs_delta: Vector3<i8>,
         axis: i8,
-    ) -> [Option<Option<Quad>>; Chunk::DIM * Chunk::DIM] {
-        array::from_fn(|i| {
-            let secondary = i / Chunk::DIM;
-            let main = i % Chunk::DIM;
-            let coords = mask.map(|i| [axis, axis, main as i8, secondary as i8][i]);
-            let quad = Self::quad(axis >= 0, areas, side, coords);
-            let neighbor = Self::quad(axis < Chunk::DIM as i8 - 1, areas, side, coords + abs_delta);
-            if quad == neighbor {
-                None
-            } else if is_negative {
-                neighbor
-            } else {
-                quad
-            }
-        })
+        coords: Point3<i8>,
+    ) -> Option<Option<Quad>> {
+        let quad = (axis >= 0).then(|| {
+            let coords = coords.map(|c| c as u8);
+            let area = self.area.block_area(coords);
+            let area_light = self.area_light.block_area_light(coords);
+            Quad::new(side, &area, &area_light)
+        });
+        let neighbor = (axis < Chunk::DIM as i8 - 1).then(|| {
+            let coords = (coords + abs_delta).map(|c| c as u8);
+            let area = self.area.block_area(coords);
+            let area_light = self.area_light.block_area_light(coords);
+            Quad::new(side, &area, &area_light)
+        });
+        if quad == neighbor {
+            None
+        } else if is_negative {
+            neighbor
+        } else {
+            quad
+        }
     }
 
     fn width(
@@ -658,15 +665,6 @@ impl ChunkData {
         }
         height
     }
-
-    fn quad(
-        cond: bool,
-        areas: &ChunkDataStore<(BlockArea, BlockAreaLight)>,
-        side: Side,
-        coords: Point3<i8>,
-    ) -> Option<Option<Quad>> {
-        cond.then(|| Quad::new(side, &areas[coords.map(|c| c as u8)]))
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -678,7 +676,7 @@ struct Quad {
 }
 
 impl Quad {
-    fn new(side: Side, (area, area_light): &(BlockArea, BlockAreaLight)) -> Option<Self> {
+    fn new(side: Side, area: &BlockArea, area_light: &BlockAreaLight) -> Option<Self> {
         let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
