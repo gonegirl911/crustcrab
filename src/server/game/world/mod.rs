@@ -127,36 +127,31 @@ impl World {
         points: P,
         group_id: GroupId,
         server_tx: &ServerSender,
-    ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
-        Self::send_events(
-            points
-                .into_iter()
-                .map(move |coords| ServerEvent::ChunkLoaded {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: Some(group_id),
-                }),
-            server_tx,
-        )
+    ) -> Result<(), SendError<ServerEvent>> {
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkLoaded {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: Some(group_id),
+            })
+            .try_for_each(|event| server_tx.send(event))
     }
 
-    #[expect(clippy::result_large_err)]
     fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
         points: P,
         server_tx: &ServerSender,
-    ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
-        Self::send_events(
-            points
-                .into_par_iter()
-                .map(|coords| ServerEvent::ChunkLoaded {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
-                })
-                .into_seq_iter(),
-            server_tx,
-        )
+    ) -> Result<(), SendError<ServerEvent>> {
+        points
+            .into_par_iter()
+            .map(|coords| ServerEvent::ChunkLoaded {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: None,
+            })
+            .into_seq_iter()
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
@@ -164,36 +159,31 @@ impl World {
         points: P,
         group_id: GroupId,
         server_tx: &ServerSender,
-    ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
-        Self::send_events(
-            points
-                .into_iter()
-                .map(move |coords| ServerEvent::ChunkUpdated {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: Some(group_id),
-                }),
-            server_tx,
-        )
+    ) -> Result<(), SendError<ServerEvent>> {
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkUpdated {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: Some(group_id),
+            })
+            .try_for_each(|event| server_tx.send(event))
     }
 
-    #[expect(clippy::result_large_err)]
     fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
         points: P,
         server_tx: &ServerSender,
-    ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
-        Self::send_events(
-            points
-                .into_par_iter()
-                .map(|coords| ServerEvent::ChunkUpdated {
-                    coords,
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
-                })
-                .into_seq_iter(),
-            server_tx,
-        )
+    ) -> Result<(), SendError<ServerEvent>> {
+        points
+            .into_par_iter()
+            .map(|coords| ServerEvent::ChunkUpdated {
+                coords,
+                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                group_id: None,
+            })
+            .into_seq_iter()
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -212,13 +202,11 @@ impl World {
         points: P,
         group_id: Option<GroupId>,
         server_tx: &ServerSender,
-    ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
-        Self::send_events(
-            points
-                .into_iter()
-                .map(move |coords| ServerEvent::ChunkUnloaded { coords, group_id }),
-            server_tx,
-        )
+    ) -> Result<(), SendError<ServerEvent>> {
+        points
+            .into_iter()
+            .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id })
+            .try_for_each(|event| server_tx.send(event))
     }
 
     fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point3<i32>>
@@ -237,16 +225,6 @@ impl World {
         points
             .into_iter()
             .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
-    }
-
-    fn send_events<E: IntoIterator<Item = ServerEvent>>(
-        events: E,
-        server_tx: &ServerSender,
-    ) -> Result<(), SendError<impl Iterator<Item = ServerEvent>>> {
-        let mut events = events.into_iter();
-        events
-            .try_for_each(|event| server_tx.send(event))
-            .map_err(|SendError(event)| SendError(iter::chain([event], events)))
     }
 }
 
