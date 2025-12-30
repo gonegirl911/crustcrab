@@ -6,7 +6,7 @@ use generic_array::{
 };
 use serde::{
     Deserialize, Deserializer,
-    de::{MapAccess, Visitor},
+    de::{self, MapAccess, Visitor},
 };
 use std::{
     fmt::{self, Debug, Formatter},
@@ -165,14 +165,14 @@ where
 
                 while let Some((variant, value)) = access.next_entry()? {
                     if !guard.init(variant, value) {
-                        return Err(serde::de::Error::custom(format_args!(
+                        return Err(de::Error::custom(format_args!(
                             "duplicate variant \"{variant:?}\"",
                         )));
                     }
                 }
 
                 if let Err(variant) = guard.finish() {
-                    Err(serde::de::Error::custom(format_args!(
+                    Err(de::Error::custom(format_args!(
                         "missing variant \"{variant:?}\"",
                     )))
                 } else {

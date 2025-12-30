@@ -18,7 +18,10 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
-use serde::{Deserialize, Deserializer};
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, Unexpected},
+};
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
     mem,
@@ -201,8 +204,8 @@ impl InventoryConfig {
             .into_iter()
             .map(|str| {
                 STR_TO_BLOCK.get(&*str).copied().ok_or_else(|| {
-                    serde::de::Error::invalid_value(
-                        serde::de::Unexpected::Str(&str),
+                    de::Error::invalid_value(
+                        Unexpected::Str(&str),
                         &&*format!(
                             "one of \"{}\"",
                             STR_TO_BLOCK

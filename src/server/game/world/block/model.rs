@@ -6,7 +6,10 @@ use crate::shared::{
 };
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Deserializer};
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, Unexpected},
+};
 use std::{borrow::Cow, iter, ops::Deref, sync::LazyLock};
 use walkdir::{DirEntry, WalkDir};
 
@@ -103,8 +106,8 @@ impl RawModel {
         if MODEL_DATA.contains_key(&*variant) {
             Ok(variant)
         } else {
-            Err(serde::de::Error::invalid_value(
-                serde::de::Unexpected::Str(&variant),
+            Err(de::Error::invalid_value(
+                Unexpected::Str(&variant),
                 &&*format!(
                     "one of \"{}\"",
                     MODEL_DATA

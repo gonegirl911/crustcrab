@@ -17,7 +17,10 @@ use crate::{
 };
 use nalgebra::{Point2, Point3, Vector3, point};
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Deserializer};
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, Unexpected},
+};
 use std::{array, ops::Deref, sync::LazyLock};
 
 pub struct BlockData {
@@ -167,8 +170,8 @@ impl RawBlockData {
     {
         let filter = Rgb::deserialize(deserializer)?;
         if let Some(c) = filter.into_iter().find(|&c| c > 1) {
-            Err(serde::de::Error::invalid_value(
-                serde::de::Unexpected::Unsigned(c),
+            Err(de::Error::invalid_value(
+                Unexpected::Unsigned(c),
                 &"either 0 or 1",
             ))
         } else {
