@@ -19,7 +19,7 @@ fn derive_enum2(input: &DeriveInput) -> syn::Result<TokenStream2> {
     };
 
     if let Some(variant) = variants
-        .into_iter()
+        .iter()
         .find(|variant| variant.fields != Fields::Unit)
     {
         return Err(syn::Error::new_spanned(
