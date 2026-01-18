@@ -15,7 +15,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    fn send(&self, server_tx: &ServerSender) {
+    fn send_time(&self, server_tx: &ServerSender) {
         _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
     }
 
@@ -38,11 +38,11 @@ impl EventHandler<Event> for Clock {
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         match event {
             Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
-                self.send(server_tx);
+                self.send_time(server_tx);
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
-                self.send(server_tx);
+                self.send_time(server_tx);
             }
             _ => {}
         }

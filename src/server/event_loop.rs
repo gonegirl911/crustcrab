@@ -21,7 +21,6 @@ impl EventLoop {
         H: for<'a> EventHandler<Event, Context<'a> = &'a ServerSender>,
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
-        handler.handle(&Event::Init, &self.server_tx);
         loop {
             let event = match ticker.recv_timeout(&self.client_rx) {
                 Ok(ClientEvent::Connected(server_tx)) => {
@@ -44,7 +43,6 @@ pub trait EventHandler<E> {
 }
 
 pub enum Event {
-    Init,
     Client(ClientEvent),
     Tick,
 }
