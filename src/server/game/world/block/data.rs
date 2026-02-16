@@ -12,7 +12,6 @@ use crate::{
         color::Rgb,
         enum_map::{Enum, EnumMap},
         indexmap::FxIndexSet,
-        toml,
     },
 };
 use nalgebra::{Point2, Point3, Vector3, point};
@@ -21,7 +20,7 @@ use serde::{
     Deserialize, Deserializer,
     de::{self, Unexpected},
 };
-use std::{array, ops::Deref, sync::LazyLock};
+use std::{array, fs, ops::Deref, sync::LazyLock};
 
 pub struct BlockData {
     model: Model,
@@ -135,33 +134,33 @@ impl BlockData {
     }
 }
 
-impl From<RawBlockData> for BlockData {
+impl From<RawBlockData<'_>> for BlockData {
     fn from(data: RawBlockData) -> Self {
         Self {
             model: data.model.into(),
             luminance: data.luminance,
             light_filter: data.light_filter,
             requires_blending: data.requires_blending,
-            valid_surface: data.valid_surface.as_deref().map(|str| STR_TO_BLOCK[str]),
+            valid_surface: data.valid_surface.map(|str| STR_TO_BLOCK[str]),
         }
     }
 }
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(default)]
-struct RawBlockData {
-    #[serde(flatten)]
-    model: RawModel,
+struct RawBlockData<'a> {
+    #[serde(borrow, flatten)]
+    model: RawModel<'a>,
     luminance: Rgb<u8>,
     #[serde(deserialize_with = "RawBlockData::deserialize_light_filter")]
     light_filter: Rgb<bool>,
     requires_blending: bool,
-    valid_surface: Option<String>,
+    valid_surface: Option<&'a str>,
 }
 
-impl RawBlockData {
-    fn tex_path(&self) -> &str {
-        &self.model.tex_path
+impl<'a> RawBlockData<'a> {
+    fn tex_path(&self) -> &'a str {
+        self.model.tex_path
     }
 
     fn deserialize_light_filter<'de, D>(deserializer: D) -> Result<Rgb<bool>, D::Error>
@@ -250,18 +249,17 @@ pub enum Component {
 
 pub(super) static BLOCK_DATA: LazyLock<Box<[BlockData]>> = LazyLock::new(|| {
     let mut data = Box::new_uninit_slice(STR_TO_BLOCK.len());
-    for (&str, &Block(i)) in &*STR_TO_BLOCK {
+    for (str, &Block(i)) in &*STR_TO_BLOCK {
         data[i as usize].write(RAW_BLOCK_DATA[str].clone().into());
     }
     unsafe { data.assume_init() }
 });
 
-pub static STR_TO_BLOCK: LazyLock<FxHashMap<&'static str, Block>> = LazyLock::new(|| {
+pub static STR_TO_BLOCK: LazyLock<FxHashMap<&str, Block>> = LazyLock::new(|| {
     let mut idx = Block::HARD_CODED_VALUES.len() as u8;
     RAW_BLOCK_DATA
         .keys()
-        .map(Deref::deref)
-        .map(|str| {
+        .map(|&str| {
             if let Some(i) = Block::HARD_CODED_VALUES.iter().position(|&s| s == str) {
                 (str, Block(i as u8))
             } else {
@@ -273,15 +271,20 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<&'static str, Block>> = LazyLock::ne
         .collect()
 });
 
-pub static TEX_PATHS: LazyLock<FxIndexSet<&'static str>> = LazyLock::new(|| {
+pub static TEX_PATHS: LazyLock<FxIndexSet<&str>> = LazyLock::new(|| {
     RAW_BLOCK_DATA
         .values()
         .map(RawBlockData::tex_path)
         .collect()
 });
 
-static RAW_BLOCK_DATA: LazyLock<FxHashMap<String, RawBlockData>> = LazyLock::new(|| {
-    let data = toml::deserialize::<_, FxHashMap<_, RawBlockData>>("assets/config/blocks.toml");
+static RAW_BLOCK_DATA: LazyLock<FxHashMap<&str, RawBlockData>> = LazyLock::new(|| {
+    let path = "assets/config/blocks.toml";
+    let contents =
+        fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
+    let leaked_contents = Box::leak(contents.into_boxed_str());
+    let data = ::toml::from_str::<FxHashMap<_, RawBlockData>>(leaked_contents)
+        .unwrap_or_else(|e| panic!("failed to deserialize {path}: {e}"));
 
     assert!(
         data.len() <= Block::MAX_COUNT,
@@ -291,15 +294,15 @@ static RAW_BLOCK_DATA: LazyLock<FxHashMap<String, RawBlockData>> = LazyLock::new
 
     if let Some(str) = Block::HARD_CODED_VALUES
         .iter()
-        .find(|&&str| !data.contains_key(str))
+        .find(|&str| !data.contains_key(str))
     {
         panic!("{str} block must be configured");
     }
 
     if let Some((block, surface)) = data
         .iter()
-        .filter_map(|(block, data)| Some((block, data.valid_surface.as_ref()?)))
-        .find(|&(_, surface)| !data.contains_key(surface))
+        .filter_map(|(block, data)| Some((block, data.valid_surface?)))
+        .find(|(_, surface)| !data.contains_key(surface))
     {
         panic!(
             "invalid valid_surface \"{surface}\" of block \"{block}\", expected one of \"{}\"",

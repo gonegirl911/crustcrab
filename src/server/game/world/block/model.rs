@@ -10,7 +10,7 @@ use serde::{
     Deserialize, Deserializer,
     de::{self, Unexpected},
 };
-use std::{borrow::Cow, iter, ops::Deref, sync::LazyLock};
+use std::{iter, ops::Deref, sync::LazyLock};
 use walkdir::{DirEntry, WalkDir};
 
 pub struct Model {
@@ -32,10 +32,10 @@ impl Model {
     }
 }
 
-impl From<RawModel> for Model {
+impl From<RawModel<'_>> for Model {
     fn from(model: RawModel) -> Self {
         Self {
-            data: &MODEL_DATA[&*model.variant],
+            data: &MODEL_DATA[model.variant],
             tex_index: model.tex_index(),
         }
     }
@@ -84,30 +84,30 @@ impl From<RawModelData> for ModelData {
 
 #[derive(Clone, Deserialize)]
 #[serde(default)]
-pub struct RawModel {
+pub struct RawModel<'a> {
     #[serde(rename = "model", deserialize_with = "RawModel::deserialize_variant")]
-    variant: Cow<'static, str>,
+    variant: &'a str,
     #[serde(rename = "texture")]
-    pub tex_path: Cow<'static, str>,
+    pub tex_path: &'a str,
 }
 
-impl RawModel {
+impl RawModel<'_> {
     fn tex_index(&self) -> u8 {
         TEX_PATHS
-            .get_index_of(&*self.tex_path)
+            .get_index_of(self.tex_path)
             .unwrap_or_else(|| unreachable!()) as u8
     }
 
-    fn deserialize_variant<'de, D>(deserializer: D) -> Result<Cow<'static, str>, D::Error>
+    fn deserialize_variant<'de, D>(deserializer: D) -> Result<&'de str, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let variant = Cow::deserialize(deserializer)?;
-        if MODEL_DATA.contains_key(&*variant) {
+        let variant = Deserialize::deserialize(deserializer)?;
+        if MODEL_DATA.contains_key(variant) {
             Ok(variant)
         } else {
             Err(de::Error::invalid_value(
-                Unexpected::Str(&variant),
+                Unexpected::Str(variant),
                 &&*format!(
                     "one of \"{}\"",
                     MODEL_DATA
@@ -121,13 +121,13 @@ impl RawModel {
     }
 }
 
-impl Default for RawModel {
+impl Default for RawModel<'_> {
     fn default() -> Self {
         const DEFAULT_TEX_PATH: &str = "missing_texture.png";
 
         Self {
-            variant: DEFAULT_VARIANT.into(),
-            tex_path: DEFAULT_TEX_PATH.into(),
+            variant: DEFAULT_VARIANT,
+            tex_path: DEFAULT_TEX_PATH,
         }
     }
 }
