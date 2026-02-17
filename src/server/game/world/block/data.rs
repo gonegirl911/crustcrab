@@ -296,7 +296,7 @@ static RAW_BLOCK_DATA: LazyLock<FxHashMap<&str, RawBlockData>> = LazyLock::new(|
         .iter()
         .find(|&str| !data.contains_key(str))
     {
-        panic!("{str} block must be configured");
+        panic!("\"{str}\" block must be configured");
     }
 
     if let Some((block, surface)) = data
