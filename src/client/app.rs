@@ -48,11 +48,13 @@ impl ApplicationHandler for App {
     }
 
     fn proxy_wake_up(&mut self, _: &dyn ActiveEventLoop) {
+        let Some(instance) = &mut self.instance else {
+            self.server_rx.try_iter().for_each(drop);
+            return;
+        };
+
         for event in self.server_rx.try_iter() {
-            self.instance
-                .as_mut()
-                .unwrap_or_else(|| unreachable!())
-                .handle(&Event::ServerEvent(event), &self.client_tx);
+            instance.handle(&Event::ServerEvent(event), &self.client_tx);
         }
     }
 
