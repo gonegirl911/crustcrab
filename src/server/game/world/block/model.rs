@@ -170,7 +170,7 @@ static MODEL_DATA: LazyLock<FxHashMap<String, ModelData>> = LazyLock::new(|| {
 
     assert!(
         data.contains_key(DEFAULT_VARIANT),
-        "{DEFAULT_VARIANT} model must be configured",
+        "\"{DEFAULT_VARIANT}\" model must be configured",
     );
 
     data
