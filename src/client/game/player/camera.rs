@@ -1,7 +1,10 @@
 use super::PlayerFeatures;
-use crate::client::{
-    CLIENT_CONFIG,
-    event_loop::{Event, EventHandler},
+use crate::{
+    client::{
+        CLIENT_CONFIG,
+        event_loop::{Event, EventHandler},
+    },
+    server::ServerEvent,
 };
 use bitflags::bitflags;
 use nalgebra::{Matrix4, Point3, Vector3, matrix, vector};
@@ -189,6 +192,9 @@ impl EventHandler for Controller {
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
+            &Event::ServerEvent(ServerEvent::PlayerInitialized { speed, .. }) => {
+                self.speed = speed;
+            }
             &Event::DeviceEvent(DeviceEvent::PointerMotion { delta: (dx, dy) }) => {
                 self.dx += dx as f32;
                 self.dy += dy as f32;

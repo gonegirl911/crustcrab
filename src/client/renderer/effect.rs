@@ -1,6 +1,8 @@
 use super::{
-    Renderer, program::Program, texture::screen::ScreenTextureArray, utils::Immediates,
-    utils::read_wgsl,
+    Renderer, Surface,
+    program::Program,
+    texture::screen::ScreenTextureArray,
+    utils::{Immediates, read_wgsl},
 };
 use crate::client::event_loop::{Event, EventHandler};
 use bytemuck::{Pod, Zeroable};
@@ -13,9 +15,13 @@ pub struct PostProcessor {
 impl PostProcessor {
     pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
-    pub fn new(renderer @ Renderer { config, .. }: &Renderer) -> Self {
-        let textures = ScreenTextureArray::new(renderer, Self::FORMAT);
-        let blit = Blit::new(renderer, textures.bind_group_layout(), config.format);
+    pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
+        let textures = ScreenTextureArray::new(renderer, surface, Self::FORMAT);
+        let blit = Blit::new(
+            renderer,
+            textures.bind_group_layout(),
+            surface.config.format,
+        );
         Self { textures, blit }
     }
 
@@ -87,10 +93,10 @@ impl PostProcessor {
 }
 
 impl EventHandler for PostProcessor {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = (&'a Renderer, &'a Surface);
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.textures.handle(event, renderer);
+    fn handle(&mut self, event: &Event, (renderer, surface): Self::Context<'_>) {
+        self.textures.handle(event, (renderer, surface));
     }
 }
 

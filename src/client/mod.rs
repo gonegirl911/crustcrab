@@ -56,9 +56,7 @@ impl Client {
 
 #[derive(Serialize, Deserialize)]
 pub enum ClientEvent {
-    InitialRenderRequested {
-        origin: Point3<f32>,
-        dir: Vector3<f32>,
+    PlayerConnected {
         render_distance: u32,
     },
     PlayerPositionChanged {

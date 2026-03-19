@@ -3,7 +3,7 @@ use crate::client::{
     CLIENT_CONFIG,
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer,
+        Renderer, Surface,
         buffer::MemoryState,
         effect::PostProcessor,
         program::Program,
@@ -23,10 +23,15 @@ pub struct Crosshair {
 }
 
 impl Crosshair {
-    pub fn new(renderer: &Renderer, input_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        surface: &Surface,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
         let texture = ImageTexture::builder()
             .renderer(renderer)
+            .surface(surface)
             .image(load_rgba("assets/textures/gui/crosshair.png"))
             .is_srgb(false)
             .build();
@@ -62,12 +67,12 @@ impl Crosshair {
 }
 
 impl EventHandler for Crosshair {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = (&'a Renderer, &'a Surface);
 
-    fn handle(&mut self, _: &Event, renderer: Self::Context<'_>) {
-        if renderer.is_surface_resized {
+    fn handle(&mut self, _: &Event, (renderer, surface): Self::Context<'_>) {
+        if surface.is_resized {
             self.uniform
-                .set(renderer, &CrosshairUniformData::new(renderer));
+                .set(renderer, &CrosshairUniformData::new(surface));
         }
     }
 }
@@ -79,10 +84,14 @@ struct CrosshairUniformData {
 }
 
 impl CrosshairUniformData {
-    fn new(renderer: &Renderer) -> Self {
+    fn new(surface: &Surface) -> Self {
         Self {
             transform: Gui::transform(
-                Gui::scaling(renderer, CLIENT_CONFIG.gui.crosshair.size),
+                Gui::scaling(
+                    surface.width(),
+                    surface.height(),
+                    CLIENT_CONFIG.gui.crosshair.size,
+                ),
                 Vector2::repeat(0.5),
             ),
         }

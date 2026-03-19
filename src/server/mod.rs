@@ -9,9 +9,9 @@ use game::{
     Game,
     clock::{ClockConfig, Time},
     player::PlayerConfig,
-    world::{BlockHoverData, ChunkData},
+    world::{BlockHoverData, ChunkData, block::Block},
 };
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
@@ -35,6 +35,12 @@ impl Server {
 
 #[derive(Serialize, Deserialize)]
 pub enum ServerEvent {
+    PlayerInitialized {
+        origin: Point3<f32>,
+        dir: Vector3<f32>,
+        speed: f32,
+        inventory: Arc<[Block]>,
+    },
     TimeUpdated(Time),
     ChunkLoaded {
         coords: Point3<i32>,

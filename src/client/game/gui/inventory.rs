@@ -5,7 +5,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         game::world::BlockVertex,
         renderer::{
-            Renderer,
+            Renderer, Surface,
             buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
             program::Program,
@@ -14,18 +14,18 @@ use crate::{
             utils::{Vertex, read_wgsl},
         },
     },
-    server::game::world::block::{Block, area::BlockArea, data::STR_TO_BLOCK},
+    server::{
+        ServerEvent,
+        game::world::block::{Block, area::BlockArea},
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
-use serde::{
-    Deserialize, Deserializer,
-    de::{self, Unexpected},
-};
+use serde::Deserialize;
 use std::{
     f32::consts::{FRAC_PI_4, FRAC_PI_6},
     mem,
-    ops::Deref,
+    sync::Arc,
 };
 use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
@@ -36,6 +36,7 @@ pub struct Inventory {
     vertex_buffer: Option<VertexBuffer<BlockVertex>>,
     uniform: Uniform<InventoryUniformData>,
     program: Program,
+    contents: Arc<[Block]>,
     index: usize,
     is_flat: bool,
     is_updated: bool,
@@ -52,8 +53,8 @@ impl Inventory {
             .cull_mode(wgpu::Face::Back)
             .depth_stencil(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: Default::default(),
                 bias: Default::default(),
             })
@@ -64,15 +65,15 @@ impl Inventory {
             vertex_buffer: None,
             uniform,
             program,
+            contents: Default::default(),
             index: 0,
             is_flat: false,
             is_updated: true,
         }
     }
 
-    #[rustfmt::skip]
     pub fn selected_block(&self) -> Option<Block> {
-        CLIENT_CONFIG.gui.inventory.contents.get(self.index).copied()
+        self.contents.get(self.index).copied()
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
@@ -102,11 +103,14 @@ impl Inventory {
 }
 
 impl EventHandler for Inventory {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = (&'a Renderer, &'a Surface);
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        if let Event::WindowEvent(event) = event {
-            match *event {
+    fn handle(&mut self, event: &Event, (renderer, surface): Self::Context<'_>) {
+        match event {
+            Event::ServerEvent(ServerEvent::PlayerInitialized { inventory, .. }) => {
+                self.contents = inventory.clone();
+            }
+            Event::WindowEvent(event) => match *event {
                 WindowEvent::KeyboardInput {
                     event:
                         KeyEvent {
@@ -121,7 +125,7 @@ impl EventHandler for Inventory {
                     }
                 }
                 WindowEvent::RedrawRequested => {
-                    let mut is_transform_outdated = renderer.is_surface_resized;
+                    let mut is_transform_outdated = surface.is_resized;
 
                     if mem::take(&mut self.is_updated) {
                         let mut is_flat = false;
@@ -149,11 +153,12 @@ impl EventHandler for Inventory {
 
                     if is_transform_outdated {
                         self.uniform
-                            .set(renderer, &InventoryUniformData::new(renderer, self.is_flat));
+                            .set(renderer, &InventoryUniformData::new(surface, self.is_flat));
                     }
                 }
                 _ => {}
-            }
+            },
+            _ => {}
         }
     }
 }
@@ -165,8 +170,12 @@ struct InventoryUniformData {
 }
 
 impl InventoryUniformData {
-    fn new(renderer: &Renderer, is_flat: bool) -> Self {
-        let scaling = Gui::scaling(renderer, CLIENT_CONFIG.gui.inventory.size);
+    fn new(surface: &Surface, is_flat: bool) -> Self {
+        let scaling = Gui::scaling(
+            surface.width(),
+            surface.height(),
+            CLIENT_CONFIG.gui.inventory.size,
+        );
         let transform = Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44));
         Self {
             transform: if is_flat {
@@ -188,35 +197,5 @@ impl InventoryUniformData {
 
 #[derive(Deserialize)]
 pub struct InventoryConfig {
-    #[serde(deserialize_with = "InventoryConfig::deserialize_contents")]
-    contents: Vec<Block>,
     size: f32,
-}
-
-impl InventoryConfig {
-    fn deserialize_contents<'de, D>(deserializer: D) -> Result<Vec<Block>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let contents = Vec::<String>::deserialize(deserializer)?;
-        assert!(contents.len() <= 9, "inventory has only 9 available slots");
-        contents
-            .into_iter()
-            .map(|str| {
-                STR_TO_BLOCK.get(&*str).copied().ok_or_else(|| {
-                    de::Error::invalid_value(
-                        Unexpected::Str(&str),
-                        &&*format!(
-                            "one of \"{}\"",
-                            STR_TO_BLOCK
-                                .keys()
-                                .map(Deref::deref)
-                                .collect::<Vec<_>>()
-                                .join("\", \"")
-                        ),
-                    )
-                })
-            })
-            .collect()
-    }
 }

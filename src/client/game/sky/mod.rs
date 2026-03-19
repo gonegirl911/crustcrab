@@ -6,7 +6,7 @@ use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
-        renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
+        renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
     },
     server::{ServerEvent, game::clock::Time},
     shared::{
@@ -31,7 +31,11 @@ pub struct Sky {
 }
 
 impl Sky {
-    pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        surface: &Surface,
+        player_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let uniform = Uniform::new(
             renderer,
             MemoryState::UNINIT,
@@ -45,6 +49,7 @@ impl Sky {
         let stars = StarDome::new(renderer, player_bind_group_layout);
         let objects = ObjectSet::new(
             renderer,
+            surface,
             player_bind_group_layout,
             uniform.bind_group_layout(),
         );

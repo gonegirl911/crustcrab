@@ -233,7 +233,7 @@ impl EventHandler<WorldEvent> for World {
 
     fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
         match *event {
-            WorldEvent::InitialRenderRequested { area, ray } => {
+            WorldEvent::PlayerConnected { area, ray } => {
                 let inserts = self.par_insert_many(area.par_server_points());
 
                 self.par_light_up(&inserts);
@@ -710,7 +710,7 @@ impl BlockHoverData {
 }
 
 pub enum WorldEvent {
-    InitialRenderRequested {
+    PlayerConnected {
         area: WorldArea,
         ray: Ray,
     },
@@ -736,8 +736,8 @@ pub enum WorldEvent {
 impl WorldEvent {
     pub fn new(event: &Event, &Player { prev, cur, ray }: &Player) -> Option<Self> {
         match *event {
-            Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
-                Some(Self::InitialRenderRequested { area: cur, ray })
+            Event::Client(ClientEvent::PlayerConnected { .. }) => {
+                Some(Self::PlayerConnected { area: cur, ray })
             }
             Event::Client(ClientEvent::PlayerPositionChanged { .. }) if cur != prev => {
                 Some(Self::WorldAreaChanged { prev, cur, ray })

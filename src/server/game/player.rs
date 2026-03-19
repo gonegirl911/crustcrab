@@ -1,12 +1,20 @@
-use super::world::World;
+use super::world::{World, block::Block};
 use crate::{
     client::ClientEvent,
-    server::event_loop::{Event, EventHandler},
+    server::{
+        SERVER_CONFIG, ServerEvent, ServerSender,
+        event_loop::{Event, EventHandler},
+        game::world::block::data::STR_TO_BLOCK,
+    },
     shared::{ray::Ray, utils},
 };
-use nalgebra::{Point2, Point3, point};
+use nalgebra::{Point2, Point3, Vector3, point};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use serde::Deserialize;
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, Unexpected},
+};
+use std::{ops::Deref, sync::Arc};
 
 #[derive(Default)]
 pub struct Player {
@@ -16,23 +24,34 @@ pub struct Player {
 }
 
 impl EventHandler<Event> for Player {
-    type Context<'a> = ();
+    type Context<'a> = &'a ServerSender;
 
-    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.prev = self.cur;
 
         if let Event::Client(event) = event {
             match *event {
-                ClientEvent::InitialRenderRequested {
-                    origin,
-                    dir,
-                    render_distance,
-                } => {
+                ClientEvent::PlayerConnected { render_distance } => {
+                    let PlayerConfig {
+                        origin,
+                        dir,
+                        speed,
+                        ref inventory,
+                        ..
+                    } = SERVER_CONFIG.player;
+
                     self.cur = WorldArea {
                         center: utils::chunk_coords(origin),
                         radius: render_distance as i32,
                     };
                     self.ray = Ray { origin, dir };
+
+                    _ = server_tx.send(ServerEvent::PlayerInitialized {
+                        origin,
+                        dir,
+                        speed,
+                        inventory: inventory.clone(),
+                    });
                 }
                 ClientEvent::PlayerOrientationChanged { dir } => {
                     self.ray.dir = dir;
@@ -120,5 +139,38 @@ impl WorldArea {
 
 #[derive(Deserialize)]
 pub struct PlayerConfig {
+    pub origin: Point3<f32>,
+    pub dir: Vector3<f32>,
+    pub speed: f32,
     pub reach: f32,
+    #[serde(deserialize_with = "PlayerConfig::deserialize_inventory")]
+    pub inventory: Arc<[Block]>,
+}
+
+impl PlayerConfig {
+    fn deserialize_inventory<'de, D>(deserializer: D) -> Result<Arc<[Block]>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let inventory = Arc::<[&str]>::deserialize(deserializer)?;
+        assert!(inventory.len() <= 9, "inventory has only 9 available slots");
+        inventory
+            .iter()
+            .map(|&str| {
+                STR_TO_BLOCK.get(str).copied().ok_or_else(|| {
+                    de::Error::invalid_value(
+                        Unexpected::Str(str),
+                        &&*format!(
+                            "one of \"{}\"",
+                            STR_TO_BLOCK
+                                .keys()
+                                .map(Deref::deref)
+                                .collect::<Vec<_>>()
+                                .join("\", \"")
+                        ),
+                    )
+                })
+            })
+            .collect()
+    }
 }

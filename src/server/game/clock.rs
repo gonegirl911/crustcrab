@@ -37,7 +37,7 @@ impl EventHandler<Event> for Clock {
 
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         match event {
-            Event::Client(ClientEvent::InitialRenderRequested { .. }) => {
+            Event::Client(ClientEvent::PlayerConnected { .. }) => {
                 self.send_time(server_tx);
             }
             Event::Tick => {

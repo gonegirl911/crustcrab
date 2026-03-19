@@ -3,7 +3,7 @@ use crate::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         renderer::{
-            Renderer,
+            Renderer, Surface,
             effect::PostProcessor,
             program::Program,
             texture::image::ImageTextureArray,
@@ -26,11 +26,13 @@ pub struct ObjectSet {
 impl ObjectSet {
     pub fn new(
         renderer: &Renderer,
+        surface: &Surface,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let textures = ImageTextureArray::builder()
             .renderer(renderer)
+            .surface(surface)
             .images([
                 load_rgba("assets/textures/sky/sun.png"),
                 load_rgba("assets/textures/sky/moon.png"),

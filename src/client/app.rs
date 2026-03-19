@@ -2,7 +2,7 @@ use super::{
     ClientEvent,
     event_loop::{Event, EventHandler},
     game::Game,
-    renderer::Renderer,
+    renderer::{Renderer, Surface},
     stopwatch::Stopwatch,
     window::Window,
 };
@@ -98,6 +98,7 @@ struct Instance {
     stopwatch: Stopwatch,
     window: Window,
     renderer: Renderer,
+    surface: Surface,
     game: Game,
 }
 
@@ -105,12 +106,13 @@ impl Instance {
     async fn new(event_loop: &dyn ActiveEventLoop) -> Self {
         let stopwatch = Stopwatch::start();
         let window = Window::new(event_loop);
-        let renderer = Renderer::new(window.to_owned_raw()).await;
-        let game = Game::new(&renderer);
+        let (renderer, surface) = Renderer::new(window.to_owned_raw()).await;
+        let game = Game::new(&renderer, &surface);
         Self {
             stopwatch,
             window,
             renderer,
+            surface,
             game,
         }
     }
@@ -119,18 +121,33 @@ impl Instance {
 impl EventHandler for Instance {
     type Context<'a> = &'a Sender<ClientEvent>;
 
+    #[rustfmt::skip]
     fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
+        let mut should_recreate_device = false;
+
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
-        self.renderer.handle(event, self.window.as_raw());
+        self.surface.handle(event, (self.window.as_raw(), &self.renderer));
         self.game.handle(
             event,
             (
                 client_tx,
                 self.window.as_raw(),
                 &self.renderer,
+                &self.surface,
                 self.stopwatch.dt,
+                &mut should_recreate_device,
             ),
         );
+
+        if should_recreate_device {
+            let window = self.window.to_owned_raw();
+            if self.renderer.is_device_lost() {
+                (self.renderer, self.surface) = pollster::block_on(Renderer::new(window));
+                self.game = Game::new(&self.renderer, &self.surface);
+            } else {
+                self.surface.recreate(window, &self.renderer);
+            }
+        }
     }
 }

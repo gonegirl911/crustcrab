@@ -64,8 +64,8 @@ impl World {
                 .cull_mode(wgpu::Face::Back)
                 .depth_stencil(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
                     stencil: Default::default(),
                     bias: Default::default(),
                 })

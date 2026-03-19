@@ -1,5 +1,6 @@
 use super::Renderer;
 use bon::bon;
+use std::slice;
 
 pub struct Program(wgpu::RenderPipeline);
 
@@ -20,7 +21,9 @@ impl Program {
         let shader = device.create_shader_module(shader_desc);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts,
+            bind_group_layouts: unsafe {
+                slice::from_raw_parts(bind_group_layouts.as_ptr().cast(), bind_group_layouts.len())
+            },
             immediate_size,
         });
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

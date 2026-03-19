@@ -4,7 +4,7 @@ use crate::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         renderer::{
-            Renderer,
+            Renderer, Surface,
             buffer::{MemoryState, VertexBuffer},
             effect::{Blender, PostProcessor},
             program::Program,
@@ -40,6 +40,7 @@ pub struct CloudLayer {
 impl CloudLayer {
     pub fn new(
         renderer: &Renderer,
+        surface: &Surface,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
@@ -51,6 +52,7 @@ impl CloudLayer {
         let image = load_rgba("assets/textures/clouds.png");
         let texture = ImageTexture::builder()
             .renderer(renderer)
+            .surface(surface)
             .image(&image)
             .is_srgb(false)
             .address_mode(wgpu::AddressMode::Repeat)
@@ -63,8 +65,8 @@ impl CloudLayer {
             .buffers(&[BlockVertex::desc(), CloudInstance::desc()])
             .depth_stencil(wgpu::DepthStencilState {
                 format: DepthBuffer::FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: Default::default(),
                 bias: Default::default(),
             })

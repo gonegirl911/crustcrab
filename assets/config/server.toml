@@ -2,7 +2,11 @@
 ticks_per_second = 20
 
 [player]
+origin = [0.0, 65.62, 0.0]
+dir = [1.0, 0.0, 0.0]
+speed = 25.0
 reach = 4.5
+inventory = ["glowstone", "glass_magenta", "glass_cyan", "dead_bush"]
 
 [clock]
 ticks_per_day = 24000

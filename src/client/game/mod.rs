@@ -10,7 +10,7 @@ use super::{
     ClientEvent,
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer,
+        Renderer, Surface,
         effect::{Aces, PostProcessor},
         texture::{image::ImageTextureArray, screen::DepthBuffer},
     },
@@ -44,25 +44,27 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(renderer: &Renderer) -> Self {
+    pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
         let player = Player::new(renderer);
-        let sky = Sky::new(renderer, player.bind_group_layout());
-        let textures = BlockTextureArray::new(renderer);
+        let sky = Sky::new(renderer, surface, player.bind_group_layout());
+        let textures = BlockTextureArray::new(renderer, surface);
         let world = World::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
             textures.bind_group_layout(),
         );
-        let processor = PostProcessor::new(renderer);
+        let processor = PostProcessor::new(renderer, surface);
         let clouds = CloudLayer::new(
             renderer,
+            surface,
             player.bind_group_layout(),
             processor.bind_group_layout(),
         );
-        let depth = DepthBuffer::new(renderer);
+        let depth = DepthBuffer::new(renderer, surface);
         let fog = Fog::new(
             renderer,
+            surface,
             player.bind_group_layout(),
             sky.bind_group_layout(),
             depth.bind_group_layout(),
@@ -79,6 +81,7 @@ impl Game {
         );
         let gui = Gui::new(
             renderer,
+            surface,
             processor.bind_group_layout(),
             textures.bind_group_layout(),
         );
@@ -180,7 +183,9 @@ impl EventHandler for Game {
         &'a Sender<ClientEvent>,
         &'a RawWindow,
         &'a Renderer,
+        &'a Surface,
         Duration,
+        &'a mut bool,
     );
 
     #[rustfmt::skip]
@@ -190,28 +195,25 @@ impl EventHandler for Game {
         (
             client_tx,
             window,
-            renderer @ Renderer {
-                surface,
-                device,
-                queue,
-                ..
-            },
+            renderer @ Renderer { device, queue, .. },
+            surface,
             dt,
+            is_surface_texture_lost,
         ): Self::Context<'_>,
     ) {
         self.sky.handle(event, renderer);
         self.world.handle(event, renderer);
         self.clouds.handle(event, dt);
-        self.fog.handle(event, renderer);
+        self.fog.handle(event, (renderer, surface));
         self.hover.handle(event, ());
-        self.gui.handle(event, renderer);
-        self.player.handle(event, (client_tx, renderer, &self.gui, dt));
-        self.depth.handle(event, renderer);
-        self.processor.handle(event, renderer);
+        self.gui.handle(event, (renderer, surface));
+        self.player.handle(event, (client_tx, renderer, surface, &self.gui, dt));
+        self.depth.handle(event, (renderer, surface));
+        self.processor.handle(event, (renderer, surface));
 
         if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) {
             match surface.get_current_texture() {
-                Ok(texture) => {
+                wgpu::CurrentSurfaceTexture::Success(texture) => {
                     let view = texture.texture.create_view(&Default::default());
                     let mut encoder = device.create_command_encoder(&Default::default());
                     self.draw(renderer, &view, &mut encoder);
@@ -219,8 +221,15 @@ impl EventHandler for Game {
                     window.pre_present_notify();
                     texture.present();
                 }
-                Err(wgpu::SurfaceError::Lost) => renderer.recreate_surface(),
-                Err(_) => {}
+                wgpu::CurrentSurfaceTexture::Suboptimal(_)
+                | wgpu::CurrentSurfaceTexture::Outdated => {
+                    surface.reconfigure(renderer);
+                }
+                wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {}
+                wgpu::CurrentSurfaceTexture::Lost => {
+                    *is_surface_texture_lost = true;
+                }
+                wgpu::CurrentSurfaceTexture::Validation => unreachable!(),
             }
         }
     }
@@ -229,10 +238,11 @@ impl EventHandler for Game {
 struct BlockTextureArray(ImageTextureArray);
 
 impl BlockTextureArray {
-    fn new(renderer: &Renderer) -> Self {
+    fn new(renderer: &Renderer, surface: &Surface) -> Self {
         Self(
             ImageTextureArray::builder()
                 .renderer(renderer)
+                .surface(surface)
                 .images(Self::images())
                 .mip_level_count(4)
                 .is_srgb(true)

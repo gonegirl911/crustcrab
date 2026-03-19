@@ -1,7 +1,7 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer, effect::PostProcessor, program::Program, texture::screen::ScreenTexture,
+        Renderer, Surface, effect::PostProcessor, program::Program, texture::screen::ScreenTexture,
         utils::read_wgsl,
     },
 };
@@ -14,11 +14,12 @@ pub struct Fog {
 impl Fog {
     pub fn new(
         renderer: &Renderer,
+        surface: &Surface,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
         depth_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let texture = ScreenTexture::new(renderer, PostProcessor::FORMAT);
+        let texture = ScreenTexture::new(renderer, surface, PostProcessor::FORMAT);
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/fog.wgsl"))
@@ -72,9 +73,9 @@ impl Fog {
 }
 
 impl EventHandler for Fog {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = (&'a Renderer, &'a Surface);
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.texture.handle(event, renderer);
+    fn handle(&mut self, event: &Event, (renderer, surface): Self::Context<'_>) {
+        self.texture.handle(event, (renderer, surface));
     }
 }

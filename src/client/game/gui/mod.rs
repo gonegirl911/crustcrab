@@ -5,7 +5,7 @@ use crate::{
     client::{
         event_loop::{Event, EventHandler},
         renderer::{
-            Renderer,
+            Renderer, Surface,
             effect::{Blit, Effect, PostProcessor},
         },
     },
@@ -25,12 +25,13 @@ pub struct Gui {
 impl Gui {
     pub fn new(
         renderer: &Renderer,
+        surface: &Surface,
         input_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
             blit: Blit::new(renderer, input_bind_group_layout, PostProcessor::FORMAT),
-            crosshair: Crosshair::new(renderer, input_bind_group_layout),
+            crosshair: Crosshair::new(renderer, surface, input_bind_group_layout),
             inventory: Inventory::new(renderer, textures_bind_group_layout),
         }
     }
@@ -88,9 +89,9 @@ impl Gui {
         );
     }
 
-    fn scaling(Renderer { config, .. }: &Renderer, factor: f32) -> Vector2<f32> {
-        let size = (config.height as f32 * 0.0325).max(13.5) * factor;
-        vector![size / config.width as f32, size / config.height as f32]
+    fn scaling(width: f32, height: f32, factor: f32) -> Vector2<f32> {
+        let size = (height * 0.0325).max(13.5) * factor;
+        vector![size / width, size / height]
     }
 
     fn transform(scaling: Vector2<f32>, offset: Vector2<f32>) -> Matrix4<f32> {
@@ -102,11 +103,11 @@ impl Gui {
 }
 
 impl EventHandler for Gui {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = (&'a Renderer, &'a Surface);
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.crosshair.handle(event, renderer);
-        self.inventory.handle(event, renderer);
+    fn handle(&mut self, event: &Event, (renderer, surface): Self::Context<'_>) {
+        self.crosshair.handle(event, (renderer, surface));
+        self.inventory.handle(event, (renderer, surface));
     }
 }
 

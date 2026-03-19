@@ -1,5 +1,5 @@
 use crate::client::renderer::{
-    Renderer,
+    Renderer, Surface,
     effect::{Blit, Effect},
 };
 use bon::bon;
@@ -16,12 +16,13 @@ impl ImageTexture {
     #[builder]
     pub fn new<R: AsRgbaImage>(
         renderer @ Renderer { device, .. }: &Renderer,
+        surface: &Surface,
         image: R,
         #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
-        let view = Self::create_view(renderer, image, mip_level_count, is_srgb);
+        let view = Self::create_view(renderer, surface, image, mip_level_count, is_srgb);
         let sampler = Self::create_sampler(renderer, address_mode, mip_level_count);
         let bind_group_layout = ImageTextureArray::create_bind_group_layout(renderer, &[]);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -53,12 +54,8 @@ impl ImageTexture {
     }
 
     fn create_view<R: AsRgbaImage>(
-        renderer @ Renderer {
-            device,
-            queue,
-            config,
-            ..
-        }: &Renderer,
+        renderer @ Renderer { device, queue, .. }: &Renderer,
+        surface: &Surface,
         image: R,
         mip_level_count: u32,
         is_srgb: bool,
@@ -76,7 +73,7 @@ impl ImageTexture {
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: if is_srgb && config.format.is_srgb() {
+            format: if is_srgb && surface.config.format.is_srgb() {
                 wgpu::TextureFormat::Rgba8UnormSrgb
             } else {
                 wgpu::TextureFormat::Rgba8Unorm
@@ -214,12 +211,13 @@ impl ImageTextureArray {
     #[builder]
     pub fn new<R: IntoIterator<Item: AsRgbaImage>>(
         renderer @ Renderer { device, .. }: &Renderer,
+        surface: &Surface,
         images: R,
         #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
     ) -> Self {
-        let views = Self::create_views(renderer, images, mip_level_count, is_srgb);
+        let views = Self::create_views(renderer, surface, images, mip_level_count, is_srgb);
         let sampler = ImageTexture::create_sampler(renderer, address_mode, mip_level_count);
         let bind_group_layout = Self::create_bind_group_layout(renderer, &views);
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -254,13 +252,16 @@ impl ImageTextureArray {
 
     fn create_views<R: IntoIterator<Item: AsRgbaImage>>(
         renderer: &Renderer,
+        surface: &Surface,
         images: R,
         mip_level_count: u32,
         is_srgb: bool,
     ) -> Vec<wgpu::TextureView> {
         images
             .into_iter()
-            .map(|image| ImageTexture::create_view(renderer, image, mip_level_count, is_srgb))
+            .map(|image| {
+                ImageTexture::create_view(renderer, surface, image, mip_level_count, is_srgb)
+            })
             .collect()
     }
 

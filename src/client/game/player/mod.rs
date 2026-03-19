@@ -6,9 +6,9 @@ use crate::{
     client::{
         CLIENT_CONFIG, ClientEvent,
         event_loop::{Event, EventHandler},
-        renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
+        renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
     },
-    server::game::world::chunk::Chunk,
+    server::{ServerEvent, game::world::chunk::Chunk},
     shared::color::Float3,
 };
 use bitflags::bitflags;
@@ -31,9 +31,9 @@ pub struct Player {
 impl Player {
     pub fn new(renderer: &Renderer) -> Self {
         let config = &CLIENT_CONFIG.player;
-        let view = View::new(config.origin, Vector3::x());
+        let view = View::new(Default::default(), Vector3::x());
         let projection = Projection::new(config.fovy, 0.0, 0.1, config.zfar());
-        let controller = Controller::new(config.speed, config.sensitivity);
+        let controller = Controller::new(0.0, config.sensitivity);
         let uniform = Uniform::new(
             renderer,
             MemoryState::UNINIT,
@@ -70,18 +70,29 @@ impl Player {
 }
 
 impl EventHandler for Player {
-    type Context<'a> = (&'a Sender<ClientEvent>, &'a Renderer, &'a Gui, Duration);
+    type Context<'a> = (
+        &'a Sender<ClientEvent>,
+        &'a Renderer,
+        &'a Surface,
+        &'a Gui,
+        Duration,
+    );
 
-    fn handle(&mut self, event: &Event, (client_tx, renderer, gui, dt): Self::Context<'_>) {
+    fn handle(
+        &mut self,
+        event: &Event,
+        (client_tx, renderer, surface, gui, dt): Self::Context<'_>,
+    ) {
         self.controller.handle(event, ());
 
         match event {
             Event::Resumed => {
-                _ = client_tx.send(ClientEvent::InitialRenderRequested {
-                    origin: self.view.origin,
-                    dir: self.view.forward,
+                _ = client_tx.send(ClientEvent::PlayerConnected {
                     render_distance: CLIENT_CONFIG.player.render_distance,
                 });
+            }
+            &Event::ServerEvent(ServerEvent::PlayerInitialized { origin, dir, .. }) => {
+                self.view = View::new(origin, dir);
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
@@ -98,8 +109,8 @@ impl EventHandler for Player {
                     });
                 }
 
-                if renderer.is_surface_resized {
-                    self.projection.aspect = renderer.aspect();
+                if surface.is_resized {
+                    self.projection.aspect = surface.width() / surface.height();
                 }
 
                 if changes.contains(Changes::BLOCK_PLACED) {
@@ -110,7 +121,7 @@ impl EventHandler for Player {
                     _ = client_tx.send(ClientEvent::BlockDestroyed);
                 }
 
-                if changes.intersects(Changes::VIEW) || renderer.is_surface_resized {
+                if changes.intersects(Changes::VIEW) || surface.is_resized {
                     self.uniform.set(
                         renderer,
                         &PlayerUniformData::new(
@@ -164,9 +175,7 @@ impl PlayerUniformData {
 
 #[derive(Deserialize)]
 pub struct PlayerConfig {
-    origin: Point3<f32>,
     fovy: f32,
-    speed: f32,
     sensitivity: f32,
     render_distance: u32,
     #[serde(default)]

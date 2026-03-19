@@ -1,7 +1,5 @@
 [player]
-origin = [0.0, 65.62, 0.0]
 fovy = 90.0
-speed = 25.0
 sensitivity = 0.0025
 render_distance = 16
 
@@ -44,5 +42,4 @@ color = [0.06, 0.06, 0.1, 0.85]
 size = 1.0
 
 [gui.inventory]
-contents = ["glowstone", "glass_magenta", "glass_cyan", "dead_bush"]
 size = 3.6

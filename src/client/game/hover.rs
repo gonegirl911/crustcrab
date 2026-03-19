@@ -116,8 +116,8 @@ impl BlockHighlight {
                 .cull_mode(wgpu::Face::Back)
                 .depth_stencil(wgpu::DepthStencilState {
                     format: DepthBuffer::FORMAT,
-                    depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: Default::default(),
                     bias: Default::default(),
                 })

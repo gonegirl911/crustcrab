@@ -43,7 +43,7 @@ impl EventHandler<Event> for Game {
     type Context<'a> = &'a ServerSender;
 
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
-        self.player.handle(event, ());
+        self.player.handle(event, server_tx);
         self.clock.handle(event, server_tx);
         if let Some(event) = WorldEvent::new(event, &self.player) {
             self.world_tx
