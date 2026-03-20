@@ -123,7 +123,7 @@ impl EventHandler for Instance {
 
     #[rustfmt::skip]
     fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
-        let mut should_recreate_device = false;
+        let mut is_surface_texture_lost = false;
 
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
@@ -136,11 +136,11 @@ impl EventHandler for Instance {
                 &self.renderer,
                 &self.surface,
                 self.stopwatch.dt,
-                &mut should_recreate_device,
+                &mut is_surface_texture_lost,
             ),
         );
 
-        if should_recreate_device {
+        if is_surface_texture_lost {
             let window = self.window.to_owned_raw();
             if self.renderer.is_device_lost() {
                 (self.renderer, self.surface) = pollster::block_on(Renderer::new(window));
