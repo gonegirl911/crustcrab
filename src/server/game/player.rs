@@ -152,11 +152,11 @@ impl PlayerConfig {
     where
         D: Deserializer<'de>,
     {
-        let inventory = Arc::<[&str]>::deserialize(deserializer)?;
+        let inventory = Box::<[_]>::deserialize(deserializer)?;
         assert!(inventory.len() <= 9, "inventory has only 9 available slots");
         inventory
-            .iter()
-            .map(|&str| {
+            .into_iter()
+            .map(|str| {
                 STR_TO_BLOCK.get(str).copied().ok_or_else(|| {
                     de::Error::invalid_value(
                         Unexpected::Str(str),
