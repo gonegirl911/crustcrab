@@ -29,9 +29,7 @@ impl Renderer {
     pub async fn new(window: Arc<RawWindow>) -> (Self, Surface) {
         let PhysicalSize { width, height } = window.surface_size();
         let instance = wgpu::Instance::default();
-        let surface = instance
-            .create_surface(window)
-            .expect("surface should be creatable");
+        let surface = Surface::create_raw(&instance, window);
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -109,19 +107,18 @@ impl Surface {
         self.config.height as f32
     }
 
-    pub fn reconfigure(&self, Renderer { device, .. }: &Renderer) {
+    pub fn configure(&self, Renderer { device, .. }: &Renderer) {
         self.surface.configure(device, &self.config);
     }
 
-    pub fn recreate(
-        &mut self,
-        window: Arc<RawWindow>,
-        renderer @ Renderer { instance, .. }: &Renderer,
-    ) {
-        self.surface = instance
+    pub fn recreate(&mut self, window: Arc<RawWindow>, Renderer { instance, .. }: &Renderer) {
+        self.surface = Self::create_raw(instance, window);
+    }
+
+    fn create_raw(instance: &wgpu::Instance, window: Arc<RawWindow>) -> wgpu::Surface<'static> {
+        instance
             .create_surface(window)
-            .expect("surface should be creatable");
-        self.reconfigure(renderer);
+            .expect("surface should be creatable")
     }
 }
 
@@ -143,7 +140,7 @@ impl EventHandler for Surface {
                         if width != 0 && height != 0 {
                             self.config.width = width;
                             self.config.height = height;
-                            self.reconfigure(renderer);
+                            self.configure(renderer);
                             self.is_resized = true;
                         }
                     }

@@ -223,7 +223,7 @@ impl EventHandler for Game {
                 }
                 wgpu::CurrentSurfaceTexture::Suboptimal(_)
                 | wgpu::CurrentSurfaceTexture::Outdated => {
-                    surface.reconfigure(renderer);
+                    surface.configure(renderer);
                 }
                 wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {}
                 wgpu::CurrentSurfaceTexture::Lost => {

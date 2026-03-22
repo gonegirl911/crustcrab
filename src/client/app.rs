@@ -147,6 +147,7 @@ impl EventHandler for Instance {
                 self.game = Game::new(&self.renderer, &self.surface);
             } else {
                 self.surface.recreate(window, &self.renderer);
+                self.surface.configure(&self.renderer);
             }
         }
     }
