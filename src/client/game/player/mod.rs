@@ -18,7 +18,7 @@ use crossbeam_channel::Sender;
 use frustum::Frustum;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
-use std::{f32::consts::SQRT_2, time::Duration};
+use std::{f32::consts::SQRT_2, mem, time::Duration};
 use winit::event::WindowEvent;
 
 pub struct Player {
@@ -67,16 +67,6 @@ impl Player {
             self.projection.zfar,
         )
     }
-
-    fn uniform_data(&self) -> PlayerUniformData {
-        PlayerUniformData::new(
-            self.projection.mat() * self.view.mat(),
-            self.view.origin,
-            self.view.forward,
-            self.projection.znear,
-            self.projection.zfar,
-        )
-    }
 }
 
 impl EventHandler for Player {
@@ -103,7 +93,7 @@ impl EventHandler for Player {
             }
             &Event::ServerEvent(ServerEvent::PlayerInitialized { origin, dir, .. }) => {
                 self.view = View::new(origin, dir);
-                self.uniform.set(renderer, &self.uniform_data());
+                self.controller.applied_external_updates = true;
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
@@ -132,8 +122,23 @@ impl EventHandler for Player {
                     _ = client_tx.send(ClientEvent::BlockDestroyed);
                 }
 
-                if changes.intersects(Changes::VIEW) || surface.is_resized {
-                    self.uniform.set(renderer, &self.uniform_data());
+                let applied_external_updates =
+                    mem::take(&mut self.controller.applied_external_updates);
+
+                if applied_external_updates
+                    || changes.intersects(Changes::VIEW)
+                    || surface.is_resized
+                {
+                    self.uniform.set(
+                        renderer,
+                        &PlayerUniformData::new(
+                            self.projection.mat() * self.view.mat(),
+                            self.view.origin,
+                            self.view.forward,
+                            self.projection.znear,
+                            self.projection.zfar,
+                        ),
+                    );
                 }
             }
             _ => {}
