@@ -109,7 +109,7 @@ impl RawModel<'_> {
             Err(de::Error::invalid_value(
                 Unexpected::Str(variant),
                 &&*format!(
-                    "one of \"{}\"",
+                    "one of [\"{}\"]",
                     MODEL_DATA
                         .keys()
                         .map(Deref::deref)

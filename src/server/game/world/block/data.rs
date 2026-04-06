@@ -305,7 +305,7 @@ static RAW_BLOCK_DATA: LazyLock<FxHashMap<&str, RawBlockData>> = LazyLock::new(|
         .find(|(_, surface)| !data.contains_key(surface))
     {
         panic!(
-            "invalid valid_surface \"{surface}\" of block \"{block}\", expected one of \"{}\"",
+            "invalid valid_surface \"{surface}\" of block \"{block}\", expected one of [\"{}\"]",
             data.keys()
                 .map(Deref::deref)
                 .collect::<Vec<_>>()
