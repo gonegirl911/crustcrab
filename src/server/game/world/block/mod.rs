@@ -6,12 +6,14 @@ use super::action::BlockAction;
 use crate::shared::color::Rgb;
 use bitfield::bitfield;
 use data::{BLOCK_DATA, BlockData};
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{self, Unexpected},
+};
 use std::{array, ops::Range};
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
-#[serde(try_from = "u8")]
+#[derive(Clone, Copy, PartialEq, Default, Serialize)]
 pub struct Block(u8);
 
 impl Block {
@@ -49,13 +51,22 @@ impl Block {
     }
 }
 
-#[expect(clippy::infallible_try_from)]
-impl TryFrom<u8> for Block {
-    type Error = !;
-
-    fn try_from(index: u8) -> Result<Self, Self::Error> {
-        assert!((index as usize) < BLOCK_DATA.len());
-        Ok(Self(index))
+impl<'de> Deserialize<'de> for Block {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let index = u64::deserialize(deserializer)?;
+        let min = 0;
+        let max = BLOCK_DATA.len() as u64;
+        if (min..max).contains(&index) {
+            Ok(Self(index as u8))
+        } else {
+            Err(de::Error::invalid_value(
+                Unexpected::Unsigned(index),
+                &&*format!("an index in the range [{min}, {max})"),
+            ))
+        }
     }
 }
 
