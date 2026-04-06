@@ -153,24 +153,27 @@ impl PlayerConfig {
         D: Deserializer<'de>,
     {
         let inventory = Box::<[_]>::deserialize(deserializer)?;
-        assert!(inventory.len() <= 9, "inventory has only 9 available slots");
-        inventory
-            .into_iter()
-            .map(|str| {
-                STR_TO_BLOCK.get(str).copied().ok_or_else(|| {
-                    de::Error::invalid_value(
-                        Unexpected::Str(str),
-                        &&*format!(
-                            "one of \"{}\"",
-                            STR_TO_BLOCK
-                                .keys()
-                                .map(Deref::deref)
-                                .collect::<Vec<_>>()
-                                .join("\", \"")
-                        ),
-                    )
+        if inventory.len() > 9 {
+            Err(de::Error::custom("inventory has only 9 available slots"))
+        } else {
+            inventory
+                .into_iter()
+                .map(|str| {
+                    STR_TO_BLOCK.get(str).copied().ok_or_else(|| {
+                        de::Error::invalid_value(
+                            Unexpected::Str(str),
+                            &&*format!(
+                                "one of [\"{}\"]",
+                                STR_TO_BLOCK
+                                    .keys()
+                                    .map(Deref::deref)
+                                    .collect::<Vec<_>>()
+                                    .join("\", \"")
+                            ),
+                        )
+                    })
                 })
-            })
-            .collect()
+                .collect()
+        }
     }
 }

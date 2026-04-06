@@ -65,10 +65,11 @@ impl World {
     {
         points
             .into_par_iter()
+            .filter(|coords| !self.chunks.0.contains_key(coords))
             .filter_map(|coords| Some((coords, self.generate(coords)?)))
             .into_seq_iter()
             .map(|(coords, chunk)| {
-                self.chunks.insert(coords, chunk);
+                self.chunks.0.insert(coords, chunk);
                 coords
             })
             .collect()
@@ -341,10 +342,6 @@ impl ChunkStore {
 
     fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
         self.0.get(&coords).map(|v| &**v)
-    }
-
-    fn insert(&mut self, coords: Point3<i32>, chunk: Box<Chunk>) {
-        assert!(self.0.insert(coords, chunk).is_none());
     }
 }
 

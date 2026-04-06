@@ -103,8 +103,11 @@ impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
             guard.set(variant, value);
         }
 
-        assert!(guard.finish().is_ok());
-        unsafe { uninit.assume_init() }
+        if guard.finish().is_err() {
+            panic!("missing variants");
+        } else {
+            unsafe { uninit.assume_init() }
+        }
     }
 }
 
@@ -171,9 +174,14 @@ where
                     }
                 }
 
-                if let Err(variant) = guard.finish() {
+                if let Err(guard) = guard.finish() {
                     Err(de::Error::custom(format_args!(
-                        "missing variant \"{variant:?}\"",
+                        "missing variants [\"{}\"]",
+                        guard
+                            .missing_variants()
+                            .map(|variant| format!("{variant:?}"))
+                            .collect::<Vec<_>>()
+                            .join("\", \""),
                     )))
                 } else {
                     Ok(unsafe { uninit.assume_init() })
@@ -215,19 +223,19 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
         self.is_init[variant] = true;
     }
 
-    fn finish(self) -> Result<(), E> {
+    fn finish(self) -> Result<(), Self> {
         if self.count == E::LEN {
             mem::forget(self);
             Ok(())
         } else {
-            Err(unsafe { self.missing_variant().unwrap_unchecked() })
+            Err(self)
         }
     }
 
-    fn missing_variant(&self) -> Option<E> {
+    fn missing_variants(&self) -> impl Iterator<Item = E> {
         self.is_init
             .iter()
-            .find(|&(_, is_init)| !is_init)
+            .filter(|&(_, is_init)| !is_init)
             .map(|(variant, _)| variant)
     }
 }

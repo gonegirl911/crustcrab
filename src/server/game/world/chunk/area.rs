@@ -9,7 +9,7 @@ use crate::{
 use nalgebra::{Point3, Vector3, point, vector};
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
-    de::{SeqAccess, Visitor},
+    de::{self, SeqAccess, Visitor},
     ser::SerializeSeq,
 };
 use std::{
@@ -197,8 +197,14 @@ impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T
                     cur += count;
                 }
 
-                assert!(cur == uninit.len());
-                Ok(ChunkAreaDataStore(unsafe { mem::transmute_copy(&uninit) }))
+                if cur == uninit.len() {
+                    Ok(ChunkAreaDataStore(unsafe { mem::transmute_copy(&uninit) }))
+                } else {
+                    Err(de::Error::invalid_length(
+                        cur,
+                        &&*format!("unpacked length of {}", uninit.len()),
+                    ))
+                }
             }
         }
 
