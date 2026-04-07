@@ -52,18 +52,6 @@ impl Chunk {
         self.glowing_count != 0
     }
 
-    pub fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
-        let block = &mut self.blocks[coords];
-        let prev = *block;
-        if block.apply(action) {
-            let curr = *block;
-            self.adjust_counts(prev, curr);
-            true
-        } else {
-            false
-        }
-    }
-
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: BlockAction) {
         let block = &mut self.blocks[coords];
         let prev = *block;

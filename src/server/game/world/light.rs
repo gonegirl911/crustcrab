@@ -326,7 +326,7 @@ impl Branch {
                 Entry::Vacant(entry) => {
                     let light = entry.insert(Default::default());
                     for (block_coords, value) in values {
-                        light.set(block_coords, value);
+                        assert!(light.set(block_coords, value));
                         hits.push(utils::coords((chunk_coords, block_coords)));
                     }
                 }

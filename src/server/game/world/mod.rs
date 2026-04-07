@@ -373,7 +373,11 @@ impl Branch {
         action: BlockAction,
     ) -> bool {
         if self.is_action_valid(chunks, coords, normal, action) {
-            self.insert(coords, action);
+            self.actions
+                .entry(utils::chunk_coords(coords))
+                .or_default()
+                .entry(utils::block_coords(coords))
+                .insert_entry(action);
             true
         } else {
             false
@@ -400,9 +404,8 @@ impl Branch {
                 Entry::Occupied(mut entry) => {
                     let chunk = entry.get_mut();
                     for (block_coords, action) in actions {
-                        if chunk.apply(block_coords, action) {
-                            hits.push((utils::coords((chunk_coords, block_coords)), action));
-                        }
+                        chunk.apply_unchecked(block_coords, action);
+                        hits.push((utils::coords((chunk_coords, block_coords)), action));
                     }
                     if chunk.is_empty() {
                         entry.remove();
@@ -452,35 +455,44 @@ impl Branch {
         normal: Vector3<i64>,
         action: BlockAction,
     ) -> bool {
-        if World::Y_RANGE.contains(&utils::chunk_coords(coords).y) {
-            match action {
-                BlockAction::Place(block) => {
-                    if let Some(surface) = block.data().valid_surface {
-                        normal == Vector3::y() && chunks.block(coords - normal) == surface
-                    } else {
-                        true
-                    }
-                }
-                BlockAction::Destroy => {
-                    let top = coords + Vector3::y();
-                    if chunks.block(top).data().valid_surface.is_some() {
-                        self.insert(top, BlockAction::Destroy);
-                    }
+        if !World::Y_RANGE.contains(&utils::chunk_coords(coords).y)
+            || !self.block(chunks, coords).is_action_valid(action)
+        {
+            return false;
+        }
+
+        match action {
+            BlockAction::Place(block) => {
+                if let Some(surface) = block.data().valid_surface {
+                    normal == Vector3::y() && self.block(chunks, coords - normal) == surface
+                } else {
                     true
                 }
             }
-        } else {
-            false
+            BlockAction::Destroy => {
+                let top = coords + Vector3::y();
+                if self.block(chunks, top).data().valid_surface.is_some() {
+                    self.apply(chunks, top, -Vector3::y(), BlockAction::Destroy)
+                } else {
+                    true
+                }
+            }
         }
     }
 
-    fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
+    fn block(&self, chunks: &ChunkStore, coords: Point3<i64>) -> Block {
+        let mut block = chunks.block(coords);
+        if let Some(action) = self.action(coords) {
+            block.apply_unchecked(action);
+        }
+        block
+    }
+
+    fn action(&self, coords: Point3<i64>) -> Option<BlockAction> {
         self.actions
-            .entry(utils::chunk_coords(coords))
-            .or_default()
-            .entry(utils::block_coords(coords))
-            .and_modify(|_| unreachable!())
-            .or_insert(action);
+            .get(&utils::chunk_coords(coords))?
+            .get(&utils::block_coords(coords))
+            .copied()
     }
 }
 
