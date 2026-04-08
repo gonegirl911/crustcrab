@@ -109,6 +109,7 @@ impl EventHandler for Inventory {
         match event {
             Event::ServerEvent(ServerEvent::PlayerInitialized { inventory, .. }) => {
                 self.contents = inventory.clone();
+                self.is_updated = true;
             }
             Event::WindowEvent(event) => match *event {
                 WindowEvent::KeyboardInput {
