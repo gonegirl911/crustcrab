@@ -41,7 +41,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::{
     array,
-    collections::hash_map::Entry,
+    collections::{VecDeque, hash_map::Entry},
     iter, mem,
     ops::{Index, Range},
 };
@@ -372,15 +372,11 @@ impl Branch {
         normal: Vector3<i64>,
         action: BlockAction,
     ) -> bool {
-        if self.is_action_valid(chunks, coords, normal, action) {
-            self.actions
-                .entry(utils::chunk_coords(coords))
-                .or_default()
-                .entry(utils::block_coords(coords))
-                .insert_entry(action);
-            true
-        } else {
+        if !self.is_action_valid(chunks, coords, normal, action) {
             false
+        } else {
+            self.expand_action(chunks, coords, action);
+            true
         }
     }
 
@@ -449,7 +445,7 @@ impl Branch {
     }
 
     fn is_action_valid(
-        &mut self,
+        &self,
         chunks: &ChunkStore,
         coords: Point3<i64>,
         normal: Vector3<i64>,
@@ -461,22 +457,28 @@ impl Branch {
             return false;
         }
 
-        match action {
-            BlockAction::Place(block) => {
-                if let Some(surface) = block.data().valid_surface {
-                    normal == Vector3::y() && self.block(chunks, coords - normal) == surface
-                } else {
-                    true
+        if let BlockAction::Place(block) = action
+            && let Some(surface) = block.data().valid_surface
+            && (normal != Vector3::y() || self.block(chunks, coords - normal) != surface)
+        {
+            return false;
+        }
+
+        true
+    }
+
+    fn expand_action(&mut self, chunks: &ChunkStore, coords: Point3<i64>, action: BlockAction) {
+        let mut deq = VecDeque::from([(coords, action)]);
+
+        while let Some((coords, action)) = deq.pop_front() {
+            if action == BlockAction::Destroy {
+                let coords = coords + Vector3::y();
+                if self.block(chunks, coords).data().valid_surface.is_some() {
+                    deq.push_front((coords, BlockAction::Destroy));
                 }
             }
-            BlockAction::Destroy => {
-                let top = coords + Vector3::y();
-                if self.block(chunks, top).data().valid_surface.is_some() {
-                    self.apply(chunks, top, -Vector3::y(), BlockAction::Destroy)
-                } else {
-                    true
-                }
-            }
+
+            self.insert(coords, action);
         }
     }
 
@@ -486,6 +488,14 @@ impl Branch {
             block.apply_unchecked(action);
         }
         block
+    }
+
+    fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
+        self.actions
+            .entry(utils::chunk_coords(coords))
+            .or_default()
+            .entry(utils::block_coords(coords))
+            .insert_entry(action);
     }
 
     fn action(&self, coords: Point3<i64>) -> Option<BlockAction> {
