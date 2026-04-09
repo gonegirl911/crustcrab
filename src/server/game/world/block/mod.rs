@@ -18,10 +18,9 @@ pub struct Block(u8);
 
 impl Block {
     const MAX_COUNT: usize = u8::MAX as usize + 1;
-    const HARD_CODED_VALUES: &[&str] = &["air", "sand", "glowstone"];
+    const HARD_CODED_VALUES: &[&str] = &["air", "sand"];
     pub const AIR: Self = Self(0);
     pub const SAND: Self = Self(1);
-    pub const GLOWSTONE: Self = Self(2);
 
     pub fn data(self) -> &'static BlockData {
         unsafe { BLOCK_DATA.get_unchecked(self.0 as usize) }
