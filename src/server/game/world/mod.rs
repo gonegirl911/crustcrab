@@ -81,6 +81,7 @@ impl World {
         self.light.par_insert_many(&self.chunks, &self.heights, points)
     }
 
+    #[rustfmt::skip]
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -91,17 +92,33 @@ impl World {
         ray: Ray,
     ) {
         let mut branch = Branch::default();
-        if branch.apply(&self.chunks, coords, normal, action) {
-            let (block_updates, inserts, removals) = branch.merge(self, area);
-            let updates = self.updates([], block_updates, area, &inserts, &removals);
-            let group_id = GroupId::new(inserts.len() + removals.len() + updates.len());
-
-            self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
-
-            _ = self.send_updates(updates, group_id, server_tx);
-            _ = Self::send_unloads(removals, Some(group_id), server_tx);
-            _ = self.send_loads(inserts, group_id, server_tx);
+        if !branch.apply(&self.chunks, coords, normal, action) {
+            return;
         }
+
+        let (actions, mut inserts, mut removals) = branch.merge(&mut self.chunks);
+        let block_updates = actions
+            .into_iter()
+            .flat_map(|(coords, action)| {
+                self.actions.insert(coords, action);
+                let light_updates = self.light.apply(&self.chunks, coords, action);
+                iter::chain([coords], light_updates)
+            })
+            .collect::<Vec<_>>();
+
+        inserts.retain(|&coords| area.client_contains(coords));
+        removals.retain(|&coords| area.client_contains(coords));
+
+        self.light.extend_placeholders(self.heights.load_placeholders(inserts.iter().copied()));
+
+        let updates = self.updates([], block_updates, area, &inserts, &removals);
+        let group_id = GroupId::new(inserts.len() + removals.len() + updates.len());
+
+        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+
+        _ = self.send_updates(updates, group_id, server_tx);
+        _ = Self::send_unloads(removals, Some(group_id), server_tx);
+        _ = self.send_loads(inserts, group_id, server_tx);
     }
 
     fn updates(
@@ -359,7 +376,7 @@ struct Branch {
 }
 
 type Changes = (
-    Vec<Point3<i64>>,
+    impl Iterator<Item = (Point3<i64>, BlockAction)>,
     FxHashSet<Point3<i32>>,
     FxHashSet<Point3<i32>>,
 );
@@ -380,65 +397,41 @@ impl Branch {
         }
     }
 
-    fn merge(
-        self,
-        World {
-            chunks,
-            heights,
-            light,
-            actions,
-            ..
-        }: &mut World,
-        area: WorldArea,
-    ) -> Changes {
-        let mut hits = vec![];
+    #[define_opaque(Changes)]
+    fn merge(self, chunks: &mut ChunkStore) -> Changes {
         let mut inserts = FxHashSet::default();
         let mut removals = FxHashSet::default();
 
-        for (chunk_coords, actions) in self.actions {
+        for (&chunk_coords, actions) in &self.actions {
             match chunks.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let chunk = entry.get_mut();
-                    for (block_coords, action) in actions {
+                    for (&block_coords, &action) in actions {
                         chunk.apply_unchecked(block_coords, action);
-                        hits.push((utils::coords((chunk_coords, block_coords)), action));
                     }
                     if chunk.is_empty() {
                         entry.remove();
-                        if area.client_contains(chunk_coords) {
-                            removals.insert(chunk_coords);
-                        }
+                        removals.insert(chunk_coords);
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let mut actions = actions
-                        .into_iter()
-                        .filter(|&(_, action)| Block::AIR.is_action_valid(action))
-                        .peekable();
-
-                    if actions.peek().is_some() {
-                        let chunk = entry.insert(Default::default());
-                        for (block_coords, action) in actions {
-                            chunk.apply_unchecked(block_coords, action);
-                            hits.push((utils::coords((chunk_coords, block_coords)), action));
-                        }
-                        inserts.insert(chunk_coords);
+                    let chunk = entry.insert(Default::default());
+                    for (&block_coords, &action) in actions {
+                        assert!(chunk.apply(block_coords, action));
                     }
+                    inserts.insert(chunk_coords);
                 }
             }
         }
 
-        light.extend_placeholders(heights.load_placeholders(inserts.iter().copied()));
-
-        inserts.retain(|&coords| area.client_contains(coords));
-
         (
-            hits.into_iter()
-                .inspect(|&(coords, action)| actions.insert(coords, action))
-                .flat_map(|(coords, action)| {
-                    iter::chain([coords], light.apply(chunks, coords, action))
-                })
-                .collect(),
+            self.actions
+                .into_iter()
+                .flat_map(|(chunk_coords, actions)| {
+                    actions.into_iter().map(move |(block_coords, action)| {
+                        (utils::coords((chunk_coords, block_coords)), action)
+                    })
+                }),
             inserts,
             removals,
         )
