@@ -462,7 +462,6 @@ impl Branch {
 
     fn expand_action(&mut self, chunks: &ChunkStore, coords: Point3<i64>, action: BlockAction) {
         let mut deq = VecDeque::from([(coords, action)]);
-
         while let Some((coords, action)) = deq.pop_front() {
             if action == BlockAction::Destroy {
                 let coords = coords + Vector3::y();
@@ -470,7 +469,6 @@ impl Branch {
                     deq.push_front((coords, BlockAction::Destroy));
                 }
             }
-
             self.insert(coords, action);
         }
     }
