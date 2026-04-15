@@ -42,7 +42,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     array,
     collections::{VecDeque, hash_map::Entry},
-    iter, mem,
+    mem,
     ops::{Index, Range},
 };
 
@@ -97,20 +97,18 @@ impl World {
         }
 
         let (actions, mut inserts, mut removals) = branch.merge(&mut self.chunks);
-        let block_updates = actions
-            .into_iter()
-            .flat_map(|(coords, action)| {
-                self.actions.insert(coords, action);
-                let light_updates = self.light.apply(&self.chunks, coords, action);
-                iter::chain([coords], light_updates)
-            })
-            .collect::<Vec<_>>();
+
+        self.light.extend_placeholders(self.heights.load_placeholders(inserts.iter().copied()));
+        let light_updates = self.light.apply(&self.chunks, actions.iter().copied());
 
         inserts.retain(|&coords| area.client_contains(coords));
         removals.retain(|&coords| area.client_contains(coords));
 
-        self.light.extend_placeholders(self.heights.load_placeholders(inserts.iter().copied()));
-
+        let block_updates = actions
+            .iter()
+            .map(|&(coords, _)| coords)
+            .chain(light_updates)
+            .collect::<FxHashSet<_>>();
         let updates = self.updates([], block_updates, area, &inserts, &removals);
         let group_id = GroupId::new(inserts.len() + removals.len() + updates.len());
 
@@ -119,6 +117,8 @@ impl World {
         _ = self.send_updates(updates, group_id, server_tx);
         _ = Self::send_unloads(removals, Some(group_id), server_tx);
         _ = self.send_loads(inserts, group_id, server_tx);
+
+        self.actions.extend(actions);
     }
 
     fn updates(
@@ -209,7 +209,7 @@ impl World {
             None
         } else {
             let mut chunk = Box::new(self.generator.generate(coords));
-            for (coords, action) in self.actions.actions(coords) {
+            for (coords, action) in self.actions.chunk_actions(coords) {
                 chunk.apply_unchecked(coords, action);
             }
             (!chunk.is_empty()).then_some(chunk)
@@ -372,11 +372,11 @@ impl Index<Point3<i32>> for ChunkStore {
 
 #[derive(Default)]
 struct Branch {
-    actions: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>,
+    actions: ActionStore,
 }
 
 type Changes = (
-    impl Iterator<Item = (Point3<i64>, BlockAction)>,
+    Vec<(Point3<i64>, BlockAction)>,
     FxHashSet<Point3<i32>>,
     FxHashSet<Point3<i32>>,
 );
@@ -392,49 +392,51 @@ impl Branch {
         if !self.is_action_valid(chunks, coords, normal, action) {
             false
         } else {
-            self.expand_action(chunks, coords, action);
+            self.execute_actions(chunks, VecDeque::from([(coords, action)]));
             true
         }
     }
 
-    #[define_opaque(Changes)]
     fn merge(self, chunks: &mut ChunkStore) -> Changes {
+        let mut hits = vec![];
         let mut inserts = FxHashSet::default();
         let mut removals = FxHashSet::default();
 
-        for (&chunk_coords, actions) in &self.actions {
+        for (chunk_coords, actions) in self.actions.0 {
             match chunks.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let chunk = entry.get_mut();
-                    for (&block_coords, &action) in actions {
-                        chunk.apply_unchecked(block_coords, action);
+
+                    for (block_coords, action) in actions {
+                        if chunk.apply(block_coords, action) {
+                            hits.push((utils::coords((chunk_coords, block_coords)), action));
+                        }
                     }
+
                     if chunk.is_empty() {
                         entry.remove();
                         removals.insert(chunk_coords);
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let chunk = entry.insert(Default::default());
-                    for (&block_coords, &action) in actions {
-                        assert!(chunk.apply(block_coords, action));
+                    let mut actions = actions
+                        .into_iter()
+                        .filter(|&(_, action)| Block::AIR.is_action_valid(action))
+                        .peekable();
+
+                    if actions.peek().is_some() {
+                        let chunk = entry.insert(Default::default());
+                        for (block_coords, action) in actions {
+                            chunk.apply_unchecked(block_coords, action);
+                            hits.push((utils::coords((chunk_coords, block_coords)), action));
+                        }
+                        inserts.insert(chunk_coords);
                     }
-                    inserts.insert(chunk_coords);
                 }
             }
         }
 
-        (
-            self.actions
-                .into_iter()
-                .flat_map(|(chunk_coords, actions)| {
-                    actions.into_iter().map(move |(block_coords, action)| {
-                        (utils::coords((chunk_coords, block_coords)), action)
-                    })
-                }),
-            inserts,
-            removals,
-        )
+        (hits, inserts, removals)
     }
 
     fn is_action_valid(
@@ -460,40 +462,28 @@ impl Branch {
         true
     }
 
-    fn expand_action(&mut self, chunks: &ChunkStore, coords: Point3<i64>, action: BlockAction) {
-        let mut deq = VecDeque::from([(coords, action)]);
-        while let Some((coords, action)) = deq.pop_front() {
+    fn execute_actions(
+        &mut self,
+        chunks: &ChunkStore,
+        mut actions: VecDeque<(Point3<i64>, BlockAction)>,
+    ) {
+        while let Some((coords, action)) = actions.pop_front() {
             if action == BlockAction::Destroy {
                 let coords = coords + Vector3::y();
                 if self.block(chunks, coords).data().valid_surface.is_some() {
-                    deq.push_front((coords, BlockAction::Destroy));
+                    actions.push_front((coords, BlockAction::Destroy));
                 }
             }
-            self.insert(coords, action);
+            self.actions.insert(coords, action);
         }
     }
 
     fn block(&self, chunks: &ChunkStore, coords: Point3<i64>) -> Block {
         let mut block = chunks.block(coords);
-        if let Some(action) = self.action(coords) {
+        if let Some(action) = self.actions.get(coords) {
             block.apply_unchecked(action);
         }
         block
-    }
-
-    fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
-        self.actions
-            .entry(utils::chunk_coords(coords))
-            .or_default()
-            .entry(utils::block_coords(coords))
-            .insert_entry(action);
-    }
-
-    fn action(&self, coords: Point3<i64>) -> Option<BlockAction> {
-        self.actions
-            .get(&utils::chunk_coords(coords))?
-            .get(&utils::block_coords(coords))
-            .copied()
     }
 }
 

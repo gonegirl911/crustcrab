@@ -120,6 +120,15 @@ impl ChunkLight {
         }
     }
 
+    pub fn set_unchecked(&mut self, coords: Point3<u8>, value: BlockLight) {
+        let prev = mem::replace(&mut self.lights[coords], value);
+        if prev == Default::default() {
+            self.non_zero_count += 1;
+        } else if value == Default::default() {
+            self.non_zero_count -= 1;
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.non_zero_count == 0
     }

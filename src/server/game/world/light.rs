@@ -119,24 +119,22 @@ impl WorldLight {
             .merge(self)
     }
 
-    pub fn apply(
-        &mut self,
-        chunks: &ChunkStore,
-        coords: Point3<i64>,
-        action: BlockAction,
-    ) -> Vec<Point3<i64>> {
-        match action {
-            BlockAction::Place(block) => {
-                let mut branch = Branch::default();
-                branch.place(chunks, self, coords, block.data());
-                branch.merge(self)
-            }
-            BlockAction::Destroy => {
-                let mut branch = Branch::default();
-                branch.destroy(chunks, self, coords, self.flood(coords));
-                branch.merge(self)
+    pub fn apply<A>(&mut self, chunks: &ChunkStore, actions: A) -> Vec<Point3<i64>>
+    where
+        A: IntoIterator<Item = (Point3<i64>, BlockAction)>,
+    {
+        let mut branch = Branch::default();
+        for (coords, action) in actions {
+            match action {
+                BlockAction::Place(block) => {
+                    branch.place(chunks, self, coords, block.data());
+                }
+                BlockAction::Destroy => {
+                    branch.destroy(chunks, self, coords, self.flood(coords));
+                }
             }
         }
+        branch.merge(self)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
@@ -324,10 +322,17 @@ impl Branch {
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let light = entry.insert(Default::default());
-                    for (block_coords, value) in values {
-                        assert!(light.set(block_coords, value));
-                        hits.push(utils::coords((chunk_coords, block_coords)));
+                    let mut values = values
+                        .into_iter()
+                        .filter(|(_, value)| *value != Default::default())
+                        .peekable();
+
+                    if values.peek().is_some() {
+                        let light = entry.insert(Default::default());
+                        for (block_coords, value) in values {
+                            light.set_unchecked(block_coords, value);
+                            hits.push(utils::coords((chunk_coords, block_coords)));
+                        }
                     }
                 }
             }

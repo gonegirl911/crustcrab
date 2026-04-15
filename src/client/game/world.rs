@@ -181,7 +181,9 @@ impl World {
                 if group_size == 1 {
                     self.apply_output(renderer, output);
                 } else {
-                    entry.insert(vec![output]);
+                    let mut group = Vec::with_capacity(group_size);
+                    group.push(output);
+                    entry.insert(group);
                 }
             }
         }

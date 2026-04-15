@@ -4,10 +4,20 @@ use nalgebra::Point3;
 use rustc_hash::FxHashMap;
 
 #[derive(Default)]
-pub struct ActionStore(FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
+pub struct ActionStore(pub FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 
 impl ActionStore {
-    pub fn actions(&self, coords: Point3<i32>) -> impl Iterator<Item = (Point3<u8>, BlockAction)> {
+    pub fn get(&self, coords: Point3<i64>) -> Option<BlockAction> {
+        self.0
+            .get(&utils::chunk_coords(coords))?
+            .get(&utils::block_coords(coords))
+            .copied()
+    }
+
+    pub fn chunk_actions(
+        &self,
+        coords: Point3<i32>,
+    ) -> impl Iterator<Item = (Point3<u8>, BlockAction)> {
         self.0
             .get(&coords)
             .into_iter()
@@ -20,6 +30,14 @@ impl ActionStore {
             .entry(utils::chunk_coords(coords))
             .or_default()
             .insert(utils::block_coords(coords), action);
+    }
+}
+
+impl Extend<(Point3<i64>, BlockAction)> for ActionStore {
+    fn extend<I: IntoIterator<Item = (Point3<i64>, BlockAction)>>(&mut self, iter: I) {
+        for (coords, action) in iter {
+            self.insert(coords, action);
+        }
     }
 }
 
