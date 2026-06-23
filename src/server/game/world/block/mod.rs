@@ -56,14 +56,14 @@ impl<'de> Deserialize<'de> for Block {
     where
         D: Deserializer<'de>,
     {
-        let index = u64::deserialize(deserializer)?;
+        let index = u8::deserialize(deserializer)?;
         let min = 0;
-        let max = BLOCK_DATA.len() as u64;
-        if (min..max).contains(&index) {
-            Ok(Self(index as u8))
+        let max = BLOCK_DATA.len();
+        if (min..max).contains(&(index as usize)) {
+            Ok(Self(index))
         } else {
             Err(de::Error::invalid_value(
-                Unexpected::Unsigned(index),
+                Unexpected::Unsigned(index as u64),
                 &&*format!("an index in the range [{min}, {max})"),
             ))
         }
