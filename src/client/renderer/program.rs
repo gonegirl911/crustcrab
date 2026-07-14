@@ -33,7 +33,7 @@ impl Program {
                 module: &shader,
                 entry_point: None,
                 compilation_options: Default::default(),
-                buffers,
+                buffers: unsafe { slice::from_raw_parts(buffers.as_ptr().cast(), buffers.len()) },
             },
             primitive: wgpu::PrimitiveState {
                 cull_mode,

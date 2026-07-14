@@ -1,3 +1,5 @@
+enable wgpu_binding_array;
+
 struct VertexInput {
     @location(0) data: vec2<u32>,
 }
@@ -28,7 +30,7 @@ struct Immediates {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) tex_index: u32,
+    @location(0) @interpolate(flat) tex_index: u32,
     @location(1) tex_coords: vec2<f32>,
     @location(2) light_factor: vec3<f32>,
 }

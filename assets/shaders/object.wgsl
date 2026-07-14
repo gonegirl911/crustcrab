@@ -1,3 +1,5 @@
+enable wgpu_binding_array;
+
 struct VertexInput {
     @builtin(vertex_index) index: u32,
 }

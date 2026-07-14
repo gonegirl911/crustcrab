@@ -219,7 +219,7 @@ impl EventHandler for Game {
                     self.draw(renderer, &view, &mut encoder);
                     queue.submit([encoder.finish()]);
                     window.pre_present_notify();
-                    texture.present();
+                    queue.present(texture);
                 }
                 wgpu::CurrentSurfaceTexture::Suboptimal(_)
                 | wgpu::CurrentSurfaceTexture::Outdated => {
