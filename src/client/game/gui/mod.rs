@@ -1,15 +1,12 @@
 pub mod crosshair;
 pub mod inventory;
 
-use crate::{
-    client::{
-        event_loop::{Event, EventHandler},
-        renderer::{
-            Renderer, Surface,
-            effect::{Blit, Effect, PostProcessor},
-        },
+use crate::client::{
+    event_loop::{Event, EventHandler},
+    renderer::{
+        Renderer, Surface,
+        effect::{Blit, Effect, PostProcessor},
     },
-    server::game::world::block::Block,
 };
 use crosshair::{Crosshair, CrosshairConfig};
 use inventory::{Inventory, InventoryConfig};
@@ -19,7 +16,7 @@ use serde::Deserialize;
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
-    inventory: Inventory,
+    pub inventory: Inventory,
 }
 
 impl Gui {
@@ -34,10 +31,6 @@ impl Gui {
             crosshair: Crosshair::new(renderer, surface, input_bind_group_layout),
             inventory: Inventory::new(renderer, textures_bind_group_layout),
         }
-    }
-
-    pub fn selected_block(&self) -> Option<Block> {
-        self.inventory.selected_block()
     }
 
     pub fn draw(
