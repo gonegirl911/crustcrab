@@ -409,7 +409,7 @@ impl Branch {
 
                     for (block_coords, action) in actions {
                         if chunk.apply(block_coords, action) {
-                            hits.push((utils::coords((chunk_coords, block_coords)), action));
+                            hits.push((utils::coords(chunk_coords, block_coords), action));
                         }
                     }
 
@@ -428,7 +428,7 @@ impl Branch {
                         let chunk = entry.insert(Default::default());
                         for (block_coords, action) in actions {
                             chunk.apply_unchecked(block_coords, action);
-                            hits.push((utils::coords((chunk_coords, block_coords)), action));
+                            hits.push((utils::coords(chunk_coords, block_coords), action));
                         }
                         inserts.insert(chunk_coords);
                     }

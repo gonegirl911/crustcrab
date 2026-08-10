@@ -1,5 +1,5 @@
 use crate::server::game::world::chunk::Chunk;
-use nalgebra::{Point, SVector, Scalar};
+use nalgebra::{Point, Scalar};
 use rayon::iter::ParallelIterator;
 use std::{
     collections::linked_list,
@@ -34,60 +34,24 @@ pub fn magnitude_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> 
 
 // ------------------------------------------------------------------------------------------------
 
-pub fn chunk_coords<T: WorldCoords>(t: T) -> T::Point<i32> {
-    t.chunk_coords()
+pub fn chunk_coords<W: WorldCoords>(coords: W) -> W::Point<i32> {
+    coords.chunk_coords()
 }
 
-pub fn block_coords<T: WorldCoords>(t: T) -> T::Point<u8> {
-    t.block_coords()
-}
-
-pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
-    t.coords()
+pub fn block_coords<W: WorldCoords>(coords: W) -> W::Point<u8> {
+    coords.block_coords()
 }
 
 pub impl(self) trait WorldCoords {
     type Point<T: Scalar>;
 
     fn chunk_coords(self) -> Self::Point<i32>;
+
     fn block_coords(self) -> Self::Point<u8>;
-    fn coords(self) -> Self::Point<i64>;
-}
-
-impl<const D: usize> WorldCoords for (SVector<i32, D>, SVector<u8, D>) {
-    type Point<T: Scalar> = SVector<T, D>;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        self.0
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.1
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        self.0.cast() * Chunk::DIM as i64 + self.1.cast()
-    }
-}
-
-impl<const D: usize> WorldCoords for (Point<i32, D>, Point<u8, D>) {
-    type Point<T: Scalar> = Point<T, D>;
-
-    fn chunk_coords(self) -> Self::Point<i32> {
-        self.0
-    }
-
-    fn block_coords(self) -> Self::Point<u8> {
-        self.1
-    }
-
-    fn coords(self) -> Self::Point<i64> {
-        coords((self.0.coords, self.1.coords)).into()
-    }
 }
 
 impl<const D: usize> WorldCoords for Point<i64, D> {
-    type Point<U: Scalar> = Point<U, D>;
+    type Point<T: Scalar> = Point<T, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
         self.map(|c| c.div_floor(Chunk::DIM as i64) as i32)
@@ -96,14 +60,10 @@ impl<const D: usize> WorldCoords for Point<i64, D> {
     fn block_coords(self) -> Self::Point<u8> {
         self.map(|c| c.rem_euclid(Chunk::DIM as i64) as u8)
     }
-
-    fn coords(self) -> Self::Point<i64> {
-        self
-    }
 }
 
 impl<const D: usize> WorldCoords for Point<f32, D> {
-    type Point<U: Scalar> = Point<U, D>;
+    type Point<T: Scalar> = Point<T, D>;
 
     fn chunk_coords(self) -> Self::Point<i32> {
         self.map(|c| (c / Chunk::DIM as f32).floor() as i32)
@@ -112,10 +72,13 @@ impl<const D: usize> WorldCoords for Point<f32, D> {
     fn block_coords(self) -> Self::Point<u8> {
         self.map(|c| c.rem_euclid(Chunk::DIM as f32) as u8)
     }
+}
 
-    fn coords(self) -> Self::Point<i64> {
-        self.map(|c| c as i64)
-    }
+pub fn coords<const D: usize>(
+    chunk_coords: Point<i32, D>,
+    block_coords: Point<u8, D>,
+) -> Point<i64, D> {
+    chunk_coords.cast() * Chunk::DIM as i64 + block_coords.cast().coords
 }
 
 // ------------------------------------------------------------------------------------------------

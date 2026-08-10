@@ -46,7 +46,9 @@ impl ChunkArea {
                 Self::block_axis_range(dz).map(move |z| {
                     (
                         point![x, y, z],
-                        utils::coords((vector![dx, dy, dz], vector![x, y, z])).cast(),
+                        utils::coords(point![dx, dy, dz], point![x, y, z])
+                            .cast()
+                            .coords,
                     )
                 })
             })

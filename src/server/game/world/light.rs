@@ -96,7 +96,7 @@ impl WorldLight {
                             for (block_coords, neighbor_block_coords) in side.block_points() {
                                 let node = Self::node(chunk, light, chunk_coords, block_coords);
                                 let filter = node.block().data().light_filter;
-                                let coords = utils::coords((chunk_coords, block_coords));
+                                let coords = utils::coords(chunk_coords, block_coords);
                                 let neighbor_value = neighbor[neighbor_block_coords];
                                 skylight_range
                                     .clone()
@@ -179,7 +179,7 @@ impl WorldLight {
             light,
             chunk_coords,
             block_coords,
-            coords: utils::coords((chunk_coords, block_coords)),
+            coords: utils::coords(chunk_coords, block_coords),
             value: 0,
         }
     }
@@ -314,7 +314,7 @@ impl Branch {
                     let light = entry.get_mut();
                     for (block_coords, value) in values {
                         if light.set(block_coords, value) {
-                            hits.push(utils::coords((chunk_coords, block_coords)));
+                            hits.push(utils::coords(chunk_coords, block_coords));
                         }
                     }
                     if light.is_empty() {
@@ -331,7 +331,7 @@ impl Branch {
                         let light = entry.insert(Default::default());
                         for (block_coords, value) in values {
                             light.set_unchecked(block_coords, value);
-                            hits.push(utils::coords((chunk_coords, block_coords)));
+                            hits.push(utils::coords(chunk_coords, block_coords));
                         }
                     }
                 }
