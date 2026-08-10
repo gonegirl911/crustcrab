@@ -16,7 +16,7 @@ use serde::Deserialize;
 pub struct Gui {
     blit: Blit,
     crosshair: Crosshair,
-    pub inventory: Inventory,
+    pub mut(self) inventory: Inventory,
 }
 
 impl Gui {

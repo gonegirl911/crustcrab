@@ -4,7 +4,7 @@ use winit::event::WindowEvent;
 
 pub struct Stopwatch {
     prev: Instant,
-    pub dt: Duration,
+    pub mut(self) dt: Duration,
 }
 
 impl Stopwatch {

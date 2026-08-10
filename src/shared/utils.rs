@@ -8,10 +8,21 @@ use std::{
 };
 
 pub fn lerp<T: Lerp>(a: T, b: T, t: f32) -> T {
-    a * (1.0 - t) + b * t
+    a.lerp(b, t)
 }
 
-pub trait Lerp = Mul<f32, Output = Self> + Add<Output = Self> + Sized;
+pub trait Lerp {
+    fn lerp(self, other: Self, t: f32) -> Self;
+}
+
+impl<T> Lerp for T
+where
+    T: Mul<f32, Output = Self> + Add<Output = Self>,
+{
+    fn lerp(self, other: Self, t: f32) -> Self {
+        self * (1.0 - t) + other * t
+    }
+}
 
 // ------------------------------------------------------------------------------------------------
 
@@ -35,7 +46,7 @@ pub fn coords<T: WorldCoords>(t: T) -> T::Point<i64> {
     t.coords()
 }
 
-pub trait WorldCoords {
+pub impl(self) trait WorldCoords {
     type Point<T: Scalar>;
 
     fn chunk_coords(self) -> Self::Point<i32>;
@@ -109,7 +120,7 @@ impl<const D: usize> WorldCoords for Point<f32, D> {
 
 // ------------------------------------------------------------------------------------------------
 
-pub trait ParallelIteratorExt: ParallelIterator {
+pub impl(self) trait ParallelIteratorExt: ParallelIterator {
     fn into_seq_iter(self) -> IntoSeqIter<Self::Item> {
         self.collect_vec_list().into_iter().flatten()
     }

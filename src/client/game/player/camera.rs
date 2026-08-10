@@ -19,9 +19,9 @@ use winit::{
 
 pub struct View {
     pub origin: Point3<f32>,
-    pub forward: Vector3<f32>,
-    pub right: Vector3<f32>,
-    pub up: Vector3<f32>,
+    pub mut(self) forward: Vector3<f32>,
+    pub mut(self) right: Vector3<f32>,
+    pub mut(self) up: Vector3<f32>,
     yaw: f32,
     pitch: f32,
 }

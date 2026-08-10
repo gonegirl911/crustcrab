@@ -20,8 +20,8 @@ use winit::{dpi::PhysicalSize, event::WindowEvent};
 
 pub struct Renderer {
     instance: wgpu::Instance,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
+    pub mut(self) device: wgpu::Device,
+    pub mut(self) queue: wgpu::Queue,
     is_device_lost: Arc<AtomicBool>,
 }
 
@@ -89,9 +89,9 @@ impl Renderer {
 
 pub struct Surface {
     surface: wgpu::Surface<'static>,
-    pub config: wgpu::SurfaceConfiguration,
+    pub mut(self) config: wgpu::SurfaceConfiguration,
     should_resize: bool,
-    pub is_resized: bool,
+    pub mut(self) is_resized: bool,
 }
 
 impl Surface {

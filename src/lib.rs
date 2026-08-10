@@ -1,8 +1,9 @@
 #![feature(
+    impl_restriction,
     impl_trait_in_assoc_type,
     int_roundings,
     maybe_uninit_fill,
-    trait_alias,
+    mut_restriction,
     type_alias_impl_trait
 )]
 
