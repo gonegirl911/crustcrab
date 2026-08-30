@@ -129,13 +129,13 @@ impl ClockConfig {
     fn stage(&self, ticks: u16) -> Stage {
         if self.dawn_range().contains(&ticks) {
             Stage::Dawn {
-                progress: Self::inv_lerp(self.dawn_range(), ticks),
+                progress: Self::progress(self.dawn_range(), ticks),
             }
         } else if self.day_range().contains(&ticks) {
             Stage::Day
         } else if self.dusk_range().contains(&ticks) {
             Stage::Dusk {
-                progress: Self::inv_lerp(self.dusk_range(), ticks),
+                progress: Self::progress(self.dusk_range(), ticks),
             }
         } else {
             Stage::Night
@@ -190,8 +190,8 @@ impl ClockConfig {
         self.noon() + self.ticks_per_day / 2
     }
 
-    fn inv_lerp(Range { start, end }: Range<u16>, value: u16) -> f32 {
-        (value - start) as f32 / (end - 1 - start) as f32
+    fn progress(Range { start, end }: Range<u16>, ticks: u16) -> f32 {
+        utils::inv_lerp(start as f32, (end - 1) as f32, ticks as f32)
     }
 }
 

@@ -1,70 +1,37 @@
-use nalgebra::{Point2, Point3, Vector2, point, vector};
+use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{collections::hash_map::Entry, ops::Index};
+use std::collections::hash_map::Entry;
 
 #[derive(Default)]
-pub struct HeightMap(FxHashMap<Point2<i32>, i32>);
+pub struct HeightMap(pub FxHashMap<Point2<i32>, i32>);
 
 impl HeightMap {
-    pub fn load_placeholders<P>(&mut self, points: P) -> impl Iterator<Item = Point3<i32>>
+    pub fn load_many<P>(&mut self, points: P) -> Vec<Point3<i32>>
     where
         P: IntoIterator<Item = Point3<i32>>,
     {
-        Self::chunk_area_points(points.into_iter().filter_map(|coords| self.load(coords)))
+        points
+            .into_iter()
+            .filter(|&coords| self.load(coords))
+            .map(|coords| coords.xz())
             .collect::<FxHashSet<_>>()
             .into_iter()
-            .flat_map(|coords| {
-                let top = self.top(coords);
-                let bottom = self.bottom(coords).unwrap_or(top);
-                (bottom..=top).map(move |y| point![coords.x, y, coords.y])
-            })
+            .map(|xz| point![xz.x, self.0[&xz], xz.y])
+            .collect()
     }
 
-    fn load(&mut self, coords: Point3<i32>) -> Option<Point2<i32>> {
+    fn load(&mut self, coords: Point3<i32>) -> bool {
         let xz = coords.xz();
         match self.0.entry(xz) {
             Entry::Occupied(entry) if *entry.get() < coords.y => {
                 *entry.into_mut() = coords.y;
-                Some(xz)
+                true
             }
-            Entry::Occupied(_) => None,
+            Entry::Occupied(_) => false,
             Entry::Vacant(entry) => {
                 entry.insert(coords.y);
-                Some(xz)
+                true
             }
         }
-    }
-
-    fn top(&self, coords: Point2<i32>) -> i32 {
-        Self::chunk_area_points([coords])
-            .filter_map(|coords| self.0.get(&coords))
-            .map(|&height| height + 1)
-            .max()
-            .unwrap_or_else(|| unreachable!())
-    }
-
-    fn bottom(&self, coords: Point2<i32>) -> Option<i32> {
-        self.0.get(&coords).map(|&height| height + 1)
-    }
-
-    fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point2<i32>>
-    where
-        P: IntoIterator<Item = Point2<i32>>,
-    {
-        points
-            .into_iter()
-            .flat_map(|coords| Self::chunk_deltas().map(move |delta| coords + delta))
-    }
-
-    fn chunk_deltas() -> impl Iterator<Item = Vector2<i32>> {
-        (-1..=1).flat_map(|x| (-1..=1).map(move |y| vector![x, y]))
-    }
-}
-
-impl Index<Point2<i32>> for HeightMap {
-    type Output = i32;
-
-    fn index(&self, coords: Point2<i32>) -> &Self::Output {
-        &self.0[&coords]
     }
 }

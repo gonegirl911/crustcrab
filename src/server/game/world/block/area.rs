@@ -3,7 +3,7 @@ use super::{
     data::{Component, Corner, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS, Side},
 };
 use crate::{enum_map, shared::enum_map::EnumMap};
-use nalgebra::{Vector3, vector};
+use nalgebra::{Point3, Vector3, vector};
 use std::{
     array,
     ops::{Index, IndexMut, Range},
@@ -65,6 +65,10 @@ impl BlockArea {
 
     fn components(&self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
         SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self[delta].data().is_opaque())
+    }
+
+    pub fn points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
+        Self::deltas().map(move |delta| coords + delta.cast())
     }
 
     pub fn deltas() -> impl Iterator<Item = Vector3<i8>> {

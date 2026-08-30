@@ -17,7 +17,6 @@ use std::{
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Index, IndexMut, Range},
-    slice,
 };
 
 #[derive(Default, Serialize, Deserialize)]
@@ -31,6 +30,10 @@ impl ChunkArea {
 
     pub fn block_area(&self, coords: Point3<u8>) -> BlockArea {
         BlockArea::from_fn(|delta| self[coords.coords.cast() + delta])
+    }
+
+    pub fn chunk_points(coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
+        Self::chunk_deltas().map(move |delta| coords + delta)
     }
 
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
@@ -107,8 +110,8 @@ impl IndexMut<Vector3<i8>> for ChunkAreaLight {
 struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl<T> ChunkAreaDataStore<T> {
-    fn values(&self) -> slice::Iter<'_, T> {
-        self.0.as_flattened().as_flattened().iter()
+    fn as_slice(&self) -> &[T] {
+        self.0.as_flattened().as_flattened()
     }
 
     fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
@@ -120,7 +123,7 @@ impl<T> ChunkAreaDataStore<T> {
 
 impl<T: PartialEq> ChunkAreaDataStore<T> {
     fn packed_len(&self) -> usize {
-        let mut values = self.values();
+        let mut values = self.as_slice().iter();
         let mut prev = values.next().unwrap_or_else(|| unreachable!());
         let mut len = 1;
 
@@ -156,7 +159,7 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
         const { assert!(ChunkArea::DIM.pow(3) <= u16::MAX as usize) };
 
         let mut seq = serializer.serialize_seq(Some(self.packed_len()))?;
-        let mut values = self.values();
+        let mut values = self.as_slice().iter();
         let mut prev = values.next().unwrap_or_else(|| unreachable!());
         let mut count = 1u16;
 

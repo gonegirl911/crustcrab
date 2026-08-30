@@ -229,6 +229,17 @@ impl Side {
             })
         })
     }
+
+    pub fn opp(self) -> Self {
+        match self {
+            Side::Top => Side::Bottom,
+            Side::Bottom => Side::Top,
+            Side::Front => Side::Back,
+            Side::Back => Side::Front,
+            Side::Left => Side::Right,
+            Side::Right => Side::Left,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Enum, Deserialize)]

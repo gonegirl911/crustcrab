@@ -107,7 +107,8 @@ impl WorldArea {
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
         (-self.radius..=self.radius).flat_map(move |dx| {
             World::Y_RANGE.flat_map(move |y| {
-                (-self.radius..=self.radius).map(move |dz| self.coords(dx, y, dz))
+                (-self.radius..=self.radius)
+                    .map(move |dz| point![self.center.x + dx, y, self.center.z + dz])
             })
         })
     }
@@ -119,7 +120,7 @@ impl WorldArea {
                 World::Y_RANGE.into_par_iter().flat_map(move |y| {
                     (-self.radius..=self.radius)
                         .into_par_iter()
-                        .map(move |dz| self.coords(dx, y, dz))
+                        .map(move |dz| point![self.center.x + dx, y, self.center.z + dz])
                 })
             })
     }
@@ -130,10 +131,6 @@ impl WorldArea {
 
     fn client_contains_y(self, y: i32) -> bool {
         y.abs_diff(self.center.y) <= self.radius as u32
-    }
-
-    fn coords(self, dx: i32, y: i32, dz: i32) -> Point3<i32> {
-        point![self.center.x + dx, y, self.center.z + dz]
     }
 }
 

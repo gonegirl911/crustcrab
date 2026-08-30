@@ -56,14 +56,14 @@ impl<'de> Deserialize<'de> for Block {
     where
         D: Deserializer<'de>,
     {
-        let index = u8::deserialize(deserializer)?;
+        let idx = u8::deserialize(deserializer)?;
         let min = 0;
         let max = BLOCK_DATA.len();
-        if (min..max).contains(&(index as usize)) {
-            Ok(Self(index))
+        if (min..max).contains(&(idx as usize)) {
+            Ok(Self(idx))
         } else {
             Err(de::Error::invalid_value(
-                Unexpected::Unsigned(index as u64),
+                Unexpected::Unsigned(idx as u64),
                 &&*format!("an index in the range [{min}, {max})"),
             ))
         }
@@ -92,11 +92,6 @@ impl BlockLight {
             value.set_component(i, Self::COMPONENT_MAX);
         }
         value
-    }
-
-    pub fn with_component(mut self, index: usize, value: u8) -> Self {
-        self.set_component(index, value);
-        self
     }
 
     pub fn lum(self) -> f32 {

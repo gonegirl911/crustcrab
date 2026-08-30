@@ -45,6 +45,7 @@ impl EventHandler<Event> for Game {
     fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
         self.player.handle(event, server_tx);
         self.clock.handle(event, server_tx);
+
         if let Some(event) = WorldEvent::new(event, &self.player) {
             self.world_tx
                 .send((event, server_tx.clone()))

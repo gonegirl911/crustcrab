@@ -42,7 +42,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     array,
     collections::{VecDeque, hash_map::Entry},
-    mem,
+    iter, mem,
     ops::{Index, Range},
 };
 
@@ -76,12 +76,6 @@ impl World {
     }
 
     #[rustfmt::skip]
-    fn par_light_up(&mut self, points: &[Point3<i32>]) -> Vec<Point3<i64>> {
-        self.light.extend_placeholders(self.heights.load_placeholders(points.iter().copied()));
-        self.light.par_insert_many(&self.chunks, &self.heights, points)
-    }
-
-    #[rustfmt::skip]
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -96,20 +90,27 @@ impl World {
             return;
         }
 
-        let (actions, mut inserts, mut removals) = branch.merge(&mut self.chunks);
+        let Changelog {
+            actions,
+            mut inserts,
+            mut removals,
+        } = branch.merge(&mut self.chunks);
 
-        self.light.extend_placeholders(self.heights.load_placeholders(inserts.iter().copied()));
+        let new_surface_points = self.heights.load_many(inserts.iter().copied());
+        self.light.extend_placeholders(&self.heights, new_surface_points);
         let light_updates = self.light.apply(&self.chunks, actions.iter().copied());
 
         inserts.retain(|&coords| area.client_contains(coords));
         removals.retain(|&coords| area.client_contains(coords));
 
-        let block_updates = actions
-            .iter()
-            .map(|&(coords, _)| coords)
-            .chain(light_updates)
-            .collect::<FxHashSet<_>>();
-        let updates = self.updates([], block_updates, area, &inserts, &removals);
+        let action_updates = actions.iter().map(|&(coords, _)| coords);
+        let updates = self.mesh_updates(
+            inserts.iter().copied(),
+            iter::chain(action_updates, light_updates),
+            area,
+            &inserts,
+            &removals,
+        );
         let group_id = GroupId::new(inserts.len() + removals.len() + updates.len());
 
         self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
@@ -121,7 +122,7 @@ impl World {
         self.actions.extend(actions);
     }
 
-    fn updates(
+    fn mesh_updates(
         &self,
         inserts: impl IntoIterator<Item = Point3<i32>>,
         block_updates: impl IntoIterator<Item = Point3<i64>>,
@@ -129,15 +130,25 @@ impl World {
         loads: &FxHashSet<Point3<i32>>,
         unloads: &FxHashSet<Point3<i32>>,
     ) -> FxHashSet<Point3<i32>> {
-        Self::chunk_area_points(inserts)
-            .chain(Self::block_area_points(block_updates).map(utils::chunk_coords))
-            .filter(|coords| {
-                area.client_contains(*coords)
-                    && self.chunks.0.contains_key(coords)
-                    && !loads.contains(coords)
-                    && !unloads.contains(coords)
-            })
-            .collect()
+        let mut updates = inserts
+            .into_iter()
+            .flat_map(ChunkArea::chunk_points)
+            .chain(
+                block_updates
+                    .into_iter()
+                    .flat_map(BlockArea::points)
+                    .map(utils::chunk_coords),
+            )
+            .collect::<FxHashSet<_>>();
+
+        updates.retain(|coords| {
+            area.client_contains(*coords)
+                && self.chunks.0.contains_key(coords)
+                && !loads.contains(coords)
+                && !unloads.contains(coords)
+        });
+
+        updates
     }
 
     fn send_loads<P: IntoIterator<Item = Point3<i32>>>(
@@ -226,35 +237,20 @@ impl World {
             .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id })
             .try_for_each(|event| server_tx.send(event))
     }
-
-    fn chunk_area_points<P>(points: P) -> impl Iterator<Item = Point3<i32>>
-    where
-        P: IntoIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_iter()
-            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
-    }
-
-    fn block_area_points<P>(points: P) -> impl Iterator<Item = Point3<i64>>
-    where
-        P: IntoIterator<Item = Point3<i64>>,
-    {
-        points
-            .into_iter()
-            .flat_map(|coords| BlockArea::deltas().map(move |delta| coords + delta.cast()))
-    }
 }
 
 impl EventHandler<WorldEvent> for World {
     type Context<'a> = &'a ServerSender;
 
+    #[rustfmt::skip]
     fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
         match *event {
             WorldEvent::PlayerConnected { area, ray } => {
                 let inserts = self.par_insert_many(area.par_server_points());
 
-                self.par_light_up(&inserts);
+                let new_surface_points = self.heights.load_many(inserts.iter().copied());
+                self.light.extend_placeholders(&self.heights, new_surface_points);
+                self.light.par_insert_many(&self.chunks, &self.heights, &inserts);
 
                 let mut loads = area
                     .client_points()
@@ -271,7 +267,11 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::WorldAreaChanged { prev, cur, ray } => {
                 let inserts = self.par_insert_many(cur.par_exclusive_server_points(prev));
-                let block_updates = self.par_light_up(&inserts);
+
+                let new_surface_points = self.heights.load_many(inserts.iter().copied());
+                self.light.extend_placeholders(&self.heights, new_surface_points);
+                let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts);
+
                 let loads = cur
                     .exclusive_client_points(prev)
                     .filter(|&coords| self.chunks.0.contains_key(&coords))
@@ -280,7 +280,7 @@ impl EventHandler<WorldEvent> for World {
                     .exclusive_client_points(cur)
                     .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect();
-                let updates = self.updates(inserts, block_updates, cur, &loads, &unloads);
+                let updates = self.mesh_updates(inserts, light_updates, cur, &loads, &unloads);
 
                 self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
 
@@ -336,6 +336,15 @@ impl EventHandler<WorldEvent> for World {
 pub struct ChunkStore(FxHashMap<Point3<i32>, Box<Chunk>>);
 
 impl ChunkStore {
+    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
+        self.0.get(&coords).map(|v| &**v)
+    }
+
+    fn block(&self, coords: Point3<i64>) -> Block {
+        self.get(utils::chunk_coords(coords))
+            .map_or_default(|chunk| chunk[utils::block_coords(coords)])
+    }
+
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
         for delta in ChunkArea::chunk_deltas() {
@@ -350,15 +359,6 @@ impl ChunkStore {
 
     fn block_area(&self, coords: Point3<i64>) -> BlockArea {
         BlockArea::from_fn(|delta| self.block(coords + delta.cast()))
-    }
-
-    fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(utils::chunk_coords(coords))
-            .map_or_default(|chunk| chunk[utils::block_coords(coords)])
-    }
-
-    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords).map(|v| &**v)
     }
 }
 
@@ -375,11 +375,11 @@ struct Branch {
     actions: ActionStore,
 }
 
-type Changes = (
-    Vec<(Point3<i64>, BlockAction)>,
-    FxHashSet<Point3<i32>>,
-    FxHashSet<Point3<i32>>,
-);
+struct Changelog {
+    actions: Vec<(Point3<i64>, BlockAction)>,
+    inserts: FxHashSet<Point3<i32>>,
+    removals: FxHashSet<Point3<i32>>,
+}
 
 impl Branch {
     fn apply(
@@ -397,7 +397,7 @@ impl Branch {
         }
     }
 
-    fn merge(self, chunks: &mut ChunkStore) -> Changes {
+    fn merge(self, chunks: &mut ChunkStore) -> Changelog {
         let mut hits = vec![];
         let mut inserts = FxHashSet::default();
         let mut removals = FxHashSet::default();
@@ -406,13 +406,11 @@ impl Branch {
             match chunks.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let chunk = entry.get_mut();
-
                     for (block_coords, action) in actions {
                         if chunk.apply(block_coords, action) {
                             hits.push((utils::coords(chunk_coords, block_coords), action));
                         }
                     }
-
                     if chunk.is_empty() {
                         entry.remove();
                         removals.insert(chunk_coords);
@@ -436,7 +434,11 @@ impl Branch {
             }
         }
 
-        (hits, inserts, removals)
+        Changelog {
+            actions: hits,
+            inserts,
+            removals,
+        }
     }
 
     fn is_action_valid(

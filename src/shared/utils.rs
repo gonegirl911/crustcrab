@@ -17,11 +17,15 @@ pub trait Lerp {
 
 impl<T> Lerp for T
 where
-    T: Mul<f32, Output = Self> + Add<Output = Self>,
+    T: Add<Output = Self> + Mul<f32, Output = Self>,
 {
     fn lerp(self, other: Self, t: f32) -> Self {
         self * (1.0 - t) + other * t
     }
+}
+
+pub fn inv_lerp(a: f32, b: f32, value: f32) -> f32 {
+    (value - a) / (b - a)
 }
 
 // ------------------------------------------------------------------------------------------------

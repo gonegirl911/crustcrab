@@ -3,7 +3,7 @@ use super::{
     action::BlockAction,
     block::{
         Block, BlockLight,
-        area::BlockAreaLight,
+        area::{BlockArea, BlockAreaLight},
         data::{BlockData, SIDE_DELTAS, Side},
     },
     chunk::{
@@ -12,7 +12,7 @@ use super::{
     },
     height::HeightMap,
 };
-use crate::shared::utils;
+use crate::shared::{enum_map::Enum, utils};
 use nalgebra::Point3;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -22,20 +22,16 @@ use std::{
         VecDeque,
         hash_map::{Entry, VacantEntry},
     },
-    ops::Range,
 };
 
 #[derive(Default)]
-pub struct WorldLight {
-    lights: FxHashMap<Point3<i32>, ChunkLight>,
-    placeholders: FxHashSet<Point3<i32>>,
-}
+pub struct WorldLight(FxHashMap<Point3<i32>, ChunkLight>);
 
 impl WorldLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
         let mut value = ChunkAreaLight::default();
         for delta in ChunkArea::chunk_deltas() {
-            if let Some(light) = self.lights.get(&(coords + delta)) {
+            if let Some(light) = self.0.get(&(coords + delta)) {
                 for (coords, delta) in ChunkArea::block_deltas(delta) {
                     value[delta] = light[coords];
                 }
@@ -48,10 +44,19 @@ impl WorldLight {
         BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn extend_placeholders<P: IntoIterator<Item = Point3<i32>>>(&mut self, points: P) {
-        for coords in points {
-            if self.placeholders.insert(coords) {
-                *self.lights.entry(coords).or_default() |= BlockLight::placeholder();
+    pub fn extend_placeholders<P>(&mut self, heights: &HeightMap, new_surface_points: P)
+    where
+        P: IntoIterator<Item = Point3<i32>>,
+    {
+        for coords in new_surface_points {
+            for neighbor_coords in ChunkArea::chunk_points(coords) {
+                if let Some(&max_y) = heights.0.get(&neighbor_coords.xz())
+                    && neighbor_coords.y > max_y
+                {
+                    self.0
+                        .entry(neighbor_coords)
+                        .or_insert_with(ChunkLight::placeholder);
+                }
             }
         }
     }
@@ -67,7 +72,7 @@ impl WorldLight {
         }
 
         for coords in points {
-            self.lights.remove(coords);
+            self.0.remove(coords);
         }
 
         let points_per_branch = points.len().div_ceil(rayon::current_num_threads());
@@ -79,10 +84,10 @@ impl WorldLight {
                 LazyBranch::default,
                 |mut branch, &chunk_coords| {
                     let chunk = &chunks[chunk_coords];
-                    let light = self.lights.get(&chunk_coords);
+                    let light = self.0.get(&chunk_coords);
 
                     if chunk.is_glowing() {
-                        for (block_coords, block) in chunk.blocks() {
+                        for (block_coords, &block) in Chunk::points().zip(chunk.as_slice()) {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
                             for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
                                 branch.insert(i, node.with_value(c));
@@ -91,23 +96,29 @@ impl WorldLight {
                     }
 
                     for (side, delta) in *SIDE_DELTAS {
-                        if let Some(neighbor) = self.lights.get(&(chunk_coords + delta.cast())) {
-                            let skylight_range = Self::skylight_range(heights, chunk_coords, side);
-                            for (block_coords, neighbor_block_coords) in side.block_points() {
-                                let node = Self::node(chunk, light, chunk_coords, block_coords);
-                                let filter = node.block().data().light_filter;
-                                let coords = utils::coords(chunk_coords, block_coords);
-                                let neighbor_value = neighbor[neighbor_block_coords];
-                                skylight_range
-                                    .clone()
-                                    .chain(BlockLight::TORCHLIGHT_RANGE)
-                                    .filter(|i| filter[i % 3])
-                                    .map(|i| (i, neighbor_value.component(i)))
-                                    .for_each(|(i, c)| {
-                                        let value = Self::value(coords, i, side, c);
-                                        branch.insert(i, node.with_value(value));
-                                    });
-                            }
+                        let Some(neighbor) = self.0.get(&(chunk_coords + delta.cast())) else {
+                            continue;
+                        };
+                        let component_range =
+                            if Self::inherits_skylight(heights, chunk_coords, side) {
+                                0..BlockLight::LEN
+                            } else {
+                                BlockLight::TORCHLIGHT_RANGE
+                            };
+                        for (block_coords, neighbor_block_coords) in side.block_points() {
+                            let node = Self::node(chunk, light, chunk_coords, block_coords);
+                            let filter = node.block().data().light_filter;
+                            let coords = utils::coords(chunk_coords, block_coords);
+                            let neighbor_value = neighbor[neighbor_block_coords];
+                            component_range
+                                .clone()
+                                .filter(|i| filter[i % 3])
+                                .map(|i| (i, neighbor_value.component(i)))
+                                .for_each(|(i, c)| {
+                                    let absorption = Self::absorption(coords, i, side.opp(), c);
+                                    let value = c.saturating_sub(absorption);
+                                    branch.insert(i, node.with_value(value));
+                                });
                         }
                     }
 
@@ -130,7 +141,7 @@ impl WorldLight {
                     branch.place(chunks, self, coords, block.data());
                 }
                 BlockAction::Destroy => {
-                    branch.destroy(chunks, self, coords, self.flood(coords));
+                    branch.destroy(chunks, self, coords);
                 }
             }
         }
@@ -138,34 +149,28 @@ impl WorldLight {
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
-        self.lights
+        self.0
             .get(&utils::chunk_coords(coords))
             .map_or_default(|light| light[utils::block_coords(coords)])
     }
 
-    fn flood(&self, coords: Point3<i64>) -> BlockLight {
-        Self::adjacent_points(coords)
-            .map(|(side, neighbor_coords)| {
-                self.block_light(neighbor_coords)
-                    .map(|i, c| Self::value(coords, i, side, c))
-            })
-            .reduce(BlockLight::sup)
-            .unwrap_or_else(|| unreachable!())
-    }
+    fn absorption(coords: Point3<i64>, index: usize, travel: Side, neighbor_value: u8) -> u8 {
+        if !BlockLight::SKYLIGHT_RANGE.contains(&index) {
+            return 1;
+        }
 
-    fn adjacent_points(coords: Point3<i64>) -> impl Iterator<Item = (Side, Point3<i64>)> {
-        SIDE_DELTAS
-            .into_iter()
-            .map(move |(side, delta)| (side, coords + delta.cast()))
-    }
+        if travel == Side::Top {
+            return neighbor_value;
+        }
 
-    fn absorption(
-        coords: Point3<i64>,
-        index: usize,
-        is_neighbor_on_top: bool,
-        neighbor_value: u8,
-    ) -> u8 {
-        !Self::is_exposed(coords, index, is_neighbor_on_top, neighbor_value) as u8
+        if coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64 - BlockArea::PADDING as i64
+            && travel == Side::Bottom
+            && neighbor_value == BlockLight::COMPONENT_MAX
+        {
+            0
+        } else {
+            1
+        }
     }
 
     fn node<'a>(
@@ -184,38 +189,9 @@ impl WorldLight {
         }
     }
 
-    fn skylight_range(heights: &HeightMap, coords: Point3<i32>, side: Side) -> Range<usize> {
-        if Self::includes_skylight(heights, coords, side) {
-            BlockLight::SKYLIGHT_RANGE
-        } else {
-            0..0
-        }
-    }
-
-    fn value(coords: Point3<i64>, index: usize, neighbor_side: Side, neighbor_value: u8) -> u8 {
-        neighbor_value.saturating_sub(Self::absorption(
-            coords,
-            index,
-            neighbor_side == Side::Top,
-            neighbor_value,
-        ))
-    }
-
-    fn is_exposed(
-        coords: Point3<i64>,
-        index: usize,
-        is_neighbor_on_top: bool,
-        neighbor_value: u8,
-    ) -> bool {
-        BlockLight::SKYLIGHT_RANGE.contains(&index)
-            && neighbor_value == BlockLight::COMPONENT_MAX
-            && coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64 - 1
-            && is_neighbor_on_top
-    }
-
-    fn includes_skylight(heights: &HeightMap, coords: Point3<i32>, side: Side) -> bool {
+    fn inherits_skylight(heights: &HeightMap, coords: Point3<i32>, side: Side) -> bool {
         match side {
-            Side::Top => coords.y == heights[coords.xz()],
+            Side::Top => coords.y == heights.0[&coords.xz()],
             Side::Bottom => false,
             _ => true,
         }
@@ -225,13 +201,13 @@ impl WorldLight {
 #[derive(Default)]
 struct LazyBranch<'a> {
     branch: Branch,
-    nodes: [NodeDeque<'a>; BlockLight::LEN],
+    nodes: [NodeQueue<'a>; BlockLight::LEN],
 }
 
 impl<'a> LazyBranch<'a> {
     fn insert(&mut self, index: usize, node: Node<'a>) {
         if node.set_component(&mut self.branch, index) {
-            self.nodes[index].push_back(node);
+            self.nodes[index].push(node);
         }
     }
 
@@ -270,13 +246,9 @@ impl Branch {
         }
     }
 
-    fn destroy(
-        &mut self,
-        chunks: &ChunkStore,
-        light: &WorldLight,
-        coords: Point3<i64>,
-        value: BlockLight,
-    ) {
+    fn destroy(&mut self, chunks: &ChunkStore, light: &WorldLight, coords: Point3<i64>) {
+        let value = self.flood(light, coords);
+
         for i in BlockLight::SKYLIGHT_RANGE {
             self.place_component(chunks, light, coords, i, value.component(i));
         }
@@ -309,7 +281,7 @@ impl Branch {
     fn merge(self, light: &mut WorldLight) -> Vec<Point3<i64>> {
         let mut hits = vec![];
         for (chunk_coords, values) in self.values {
-            match light.lights.entry(chunk_coords) {
+            match light.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let light = entry.get_mut();
                     for (block_coords, value) in values {
@@ -350,7 +322,7 @@ impl Branch {
         filter: bool,
     ) {
         if !filter {
-            let node = Node::new(chunks, light, coords, 0);
+            let node = Self::node(chunks, light, coords, 0);
             let block_light = BlockLightRefMut::new(self, &node);
             let component = block_light.component(index);
             if component > value {
@@ -368,7 +340,7 @@ impl Branch {
         index: usize,
         value: u8,
     ) {
-        let node = Node::new(chunks, light, coords, value);
+        let node = Self::node(chunks, light, coords, value);
         if node.set_component(self, index) {
             self.spread_nodes(chunks, light, index, [node].into());
         }
@@ -382,7 +354,7 @@ impl Branch {
         index: usize,
         value: u8,
     ) {
-        let node = Node::new(chunks, light, coords, value);
+        let node = Self::node(chunks, light, coords, value);
         let block_light = BlockLightRefMut::new(self, &node);
         let component = block_light.component(index);
         match component.cmp(&value) {
@@ -398,33 +370,49 @@ impl Branch {
         }
     }
 
-    fn unspread_node(&mut self, chunks: &ChunkStore, light: &WorldLight, index: usize, node: Node) {
-        let mut deq = NodeDeque::from([node]);
-        let mut sources = UniqueNodeDeque::default();
+    fn flood(&self, light: &WorldLight, coords: Point3<i64>) -> BlockLight {
+        SIDE_DELTAS
+            .into_iter()
+            .map(|(side, delta)| {
+                let neighbor_coords = coords + delta.cast();
+                self.block_light(light, neighbor_coords).map(|i, c| {
+                    let absorption = WorldLight::absorption(coords, i, side.opp(), c);
+                    c.saturating_sub(absorption)
+                })
+            })
+            .reduce(BlockLight::sup)
+            .unwrap_or_else(|| unreachable!())
+    }
 
-        while let Some(node) = deq.pop_front() {
+    fn unspread_node(&mut self, chunks: &ChunkStore, light: &WorldLight, index: usize, node: Node) {
+        let mut queue = NodeQueue::from([node]);
+        let mut sources = NodeSet::default();
+
+        while let Some(node) = queue.pop() {
             for node in node.neighbors(chunks, light, index) {
                 let data = node.block().data();
-                let value = Self::value(data, index);
+                let luminance = Self::luminance(data, index);
                 if data.light_filter[index % 3] {
                     let block_light = BlockLightRefMut::new(self, &node);
                     let component = block_light.component(index);
                     match component.cmp(&node.value) {
                         Ordering::Less => {}
                         Ordering::Equal => {
-                            block_light.set_component(index, value);
-                            sources.insert(node.with_value(value));
-                            deq.push_back(node);
+                            block_light.set_component(index, luminance);
+                            sources.insert(node.with_value(luminance));
+                            queue.push(node);
                         }
-                        Ordering::Greater => sources.insert(node.with_value(component)),
+                        Ordering::Greater => {
+                            sources.insert(node.with_value(component));
+                        }
                     }
                 } else {
-                    sources.insert(node.with_value(value));
+                    sources.insert(node.with_value(luminance));
                 }
             }
         }
 
-        self.spread_nodes(chunks, light, index, sources.deq);
+        self.spread_nodes(chunks, light, index, sources.into());
     }
 
     fn spread_nodes<'a>(
@@ -432,62 +420,90 @@ impl Branch {
         chunks: &'a ChunkStore,
         light: &'a WorldLight,
         index: usize,
-        mut deq: NodeDeque<'a>,
+        mut deq: NodeQueue<'a>,
     ) {
-        while let Some(node) = deq.pop_front() {
+        while let Some(node) = deq.pop() {
             for node in node.neighbors(chunks, light, index) {
-                if node.block().data().light_filter[index % 3] {
-                    let block_light = BlockLightRefMut::new(self, &node);
-                    if block_light.component(index) < node.value {
-                        block_light.set_component(index, node.value);
-                        deq.push_back(node);
-                    }
+                if node.block().data().light_filter[index % 3] && node.set_component(self, index) {
+                    deq.push(node);
                 }
             }
         }
     }
 
-    fn value(data: &BlockData, index: usize) -> u8 {
-        data.luminance[index % 3] * BlockLight::TORCHLIGHT_RANGE.contains(&index) as u8
+    fn block_light(&self, light: &WorldLight, coords: Point3<i64>) -> BlockLight {
+        self.values
+            .get(&utils::chunk_coords(coords))
+            .and_then(|values| values.get(&utils::block_coords(coords)))
+            .copied()
+            .unwrap_or_else(|| light.block_light(coords))
+    }
+
+    fn node<'a>(
+        chunks: &'a ChunkStore,
+        light: &'a WorldLight,
+        coords: Point3<i64>,
+        value: u8,
+    ) -> Node<'a> {
+        let chunk_coords = utils::chunk_coords(coords);
+        Node {
+            chunk: chunks.get(chunk_coords),
+            light: light.0.get(&chunk_coords),
+            chunk_coords,
+            block_coords: utils::block_coords(coords),
+            coords,
+            value,
+        }
+    }
+
+    fn luminance(data: &BlockData, index: usize) -> u8 {
+        if BlockLight::TORCHLIGHT_RANGE.contains(&index) {
+            data.luminance[index % 3]
+        } else {
+            0
+        }
     }
 }
 
 #[derive(Default)]
-struct NodeDeque<'a>(VecDeque<Node<'a>>);
+struct NodeQueue<'a>(VecDeque<Node<'a>>);
 
-impl<'a> NodeDeque<'a> {
-    fn push_back(&mut self, node: Node<'a>) {
+impl<'a> NodeQueue<'a> {
+    fn push(&mut self, node: Node<'a>) -> bool {
         if node.value > 1 {
             self.0.push_back(node);
+            true
+        } else {
+            false
         }
     }
 
-    fn pop_front(&mut self) -> Option<Node<'a>> {
+    fn pop(&mut self) -> Option<Node<'a>> {
         self.0.pop_front()
     }
 }
 
-impl<'a, const N: usize> From<[Node<'a>; N]> for NodeDeque<'a> {
+impl<'a, const N: usize> From<[Node<'a>; N]> for NodeQueue<'a> {
     fn from(nodes: [Node<'a>; N]) -> Self {
-        let mut value = Self::default();
-        for node in nodes {
-            value.push_back(node);
-        }
-        value
+        Self(nodes.into())
+    }
+}
+
+impl<'a> From<NodeSet<'a>> for NodeQueue<'a> {
+    fn from(set: NodeSet<'a>) -> Self {
+        set.queue
     }
 }
 
 #[derive(Default)]
-struct UniqueNodeDeque<'a> {
+struct NodeSet<'a> {
     points: FxHashSet<Point3<i64>>,
-    deq: NodeDeque<'a>,
+    queue: NodeQueue<'a>,
 }
 
-impl<'a> UniqueNodeDeque<'a> {
-    fn insert(&mut self, node: Node<'a>) {
-        if self.points.insert(node.coords) {
-            self.deq.push_back(node);
-        }
+impl<'a> NodeSet<'a> {
+    fn insert(&mut self, node: Node<'a>) -> bool {
+        self.points.insert(node.coords) && self.queue.push(node)
     }
 }
 
@@ -501,31 +517,19 @@ struct Node<'a> {
 }
 
 impl<'a> Node<'a> {
-    fn new(chunks: &'a ChunkStore, light: &'a WorldLight, coords: Point3<i64>, value: u8) -> Self {
-        let chunk_coords = utils::chunk_coords(coords);
-        Self {
-            chunk: chunks.get(chunk_coords),
-            light: light.lights.get(&chunk_coords),
-            chunk_coords,
-            block_coords: utils::block_coords(coords),
-            coords,
-            value,
-        }
-    }
-
     fn with_value(&self, value: u8) -> Self {
         Self { value, ..*self }
     }
 
     fn set_component(&self, branch: &mut Branch, index: usize) -> bool {
-        if self.value != 0 {
-            let block_light = BlockLightRefMut::new(branch, self);
-            if block_light.component(index) < self.value {
-                block_light.set_component(index, self.value);
-                true
-            } else {
-                false
-            }
+        if self.value == 0 {
+            return false;
+        }
+
+        let block_light = BlockLightRefMut::new(branch, self);
+        if block_light.component(index) < self.value {
+            block_light.set_component(index, self.value);
+            true
         } else {
             false
         }
@@ -537,8 +541,7 @@ impl<'a> Node<'a> {
         light: &'a WorldLight,
         index: usize,
     ) -> impl Iterator<Item = Self> {
-        WorldLight::adjacent_points(self.coords)
-            .map(move |(side, coords)| self.neighbor(chunks, light, coords, index, side))
+        Enum::variants().map(move |side| self.neighbor(chunks, light, side, index))
     }
 
     fn block(&self) -> Block {
@@ -553,13 +556,14 @@ impl<'a> Node<'a> {
         &self,
         chunks: &'a ChunkStore,
         light: &'a WorldLight,
-        coords: Point3<i64>,
-        index: usize,
         side: Side,
+        index: usize,
     ) -> Self {
+        let coords = self.coords + SIDE_DELTAS[side].cast();
         let chunk_coords = utils::chunk_coords(coords);
         let block_coords = utils::block_coords(coords);
-        let value = Self::value(coords, index, side, self.value);
+        let absorption = WorldLight::absorption(coords, index, side, self.value);
+        let value = self.value.saturating_sub(absorption);
         if self.chunk_coords == chunk_coords {
             Self {
                 block_coords,
@@ -570,17 +574,13 @@ impl<'a> Node<'a> {
         } else {
             Self {
                 chunk: chunks.get(chunk_coords),
-                light: light.lights.get(&chunk_coords),
+                light: light.0.get(&chunk_coords),
                 chunk_coords,
                 block_coords,
                 coords,
                 value,
             }
         }
-    }
-
-    fn value(coords: Point3<i64>, index: usize, side: Side, neighbor_value: u8) -> u8 {
-        neighbor_value - WorldLight::absorption(coords, index, side == Side::Bottom, neighbor_value)
     }
 }
 
@@ -631,12 +631,10 @@ impl<'a> BlockLightRefMut<'a> {
             Self::UninitChunk {
                 entry,
                 coords,
-                fallback,
+                mut fallback,
             } => {
-                entry.insert(FromIterator::from_iter([(
-                    coords,
-                    fallback.with_component(index, value),
-                )]));
+                fallback.set_component(index, value);
+                entry.insert([(coords, fallback)].into_iter().collect());
             }
             Self::UninitBlock { entry, fallback } => {
                 entry.insert(fallback).set_component(index, value);

@@ -12,7 +12,7 @@ use crate::shared::{
 use nalgebra::{Point3, Vector3, point};
 use std::{
     array, mem,
-    ops::{BitOrAssign, Index, IndexMut},
+    ops::{Index, IndexMut},
 };
 
 #[derive(Default)]
@@ -38,10 +38,6 @@ impl Chunk {
             non_air_count,
             glowing_count,
         }
-    }
-
-    pub fn blocks(&self) -> impl Iterator<Item = (Point3<u8>, &Block)> {
-        self.blocks.values()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -72,11 +68,24 @@ impl Chunk {
         self.adjust_counts(prev, curr);
     }
 
+    pub fn as_slice(&self) -> &[Block] {
+        self.blocks.as_slice()
+    }
+
     fn adjust_counts(&mut self, prev: Block, curr: Block) {
         self.non_air_count -= (prev != Block::AIR) as u16;
         self.non_air_count += (curr != Block::AIR) as u16;
         self.glowing_count -= prev.data().is_glowing() as u16;
         self.glowing_count += curr.data().is_glowing() as u16;
+    }
+
+    pub fn points() -> impl Iterator<Item = Point3<u8>> {
+        (0..Self::DIM.pow(3)).map(|i| {
+            let x = i / Self::DIM.pow(2);
+            let y = i % Self::DIM.pow(2) / Self::DIM;
+            let z = i % Self::DIM;
+            point![x, y, z].cast()
+        })
     }
 
     fn bounding_box(coords: Point3<i32>) -> Aabb {
@@ -106,6 +115,13 @@ pub struct ChunkLight {
 }
 
 impl ChunkLight {
+    pub fn placeholder() -> Self {
+        Self {
+            lights: ChunkDataStore::from_fn(|_| BlockLight::placeholder()),
+            non_zero_count: Chunk::DIM.pow(3) as u16,
+        }
+    }
+
     pub fn set(&mut self, coords: Point3<u8>, value: BlockLight) -> bool {
         let prev = mem::replace(&mut self.lights[coords], value);
         if prev == value {
@@ -142,15 +158,6 @@ impl Index<Point3<u8>> for ChunkLight {
     }
 }
 
-impl BitOrAssign<BlockLight> for ChunkLight {
-    fn bitor_assign(&mut self, value: BlockLight) {
-        if value.0 != 0 {
-            self.lights.apply(|light| light.0 |= value.0);
-            self.non_zero_count = Chunk::DIM.pow(3) as u16;
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct ChunkDataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
@@ -161,19 +168,8 @@ impl<T> ChunkDataStore<T> {
         }))
     }
 
-    fn values(&self) -> impl Iterator<Item = (Point3<u8>, &T)> {
-        self.0.iter().enumerate().flat_map(|(x, values)| {
-            values.iter().enumerate().flat_map(move |(y, values)| {
-                values
-                    .iter()
-                    .enumerate()
-                    .map(move |(z, value)| (point![x, y, z].cast(), value))
-            })
-        })
-    }
-
-    fn apply<F: FnMut(&mut T)>(&mut self, f: F) {
-        self.0.iter_mut().flatten().flatten().for_each(f);
+    fn as_slice(&self) -> &[T] {
+        self.0.as_flattened().as_flattened()
     }
 }
 
