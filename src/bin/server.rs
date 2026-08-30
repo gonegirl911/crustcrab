@@ -29,7 +29,7 @@ fn main() {
         } = Parser::parse();
         let priority_listener = match TcpListener::bind(&priority_addr) {
             Ok(listener) => {
-                eprintln!("[{priority_addr}] create TCP listener SUCCEDED");
+                eprintln!("[{priority_addr}] create TCP listener SUCCEEDED");
                 listener
             }
             Err(e) => {
@@ -39,7 +39,7 @@ fn main() {
         };
         let listener = match TcpListener::bind(&addr) {
             Ok(listener) => {
-                eprintln!("[{addr}] create TCP listener SUCCEDED");
+                eprintln!("[{addr}] create TCP listener SUCCEEDED");
                 listener
             }
             Err(e) => {
@@ -51,7 +51,7 @@ fn main() {
         for (priority_stream, stream) in priority_listener.incoming().zip(listener.incoming()) {
             let priority_stream = match priority_stream {
                 Ok(stream) => {
-                    eprintln!("[{priority_addr}] open TCP connection SUCCEDED");
+                    eprintln!("[{priority_addr}] open TCP connection SUCCEEDED");
                     stream
                 }
                 Err(e) => {
@@ -64,7 +64,7 @@ fn main() {
             }
             let stream = match stream {
                 Ok(stream) => {
-                    eprintln!("[{addr}] open TCP connection SUCCEDED");
+                    eprintln!("[{addr}] open TCP connection SUCCEEDED");
                     stream
                 }
                 Err(e) => {

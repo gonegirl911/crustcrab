@@ -27,7 +27,7 @@ fn main() {
     } = Parser::parse();
     let priority_stream = match TcpStream::connect(&priority_addr) {
         Ok(stream) => {
-            eprintln!("[{priority_addr}] open TCP connection SUCCEDED");
+            eprintln!("[{priority_addr}] open TCP connection SUCCEEDED");
             stream
         }
         Err(e) => {
@@ -40,7 +40,7 @@ fn main() {
     }
     let stream = match TcpStream::connect(&addr) {
         Ok(stream) => {
-            eprintln!("[{addr}] open TCP connection SUCCEDED");
+            eprintln!("[{addr}] open TCP connection SUCCEEDED");
             stream
         }
         Err(e) => {
@@ -128,12 +128,12 @@ fn main() {
         if let Err(e) = priority_stream.shutdown(Shutdown::Both)
             && e.kind() != ErrorKind::NotConnected
         {
-            eprintln!("[{priority_addr}] gracefull shutdown FAILED: {e}");
+            eprintln!("[{priority_addr}] graceful shutdown FAILED: {e}");
         }
         if let Err(e) = stream.shutdown(Shutdown::Both)
             && e.kind() != ErrorKind::NotConnected
         {
-            eprintln!("[{addr}] gracefull shutdown FAILED: {e}");
+            eprintln!("[{addr}] graceful shutdown FAILED: {e}");
         }
     });
 }
