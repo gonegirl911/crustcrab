@@ -184,7 +184,6 @@ impl WorldLight {
             light,
             chunk_coords,
             block_coords,
-            coords: utils::coords(chunk_coords, block_coords),
             value: 0,
         }
     }
@@ -451,7 +450,6 @@ impl Branch {
             light: light.0.get(&chunk_coords),
             chunk_coords,
             block_coords: utils::block_coords(coords),
-            coords,
             value,
         }
     }
@@ -503,7 +501,7 @@ struct NodeSet<'a> {
 
 impl<'a> NodeSet<'a> {
     fn insert(&mut self, node: Node<'a>) -> bool {
-        self.points.insert(node.coords) && self.queue.push(node)
+        self.points.insert(node.coords()) && self.queue.push(node)
     }
 }
 
@@ -512,7 +510,6 @@ struct Node<'a> {
     light: Option<&'a ChunkLight>,
     chunk_coords: Point3<i32>,
     block_coords: Point3<u8>,
-    coords: Point3<i64>,
     value: u8,
 }
 
@@ -552,6 +549,10 @@ impl<'a> Node<'a> {
         self.light.map_or_default(|light| light[self.block_coords])
     }
 
+    fn coords(&self) -> Point3<i64> {
+        utils::coords(self.chunk_coords, self.block_coords)
+    }
+
     fn neighbor(
         &self,
         chunks: &'a ChunkStore,
@@ -559,7 +560,7 @@ impl<'a> Node<'a> {
         side: Side,
         index: usize,
     ) -> Self {
-        let coords = self.coords + SIDE_DELTAS[side].cast();
+        let coords = self.coords() + SIDE_DELTAS[side].cast();
         let chunk_coords = utils::chunk_coords(coords);
         let block_coords = utils::block_coords(coords);
         let absorption = WorldLight::absorption(coords, index, side, self.value);
@@ -567,7 +568,6 @@ impl<'a> Node<'a> {
         if self.chunk_coords == chunk_coords {
             Self {
                 block_coords,
-                coords,
                 value,
                 ..*self
             }
@@ -577,7 +577,6 @@ impl<'a> Node<'a> {
                 light: light.0.get(&chunk_coords),
                 chunk_coords,
                 block_coords,
-                coords,
                 value,
             }
         }
