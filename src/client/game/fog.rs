@@ -30,7 +30,7 @@ impl Fog {
                 depth_bind_group_layout,
             ])
             .format(PostProcessor::FORMAT)
-            .blend(wgpu::BlendState::ALPHA_BLENDING)
+            .blend(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING)
             .build();
         Self { texture, program }
     }
