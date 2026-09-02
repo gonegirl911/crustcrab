@@ -191,7 +191,7 @@ pub struct PlayerConfig {
 
 impl PlayerConfig {
     fn zfar(&self) -> f32 {
-        ((self.render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2
+        ((self.render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2 + 1024.0
     }
 }
 
