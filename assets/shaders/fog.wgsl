@@ -30,8 +30,9 @@ struct SkyUniform {
     sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    glow_color: vec4<f32>,
-    glow_angle: f32,
+    glow_color: vec3<f32>,
+    glow_opacity: f32,
+    arc_angle: f32,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }
@@ -61,11 +62,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let depth = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x);
     let ray_distance = depth / cos_theta;
     let distance = max(sqrt(1.0 - dir.y * dir.y), abs(dir.y)) * ray_distance;
-    let fog_start = f32((player.render_distance - 3u) * 16u);
+    let fog_start = f32(player.render_distance * CHUNK_DIM - FOG_PADDING);
     let bg_factor = smooth_falloff(distance - fog_start);
     let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);
-    let glow_factor = sun_alignment * sky.glow_color.a;
-    let fog_color = mix(sky.horizon_color, sky.glow_color.rgb, glow_factor);
+    let glow_factor = sun_alignment * sky.glow_opacity;
+    let fog_color = mix(sky.horizon_color, sky.glow_color, glow_factor);
     let bg_color = textureSample(t_input, s_input, in.input_coords);
     let color = mix(vec4(fog_color, 1.0), bg_color, bg_factor);
     return color * f32(bg_color.a != 0.0);
@@ -83,4 +84,6 @@ fn pow2(n: f32) -> f32 {
     return n * n;
 }
 
+const CHUNK_DIM = 16u;
+const FOG_PADDING = 3u * CHUNK_DIM;
 const FALLOFF_BANDWIDTH = 16.0;

@@ -9,15 +9,16 @@ sun_intensity = 15.0
 [sky.day]
 color = [0.22, 0.5, 1.0]
 horizon_color = [0.37, 0.62, 1.0]
+glow_color = [1.0, 0.45, 0.0]
+arc_angle = 14.0
 light_intensity = [1.0, 1.0, 1.0]
 
 [sky.night]
 color = [0.0, 0.0, 0.0]
 horizon_color = [0.02, 0.02, 0.03]
+glow_color = [1.0, 0.0, 0.0]
+arc_angle = 10.0
 light_intensity = [0.1, 0.1, 0.25]
-
-[sky.glow]
-colors = [[1.0, 0.45, 0.0], [1.0, 0.0, 0.0]]
 
 [sky.star]
 size = 0.005

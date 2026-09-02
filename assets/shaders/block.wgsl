@@ -18,8 +18,9 @@ struct SkyUniform {
     sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    glow_color: vec4<f32>,
-    glow_angle: f32,
+    glow_color: vec3<f32>,
+    glow_opacity: f32,
+    arc_angle: f32,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }
@@ -45,7 +46,7 @@ var<immediate> imm: Immediates;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-    let coords = imm.chunk_coords * 16.0 + vec3(
+    let coords = imm.chunk_coords * CHUNK_DIM + vec3(
         f32(extractBits(vertex.data[0], 0u, 5u)),
         f32(extractBits(vertex.data[0], 5u, 5u)),
         f32(extractBits(vertex.data[0], 10u, 5u)),
@@ -67,15 +68,15 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 16u, 4u)),
         f32(extractBits(vertex.data[1], 20u, 4u)),
     );
-    let face_light = array(0.6, 1.0, 0.5, 0.8)[face];
-    let ambient_light = mix(0.2, 1.0, ao / 3.0);
-    let global_light = pow(vec3(0.8), (15.0 - skylight)) * sky.light_intensity;
-    let local_light = pow(vec3(0.8), (15.0 - torchlight));
+    let face_brightness = FACE_BRIGHTNESS[face];
+    let ao_factor = mix(AO_MIN, AO_MAX, ao / AO_LEVELS);
+    let global_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - skylight)) * sky.light_intensity;
+    let local_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - torchlight));
     return VertexOutput(
         player.vp * vec4(-player.origin + coords, 1.0),
         tex_idx,
         tex_coords,
-        saturate(global_light + local_light) * ambient_light * face_light,
+        saturate(global_light + local_light) * (1.0 - ao_factor) * face_brightness,
     );
 }
 
@@ -94,3 +95,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         return color * vec4(in.light_factor, 1.0);
     }
 }
+
+const CHUNK_DIM = 16.0;
+const AO_MIN = 0.0;
+const AO_MAX = 0.8;
+const AO_LEVELS = 3;
+const FACE_BRIGHTNESS = array(0.6, 1.0, 0.5, 0.8);
+const LIGHT_ATTENUATION = 0.8;
+const LIGHT_MAX = 15.0;

@@ -29,8 +29,9 @@ struct SkyUniform {
     sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    glow_color: vec4<f32>,
-    glow_angle: f32,
+    glow_color: vec3<f32>,
+    glow_opacity: f32,
+    arc_angle: f32,
     sun_intensity: f32,
     light_intensity: vec3<f32>,
 }
@@ -44,15 +45,15 @@ var<uniform> sky: SkyUniform;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = normalize((player.inv_vp * vec4(in.screen_coords, 1.0, 1.0)).xyz);
-    let horizon_factor = smooth_falloff(dir.y - HORIZON_OFFSET);
-    let theta = -sign(sky.sun_dir.x) * radians(sky.glow_angle);
+    let horizon_factor = smooth_falloff(dir.y + HORIZON_OFFSET);
+    let theta = -sign(sky.sun_dir.x) * radians(sky.arc_angle);
     let rotated_y = dir.x * sin(theta) + dir.y * cos(theta);
-    let arc_factor = smooth_falloff(rotated_y + GLOW_OFFSET);
+    let arc_factor = smooth_falloff(rotated_y + ARC_OFFSET);
     let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);
     let horizon_glow_factor = sun_alignment * horizon_factor;
-    let glow_factor = max(arc_factor, horizon_glow_factor) * sky.glow_color.a;
+    let glow_factor = max(arc_factor, horizon_glow_factor) * sky.glow_opacity;
     let sky_gradient = mix(sky.color, sky.horizon_color, horizon_factor);
-    let color = mix(sky_gradient, sky.glow_color.rgb, glow_factor);
+    let color = mix(sky_gradient, sky.glow_color, glow_factor);
     return vec4(color, 1.0);
 }
 
@@ -64,6 +65,6 @@ fn pow2(n: f32) -> f32 {
     return n * n;
 }
 
-const HORIZON_OFFSET = sin(radians(2.0));
+const HORIZON_OFFSET = sin(radians(-2.0));
+const ARC_OFFSET = sin(radians(8.0));
 const FALLOFF_BANDWIDTH = sin(radians(6.0));
-const GLOW_OFFSET = sin(radians(8.0));

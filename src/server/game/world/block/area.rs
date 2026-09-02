@@ -57,9 +57,9 @@ impl BlockArea {
         let edge2 = components[Component::Edge2];
         let corner = components[Component::Corner];
         if edge1 && edge2 {
-            0
+            3
         } else {
-            3 - (edge1 as u8 + edge2 as u8 + corner as u8)
+            edge1 as u8 + edge2 as u8 + corner as u8
         }
     }
 

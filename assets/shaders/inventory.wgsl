@@ -32,8 +32,8 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 27u, 5u)),
     );
     let face = extractBits(vertex.data[0], 23u, 2u);
-    let face_light = array(0.6, 1.0, 0.5, 0.8)[face];
-    return VertexOutput(coords, tex_idx, tex_coords, face_light);
+    let face_brightness = FACE_BRIGHTNESS[face];
+    return VertexOutput(coords, tex_idx, tex_coords, face_brightness);
 }
 
 @group(1) @binding(0)
@@ -47,3 +47,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
     return color * vec4(vec3(in.light_factor), 1.0);
 }
+
+const FACE_BRIGHTNESS = array(0.6, 1.0, 0.5, 0.8);
