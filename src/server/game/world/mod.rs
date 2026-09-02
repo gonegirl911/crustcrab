@@ -706,7 +706,7 @@ impl BlockHoverData {
     fn brightness(area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
         Enum::variants()
             .flat_map(|side| area_light.corner_lights(side, area).into_values())
-            .max_by(|a, b| a.lum().total_cmp(&b.lum()))
+            .max_by(|a, b| a.relative_brightness().total_cmp(&b.relative_brightness()))
             .unwrap_or_else(|| unreachable!())
     }
 }

@@ -94,8 +94,9 @@ impl BlockLight {
         value
     }
 
-    pub fn lum(self) -> f32 {
-        (Self::linearize(self.skylight()) + Self::linearize(self.torchlight()))
+    pub fn relative_brightness(self) -> f32 {
+        (self.skylight() + self.torchlight())
+            .map(|c| c as f32 / Self::COMPONENT_MAX as f32)
             .saturate()
             .lum()
     }
@@ -118,10 +119,6 @@ impl BlockLight {
 
     fn torchlight(self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
-    }
-
-    fn linearize(color: Rgb<u8>) -> Rgb<f32> {
-        color.map(|c| 0.8f32.powi((Self::COMPONENT_MAX - c) as i32))
     }
 }
 

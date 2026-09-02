@@ -124,8 +124,10 @@ impl BlockData {
     ) -> [Corner; 6] {
         if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
             < corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
-            || corner_lights[Corner::LowerLeft].lum() + corner_lights[Corner::UpperRight].lum()
-                > corner_lights[Corner::LowerRight].lum() + corner_lights[Corner::UpperLeft].lum()
+            || corner_lights[Corner::LowerLeft].relative_brightness()
+                + corner_lights[Corner::UpperRight].relative_brightness()
+                > corner_lights[Corner::LowerRight].relative_brightness()
+                    + corner_lights[Corner::UpperLeft].relative_brightness()
         {
             FLIPPED_CORNERS
         } else {
