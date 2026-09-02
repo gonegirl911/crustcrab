@@ -38,7 +38,7 @@ impl StarDome {
     pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
         let count = CLIENT_CONFIG.sky.star.count;
         let stars = {
-            let mut rng = SmallRng::seed_from_u64(8008);
+            let mut rng = SmallRng::seed_from_u64(80085);
             let generator = StarGenerator::default();
             (0..count).map(|_| generator.generate(&mut rng)).collect()
         };
