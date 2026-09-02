@@ -39,7 +39,7 @@ impl BlockArea {
         if is_externally_lit && let Some(side) = side {
             enum_map! { corner => self.ao(side, corner) }
         } else {
-            enum_map! { _ => 3 }
+            Default::default()
         }
     }
 
