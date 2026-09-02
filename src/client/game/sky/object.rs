@@ -108,16 +108,13 @@ struct ObjectImmediates {
 
 impl ObjectImmediates {
     fn new(dir: Vector3<f32>, tex_index: u32, is_am: bool) -> Self {
+        let up = if is_am { -Vector3::y() } else { Vector3::y() };
         let size = CLIENT_CONFIG.sky.object.size;
         Self {
-            m: Matrix4::face_towards(&dir.into(), &Point3::origin(), &Self::up(is_am))
+            m: Matrix4::face_towards(&dir.into(), &Point3::origin(), &up)
                 .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
             tex_index,
         }
-    }
-
-    fn up(is_am: bool) -> Vector3<f32> {
-        if is_am { -Vector3::y() } else { Vector3::y() }
     }
 }
 

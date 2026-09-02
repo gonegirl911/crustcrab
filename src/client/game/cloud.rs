@@ -16,13 +16,16 @@ use crate::{
         ServerEvent,
         game::{
             clock::Stage,
-            world::block::{Block, area::BlockArea},
+            world::{
+                block::{Block, area::BlockArea},
+                chunk::Chunk,
+            },
         },
     },
     shared::color::{Float3, Rgb, Rgba},
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Point2, Vector2, Vector3, point, vector};
+use nalgebra::{Point2, Point3, Vector2, point, vector};
 use serde::Deserialize;
 use std::time::Duration;
 use winit::event::WindowEvent;
@@ -137,7 +140,8 @@ impl CloudLayer {
     }
 
     fn instances() -> impl Iterator<Item = CloudInstance> {
-        let radius = (CLIENT_CONFIG.player.render_distance() / CLIENT_CONFIG.cloud.size.x) as i32;
+        let render_distance = CLIENT_CONFIG.player.render_distance as u64 * Chunk::DIM as u64;
+        let radius = (render_distance / CLIENT_CONFIG.cloud.size.x) as i32;
         (-radius..=radius).flat_map(move |dx| {
             (-radius..=radius)
                 .filter(move |dz| dx.pow(2) + dz.pow(2) <= radius.pow(2))
@@ -222,8 +226,8 @@ impl CloudImmediates {
         self.offset.x %= self.tex_dims.x * self.size.x;
     }
 
-    fn scale_factor() -> Vector3<f32> {
-        let size = CLIENT_CONFIG.cloud.size.coords.xyx();
+    fn scale_factor() -> Point3<f32> {
+        let size = CLIENT_CONFIG.cloud.size.xyx();
         let padding = CLIENT_CONFIG.cloud.padding;
         size.map(|c| 1.0 + padding * 2.0 / c as f32)
     }

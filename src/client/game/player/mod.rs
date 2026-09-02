@@ -184,18 +184,14 @@ impl PlayerUniformData {
 pub struct PlayerConfig {
     fovy: f32,
     sensitivity: f32,
-    render_distance: u32,
+    pub render_distance: u32,
     #[serde(default)]
     features: PlayerFeatures,
 }
 
 impl PlayerConfig {
-    pub fn render_distance(&self) -> u64 {
-        self.render_distance as u64 * Chunk::DIM as u64
-    }
-
     fn zfar(&self) -> f32 {
-        1000.0 + SQRT_2 * ((self.render_distance + 1) as u64 * Chunk::DIM as u64) as f32
+        ((self.render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2
     }
 }
 

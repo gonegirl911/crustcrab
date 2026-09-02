@@ -61,7 +61,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let cos_theta = dot(dir, player.forward);
     let depth = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x);
     let ray_distance = depth / cos_theta;
-    let distance = max(sqrt(1.0 - dir.y * dir.y), abs(dir.y)) * ray_distance;
+    let distance = cylinder_distance(dir, ray_distance);
     let fog_start = f32(player.render_distance * CHUNK_DIM - FOG_PADDING);
     let bg_factor = smooth_falloff(distance - fog_start);
     let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);
@@ -74,6 +74,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 fn linearize(depth: f32) -> f32 {
     return player.znear / (player.zfar - depth * (player.zfar - player.znear));
+}
+
+fn cylinder_distance(dir: vec3<f32>, ray_distance: f32) -> f32 {
+    let r = sqrt(1.0 - pow2(dir.y)) * ray_distance;
+    let h = abs(dir.y) * ray_distance;
+    return (r + h + sqrt(pow2(r - h) + pow2(FALLOFF_BANDWIDTH))) * 0.5;
 }
 
 fn smooth_falloff(x: f32) -> f32 {
