@@ -193,7 +193,7 @@ impl Vertex for CloudInstance {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct CloudImmediates {
-    dims: Point2<f32>,
+    tex_dims: Point2<f32>,
     size: Point2<f32>,
     scale_factor: Float3,
     color: Float3,
@@ -202,9 +202,9 @@ struct CloudImmediates {
 }
 
 impl CloudImmediates {
-    fn new((width, height): (u32, u32)) -> Self {
+    fn new((tex_width, tex_height): (u32, u32)) -> Self {
         Self {
-            dims: point![width, height].cast(),
+            tex_dims: point![tex_width, tex_height].cast(),
             size: CLIENT_CONFIG.cloud.size.cast(),
             scale_factor: Self::scale_factor().into(),
             color: Self::color(Default::default()).into(),
@@ -219,7 +219,7 @@ impl CloudImmediates {
 
     fn update_offset(&mut self, dt: Duration) {
         self.offset.x -= CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
-        self.offset.x %= self.size.x * self.dims.x;
+        self.offset.x %= self.tex_dims.x * self.size.x;
     }
 
     fn scale_factor() -> Vector3<f32> {

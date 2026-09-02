@@ -58,22 +58,29 @@ var s_depth: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = normalize((player.inv_vp * vec4(in.screen_coords, 1.0, 1.0)).xyz);
     let cos_theta = dot(dir, player.forward);
-    let sin_gamma = max(abs(dir.y), sqrt(1.0 - dir.y * dir.y));
-    let distance = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x) / cos_theta * sin_gamma;
+    let depth = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x);
+    let ray_distance = depth / cos_theta;
+    let distance = max(sqrt(1.0 - dir.y * dir.y), abs(dir.y)) * ray_distance;
     let fog_start = f32((player.render_distance - 3u) * 16u);
-    let fog_factor = exp2(-pow2(max((distance - fog_start) / 16.0, 0.0)));
-    let glow_factor = max(mix(1.0, -1.0, acos(dot(player.forward, sky.sun_dir)) * FRAC_1_PI), 0.0) * sky.glow_color.a;
+    let bg_factor = smooth_falloff(distance - fog_start);
+    let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);
+    let glow_factor = sun_alignment * sky.glow_color.a;
     let fog_color = mix(sky.horizon_color, sky.glow_color.rgb, glow_factor);
     let bg_color = textureSample(t_input, s_input, in.input_coords);
-    return mix(vec4(fog_color, 1.0), bg_color, fog_factor) * f32(bg_color.a != 0.0);
+    let color = mix(vec4(fog_color, 1.0), bg_color, bg_factor);
+    return color * f32(bg_color.a != 0.0);
 }
 
 fn linearize(depth: f32) -> f32 {
     return player.znear / (player.zfar - depth * (player.zfar - player.znear));
 }
 
+fn smooth_falloff(x: f32) -> f32 {
+    return exp2(-pow2(max(x / FALLOFF_BANDWIDTH, 0.0)));
+}
+
 fn pow2(n: f32) -> f32 {
     return n * n;
 }
 
-const FRAC_1_PI = 0.318309886183790671537767526745028724;
+const FALLOFF_BANDWIDTH = 16.0;

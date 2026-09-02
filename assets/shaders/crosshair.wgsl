@@ -8,8 +8,8 @@ struct CrosshairUniform {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) input_coords: vec2<f32>,
-    @location(1) tex_coords: vec2<f32>,
+    @location(0) tex_coords: vec2<f32>,
+    @location(1) input_coords: vec2<f32>,
 }
 
 @group(0) @binding(0)
@@ -20,7 +20,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32(((vertex.index + 2u) / 3u) % 2u);
     let y = f32(((vertex.index + 1u) / 3u) % 2u);
     let coords = crosshair.transform * vec4(x - 0.5, y - 0.5, 0.0, 1.0);
-    return VertexOutput(coords, (1.0 + vec2(coords.x, -coords.y)) * 0.5, vec2(x, 1.0 - y));
+    return VertexOutput(coords, vec2(x, 1.0 - y), (1.0 + vec2(coords.x, -coords.y)) * 0.5);
 }
 
 @group(1) @binding(0)
@@ -37,8 +37,7 @@ var s_input: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4(
-        1.0 - textureSample(t_input, s_input, in.input_coords).rgb,
-        textureSample(t_crosshair, s_crosshair, in.tex_coords).a,
-    );
+    let crosshair_color = textureSample(t_crosshair, s_crosshair, in.tex_coords);
+    let bg_color = textureSample(t_input, s_input, in.input_coords);
+    return vec4(1.0 - bg_color.rgb, crosshair_color.a);
 }

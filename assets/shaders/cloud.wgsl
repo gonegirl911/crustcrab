@@ -17,7 +17,7 @@ struct PlayerUniform {
 }
 
 struct Immediates {
-    dims: vec2<f32>,
+    tex_dims: vec2<f32>,
     size: vec2<f32>,
     scale_factor: vec3<f32>,
     color: vec3<f32>,
@@ -44,12 +44,13 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     );
     let face = extractBits(vertex.data[0], 23u, 2u);
     let offset = instance.offset - rem_euclid(player.origin.xz - imm.offset, imm.size.x);
-    let light_factor = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
-    return VertexOutput(
-        player.vp * vec4(vec3(imm.size, imm.size.x) * ((-0.5 + coords) * imm.scale_factor + 0.5) + vec3(offset.x, -player.origin.y + 192.0, offset.y), 1.0),
-        (player.origin.xz + instance.offset - imm.offset) / imm.size.x / imm.dims,
-        light_factor,
-    );
+    let scaled_coords = (coords - 0.5) * imm.scale_factor + 0.5;
+    let cloud_dims = vec3(imm.size, imm.size.x);
+    let world_pos = scaled_coords * cloud_dims + vec3(offset.x, -player.origin.y + 192.0, offset.y);
+    let scroll_xz = player.origin.xz + instance.offset - imm.offset;
+    let tex_coords = scroll_xz / imm.size.x / imm.tex_dims;
+    let light_factor = array(0.6, 1.0, 0.5, 0.8)[face];
+    return VertexOutput(player.vp * vec4(world_pos, 1.0), tex_coords, light_factor);
 }
 
 fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {

@@ -411,6 +411,13 @@ impl Branch {
             }
         }
 
+        sources.retain(|node| {
+            self.values
+                .get(&node.chunk_coords)
+                .and_then(|values| values.get(&node.block_coords))
+                .is_none_or(|value| value.component(index) == node.value)
+        });
+
         self.spread_nodes(chunks, light, index, sources.into());
     }
 
@@ -502,6 +509,10 @@ struct NodeSet<'a> {
 impl<'a> NodeSet<'a> {
     fn insert(&mut self, node: Node<'a>) -> bool {
         self.points.insert(node.coords()) && self.queue.push(node)
+    }
+
+    fn retain<F: FnMut(&Node) -> bool>(&mut self, f: F) {
+        self.queue.0.retain(f);
     }
 }
 

@@ -44,30 +44,26 @@ var<uniform> sky: SkyUniform;
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = normalize((player.inv_vp * vec4(in.screen_coords, 1.0, 1.0)).xyz);
+    let horizon_factor = smooth_falloff(dir.y - HORIZON_OFFSET);
     let theta = -sign(sky.sun_dir.x) * radians(sky.glow_angle);
-    let horizon_factor = factor(degrees(asin(dir.y)) - 2.0);
-    let horizon_glow_factor = max(mix(1.0, -1.0, acos(dot(player.forward, sky.sun_dir)) * FRAC_1_PI), 0.0) * horizon_factor;
-    let glow_factor = max(factor(degrees(asin(rotate_z(dir, theta).y)) + 8.0), horizon_glow_factor) * sky.glow_color.a;
-    let color = mix(mix(sky.color, sky.horizon_color, horizon_factor), sky.glow_color.rgb, glow_factor);
+    let rotated_y = dir.x * sin(theta) + dir.y * cos(theta);
+    let arc_factor = smooth_falloff(rotated_y + GLOW_OFFSET);
+    let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);
+    let horizon_glow_factor = sun_alignment * horizon_factor;
+    let glow_factor = max(arc_factor, horizon_glow_factor) * sky.glow_color.a;
+    let sky_gradient = mix(sky.color, sky.horizon_color, horizon_factor);
+    let color = mix(sky_gradient, sky.glow_color.rgb, glow_factor);
     return vec4(color, 1.0);
 }
 
-fn factor(theta: f32) -> f32 {
-    return exp2(-pow2(max(theta / 6.0, 0.0)));
-}
-
-fn rotate_z(dir: vec3<f32>, theta: f32) -> vec3<f32> {
-    let sin_theta = sin(theta);
-    let cos_theta = cos(theta);
-    return vec3(
-        dir.x * cos_theta - dir.y * sin_theta,
-        dir.x * sin_theta + dir.y * cos_theta,
-        dir.z,
-    );
+fn smooth_falloff(x: f32) -> f32 {
+    return exp2(-pow2(max(x / FALLOFF_BANDWIDTH, 0.0)));
 }
 
 fn pow2(n: f32) -> f32 {
     return n * n;
 }
 
-const FRAC_1_PI = 0.318309886183790671537767526745028724;
+const HORIZON_OFFSET = sin(radians(2.0));
+const FALLOFF_BANDWIDTH = sin(radians(6.0));
+const GLOW_OFFSET = sin(radians(8.0));

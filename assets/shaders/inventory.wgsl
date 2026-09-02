@@ -32,7 +32,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 27u, 5u)),
     );
     let face = extractBits(vertex.data[0], 23u, 2u);
-    let face_light = mix(mix(mix(mix(0.0, 0.6, f32(face == 0u)), 1.0, f32(face == 1u)), 0.5, f32(face == 2u)), 0.8, f32(face == 3u));
+    let face_light = array(0.6, 1.0, 0.5, 0.8)[face];
     return VertexOutput(coords, tex_idx, tex_coords, face_light);
 }
 

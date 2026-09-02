@@ -29,5 +29,6 @@ var<immediate> imm: Immediates;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_input, s_input, in.input_coords) * vec4(vec3(1.0), imm.opacity);
+    let color = textureSample(t_input, s_input, in.input_coords);
+    return color * vec4(vec3(1.0), imm.opacity);
 }
