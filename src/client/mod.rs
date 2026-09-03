@@ -14,7 +14,7 @@ use crossbeam_channel::{Receiver, Sender};
 use game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig};
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 pub struct Client {
@@ -41,7 +41,7 @@ impl Client {
             },
             ServerSender::Proxy {
                 tx: server_tx,
-                proxy,
+                wake_up: Arc::new(move || proxy.wake_up()),
             },
         )
     }

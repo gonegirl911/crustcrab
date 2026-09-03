@@ -15,7 +15,6 @@ use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
 use uuid::Uuid;
-use winit::event_loop::EventLoopProxy;
 
 pub struct Server {
     event_loop: EventLoop,
@@ -94,7 +93,7 @@ impl GroupId {
 pub enum ServerSender {
     Proxy {
         tx: Sender<ServerEvent>,
-        proxy: EventLoopProxy,
+        wake_up: Arc<dyn Fn() + Send + Sync>,
     },
     Disconnected,
     Sender {
@@ -107,9 +106,9 @@ impl ServerSender {
     pub fn send(&self, event: ServerEvent) -> Result<(), SendError<ServerEvent>> {
         assert!(!event.is_special());
         match self {
-            Self::Proxy { tx, proxy } => {
+            Self::Proxy { tx, wake_up } => {
                 tx.send(event)?;
-                proxy.wake_up();
+                wake_up();
             }
             Self::Disconnected => {
                 return Err(SendError(event));
