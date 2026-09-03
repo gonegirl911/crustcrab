@@ -55,7 +55,7 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {
     let r = a % b;
-    return mix(r, r + abs(b), vec2<f32>(r < vec2(0.0)));
+    return select(r, r + abs(b), r < vec2(0.0));
 }
 
 @group(1) @binding(0)
