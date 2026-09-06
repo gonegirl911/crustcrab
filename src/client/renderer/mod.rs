@@ -46,11 +46,7 @@ impl Renderer {
                 required_features: wgpu::Features::IMMEDIATES
                     | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
                     | wgpu::Features::TEXTURE_BINDING_ARRAY,
-                required_limits: wgpu::Limits {
-                    max_binding_array_elements_per_shader_stage: 6,
-                    max_immediate_size: 72,
-                    ..Default::default()
-                },
+                required_limits: adapter.limits(),
                 ..Default::default()
             })
             .await
