@@ -70,8 +70,8 @@ impl Player {
 
     fn zfar() -> f32 {
         let render_distance = CLIENT_CONFIG.player.render_distance;
-        let puffer = 1024.0;
-        ((render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2 + puffer
+        let buffer = 1024.0;
+        ((render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2 + buffer
     }
 }
 
