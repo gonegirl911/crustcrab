@@ -36,5 +36,5 @@ serde = { version = "1.0.228", features = ["derive", "rc"] }
 toml = "1.1.2"
 uuid = { version = "1.23.5", features = ["fast-rng", "serde", "v4"] }
 walkdir = "2.5.0"
-wgpu = "30.0.0"
-winit = "0.31.0-beta.2"
+wgpu = "30.0.1"
+winit = "0.31.0-beta.3"
