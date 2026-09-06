@@ -20,20 +20,24 @@ var<uniform> inventory: InventoryUniform;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-    let coords = inventory.transform * vec4(
+    let coords = vec3(
         f32(extractBits(vertex.data[0], 0u, 5u)),
         f32(extractBits(vertex.data[0], 5u, 5u)),
         f32(extractBits(vertex.data[0], 10u, 5u)),
-        1.0,
     );
     let tex_idx = extractBits(vertex.data[0], 15u, 8u);
     let tex_coords = vec2(
         f32(extractBits(vertex.data[0], 27u, 5u)),
         f32(extractBits(vertex.data[1], 27u, 5u)),
     );
-    let face = extractBits(vertex.data[0], 23u, 2u);
-    let face_brightness = FACE_BRIGHTNESS[face];
-    return VertexOutput(coords, tex_idx, tex_coords, face_brightness);
+    let side_shade = extractBits(vertex.data[0], 23u, 2u);
+    let side_factor = SIDE_FACTORS[side_shade];
+    return VertexOutput(
+        inventory.transform * vec4(coords, 1.0),
+        tex_idx,
+        tex_coords,
+        side_factor,
+    );
 }
 
 @group(1) @binding(0)
@@ -48,4 +52,4 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return color * vec4(vec3(in.light_factor), 1.0);
 }
 
-const FACE_BRIGHTNESS = array(0.6, 1.0, 0.5, 0.8);
+const SIDE_FACTORS = array(0.6, 1.0, 0.5, 0.8);

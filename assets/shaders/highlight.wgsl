@@ -16,11 +16,10 @@ struct SkyUniform {
     sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    glow_color: vec3<f32>,
     glow_opacity: f32,
+    glow_color: vec3<f32>,
     arc_angle: f32,
-    sun_intensity: f32,
-    light_intensity: vec3<f32>,
+    sunlight_intensity: vec3<f32>,
 }
 
 struct Immediates {
@@ -53,11 +52,11 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(imm.brightness, 16u, 4u)),
         f32(extractBits(imm.brightness, 20u, 4u)),
     );
-    let global_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - skylight)) * sky.light_intensity;
+    let global_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - skylight));
     let local_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - torchlight));
     return VertexOutput(
         player.vp * (vec4(-player.origin, 0.0) + imm.m * vec4(vertex.coords, 1.0)),
-        HIGHLIGHT_OPACITY * luminance(saturate(global_light + local_light)),
+        HIGHLIGHT_OPACITY * luminance(saturate(global_light * sky.sunlight_intensity + local_light)),
     );
 }
 

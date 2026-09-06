@@ -42,15 +42,15 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
         f32(extractBits(vertex.data[0], 5u, 5u)),
         f32(extractBits(vertex.data[0], 10u, 5u)),
     );
-    let face = extractBits(vertex.data[0], 23u, 2u);
+    let side_shade = extractBits(vertex.data[0], 23u, 2u);
     let offset = instance.offset - rem_euclid(player.origin.xz - imm.offset, imm.size.x);
     let scaled_coords = (coords - 0.5) * imm.scale_factor + 0.5;
     let cloud_dims = vec3(imm.size, imm.size.x);
     let world_pos = scaled_coords * cloud_dims + vec3(offset.x, -player.origin.y + CLOUD_ALTITUDE, offset.y);
     let scroll_xz = player.origin.xz + instance.offset - imm.offset;
     let tex_coords = scroll_xz / imm.size.x / imm.tex_dims;
-    let face_brightness = FACE_BRIGHTNESS[face];
-    return VertexOutput(player.vp * vec4(world_pos, 1.0), tex_coords, face_brightness);
+    let side_factor = SIDE_FACTORS[side_shade];
+    return VertexOutput(player.vp * vec4(world_pos, 1.0), tex_coords, side_factor);
 }
 
 fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {
@@ -74,4 +74,4 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 const CLOUD_ALTITUDE = 192.0;
-const FACE_BRIGHTNESS = array(0.6, 1.0, 0.5, 0.8);
+const SIDE_FACTORS = array(0.6, 1.0, 0.5, 0.8);

@@ -41,20 +41,22 @@ impl BlockData {
         corner_lights: EnumMap<Corner, BlockLight>,
     ) -> impl Iterator<Item = BlockVertex> {
         let corner_deltas = self.model.corner_deltas(side);
-        let corners = Self::corners(corner_aos, corner_lights);
-        let face = side.into();
+        let side_shade = side.into();
         corner_deltas.iter().flat_map(move |corner_deltas| {
-            corners.into_iter().map(move |corner| {
-                let tex_coords = CORNER_TEX_COORDS[corner];
-                BlockVertex::new(
-                    coords + corner_deltas[corner].component_mul(&dims.coords),
-                    self.model.tex_index,
-                    array::from_fn(|i| tex_coords[i] * tex_dims[i]).into(),
-                    face,
-                    corner_aos[corner],
-                    corner_lights[corner],
-                )
-            })
+            let vertices = enum_map! {
+                corner => {
+                    let tex_coords = CORNER_TEX_COORDS[corner];
+                    BlockVertex::new(
+                        coords + corner_deltas[corner].component_mul(&dims.coords),
+                        self.model.tex_index,
+                        array::from_fn(|i| tex_coords[i] * tex_dims[i]).into(),
+                        side_shade,
+                        corner_aos[corner],
+                        corner_lights[corner],
+                    )
+                }
+            };
+            Self::triangulation(&vertices).map(|corner| vertices[corner])
         })
     }
 
@@ -90,12 +92,12 @@ impl BlockData {
     pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex>> {
         let tex_idx = self.model.flat_icon()?;
         let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
-        Some(CORNERS.into_iter().map(move |corner| {
+        Some(LL_UR_TRIANGULATION.into_iter().map(move |corner| {
             BlockVertex::new(
                 corner_deltas[corner].into(),
                 tex_idx,
                 CORNER_TEX_COORDS[corner],
-                Default::default(),
+                SideShade::Top,
                 Default::default(),
                 Default::default(),
             )
@@ -118,20 +120,15 @@ impl BlockData {
         !self.is_glowing() && self.light_filter == Default::default()
     }
 
-    fn corners(
-        corner_aos: EnumMap<Corner, u8>,
-        corner_lights: EnumMap<Corner, BlockLight>,
-    ) -> [Corner; 6] {
-        if corner_aos[Corner::LowerLeft] + corner_aos[Corner::UpperRight]
-            < corner_aos[Corner::LowerRight] + corner_aos[Corner::UpperLeft]
-            || corner_lights[Corner::LowerLeft].relative_brightness()
-                + corner_lights[Corner::UpperRight].relative_brightness()
-                > corner_lights[Corner::LowerRight].relative_brightness()
-                    + corner_lights[Corner::UpperLeft].relative_brightness()
-        {
-            FLIPPED_CORNERS
+    fn triangulation(vertices: &EnumMap<Corner, BlockVertex>) -> [Corner; 6] {
+        let lower_left = vertices[Corner::LowerLeft].light_factor(0.0).lum();
+        let upper_right = vertices[Corner::UpperRight].light_factor(0.0).lum();
+        let lower_right = vertices[Corner::LowerRight].light_factor(0.0).lum();
+        let upper_left = vertices[Corner::UpperLeft].light_factor(0.0).lum();
+        if lower_left + upper_right > lower_right + upper_left {
+            LL_UR_TRIANGULATION
         } else {
-            CORNERS
+            LR_UL_TRIANGULATION
         }
     }
 }
@@ -183,20 +180,14 @@ impl<'a> RawBlockData<'a> {
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
-pub enum Face {
+pub enum SideShade {
     X = 0,
     Top = 1,
     Bottom = 2,
     Z = 3,
 }
 
-impl Default for Face {
-    fn default() -> Self {
-        None.into()
-    }
-}
-
-impl From<Option<Side>> for Face {
+impl From<Option<Side>> for SideShade {
     fn from(side: Option<Side>) -> Self {
         match side {
             Some(Side::Left | Side::Right) => Self::X,
@@ -421,20 +412,20 @@ pub static SIDE_CORNER_COMPONENT_DELTAS: LazyLock<
 static CORNER_TEX_COORDS: LazyLock<EnumMap<Corner, Point2<u8>>> =
     LazyLock::new(|| SIDE_CORNER_DELTAS[Side::Front].map(|_, delta| point![delta.x, 1 - delta.y]));
 
-const CORNERS: [Corner; 6] = [
+const LL_UR_TRIANGULATION: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
-    Corner::UpperLeft,
-    Corner::LowerRight,
+    Corner::UpperRight,
+    Corner::LowerLeft,
     Corner::UpperRight,
     Corner::UpperLeft,
 ];
 
-const FLIPPED_CORNERS: [Corner; 6] = [
+const LR_UL_TRIANGULATION: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
-    Corner::UpperRight,
-    Corner::LowerLeft,
+    Corner::UpperLeft,
+    Corner::LowerRight,
     Corner::UpperRight,
     Corner::UpperLeft,
 ];

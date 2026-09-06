@@ -1,6 +1,7 @@
 use super::player::frustum::{Cullable, Frustum};
 use crate::{
     client::{
+        CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
@@ -15,11 +16,11 @@ use crate::{
         GroupId, ServerEvent,
         game::world::{
             ChunkData,
-            block::{BlockLight, data::Face},
+            block::{BlockLight, data::SideShade},
             chunk::Chunk,
         },
     },
-    shared::{pool::ThreadPool, utils},
+    shared::{color::Rgb, pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -366,7 +367,7 @@ impl BlockVertex {
         coords: Point3<u8>,
         tex_index: u8,
         tex_coords: Point2<u8>,
-        face: Face,
+        side_shade: SideShade,
         ao: u8,
         light: BlockLight,
     ) -> Self {
@@ -377,7 +378,7 @@ impl BlockVertex {
         data[0].set_bit_range(22, 15, tex_index);
         data[0].set_bit_range(31, 27, tex_coords.x);
         data[1].set_bit_range(31, 27, tex_coords.y);
-        data[0].set_bit_range(24, 23, face as u8);
+        data[0].set_bit_range(24, 23, side_shade as u8);
         data[0].set_bit_range(26, 25, ao);
         data[1].set_bit_range(26, 0, light.0);
         Self { data }
@@ -389,6 +390,36 @@ impl BlockVertex {
             self.data[0].bit_range(9, 5),
             self.data[0].bit_range(14, 10),
         ]
+    }
+
+    fn side_shade(self) -> u8 {
+        self.data[0].bit_range(24, 23)
+    }
+
+    fn ao(self) -> u8 {
+        self.data[0].bit_range(26, 25)
+    }
+
+    pub fn light(self) -> BlockLight {
+        BlockLight(self.data[1])
+    }
+
+    pub fn light_factor(self, nightness: f32) -> Rgb<f32> {
+        let side_shade = self.side_shade();
+        let ao = self.ao();
+        let side_factor = [0.6, 1.0, 0.5, 0.8][side_shade as usize];
+        let ao_factor = utils::lerp(0.0, 0.8, ao as f32 / 3.0);
+        self.world_light(nightness) * (1.0 - ao_factor) * side_factor
+    }
+
+    pub fn world_light(self, nightness: f32) -> Rgb<f32> {
+        let sunlight_intensity = CLIENT_CONFIG.sky.sunlight_intensity(nightness);
+        let light = self.light();
+        let skylight = light.skylight();
+        let torchlight = light.torchlight();
+        let global_light = skylight.map(|c| 0.8f32.powi((BlockLight::COMPONENT_MAX - c) as i32));
+        let local_light = torchlight.map(|c| 0.8f32.powi((BlockLight::COMPONENT_MAX - c) as i32));
+        (global_light * sunlight_intensity + local_light).saturate()
     }
 }
 

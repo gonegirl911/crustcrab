@@ -3,22 +3,19 @@ fovy = 90.0
 sensitivity = 0.0025
 render_distance = 16
 
-[sky]
-sun_intensity = 15.0
-
 [sky.day]
 color = [0.22, 0.5, 1.0]
 horizon_color = [0.37, 0.62, 1.0]
 glow_color = [1.0, 0.45, 0.0]
 arc_angle = 14.0
-light_intensity = [1.0, 1.0, 1.0]
+sunlight_intensity = [1.0, 1.0, 1.0]
 
 [sky.night]
 color = [0.0, 0.0, 0.0]
 horizon_color = [0.02, 0.02, 0.03]
 glow_color = [1.0, 0.0, 0.0]
 arc_angle = 10.0
-light_intensity = [0.1, 0.1, 0.25]
+sunlight_intensity = [0.1, 0.1, 0.25]
 
 [sky.star]
 size = 0.005
@@ -27,6 +24,7 @@ count = 1500
 
 [sky.object]
 size = 0.1
+day_brightness = 15.0
 
 [cloud]
 size = [12, 4]
@@ -38,6 +36,10 @@ color = [1.0, 1.0, 1.0, 0.99]
 
 [cloud.night]
 color = [0.06, 0.06, 0.1, 0.85]
+
+[gui]
+base_unit = 0.03125
+min_size = 16.0
 
 [gui.crosshair]
 size = 1.0

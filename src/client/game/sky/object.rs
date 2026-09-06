@@ -11,6 +11,7 @@ use crate::{
         },
     },
     server::{ServerEvent, game::clock::Time},
+    shared::utils,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, Vector3, vector};
@@ -81,10 +82,15 @@ impl ObjectSet {
 
     fn imm(time: Time) -> (ObjectImmediates, ObjectImmediates) {
         let sun_dir = time.sky_rotation() * Vector3::x();
-        let is_am = time.is_am();
+        let up = if sun_dir.x < 0.0 {
+            Vector3::y()
+        } else {
+            -Vector3::y()
+        };
+        let nightness = time.nightness();
         (
-            ObjectImmediates::new(sun_dir, 0, is_am),
-            ObjectImmediates::new(-sun_dir, 1, is_am),
+            ObjectImmediates::new(sun_dir, up, 0, nightness),
+            ObjectImmediates::new(-sun_dir, up, 1, nightness),
         )
     }
 }
@@ -104,16 +110,17 @@ impl EventHandler for ObjectSet {
 struct ObjectImmediates {
     m: Matrix4<f32>,
     tex_index: u32,
+    brightness: f32,
 }
 
 impl ObjectImmediates {
-    fn new(dir: Vector3<f32>, tex_index: u32, is_am: bool) -> Self {
-        let up = if is_am { -Vector3::y() } else { Vector3::y() };
-        let size = CLIENT_CONFIG.sky.object.size;
+    fn new(dir: Vector3<f32>, up: Vector3<f32>, tex_index: u32, nightness: f32) -> Self {
+        let config = &CLIENT_CONFIG.sky.object;
         Self {
             m: Matrix4::face_towards(&dir.into(), &Point3::origin(), &up)
-                .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
+                .prepend_nonuniform_scaling(&vector![config.size, config.size, 1.0]),
             tex_index,
+            brightness: utils::lerp(config.day_brightness, 1.0, nightness),
         }
     }
 }
@@ -123,4 +130,5 @@ impl Immediates for ObjectImmediates {}
 #[derive(Deserialize)]
 pub struct ObjectConfig {
     size: f32,
+    day_brightness: f32,
 }

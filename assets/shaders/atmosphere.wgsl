@@ -29,11 +29,10 @@ struct SkyUniform {
     sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    glow_color: vec3<f32>,
     glow_opacity: f32,
+    glow_color: vec3<f32>,
     arc_angle: f32,
-    sun_intensity: f32,
-    light_intensity: vec3<f32>,
+    sunlight_intensity: vec3<f32>,
 }
 
 @group(0) @binding(0)

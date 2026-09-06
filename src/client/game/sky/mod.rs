@@ -128,45 +128,36 @@ impl EventHandler for Sky {
 struct SkyUniformData {
     sun_dir: Float3,
     color: Float3,
-    horizon_color: Float3,
-    glow_color: Rgb<f32>,
+    horizon_color: Rgb<f32>,
     glow_opacity: f32,
+    glow_color: Rgb<f32>,
     arc_angle: f32,
-    sun_intensity: f32,
-    padding: [f32; 2],
-    light_intensity: Float3,
+    sunlight_intensity: Float3,
 }
 
 impl SkyUniformData {
     fn new(time: Time) -> Self {
-        let progress = time.stage().progress();
+        let nightness = time.nightness();
         let config = &CLIENT_CONFIG.sky;
         let sun_dir = time.sky_rotation() * Vector3::x();
-        let color = utils::lerp(config.day.color, config.night.color, progress);
+        let color = utils::lerp(config.day.color, config.night.color, nightness);
         let horizon_color = utils::lerp(
             config.day.horizon_color,
             config.night.horizon_color,
-            progress,
+            nightness,
         );
-        let glow_color = utils::lerp(config.day.glow_color, config.night.glow_color, progress);
-        let glow_opacity = Self::glow_opacity(progress);
-        let arc_angle = Self::arc_angle(config.day.arc_angle, config.night.arc_angle, progress);
-        let sun_intensity = utils::lerp(config.sun_intensity, 1.0, progress);
-        let light_intensity = utils::lerp(
-            config.day.light_intensity,
-            config.night.light_intensity,
-            progress,
-        );
+        let glow_color = utils::lerp(config.day.glow_color, config.night.glow_color, nightness);
+        let glow_opacity = Self::glow_opacity(nightness);
+        let arc_angle = Self::arc_angle(config.day.arc_angle, config.night.arc_angle, nightness);
+        let sunlight_intensity = config.sunlight_intensity(nightness);
         Self {
             sun_dir: sun_dir.into(),
             color: color.into(),
-            horizon_color: horizon_color.into(),
-            glow_color,
+            horizon_color,
             glow_opacity,
+            glow_color,
             arc_angle,
-            sun_intensity,
-            padding: Default::default(),
-            light_intensity: light_intensity.into(),
+            sunlight_intensity: sunlight_intensity.into(),
         }
     }
 
@@ -182,18 +173,27 @@ impl SkyUniformData {
 
 #[derive(Deserialize)]
 pub struct SkyConfig {
-    sun_intensity: f32,
-    day: StageConfig,
-    night: StageConfig,
+    day: TimePhaseConfig,
+    night: TimePhaseConfig,
     star: StarConfig,
     object: ObjectConfig,
 }
 
+impl SkyConfig {
+    pub fn sunlight_intensity(&self, nightness: f32) -> Rgb<f32> {
+        utils::lerp(
+            self.day.sunlight_intensity,
+            self.night.sunlight_intensity,
+            nightness,
+        )
+    }
+}
+
 #[derive(Deserialize)]
-struct StageConfig {
+struct TimePhaseConfig {
     color: Rgb<f32>,
     horizon_color: Rgb<f32>,
     glow_color: Rgb<f32>,
     arc_angle: f32,
-    light_intensity: Rgb<f32>,
+    sunlight_intensity: Rgb<f32>,
 }

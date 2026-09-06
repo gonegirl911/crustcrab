@@ -49,7 +49,11 @@ impl BlockHover {
         sky_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
     ) {
-        if let Some(BlockHoverData { hitbox, brightness }) = self.data {
+        if let Some(BlockHoverData {
+            hitbox,
+            brightness: Some(brightness),
+        }) = self.data
+        {
             self.highlight.draw(
                 &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {

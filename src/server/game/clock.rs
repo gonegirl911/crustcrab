@@ -4,7 +4,7 @@ use crate::{
         SERVER_CONFIG, ServerEvent, ServerSender,
         event_loop::{Event, EventHandler},
     },
-    shared::utils::{self, Lerp},
+    shared::utils,
 };
 use nalgebra::{UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
@@ -56,52 +56,39 @@ pub struct Time {
 
 impl Time {
     pub fn sky_rotation(self) -> UnitQuaternion<f32> {
-        let time = SERVER_CONFIG.clock.time(self.ticks);
-        let theta = TAU * time;
-        UnitQuaternion::new(Vector3::z() * theta)
+        let config = &SERVER_CONFIG.clock;
+        let anchor = config.sunrise() as f32 / config.ticks_per_day as f32;
+        let progress = self.progress(0..config.ticks_per_day) - anchor;
+        let angle = TAU * progress;
+        UnitQuaternion::new(Vector3::z() * angle)
     }
 
-    pub fn stage(self) -> Stage {
-        SERVER_CONFIG.clock.stage(self.ticks)
+    pub fn nightness(self) -> f32 {
+        let config = &SERVER_CONFIG.clock;
+        let dawn_range = config.dawn_range();
+        let day_range = config.day_range();
+        let dusk_range = config.dusk_range();
+        if dawn_range.contains(&self.ticks) {
+            1.0 - self.progress(dawn_range)
+        } else if day_range.contains(&self.ticks) {
+            0.0
+        } else if dusk_range.contains(&self.ticks) {
+            self.progress(dusk_range)
+        } else {
+            1.0
+        }
     }
 
-    pub fn is_am(self) -> bool {
-        SERVER_CONFIG.clock.is_am(self.ticks)
+    fn progress(self, Range { start, end }: Range<u16>) -> f32 {
+        utils::inv_lerp(start as f32, (end - 1) as f32, self.ticks as f32)
     }
 }
 
 impl Default for Time {
     fn default() -> Self {
-        Clock::default().time()
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum Stage {
-    Dawn { progress: f32 },
-    Day,
-    Dusk { progress: f32 },
-    Night,
-}
-
-impl Stage {
-    pub fn lerp<T: Lerp>(self, day: T, night: T) -> T {
-        utils::lerp(day, night, self.progress())
-    }
-
-    pub fn progress(self) -> f32 {
-        match self {
-            Self::Dawn { progress } => 1.0 - progress,
-            Self::Day => 0.0,
-            Self::Dusk { progress } => progress,
-            Self::Night => 1.0,
+        Self {
+            ticks: SERVER_CONFIG.clock.starting_ticks(),
         }
-    }
-}
-
-impl Default for Stage {
-    fn default() -> Self {
-        Time::default().stage()
     }
 }
 
@@ -109,45 +96,17 @@ impl Default for Stage {
 pub struct ClockConfig {
     ticks_per_day: u16,
     twilight_duration: u16,
-    starting_stage: StartingStage,
+    starting_phase: TimePhase,
 }
 
 impl ClockConfig {
     fn starting_ticks(&self) -> u16 {
-        match self.starting_stage {
-            StartingStage::Dawn => 0,
-            StartingStage::Day => self.day_start(),
-            StartingStage::Dusk => self.dusk_start(),
-            StartingStage::Night => self.night_start(),
+        match self.starting_phase {
+            TimePhase::Dawn => 0,
+            TimePhase::Day => self.day_start(),
+            TimePhase::Dusk => self.dusk_start(),
+            TimePhase::Night => self.night_start(),
         }
-    }
-
-    fn time(&self, ticks: u16) -> f32 {
-        (ticks as i16 - self.horizon() as i16) as f32 / self.ticks_per_day as f32
-    }
-
-    fn stage(&self, ticks: u16) -> Stage {
-        if self.dawn_range().contains(&ticks) {
-            Stage::Dawn {
-                progress: Self::progress(self.dawn_range(), ticks),
-            }
-        } else if self.day_range().contains(&ticks) {
-            Stage::Day
-        } else if self.dusk_range().contains(&ticks) {
-            Stage::Dusk {
-                progress: Self::progress(self.dusk_range(), ticks),
-            }
-        } else {
-            Stage::Night
-        }
-    }
-
-    fn is_am(&self, ticks: u16) -> bool {
-        !self.is_pm(ticks)
-    }
-
-    fn is_pm(&self, ticks: u16) -> bool {
-        self.pm_range().contains(&ticks)
     }
 
     fn dawn_range(&self) -> Range<u16> {
@@ -162,20 +121,12 @@ impl ClockConfig {
         self.dusk_start()..self.night_start()
     }
 
-    fn pm_range(&self) -> Range<u16> {
-        self.noon()..self.midnight()
-    }
-
-    fn horizon(&self) -> u16 {
+    fn sunrise(&self) -> u16 {
         self.twilight_duration / 2
     }
 
     fn day_start(&self) -> u16 {
         self.twilight_duration
-    }
-
-    fn noon(&self) -> u16 {
-        self.horizon() + self.ticks_per_day / 4
     }
 
     fn dusk_start(&self) -> u16 {
@@ -185,19 +136,11 @@ impl ClockConfig {
     fn night_start(&self) -> u16 {
         self.dusk_start() + self.twilight_duration
     }
-
-    fn midnight(&self) -> u16 {
-        self.noon() + self.ticks_per_day / 2
-    }
-
-    fn progress(Range { start, end }: Range<u16>, ticks: u16) -> f32 {
-        utils::inv_lerp(start as f32, (end - 1) as f32, ticks as f32)
-    }
 }
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum StartingStage {
+enum TimePhase {
     Dawn,
     Day,
     Dusk,

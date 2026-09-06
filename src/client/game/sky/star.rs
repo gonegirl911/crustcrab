@@ -10,10 +10,8 @@ use crate::{
             utils::{Immediates, Vertex, read_wgsl},
         },
     },
-    server::{
-        ServerEvent,
-        game::clock::{Stage, Time},
-    },
+    server::{ServerEvent, game::clock::Time},
+    shared::utils,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, UnitQuaternion, Vector3, point, vector};
@@ -52,12 +50,13 @@ impl StarDome {
             .format(PostProcessor::FORMAT)
             .blend(wgpu::BlendState::ALPHA_BLENDING)
             .build();
+        let time = Time::default();
         Self {
             stars,
             instance_buffer,
             program,
-            imm: Default::default(),
-            updated_rotation: Some(Time::default().sky_rotation()),
+            imm: StarImmediates::new(time.nightness()),
+            updated_rotation: Some(time.sky_rotation()),
         }
     }
 
@@ -83,7 +82,7 @@ impl EventHandler for StarDome {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
-                self.imm = StarImmediates::new(time.stage());
+                self.imm = StarImmediates::new(time.nightness());
                 self.updated_rotation = Some(time.sky_rotation());
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
@@ -168,17 +167,11 @@ struct StarImmediates {
 }
 
 impl StarImmediates {
-    fn new(stage: Stage) -> Self {
+    fn new(nightness: f32) -> Self {
         let brightness = CLIENT_CONFIG.sky.star.brightness;
         Self {
-            opacity: stage.lerp(-brightness / 2.0, brightness).max(0.0),
+            opacity: utils::lerp(-brightness / 2.0, brightness, nightness).max(0.0),
         }
-    }
-}
-
-impl Default for StarImmediates {
-    fn default() -> Self {
-        Self::new(Default::default())
     }
 }
 

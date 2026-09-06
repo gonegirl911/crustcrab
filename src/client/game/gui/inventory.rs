@@ -23,7 +23,7 @@ use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
 use serde::Deserialize;
 use std::{
-    f32::consts::{FRAC_PI_4, FRAC_PI_6},
+    f32::consts::{FRAC_PI_4, FRAC_PI_6, SQRT_2},
     mem,
     sync::Arc,
 };
@@ -38,7 +38,7 @@ pub struct Inventory {
     program: Program,
     contents: Arc<[Block]>,
     index: usize,
-    is_flat: bool,
+    is_icon_flat: bool,
     is_updated: bool,
 }
 
@@ -67,7 +67,7 @@ impl Inventory {
             program,
             contents: Default::default(),
             index: 0,
-            is_flat: false,
+            is_icon_flat: false,
             is_updated: true,
         }
     }
@@ -129,12 +129,12 @@ impl EventHandler for Inventory {
                     let mut is_transform_outdated = surface.is_resized;
 
                     if mem::take(&mut self.is_updated) {
-                        let mut is_flat = false;
+                        let mut is_icon_flat = false;
 
                         self.vertex_buffer = self.selected_block().and_then(|block| {
                             let data = block.data();
                             let vertices = if let Some(vertices) = data.flat_icon() {
-                                is_flat = true;
+                                is_icon_flat = true;
                                 vertices.collect::<Vec<_>>()
                             } else {
                                 data.mesh(
@@ -147,14 +147,16 @@ impl EventHandler for Inventory {
                             VertexBuffer::try_new(renderer, MemoryState::Immutable(&vertices))
                         });
 
-                        if mem::replace(&mut self.is_flat, is_flat) != is_flat {
+                        if mem::replace(&mut self.is_icon_flat, is_icon_flat) != is_icon_flat {
                             is_transform_outdated = true;
                         }
                     }
 
                     if is_transform_outdated {
-                        self.uniform
-                            .set(renderer, &InventoryUniformData::new(surface, self.is_flat));
+                        self.uniform.set(
+                            renderer,
+                            &InventoryUniformData::new(surface, self.is_icon_flat),
+                        );
                     }
                 }
                 _ => {}
@@ -171,27 +173,25 @@ struct InventoryUniformData {
 }
 
 impl InventoryUniformData {
-    fn new(surface: &Surface, is_flat: bool) -> Self {
-        let scaling = Gui::scaling(
-            surface.width(),
-            surface.height(),
-            CLIENT_CONFIG.gui.inventory.size,
-        );
-        let transform = Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44));
+    fn new(surface: &Surface, is_icon_flat: bool) -> Self {
+        let icon_projection = Self::icon_projection(is_icon_flat);
+        let scaling = Gui::scaling(surface, CLIENT_CONFIG.gui.inventory.size);
+        let gui_transform = Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44));
         Self {
-            transform: if is_flat {
-                transform
-            } else {
-                let diagonal = 3.0f32.sqrt();
-                let rot_x = -FRAC_PI_6;
-                let theta = (1.0 / diagonal).acos() + rot_x;
-                transform
-                    * Matrix4::new_rotation(Vector3::x() * rot_x)
-                        .append_scaling(1.0 / diagonal / theta.cos())
-                        .append_translation(&vector![0.5, 0.5, 0.545])
-                    * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
-                        .prepend_translation(&Vector3::repeat(-0.5))
-            },
+            transform: gui_transform * icon_projection,
+        }
+    }
+
+    fn icon_projection(is_icon_flat: bool) -> Matrix4<f32> {
+        if is_icon_flat {
+            Matrix4::identity()
+        } else {
+            let sqrt3 = 3.0f32.sqrt();
+            Matrix4::new_translation(&vector![0.5, 0.5, SQRT_2 - sqrt3 / 2.0])
+                * Matrix4::new_scaling(2.0 / (SQRT_2 + sqrt3))
+                * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+                * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
+                * Matrix4::new_translation(&Vector3::repeat(-0.5))
         }
     }
 }

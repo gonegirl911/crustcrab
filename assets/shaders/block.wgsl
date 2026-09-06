@@ -18,11 +18,10 @@ struct SkyUniform {
     sun_dir: vec3<f32>,
     color: vec3<f32>,
     horizon_color: vec3<f32>,
-    glow_color: vec3<f32>,
     glow_opacity: f32,
+    glow_color: vec3<f32>,
     arc_angle: f32,
-    sun_intensity: f32,
-    light_intensity: vec3<f32>,
+    sunlight_intensity: vec3<f32>,
 }
 
 struct Immediates {
@@ -46,7 +45,7 @@ var<immediate> imm: Immediates;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
-    let coords = imm.chunk_coords * CHUNK_DIM + vec3(
+    let coords = vec3(
         f32(extractBits(vertex.data[0], 0u, 5u)),
         f32(extractBits(vertex.data[0], 5u, 5u)),
         f32(extractBits(vertex.data[0], 10u, 5u)),
@@ -56,7 +55,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[0], 27u, 5u)),
         f32(extractBits(vertex.data[1], 27u, 5u)),
     );
-    let face = extractBits(vertex.data[0], 23u, 2u);
+    let side_shade = extractBits(vertex.data[0], 23u, 2u);
     let ao = f32(extractBits(vertex.data[0], 25u, 2u));
     let skylight = vec3(
         f32(extractBits(vertex.data[1], 0u, 4u)),
@@ -68,15 +67,15 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 16u, 4u)),
         f32(extractBits(vertex.data[1], 20u, 4u)),
     );
-    let face_brightness = FACE_BRIGHTNESS[face];
-    let ao_factor = mix(AO_MIN, AO_MAX, ao / AO_LEVELS);
-    let global_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - skylight)) * sky.light_intensity;
-    let local_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - torchlight));
+    let side_factor = SIDE_FACTORS[side_shade];
+    let ao_factor = mix(AO_FACTOR_MIN, AO_FACTOR_MAX, ao / AO_MAX);
+    let global_light = pow(vec3(LIGHT_ATTENUATION), LIGHT_MAX - skylight);
+    let local_light = pow(vec3(LIGHT_ATTENUATION), LIGHT_MAX - torchlight);
     return VertexOutput(
-        player.vp * vec4(-player.origin + coords, 1.0),
+        player.vp * vec4(-player.origin + imm.chunk_coords * CHUNK_DIM + coords, 1.0),
         tex_idx,
         tex_coords,
-        saturate(global_light + local_light) * (1.0 - ao_factor) * face_brightness,
+        saturate(global_light * sky.sunlight_intensity + local_light) * (1.0 - ao_factor) * side_factor,
     );
 }
 
@@ -97,9 +96,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 const CHUNK_DIM = 16.0;
-const AO_MIN = 0.0;
-const AO_MAX = 0.8;
-const AO_LEVELS = 3;
-const FACE_BRIGHTNESS = array(0.6, 1.0, 0.5, 0.8);
+const SIDE_FACTORS = array(0.6, 1.0, 0.5, 0.8);
+const AO_FACTOR_MIN = 0.0;
+const AO_FACTOR_MAX = 0.8;
+const AO_MAX = 3.0;
 const LIGHT_ATTENUATION = 0.8;
 const LIGHT_MAX = 15.0;

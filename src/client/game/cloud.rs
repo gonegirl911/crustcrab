@@ -15,14 +15,17 @@ use crate::{
     server::{
         ServerEvent,
         game::{
-            clock::Stage,
+            clock::Time,
             world::{
                 block::{Block, area::BlockArea},
                 chunk::Chunk,
             },
         },
     },
-    shared::color::{Float3, Rgb, Rgba},
+    shared::{
+        color::{Float3, Rgb, Rgba},
+        utils,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, Vector2, point, vector};
@@ -76,14 +79,15 @@ impl CloudLayer {
             .format(PostProcessor::FORMAT)
             .build();
         let blender = Blender::new(renderer, spare_bind_group_layout, PostProcessor::FORMAT);
+        let nightness = Time::default().nightness();
         Self {
             vertex_buffer,
             instance_buffer,
             texture,
             program,
             blender,
-            imm: CloudImmediates::new(image.dimensions()),
-            opacity: Self::opacity(Default::default()),
+            imm: CloudImmediates::new(image.dimensions(), nightness),
+            opacity: Self::opacity(nightness),
         }
     }
 
@@ -149,10 +153,11 @@ impl CloudLayer {
         })
     }
 
-    fn opacity(stage: Stage) -> f32 {
-        stage.lerp(
+    fn opacity(nightness: f32) -> f32 {
+        utils::lerp(
             CLIENT_CONFIG.cloud.day.color.a,
             CLIENT_CONFIG.cloud.night.color.a,
+            nightness,
         )
     }
 }
@@ -163,9 +168,9 @@ impl EventHandler for CloudLayer {
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
         match event {
             Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
-                let stage = time.stage();
-                self.imm.update_color(stage);
-                self.opacity = Self::opacity(stage);
+                let nightness = time.nightness();
+                self.imm.update_color(nightness);
+                self.opacity = Self::opacity(nightness);
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 self.imm.update_offset(dt);
@@ -206,19 +211,19 @@ struct CloudImmediates {
 }
 
 impl CloudImmediates {
-    fn new((tex_width, tex_height): (u32, u32)) -> Self {
+    fn new((tex_width, tex_height): (u32, u32), nightness: f32) -> Self {
         Self {
             tex_dims: point![tex_width, tex_height].cast(),
             size: CLIENT_CONFIG.cloud.size.cast(),
             scale_factor: Self::scale_factor().into(),
-            color: Self::color(Default::default()).into(),
+            color: Self::color(nightness).into(),
             offset: Default::default(),
             padding: Default::default(),
         }
     }
 
-    fn update_color(&mut self, stage: Stage) {
-        self.color = Self::color(stage).into();
+    fn update_color(&mut self, nightness: f32) {
+        self.color = Self::color(nightness).into();
     }
 
     fn update_offset(&mut self, dt: Duration) {
@@ -232,10 +237,11 @@ impl CloudImmediates {
         size.map(|c| 1.0 + padding * 2.0 / c as f32)
     }
 
-    fn color(stage: Stage) -> Rgb<f32> {
-        stage.lerp(
+    fn color(nightness: f32) -> Rgb<f32> {
+        utils::lerp(
             CLIENT_CONFIG.cloud.day.color.rgb,
             CLIENT_CONFIG.cloud.night.color.rgb,
+            nightness,
         )
     }
 }

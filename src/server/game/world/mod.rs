@@ -691,23 +691,22 @@ impl PartialEq for Quad {
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct BlockHoverData {
     pub hitbox: Aabb,
-    pub brightness: BlockLight,
+    pub brightness: Option<BlockLight>,
 }
 
 impl BlockHoverData {
     fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
         let data = area.kernel().data();
-        Self {
-            hitbox: data.hitbox(coords),
-            brightness: Self::brightness(area, area_light),
-        }
-    }
-
-    fn brightness(area: &BlockArea, area_light: &BlockAreaLight) -> BlockLight {
-        Enum::variants()
-            .flat_map(|side| area_light.corner_lights(side, area).into_values())
-            .max_by(|a, b| a.relative_brightness().total_cmp(&b.relative_brightness()))
-            .unwrap_or_else(|| unreachable!())
+        let hitbox = data.hitbox(coords);
+        let brightness = data
+            .mesh(utils::block_coords(coords), area, area_light)
+            .max_by(|a, b| {
+                let a = a.world_light(0.0).lum();
+                let b = b.world_light(0.0).lum();
+                a.total_cmp(&b)
+            })
+            .map(BlockVertex::light);
+        Self { hitbox, brightness }
     }
 }
 

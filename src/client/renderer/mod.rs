@@ -48,7 +48,7 @@ impl Renderer {
                     | wgpu::Features::TEXTURE_BINDING_ARRAY,
                 required_limits: wgpu::Limits {
                     max_binding_array_elements_per_shader_stage: 6,
-                    max_immediate_size: 68,
+                    max_immediate_size: 72,
                     ..Default::default()
                 },
                 ..Default::default()

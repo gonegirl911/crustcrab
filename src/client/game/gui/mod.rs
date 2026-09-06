@@ -2,6 +2,7 @@ pub mod crosshair;
 pub mod inventory;
 
 use crate::client::{
+    CLIENT_CONFIG,
     event_loop::{Event, EventHandler},
     renderer::{
         Renderer, Surface,
@@ -82,9 +83,10 @@ impl Gui {
         );
     }
 
-    fn scaling(width: f32, height: f32, factor: f32) -> Vector2<f32> {
-        let size = (height * 0.0325).max(13.5) * factor;
-        vector![size / width, size / height]
+    fn scaling(surface: &Surface, factor: f32) -> Vector2<f32> {
+        let config = &CLIENT_CONFIG.gui;
+        let size = (surface.height() * config.base_unit).max(config.min_size) * factor;
+        vector![size / surface.width(), size / surface.height()]
     }
 
     fn transform(scaling: Vector2<f32>, offset: Vector2<f32>) -> Matrix4<f32> {
@@ -106,6 +108,8 @@ impl EventHandler for Gui {
 
 #[derive(Deserialize)]
 pub struct GuiConfig {
+    base_unit: f32,
+    min_size: f32,
     crosshair: CrosshairConfig,
     inventory: InventoryConfig,
 }
