@@ -16,7 +16,6 @@ use crate::{
 };
 use atmosphere::Atmosphere;
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Vector3;
 use object::{ObjectConfig, ObjectSet};
 use serde::Deserialize;
 use star::{StarConfig, StarDome};
@@ -137,37 +136,21 @@ struct SkyUniformData {
 
 impl SkyUniformData {
     fn new(time: Time) -> Self {
-        let nightness = time.nightness();
         let config = &CLIENT_CONFIG.sky;
-        let sun_dir = time.sky_rotation() * Vector3::x();
-        let color = utils::lerp(config.day.color, config.night.color, nightness);
-        let horizon_color = utils::lerp(
-            config.day.horizon_color,
-            config.night.horizon_color,
-            nightness,
-        );
-        let glow_color = utils::lerp(config.day.glow_color, config.night.glow_color, nightness);
-        let glow_opacity = Self::glow_opacity(nightness);
-        let arc_angle = Self::arc_angle(config.day.arc_angle, config.night.arc_angle, nightness);
-        let sunlight_intensity = config.sunlight_intensity(nightness);
+        let nightness = time.nightness();
         Self {
-            sun_dir: sun_dir.into(),
-            color: color.into(),
-            horizon_color,
-            glow_opacity,
-            glow_color,
-            arc_angle,
-            sunlight_intensity: sunlight_intensity.into(),
+            sun_dir: time.sun_dir().into(),
+            color: config.color(nightness).into(),
+            horizon_color: config.horizon_color(nightness),
+            glow_opacity: Self::glow_opacity(nightness),
+            glow_color: config.glow_color(nightness),
+            arc_angle: config.arc_angle(nightness),
+            sunlight_intensity: config.sunlight_intensity(nightness).into(),
         }
     }
 
-    fn glow_opacity(progress: f32) -> f32 {
-        1.0 - (progress * 2.0 - 1.0).powi(2)
-    }
-
-    fn arc_angle(day: f32, night: f32, progress: f32) -> f32 {
-        let t = 1.0 - (1.0 - (progress * 3.0 - 1.0).max(0.0)).abs();
-        utils::lerp(day, night, t)
+    fn glow_opacity(nightness: f32) -> f32 {
+        1.0 - (nightness * 2.0 - 1.0).powi(2)
     }
 }
 
@@ -180,6 +163,23 @@ pub struct SkyConfig {
 }
 
 impl SkyConfig {
+    fn color(&self, nightness: f32) -> Rgb<f32> {
+        utils::lerp(self.day.color, self.night.color, nightness)
+    }
+
+    fn horizon_color(&self, nightness: f32) -> Rgb<f32> {
+        utils::lerp(self.day.horizon_color, self.night.horizon_color, nightness)
+    }
+
+    fn glow_color(&self, nightness: f32) -> Rgb<f32> {
+        utils::lerp(self.day.glow_color, self.night.glow_color, nightness)
+    }
+
+    fn arc_angle(&self, nightness: f32) -> f32 {
+        let t = 1.0 - (1.0 - (nightness * 3.0 - 1.0).max(0.0)).abs();
+        utils::lerp(self.day.arc_angle, self.night.arc_angle, t)
+    }
+
     pub fn sunlight_intensity(&self, nightness: f32) -> Rgb<f32> {
         utils::lerp(
             self.day.sunlight_intensity,

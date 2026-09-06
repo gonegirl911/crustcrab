@@ -91,22 +91,6 @@ impl<T> IntoIterator for Rgb<T> {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(from = "[T; 4]")]
-pub struct Rgba<T> {
-    pub rgb: Rgb<T>,
-    pub a: T,
-}
-
-impl<T> From<[T; 4]> for Rgba<T> {
-    fn from([r, g, b, a]: [T; 4]) -> Self {
-        Self {
-            rgb: Rgb::new(r, g, b),
-            a,
-        }
-    }
-}
-
 #[repr(C, align(16))]
 #[derive(Clone, Copy, Default, Zeroable, Pod)]
 pub struct Float3 {

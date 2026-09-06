@@ -23,7 +23,7 @@ use crate::{
         },
     },
     shared::{
-        color::{Float3, Rgb, Rgba},
+        color::{Float3, Rgb},
         utils,
     },
 };
@@ -48,6 +48,7 @@ impl CloudLayer {
         renderer: &Renderer,
         surface: &Surface,
         player_bind_group_layout: &wgpu::BindGroupLayout,
+        lighting_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&Self::vertices()));
@@ -66,7 +67,11 @@ impl CloudLayer {
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/cloud.wgsl"))
-            .bind_group_layouts(&[player_bind_group_layout, texture.bind_group_layout()])
+            .bind_group_layouts(&[
+                player_bind_group_layout,
+                lighting_bind_group_layout,
+                texture.bind_group_layout(),
+            ])
             .immediate_size(CloudImmediates::SIZE)
             .buffers(&[BlockVertex::desc(), CloudInstance::desc()])
             .depth_stencil(wgpu::DepthStencilState {
@@ -87,10 +92,11 @@ impl CloudLayer {
             program,
             blender,
             imm: CloudImmediates::new(image.dimensions(), nightness),
-            opacity: Self::opacity(nightness),
+            opacity: CLIENT_CONFIG.cloud.opacity(nightness),
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     #[rustfmt::skip]
     pub fn draw(
         &self,
@@ -98,6 +104,7 @@ impl CloudLayer {
         encoder: &mut wgpu::CommandEncoder,
         spare_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
+        lighting_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         spare_bind_group: &wgpu::BindGroup,
     ) {
@@ -124,7 +131,11 @@ impl CloudLayer {
             });
             self.program.bind(
                 &mut render_pass,
-                [player_bind_group, self.texture.bind_group()],
+                [
+                    player_bind_group,
+                    lighting_bind_group,
+                    self.texture.bind_group(),
+                ],
             );
             self.imm.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
@@ -152,14 +163,6 @@ impl CloudLayer {
                 .map(move |dz| CloudInstance::new(vector![dx, dz]))
         })
     }
-
-    fn opacity(nightness: f32) -> f32 {
-        utils::lerp(
-            CLIENT_CONFIG.cloud.day.color.a,
-            CLIENT_CONFIG.cloud.night.color.a,
-            nightness,
-        )
-    }
 }
 
 impl EventHandler for CloudLayer {
@@ -170,7 +173,7 @@ impl EventHandler for CloudLayer {
             Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
                 let nightness = time.nightness();
                 self.imm.update_color(nightness);
-                self.opacity = Self::opacity(nightness);
+                self.opacity = CLIENT_CONFIG.cloud.opacity(nightness);
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 self.imm.update_offset(dt);
@@ -216,14 +219,14 @@ impl CloudImmediates {
             tex_dims: point![tex_width, tex_height].cast(),
             size: CLIENT_CONFIG.cloud.size.cast(),
             scale_factor: Self::scale_factor().into(),
-            color: Self::color(nightness).into(),
+            color: CLIENT_CONFIG.cloud.color(nightness).into(),
             offset: Default::default(),
             padding: Default::default(),
         }
     }
 
     fn update_color(&mut self, nightness: f32) {
-        self.color = Self::color(nightness).into();
+        self.color = CLIENT_CONFIG.cloud.color(nightness).into();
     }
 
     fn update_offset(&mut self, dt: Duration) {
@@ -236,14 +239,6 @@ impl CloudImmediates {
         let padding = CLIENT_CONFIG.cloud.padding;
         size.map(|c| 1.0 + padding * 2.0 / c as f32)
     }
-
-    fn color(nightness: f32) -> Rgb<f32> {
-        utils::lerp(
-            CLIENT_CONFIG.cloud.day.color.rgb,
-            CLIENT_CONFIG.cloud.night.color.rgb,
-            nightness,
-        )
-    }
 }
 
 impl Immediates for CloudImmediates {}
@@ -253,11 +248,22 @@ pub struct CloudConfig {
     size: Point2<u64>,
     pub padding: f32,
     speed: f32,
-    day: StageConfig,
-    night: StageConfig,
+    day: TimePhaseConfig,
+    night: TimePhaseConfig,
+}
+
+impl CloudConfig {
+    fn color(&self, nightness: f32) -> Rgb<f32> {
+        utils::lerp(self.day.color, self.night.color, nightness)
+    }
+
+    fn opacity(&self, nightness: f32) -> f32 {
+        utils::lerp(self.day.opacity, self.night.opacity, nightness)
+    }
 }
 
 #[derive(Deserialize)]
-struct StageConfig {
-    color: Rgba<f32>,
+struct TimePhaseConfig {
+    color: Rgb<f32>,
+    opacity: f32,
 }

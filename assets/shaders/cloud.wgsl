@@ -24,6 +24,14 @@ struct Immediates {
     offset: vec2<f32>,
 }
 
+struct LightingUniform {
+    side_factors: vec4<f32>,
+    attenuation: f32,
+    ao_factor_min: f32,
+    ao_factor_max: f32,
+    padding: f32,
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
@@ -34,6 +42,9 @@ struct VertexOutput {
 var<uniform> player: PlayerUniform;
 
 var<immediate> imm: Immediates;
+
+@group(1) @binding(0)
+var<uniform> lighting: LightingUniform;
 
 @vertex
 fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -49,7 +60,7 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     let world_pos = scaled_coords * cloud_dims + vec3(offset.x, -player.origin.y + CLOUD_ALTITUDE, offset.y);
     let scroll_xz = player.origin.xz + instance.offset - imm.offset;
     let tex_coords = scroll_xz / imm.size.x / imm.tex_dims;
-    let side_factor = SIDE_FACTORS[side_shade];
+    let side_factor = lighting.side_factors[side_shade];
     return VertexOutput(player.vp * vec4(world_pos, 1.0), tex_coords, side_factor);
 }
 
@@ -58,10 +69,10 @@ fn rem_euclid(a: vec2<f32>, b: f32) -> vec2<f32> {
     return select(r, r + abs(b), r < vec2(0.0));
 }
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var t_clouds: texture_2d<f32>;
 
-@group(1) @binding(1)
+@group(2) @binding(1)
 var s_clouds: sampler;
 
 @fragment
@@ -74,4 +85,3 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 const CLOUD_ALTITUDE = 192.0;
-const SIDE_FACTORS = array(0.6, 1.0, 0.5, 0.8);

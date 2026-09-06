@@ -179,7 +179,8 @@ impl<'a> RawBlockData<'a> {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Enum, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SideShade {
     X = 0,
     Top = 1,

@@ -55,6 +55,10 @@ pub struct Time {
 }
 
 impl Time {
+    pub fn sun_dir(self) -> Vector3<f32> {
+        self.sky_rotation() * Vector3::x()
+    }
+
     pub fn sky_rotation(self) -> UnitQuaternion<f32> {
         let config = &SERVER_CONFIG.clock;
         let anchor = config.sunrise() as f32 / config.ticks_per_day as f32;

@@ -26,7 +26,7 @@ use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cmp::Reverse, collections::hash_map::Entry, iter, sync::Arc, time::Instant};
+use std::{cmp::Reverse, collections::hash_map::Entry, iter, mem, sync::Arc, time::Instant};
 use uuid::Uuid;
 use winit::event::WindowEvent;
 
@@ -48,6 +48,7 @@ impl World {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
+        lighting_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
@@ -58,6 +59,7 @@ impl World {
                 .bind_group_layouts(&[
                     player_bind_group_layout,
                     sky_bind_group_layout,
+                    lighting_bind_group_layout,
                     textures_bind_group_layout,
                 ])
                 .immediate_size(BlockImmediates::SIZE)
@@ -88,6 +90,7 @@ impl World {
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
+        lighting_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         frustum: &Frustum,
@@ -100,7 +103,12 @@ impl World {
 
             self.program.bind(
                 &mut render_pass,
-                [player_bind_group, sky_bind_group, textures_bind_group],
+                [
+                    player_bind_group,
+                    sky_bind_group,
+                    lighting_bind_group,
+                    textures_bind_group,
+                ],
             );
 
             for (&coords, (mesh, _)) in &mut self.meshes {
@@ -123,7 +131,12 @@ impl World {
 
         self.program.bind(
             &mut render_pass,
-            [player_bind_group, sky_bind_group, textures_bind_group],
+            [
+                player_bind_group,
+                sky_bind_group,
+                lighting_bind_group,
+                textures_bind_group,
+            ],
         );
 
         transparent_meshes.sort_unstable_by_key(|&(coords, _)| {
@@ -392,8 +405,8 @@ impl BlockVertex {
         ]
     }
 
-    fn side_shade(self) -> u8 {
-        self.data[0].bit_range(24, 23)
+    fn side_shade(self) -> SideShade {
+        unsafe { mem::transmute::<u8, _>(self.data[0].bit_range(24, 23)) }
     }
 
     fn ao(self) -> u8 {
@@ -404,21 +417,41 @@ impl BlockVertex {
         BlockLight(self.data[1])
     }
 
+    fn skylight(self) -> Rgb<u8> {
+        self.light().skylight()
+    }
+
+    fn torchlight(self) -> Rgb<u8> {
+        self.light().torchlight()
+    }
+
     pub fn light_factor(self, nightness: f32) -> Rgb<f32> {
+        let lighting = &CLIENT_CONFIG.lighting;
+
+        let side_factors = lighting.side_factors;
+        let ao_factor_min = lighting.ao_factor_min;
+        let ao_factor_max = lighting.ao_factor_max;
+        let ao_max = 3.0;
+
         let side_shade = self.side_shade();
-        let ao = self.ao();
-        let side_factor = [0.6, 1.0, 0.5, 0.8][side_shade as usize];
-        let ao_factor = utils::lerp(0.0, 0.8, ao as f32 / 3.0);
+        let ao = self.ao() as f32;
+        let side_factor = side_factors[side_shade];
+        let ao_factor = utils::lerp(ao_factor_min, ao_factor_max, ao / ao_max);
         self.world_light(nightness) * (1.0 - ao_factor) * side_factor
     }
 
     pub fn world_light(self, nightness: f32) -> Rgb<f32> {
-        let sunlight_intensity = CLIENT_CONFIG.sky.sunlight_intensity(nightness);
-        let light = self.light();
-        let skylight = light.skylight();
-        let torchlight = light.torchlight();
-        let global_light = skylight.map(|c| 0.8f32.powi((BlockLight::COMPONENT_MAX - c) as i32));
-        let local_light = torchlight.map(|c| 0.8f32.powi((BlockLight::COMPONENT_MAX - c) as i32));
+        let sky = &CLIENT_CONFIG.sky;
+        let lighting = &CLIENT_CONFIG.lighting;
+
+        let sunlight_intensity = sky.sunlight_intensity(nightness);
+        let light_attenuation = lighting.attenuation;
+        let light_max = BlockLight::COMPONENT_MAX;
+
+        let skylight = self.skylight();
+        let torchlight = self.torchlight();
+        let global_light = skylight.map(|c| light_attenuation.powi((light_max - c) as i32));
+        let local_light = torchlight.map(|c| light_attenuation.powi((light_max - c) as i32));
         (global_light * sunlight_intensity + local_light).saturate()
     }
 }

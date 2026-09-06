@@ -22,6 +22,14 @@ struct SkyUniform {
     sunlight_intensity: vec3<f32>,
 }
 
+struct LightingUniform {
+    side_factors: vec4<f32>,
+    attenuation: f32,
+    ao_factor_min: f32,
+    ao_factor_max: f32,
+    padding: f32,
+}
+
 struct Immediates {
     m: mat4x4<f32>,
     brightness: u32,
@@ -38,6 +46,9 @@ var<uniform> player: PlayerUniform;
 @group(1) @binding(0)
 var<uniform> sky: SkyUniform;
 
+@group(2) @binding(0)
+var<uniform> lighting: LightingUniform;
+
 var<immediate> imm: Immediates;
 
 @vertex
@@ -52,8 +63,8 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(imm.brightness, 16u, 4u)),
         f32(extractBits(imm.brightness, 20u, 4u)),
     );
-    let global_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - skylight));
-    let local_light = pow(vec3(LIGHT_ATTENUATION), (LIGHT_MAX - torchlight));
+    let global_light = pow(vec3(lighting.attenuation), (LIGHT_MAX - skylight));
+    let local_light = pow(vec3(lighting.attenuation), (LIGHT_MAX - torchlight));
     return VertexOutput(
         player.vp * (vec4(-player.origin, 0.0) + imm.m * vec4(vertex.coords, 1.0)),
         HIGHLIGHT_OPACITY * luminance(saturate(global_light * sky.sunlight_intensity + local_light)),
@@ -69,6 +80,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(vec3(1.0), in.opacity);
 }
 
-const LIGHT_ATTENUATION = 0.8;
 const LIGHT_MAX = 15.0;
 const HIGHLIGHT_OPACITY = 0.1;

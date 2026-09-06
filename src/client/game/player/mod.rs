@@ -32,7 +32,7 @@ impl Player {
     pub fn new(renderer: &Renderer) -> Self {
         let config = &CLIENT_CONFIG.player;
         let view = View::new(Default::default(), Vector3::x());
-        let projection = Projection::new(config.fovy, 0.0, 0.1, config.zfar());
+        let projection = Projection::new(config.fovy, 0.0, 0.1, Self::zfar());
         let controller = Controller::new(0.0, config.sensitivity);
         let uniform = Uniform::new(
             renderer,
@@ -66,6 +66,12 @@ impl Player {
             self.projection.znear,
             self.projection.zfar,
         )
+    }
+
+    fn zfar() -> f32 {
+        let render_distance = CLIENT_CONFIG.player.render_distance;
+        let puffer = 1024.0;
+        ((render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2 + puffer
     }
 }
 
@@ -187,12 +193,6 @@ pub struct PlayerConfig {
     pub render_distance: u32,
     #[serde(default)]
     features: PlayerFeatures,
-}
-
-impl PlayerConfig {
-    fn zfar(&self) -> f32 {
-        ((self.render_distance as u64 + 1) * Chunk::DIM as u64) as f32 * SQRT_2 + 1024.0
-    }
 }
 
 bitflags! {

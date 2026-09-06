@@ -11,7 +11,13 @@ use crate::{
 };
 use app::App;
 use crossbeam_channel::{Receiver, Sender};
-use game::{cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, sky::SkyConfig};
+use game::{
+    cloud::CloudConfig,
+    gui::GuiConfig,
+    lighting::LightingConfig,
+    player::PlayerConfig,
+    sky::SkyConfig,
+};
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
@@ -78,6 +84,7 @@ struct ClientConfig {
     player: PlayerConfig,
     sky: SkyConfig,
     cloud: CloudConfig,
+    lighting: LightingConfig,
     gui: GuiConfig,
 }
 

@@ -2,21 +2,13 @@ use super::{Renderer, buffer::VertexBuffer};
 use crate::client::renderer::buffer::MemoryState;
 use bytemuck::Pod;
 use image::RgbaImage;
+use nalgebra::{Matrix4, Point3, Vector3, vector};
 use std::{
     cmp::{Ordering, Reverse},
     fs,
     path::Path,
     slice,
 };
-
-pub fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
-    let path = path.as_ref();
-    image::open(path)
-        .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
-        .into_rgba8()
-}
-
-// ------------------------------------------------------------------------------------------------
 
 pub fn read_wgsl<P: AsRef<Path>>(path: P) -> wgpu::ShaderModuleDescriptor<'static> {
     let path = path.as_ref();
@@ -25,20 +17,6 @@ pub fn read_wgsl<P: AsRef<Path>>(path: P) -> wgpu::ShaderModuleDescriptor<'stati
     wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(contents.into()),
-    }
-}
-
-// ------------------------------------------------------------------------------------------------
-
-pub trait Immediates: Pod {
-    const SIZE: u32 = {
-        let size = size_of::<Self>();
-        assert!(usize::BITS <= u32::BITS || size <= u32::MAX as usize);
-        size as u32
-    };
-
-    fn set(&self, render_pass: &mut wgpu::RenderPass) {
-        render_pass.set_immediates(0, bytemuck::cast_slice(slice::from_ref(self)));
     }
 }
 
@@ -54,6 +32,20 @@ pub trait Vertex: Pod {
             step_mode: Self::STEP_MODE,
             attributes: Self::ATTRIBS,
         }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+pub trait Immediates: Pod {
+    const SIZE: u32 = {
+        let size = size_of::<Self>();
+        assert!(usize::BITS <= u32::BITS || size <= u32::MAX as usize);
+        size as u32
+    };
+
+    fn set(&self, render_pass: &mut wgpu::RenderPass) {
+        render_pass.set_immediates(0, bytemuck::cast_slice(slice::from_ref(self)));
     }
 }
 
@@ -118,4 +110,20 @@ impl Ord for TotalOrd {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.total_cmp(&other.0)
     }
+}
+
+// ------------------------------------------------------------------------------------------------
+
+pub fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
+    let path = path.as_ref();
+    image::open(path)
+        .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
+        .into_rgba8()
+}
+
+// ------------------------------------------------------------------------------------------------
+
+pub fn billboard(coords: Point3<f32>, target: Point3<f32>, up: Vector3<f32>) -> Matrix4<f32> {
+    Matrix4::face_towards(&coords, &target, &up)
+        .prepend_nonuniform_scaling(&vector![-1.0, 1.0, 1.0])
 }

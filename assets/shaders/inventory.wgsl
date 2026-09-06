@@ -8,6 +8,14 @@ struct InventoryUniform {
     transform: mat4x4<f32>,
 }
 
+struct LightingUniform {
+    side_factors: vec4<f32>,
+    attenuation: f32,
+    ao_factor_min: f32,
+    ao_factor_max: f32,
+    padding: f32,
+}
+
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) @interpolate(flat) tex_index: u32,
@@ -17,6 +25,9 @@ struct VertexOutput {
 
 @group(0) @binding(0)
 var<uniform> inventory: InventoryUniform;
+
+@group(1) @binding(0)
+var<uniform> lighting: LightingUniform;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
@@ -31,7 +42,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 27u, 5u)),
     );
     let side_shade = extractBits(vertex.data[0], 23u, 2u);
-    let side_factor = SIDE_FACTORS[side_shade];
+    let side_factor = lighting.side_factors[side_shade];
     return VertexOutput(
         inventory.transform * vec4(coords, 1.0),
         tex_idx,
@@ -40,10 +51,10 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     );
 }
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var t_blocks: binding_array<texture_2d<f32>>;
 
-@group(1) @binding(1)
+@group(2) @binding(1)
 var s_block: sampler;
 
 @fragment
@@ -51,5 +62,3 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
     return color * vec4(vec3(in.light_factor), 1.0);
 }
-
-const SIDE_FACTORS = array(0.6, 1.0, 0.5, 0.8);

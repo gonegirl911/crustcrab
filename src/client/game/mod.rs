@@ -2,6 +2,7 @@ pub mod cloud;
 pub mod fog;
 pub mod gui;
 pub mod hover;
+pub mod lighting;
 pub mod player;
 pub mod sky;
 pub mod world;
@@ -23,6 +24,7 @@ use fog::Fog;
 use gui::Gui;
 use hover::BlockHover;
 use image::RgbaImage;
+use lighting::Lighting;
 use player::Player;
 use sky::Sky;
 use std::{ops::Deref, time::Duration};
@@ -31,6 +33,7 @@ use world::World;
 
 pub struct Game {
     sky: Sky,
+    lighting: Lighting,
     world: World,
     clouds: CloudLayer,
     fog: Fog,
@@ -47,11 +50,13 @@ impl Game {
     pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
         let player = Player::new(renderer);
         let sky = Sky::new(renderer, surface, player.bind_group_layout());
+        let lighting = Lighting::new(renderer);
         let textures = BlockTextureArray::new(renderer, surface);
         let world = World::new(
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
+            lighting.bind_group_layout(),
             textures.bind_group_layout(),
         );
         let processor = PostProcessor::new(renderer, surface);
@@ -59,6 +64,7 @@ impl Game {
             renderer,
             surface,
             player.bind_group_layout(),
+            lighting.bind_group_layout(),
             processor.bind_group_layout(),
         );
         let depth = DepthBuffer::new(renderer, surface);
@@ -73,6 +79,7 @@ impl Game {
             renderer,
             player.bind_group_layout(),
             sky.bind_group_layout(),
+            lighting.bind_group_layout(),
         );
         let aces = Aces::new(
             renderer,
@@ -82,11 +89,13 @@ impl Game {
         let gui = Gui::new(
             renderer,
             surface,
+            lighting.bind_group_layout(),
             processor.bind_group_layout(),
             textures.bind_group_layout(),
         );
         Self {
             sky,
+            lighting,
             world,
             clouds,
             fog,
@@ -115,6 +124,7 @@ impl Game {
             encoder,
             self.player.bind_group(),
             self.sky.bind_group(),
+            self.lighting.bind_group(),
             self.textures.bind_group(),
             self.depth.view(),
             &self.player.frustum(),
@@ -132,6 +142,7 @@ impl Game {
                     encoder,
                     self.player.bind_group(),
                     self.sky.bind_group(),
+                    self.lighting.bind_group(),
                     self.depth.view(),
                 );
             },
@@ -150,6 +161,7 @@ impl Game {
             encoder,
             self.processor.spare_view(),
             self.player.bind_group(),
+            self.lighting.bind_group(),
             self.depth.view(),
             self.processor.spare_bind_group(),
         );
@@ -168,6 +180,7 @@ impl Game {
             self.gui.draw(
                 view,
                 encoder,
+                self.lighting.bind_group(),
                 bind_group,
                 self.textures.bind_group(),
                 self.depth.view(),

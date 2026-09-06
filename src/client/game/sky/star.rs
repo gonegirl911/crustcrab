@@ -7,7 +7,7 @@ use crate::{
             buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
             program::Program,
-            utils::{Immediates, Vertex, read_wgsl},
+            utils::{Immediates, Vertex, billboard, read_wgsl},
         },
     },
     server::{ServerEvent, game::clock::Time},
@@ -147,9 +147,9 @@ impl StarInstance {
     fn new(Star { coords, rotation }: Star, sky_rotation: UnitQuaternion<f32>) -> Self {
         let size = CLIENT_CONFIG.sky.star.size;
         Self {
-            m: Matrix4::face_towards(&(sky_rotation * coords), &Point3::origin(), &Vector3::y())
+            m: billboard(sky_rotation * coords, Point3::origin(), Vector3::y())
                 * Matrix4::new_rotation(Vector3::z() * rotation)
-                    .prepend_nonuniform_scaling(&vector![size, size, 1.0]),
+                * Matrix4::new_nonuniform_scaling(&vector![size, size, 1.0]),
         }
     }
 }

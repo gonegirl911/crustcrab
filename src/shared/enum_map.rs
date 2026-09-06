@@ -56,6 +56,10 @@ impl<E: Enum, T> EnumMap<E, T> {
         self.0.into_iter()
     }
 
+    pub fn inner(&self) -> &GenericArray<T, E::Length> {
+        &self.0
+    }
+
     pub fn map<U, F>(self, mut f: F) -> EnumMap<E, U>
     where
         F: FnMut(E, T) -> U,

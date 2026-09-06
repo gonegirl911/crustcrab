@@ -24,6 +24,14 @@ struct SkyUniform {
     sunlight_intensity: vec3<f32>,
 }
 
+struct LightingUniform {
+    side_factors: vec4<f32>,
+    attenuation: f32,
+    ao_factor_min: f32,
+    ao_factor_max: f32,
+    padding: f32,
+}
+
 struct Immediates {
     chunk_coords: vec3<f32>,
 }
@@ -40,6 +48,9 @@ var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
 var<uniform> sky: SkyUniform;
+
+@group(2) @binding(0)
+var<uniform> lighting: LightingUniform;
 
 var<immediate> imm: Immediates;
 
@@ -67,10 +78,10 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 16u, 4u)),
         f32(extractBits(vertex.data[1], 20u, 4u)),
     );
-    let side_factor = SIDE_FACTORS[side_shade];
-    let ao_factor = mix(AO_FACTOR_MIN, AO_FACTOR_MAX, ao / AO_MAX);
-    let global_light = pow(vec3(LIGHT_ATTENUATION), LIGHT_MAX - skylight);
-    let local_light = pow(vec3(LIGHT_ATTENUATION), LIGHT_MAX - torchlight);
+    let side_factor = lighting.side_factors[side_shade];
+    let ao_factor = mix(lighting.ao_factor_min, lighting.ao_factor_max, ao / AO_MAX);
+    let global_light = pow(vec3(lighting.attenuation), LIGHT_MAX - skylight);
+    let local_light = pow(vec3(lighting.attenuation), LIGHT_MAX - torchlight);
     return VertexOutput(
         player.vp * vec4(-player.origin + imm.chunk_coords * CHUNK_DIM + coords, 1.0),
         tex_idx,
@@ -79,10 +90,10 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
     );
 }
 
-@group(2) @binding(0)
+@group(3) @binding(0)
 var t_blocks: binding_array<texture_2d<f32>>;
 
-@group(2) @binding(1)
+@group(3) @binding(1)
 var s_block: sampler;
 
 @fragment
@@ -96,9 +107,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 const CHUNK_DIM = 16.0;
-const SIDE_FACTORS = array(0.6, 1.0, 0.5, 0.8);
-const AO_FACTOR_MIN = 0.0;
-const AO_FACTOR_MAX = 0.8;
 const AO_MAX = 3.0;
-const LIGHT_ATTENUATION = 0.8;
 const LIGHT_MAX = 15.0;

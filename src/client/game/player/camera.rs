@@ -153,10 +153,9 @@ impl Controller {
     }
 
     fn apply_rotation(&self, view: &mut View) {
-        const BOUND_Y: f32 = FRAC_PI_2 - f32::EPSILON;
-
+        let bound_y = FRAC_PI_2 - f32::EPSILON;
         view.yaw = (view.yaw - self.dx * self.sensitivity) % TAU;
-        view.pitch = (view.pitch - self.dy * self.sensitivity).clamp(-BOUND_Y, BOUND_Y);
+        view.pitch = (view.pitch - self.dy * self.sensitivity).clamp(-bound_y, bound_y);
         view.forward = View::forward(view.yaw, view.pitch);
         view.right = View::right(view.forward);
         view.up = View::up(view.forward, view.right);

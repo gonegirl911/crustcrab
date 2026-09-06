@@ -43,12 +43,20 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn new(renderer: &Renderer, textures_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        textures_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
         let program = Program::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/inventory.wgsl"))
-            .bind_group_layouts(&[uniform.bind_group_layout(), textures_bind_group_layout])
+            .bind_group_layouts(&[
+                uniform.bind_group_layout(),
+                lighting_bind_group_layout,
+                textures_bind_group_layout,
+            ])
             .buffers(&[BlockVertex::desc()])
             .cull_mode(wgpu::Face::Back)
             .depth_stencil(wgpu::DepthStencilState {
@@ -76,11 +84,20 @@ impl Inventory {
         self.contents.get(self.index).copied()
     }
 
-    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, textures_bind_group: &wgpu::BindGroup) {
+    pub fn draw(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        lighting_bind_group: &wgpu::BindGroup,
+        textures_bind_group: &wgpu::BindGroup,
+    ) {
         if let Some(buffer) = &self.vertex_buffer {
             self.program.bind(
                 render_pass,
-                [self.uniform.bind_group(), textures_bind_group],
+                [
+                    self.uniform.bind_group(),
+                    lighting_bind_group,
+                    textures_bind_group,
+                ],
             );
             buffer.draw(render_pass);
         }

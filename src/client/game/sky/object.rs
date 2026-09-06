@@ -7,7 +7,7 @@ use crate::{
             effect::PostProcessor,
             program::Program,
             texture::image::ImageTextureArray,
-            utils::{Immediates, load_rgba, read_wgsl},
+            utils::{Immediates, billboard, load_rgba, read_wgsl},
         },
     },
     server::{ServerEvent, game::clock::Time},
@@ -81,16 +81,12 @@ impl ObjectSet {
     }
 
     fn imm(time: Time) -> (ObjectImmediates, ObjectImmediates) {
-        let sun_dir = time.sky_rotation() * Vector3::x();
-        let up = if sun_dir.x < 0.0 {
-            Vector3::y()
-        } else {
-            -Vector3::y()
-        };
+        let sun_dir = time.sun_dir();
+        let up = -sun_dir.x.signum() * Vector3::y();
         let nightness = time.nightness();
         (
-            ObjectImmediates::new(sun_dir, up, 0, nightness),
-            ObjectImmediates::new(-sun_dir, up, 1, nightness),
+            ObjectImmediates::new(0, sun_dir, up, nightness),
+            ObjectImmediates::new(1, -sun_dir, up, nightness),
         )
     }
 }
@@ -114,13 +110,14 @@ struct ObjectImmediates {
 }
 
 impl ObjectImmediates {
-    fn new(dir: Vector3<f32>, up: Vector3<f32>, tex_index: u32, nightness: f32) -> Self {
+    #[rustfmt::skip]
+    fn new(tex_index: u32, dir: Vector3<f32>, up: Vector3<f32>, nightness: f32) -> Self {
         let config = &CLIENT_CONFIG.sky.object;
         Self {
-            m: Matrix4::face_towards(&dir.into(), &Point3::origin(), &up)
+            m: billboard(dir.into(), Point3::origin(), up)
                 .prepend_nonuniform_scaling(&vector![config.size, config.size, 1.0]),
             tex_index,
-            brightness: utils::lerp(config.day_brightness, 1.0, nightness),
+            brightness: config.brightness(nightness),
         }
     }
 }
@@ -130,5 +127,17 @@ impl Immediates for ObjectImmediates {}
 #[derive(Deserialize)]
 pub struct ObjectConfig {
     size: f32,
-    day_brightness: f32,
+    day: TimePhaseConfig,
+    night: TimePhaseConfig,
+}
+
+impl ObjectConfig {
+    fn brightness(&self, nightness: f32) -> f32 {
+        utils::lerp(self.day.brightness, self.night.brightness, nightness)
+    }
+}
+
+#[derive(Deserialize)]
+struct TimePhaseConfig {
+    brightness: f32,
 }

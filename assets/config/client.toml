@@ -24,7 +24,18 @@ count = 1500
 
 [sky.object]
 size = 0.1
-day_brightness = 15.0
+
+[sky.object.day]
+brightness = 15.0
+
+[sky.object.night]
+brightness = 1.0
+
+[lighting]
+side_factors = { x = 0.6, top = 1.0, bottom = 0.5, z = 0.8 }
+ao_factor_min = 0.0
+ao_factor_max = 0.8
+attenuation = 0.8
 
 [cloud]
 size = [12, 4]
@@ -32,10 +43,12 @@ padding = 0.005
 speed = 1.0
 
 [cloud.day]
-color = [1.0, 1.0, 1.0, 0.99]
+color = [1.0, 1.0, 1.0]
+opacity = 0.99
 
 [cloud.night]
-color = [0.06, 0.06, 0.1, 0.85]
+color = [0.06, 0.06, 0.1]
+opacity = 0.85
 
 [gui]
 base_unit = 0.03125
