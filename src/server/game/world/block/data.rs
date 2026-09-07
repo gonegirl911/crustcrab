@@ -20,7 +20,7 @@ use serde::{
     Deserialize, Deserializer,
     de::{self, Unexpected},
 };
-use std::{array, fs, ops::Deref, sync::LazyLock};
+use std::{array, collections::BTreeMap, fs, ops::Deref, sync::LazyLock};
 
 pub struct BlockData {
     model: Model,
@@ -283,12 +283,12 @@ pub static TEX_PATHS: LazyLock<FxIndexSet<&str>> = LazyLock::new(|| {
         .collect()
 });
 
-static RAW_BLOCK_DATA: LazyLock<FxHashMap<&str, RawBlockData>> = LazyLock::new(|| {
+static RAW_BLOCK_DATA: LazyLock<BTreeMap<&str, RawBlockData>> = LazyLock::new(|| {
     let path = "assets/config/blocks.toml";
     let contents =
         fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
     let leaked_contents = Box::leak(contents.into_boxed_str());
-    let data = ::toml::from_str::<FxHashMap<_, RawBlockData>>(leaked_contents)
+    let data = ::toml::from_str::<BTreeMap<_, RawBlockData>>(leaked_contents)
         .unwrap_or_else(|e| panic!("failed to deserialize {path}: {e}"));
 
     assert!(
