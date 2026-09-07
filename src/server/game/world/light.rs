@@ -25,13 +25,13 @@ use std::{
 };
 
 #[derive(Default)]
-pub struct WorldLight(FxHashMap<Point3<i32>, ChunkLight>);
+pub struct WorldLight(FxHashMap<Point3<i32>, Box<ChunkLight>>);
 
 impl WorldLight {
     pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
         let mut value = ChunkAreaLight::default();
         for delta in ChunkArea::chunk_deltas() {
-            if let Some(light) = self.0.get(&(coords + delta)) {
+            if let Some(light) = self.get(coords + delta) {
                 for (coords, delta) in ChunkArea::block_deltas(delta) {
                     value[delta] = light[coords];
                 }
@@ -55,7 +55,7 @@ impl WorldLight {
                 {
                     self.0
                         .entry(neighbor_coords)
-                        .or_insert_with(ChunkLight::placeholder);
+                        .or_insert_with(|| ChunkLight::placeholder().into());
                 }
             }
         }
@@ -84,7 +84,7 @@ impl WorldLight {
                 LazyBranch::default,
                 |mut branch, &chunk_coords| {
                     let chunk = &chunks[chunk_coords];
-                    let light = self.0.get(&chunk_coords);
+                    let light = self.get(chunk_coords);
 
                     if chunk.is_glowing() {
                         for (block_coords, &block) in Chunk::points().zip(chunk.as_slice()) {
@@ -96,7 +96,7 @@ impl WorldLight {
                     }
 
                     for (side, delta) in *SIDE_DELTAS {
-                        let Some(neighbor) = self.0.get(&(chunk_coords + delta.cast())) else {
+                        let Some(neighbor) = self.get(chunk_coords + delta.cast()) else {
                             continue;
                         };
                         let component_range =
@@ -148,9 +148,12 @@ impl WorldLight {
         branch.merge(self)
     }
 
+    fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
+        self.0.get(&coords).map(|light| &**light)
+    }
+
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
-        self.0
-            .get(&utils::chunk_coords(coords))
+        self.get(utils::chunk_coords(coords))
             .map_or_default(|light| light[utils::block_coords(coords)])
     }
 
@@ -454,7 +457,7 @@ impl Branch {
         let chunk_coords = utils::chunk_coords(coords);
         Node {
             chunk: chunks.get(chunk_coords),
-            light: light.0.get(&chunk_coords),
+            light: light.get(chunk_coords),
             chunk_coords,
             block_coords: utils::block_coords(coords),
             value,
@@ -585,7 +588,7 @@ impl<'a> Node<'a> {
         } else {
             Self {
                 chunk: chunks.get(chunk_coords),
-                light: light.0.get(&chunk_coords),
+                light: light.get(chunk_coords),
                 chunk_coords,
                 block_coords,
                 value,
