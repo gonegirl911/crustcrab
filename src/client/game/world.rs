@@ -313,18 +313,10 @@ impl EventHandler for World {
     }
 }
 
-enum ChunkMesh {
-    Mixed {
-        opaque_part: OpaquePart,
-        transparent_part: TransparentPart,
-    },
-    Opaque(OpaquePart),
-    Transparent(TransparentPart),
+struct ChunkMesh {
+    opaque_part: Option<VertexBuffer<BlockVertex>>,
+    transparent_part: Option<TransparentMesh<Point3<f32>, BlockVertex>>,
 }
-
-type OpaquePart = VertexBuffer<BlockVertex>;
-
-type TransparentPart = TransparentMesh<Point3<f32>, BlockVertex>;
 
 impl ChunkMesh {
     fn new(
@@ -332,40 +324,25 @@ impl ChunkMesh {
         vertices: &[BlockVertex],
         transparent_vertices: &[BlockVertex],
     ) -> Option<Self> {
-        match (
-            VertexBuffer::try_new(renderer, MemoryState::Immutable(vertices)),
-            TransparentMesh::try_new(renderer, transparent_vertices, |v| {
-                v.iter()
-                    .fold(Point3::default(), |acc, v| acc + v.coords().coords)
-                    .cast()
-                    / v.len() as f32
-            }),
-        ) {
-            (Some(opaque_part), Some(transparent_part)) => Some(Self::Mixed {
-                opaque_part,
-                transparent_part,
-            }),
-            (Some(opaque_part), None) => Some(Self::Opaque(opaque_part)),
-            (None, Some(transparent_part)) => Some(Self::Transparent(transparent_part)),
-            (None, None) => None,
-        }
+        let opaque_part = VertexBuffer::try_new(renderer, MemoryState::Immutable(vertices));
+        let transparent_part = TransparentMesh::try_new(renderer, transparent_vertices, |v| {
+            v.iter()
+                .fold(Point3::default(), |acc, v| acc + v.coords().coords)
+                .cast()
+                / v.len() as f32
+        });
+        (opaque_part.is_some() || transparent_part.is_some()).then_some(Self {
+            opaque_part,
+            transparent_part,
+        })
     }
 
-    fn opaque_part(&self) -> Option<&OpaquePart> {
-        if let Self::Mixed { opaque_part, .. } | Self::Opaque(opaque_part) = self {
-            Some(opaque_part)
-        } else {
-            None
-        }
+    fn opaque_part(&self) -> Option<&VertexBuffer<BlockVertex>> {
+        self.opaque_part.as_ref()
     }
 
-    #[rustfmt::skip]
-    fn transparent_part_mut(&mut self) -> Option<&mut TransparentPart> {
-        if let Self::Mixed { transparent_part, .. } | Self::Transparent(transparent_part) = self {
-            Some(transparent_part)
-        } else {
-            None
-        }
+    fn transparent_part_mut(&mut self) -> Option<&mut TransparentMesh<Point3<f32>, BlockVertex>> {
+        self.transparent_part.as_mut()
     }
 }
 
