@@ -20,7 +20,7 @@ use crate::{
                 ChunkData,
                 block::{
                     BlockLight,
-                    data::{SIDE_DELTAS, Side, SideShade},
+                    data::{SIDE_DELTAS, SideShade},
                 },
                 chunk::{
                     Chunk,
@@ -29,7 +29,7 @@ use crate::{
             },
         },
     },
-    shared::{color::Rgb, enum_map::Enum, pool::ThreadPool, utils},
+    shared::{color::Rgb, indexmap::FxIndexMap, pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -260,11 +260,10 @@ impl World {
     }
 
     #[rustfmt::skip]
-    fn cull_chunks(&self, frustum: &Frustum) -> Vec<Point3<i32>> {
+    fn cull_chunks(&self, frustum: &Frustum) -> impl Iterator<Item = Point3<i32>> {
         let origin = utils::chunk_coords(frustum.origin);
-        let mut visible = vec![origin];
         let mut queue = VecDeque::from([origin]);
-        let mut entries = FxHashMap::from_iter([(origin, SideSet::default())]);
+        let mut visited = FxIndexMap::from_iter([(origin, SideSet::default())]);
         let area = WorldArea {
             center: origin,
             radius: CLIENT_CONFIG.player.render_distance as i32,
@@ -272,7 +271,7 @@ impl World {
 
         while let Some(coords) = queue.pop_front() {
             let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
-            let entry_sides = entries[&coords];
+            let sources = visited[&coords];
 
             for (side, delta) in *SIDE_DELTAS {
                 if delta.cast().dot(&(coords - origin)) < 0 {
@@ -291,32 +290,23 @@ impl World {
 
                 if coords != origin
                     && let Some(graph) = visibility_graph
-                    && !Side::variants()
-                        .filter(|&side| entry_sides.contains(side))
-                        .any(|entry| graph.connected(entry, side))
+                    && !sources
+                        .into_iter()
+                        .any(|source| graph.connected(source, side))
                 {
                     continue;
                 }
 
-                let entry_side = side.opp();
-                match entries.entry(neighbor_coords) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(SideSet::from([entry_side]));
-                        visible.push(neighbor_coords);
-                        queue.push_back(neighbor_coords);
-                    }
-                    Entry::Occupied(mut entry) => {
-                        let sides = entry.get_mut();
-                        if !sides.contains(entry_side) {
-                            sides.insert(entry_side);
-                            queue.push_back(neighbor_coords);
-                        }
-                    }
+                let neighbor_source = side.opp();
+                let neighbor_sources = visited.entry(neighbor_coords).or_default();
+                if !neighbor_sources.contains(neighbor_source) {
+                    neighbor_sources.insert(neighbor_source);
+                    queue.push_back(neighbor_coords);
                 }
             }
         }
 
-        visible
+        visited.into_keys()
     }
 
     fn compute(

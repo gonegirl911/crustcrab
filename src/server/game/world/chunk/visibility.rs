@@ -86,12 +86,11 @@ impl SideSet {
     }
 }
 
-impl<const N: usize> From<[Side; N]> for SideSet {
-    fn from(sides: [Side; N]) -> Self {
-        let mut set = Self::default();
-        for side in sides {
-            set.insert(side);
-        }
-        set
+impl IntoIterator for SideSet {
+    type Item = Side;
+    type IntoIter = impl Iterator<Item = Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Enum::variants().filter(move |&side| self.contains(side))
     }
 }
