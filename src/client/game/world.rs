@@ -265,6 +265,10 @@ impl World {
         let mut visible = vec![origin];
         let mut queue = VecDeque::from([origin]);
         let mut entries = FxHashMap::from_iter([(origin, SideSet::default())]);
+        let area = WorldArea {
+            center: origin,
+            radius: CLIENT_CONFIG.player.render_distance as i32
+        };
 
         while let Some(coords) = queue.pop_front() {
             let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
@@ -277,10 +281,6 @@ impl World {
 
                 let neighbor_coords = coords + delta.cast();
 
-                let area = WorldArea {
-                    center: origin,
-                    radius: CLIENT_CONFIG.player.render_distance as i32
-                };
                 if !area.client_contains(neighbor_coords) {
                     continue;
                 }
