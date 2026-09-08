@@ -383,7 +383,7 @@ impl Branch {
                 })
             })
             .reduce(BlockLight::sup)
-            .unwrap_or_else(|| unreachable!())
+            .unwrap()
     }
 
     fn unspread_node(&mut self, chunks: &ChunkStore, light: &WorldLight, index: usize, node: Node) {

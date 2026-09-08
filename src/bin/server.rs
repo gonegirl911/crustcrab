@@ -86,7 +86,7 @@ fn main() {
                     }
                     .into(),
                 ))
-                .unwrap_or_else(|_| unreachable!());
+                .unwrap();
 
             thread::scope(|s| {
                 s.spawn(|| {
@@ -158,7 +158,7 @@ fn main() {
                             continue;
                         }
                     };
-                    client_tx.send(event).unwrap_or_else(|_| unreachable!());
+                    client_tx.send(event).uwrap();
                 }
                 eprintln!("[{priority_addr}] reading CLOSED");
             });

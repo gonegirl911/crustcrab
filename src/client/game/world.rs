@@ -153,11 +153,9 @@ impl World {
 
     fn send(&self, input: ChunkInput, group_id: Option<GroupId>) {
         if let Some(group_id) = group_id {
-            self.group_workers
-                .send((input, group_id))
-                .unwrap_or_else(|_| unreachable!());
+            self.group_workers.send((input, group_id)).unwrap();
         } else {
-            self.workers.send(input).unwrap_or_else(|_| unreachable!());
+            self.workers.send(input).unwrap();
         }
     }
 

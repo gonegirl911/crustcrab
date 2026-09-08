@@ -38,9 +38,7 @@ impl Renderer {
             })
             .await
             .expect("adapter should be available");
-        let config = surface
-            .get_default_config(&adapter, width, height)
-            .unwrap_or_else(|| unreachable!());
+        let config = surface.get_default_config(&adapter, width, height).unwrap();
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 required_features: wgpu::Features::IMMEDIATES

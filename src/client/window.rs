@@ -65,8 +65,7 @@ impl EventHandler for Window {
                         },
                     ..
                 } => {
-                    self.set_cursor_grab([CursorGrabMode::None])
-                        .unwrap_or_else(|_| unreachable!());
+                    self.set_cursor_grab([CursorGrabMode::None]).unwrap();
                     self.0.set_cursor_visible(true);
                 }
                 _ => {}

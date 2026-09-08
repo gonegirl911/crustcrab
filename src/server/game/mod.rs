@@ -47,9 +47,7 @@ impl EventHandler<Event> for Game {
         self.clock.handle(event, server_tx);
 
         if let Some(event) = WorldEvent::new(event, &self.player) {
-            self.world_tx
-                .send((event, server_tx.clone()))
-                .unwrap_or_else(|_| unreachable!());
+            self.world_tx.send((event, server_tx.clone())).unwrap();
         }
     }
 }

@@ -129,7 +129,7 @@ impl<T> Buffer<[T]> {
 
 impl<T: Pod> Buffer<[T]> {
     fn new(renderer: &Renderer, data: Result<&[T], usize>, usage: wgpu::BufferUsages) -> Self {
-        Self::try_new(renderer, data, usage).unwrap_or_else(|| unreachable!())
+        Self::try_new(renderer, data, usage).unwrap()
     }
 
     fn try_new(

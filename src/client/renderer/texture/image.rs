@@ -162,7 +162,7 @@ impl ImageTexture {
                 ..Default::default()
             })
         });
-        let mut src = views.next().unwrap_or_else(|| unreachable!());
+        let mut src = views.next().unwrap();
 
         for dst in views {
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {

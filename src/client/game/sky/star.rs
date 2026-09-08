@@ -130,9 +130,9 @@ impl StarGenerator {
 impl Default for StarGenerator {
     fn default() -> Self {
         Self {
-            theta: Uniform::new_inclusive(-PI, PI).unwrap_or_else(|_| unreachable!()),
-            cos_phi: Uniform::new_inclusive(-1.0, 1.0).unwrap_or_else(|_| unreachable!()),
-            rotation: Uniform::new(0.0, FRAC_PI_2).unwrap_or_else(|_| unreachable!()),
+            theta: Uniform::new_inclusive(-PI, PI).unwrap(),
+            cos_phi: Uniform::new_inclusive(-1.0, 1.0).unwrap(),
+            rotation: Uniform::new(0.0, FRAC_PI_2).unwrap(),
         }
     }
 }

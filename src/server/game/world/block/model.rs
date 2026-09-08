@@ -93,9 +93,7 @@ pub struct RawModel<'a> {
 
 impl RawModel<'_> {
     fn tex_index(&self) -> u8 {
-        TEX_PATHS
-            .get_index_of(self.tex_path)
-            .unwrap_or_else(|| unreachable!()) as u8
+        TEX_PATHS.get_index_of(self.tex_path).unwrap() as u8
     }
 
     fn deserialize_variant<'de, D>(deserializer: D) -> Result<&'de str, D::Error>
@@ -159,7 +157,7 @@ static MODEL_DATA: LazyLock<FxHashMap<String, ModelData>> = LazyLock::new(|| {
             let path = entry.path();
             (
                 path.file_stem()
-                    .unwrap_or_else(|| unreachable!())
+                    .unwrap()
                     .to_str()
                     .unwrap_or_else(|| panic!("{} should have a valid UTF-8 stem", path.display()))
                     .into(),

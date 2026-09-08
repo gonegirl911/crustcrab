@@ -175,7 +175,7 @@ impl PlayerUniformData {
     ) -> Self {
         Self {
             vp,
-            inv_vp: vp.try_inverse().unwrap_or_else(|| unreachable!()),
+            inv_vp: vp.try_inverse().unwrap(),
             origin: origin.into(),
             forward,
             render_distance: CLIENT_CONFIG.player.render_distance,

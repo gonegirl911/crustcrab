@@ -63,7 +63,7 @@ impl ApplicationHandler for App {
 
         self.instance
             .as_mut()
-            .unwrap_or_else(|| unreachable!())
+            .unwrap()
             .handle(&Event::WindowEvent(event), &self.client_tx);
 
         if should_exit {
@@ -74,14 +74,14 @@ impl ApplicationHandler for App {
     fn device_event(&mut self, _: &dyn ActiveEventLoop, _: Option<DeviceId>, event: DeviceEvent) {
         self.instance
             .as_mut()
-            .unwrap_or_else(|| unreachable!())
+            .unwrap()
             .handle(&Event::DeviceEvent(event), &self.client_tx);
     }
 
     fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
         self.instance
             .as_mut()
-            .unwrap_or_else(|| unreachable!())
+            .unwrap()
             .handle(&Event::AboutToWait, &self.client_tx);
     }
 

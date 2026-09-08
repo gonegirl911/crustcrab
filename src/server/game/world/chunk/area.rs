@@ -124,7 +124,7 @@ impl<T> ChunkAreaDataStore<T> {
 impl<T: PartialEq> ChunkAreaDataStore<T> {
     fn packed_len(&self) -> usize {
         let mut values = self.as_slice().iter();
-        let mut prev = values.next().unwrap_or_else(|| unreachable!());
+        let mut prev = values.next().unwrap();
         let mut len = 1;
 
         for cur in values {
@@ -160,7 +160,7 @@ impl<T: PartialEq + Serialize> Serialize for ChunkAreaDataStore<T> {
 
         let mut seq = serializer.serialize_seq(Some(self.packed_len()))?;
         let mut values = self.as_slice().iter();
-        let mut prev = values.next().unwrap_or_else(|| unreachable!());
+        let mut prev = values.next().unwrap();
         let mut count = 1u16;
 
         for cur in values {
