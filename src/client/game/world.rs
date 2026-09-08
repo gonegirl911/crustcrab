@@ -16,17 +16,29 @@ use crate::{
         GroupId, ServerEvent,
         game::world::{
             ChunkData,
-            block::{BlockLight, data::SideShade},
-            chunk::{Chunk, visibility::VisibilityGraph},
+            block::{
+                BlockLight,
+                data::{SIDE_DELTAS, Side, SideShade},
+            },
+            chunk::{
+                Chunk,
+                visibility::{SideSet, VisibilityGraph},
+            },
         },
     },
-    shared::{color::Rgb, pool::ThreadPool, utils},
+    shared::{color::Rgb, enum_map::Enum, pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cmp::Reverse, collections::hash_map::Entry, iter, mem, sync::Arc, time::Instant};
+use std::{
+    cmp::Reverse,
+    collections::{VecDeque, hash_map::Entry},
+    iter, mem,
+    sync::Arc,
+    time::Instant,
+};
 use uuid::Uuid;
 use winit::event::WindowEvent;
 
@@ -92,7 +104,8 @@ impl World {
         frustum: &Frustum,
         intermediate_action: F,
     ) {
-        let mut transparent_meshes = vec![];
+        let visible_points = self.cull_chunks(frustum);
+        let mut transparent_points = vec![];
 
         {
             let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
@@ -107,16 +120,18 @@ impl World {
                 ],
             );
 
-            for (&coords, (mesh, _)) in &mut self.meshes {
-                if Chunk::bounding_sphere(coords).is_visible(frustum) {
-                    if let Some(opaque_part) = mesh.opaque_part() {
-                        BlockImmediates::new(coords).set(&mut render_pass);
-                        opaque_part.draw(&mut render_pass);
-                    }
+            for coords in visible_points {
+                let Some((mesh, _)) = self.meshes.get(&coords) else {
+                    continue;
+                };
 
-                    if let Some(transparent_part) = mesh.transparent_part_mut() {
-                        transparent_meshes.push((coords, transparent_part));
-                    }
+                if let Some(opaque_part) = &mesh.opaque_part {
+                    BlockImmediates::new(coords).set(&mut render_pass);
+                    opaque_part.draw(&mut render_pass);
+                }
+
+                if mesh.transparent_part.is_some() {
+                    transparent_points.push(coords);
                 }
             }
         }
@@ -135,17 +150,19 @@ impl World {
             ],
         );
 
-        transparent_meshes.sort_unstable_by_key(|&(coords, _)| {
+        transparent_points.sort_unstable_by_key(|&coords| {
             Reverse(utils::magnitude_squared(
                 coords,
                 utils::chunk_coords(frustum.origin),
             ))
         });
 
-        for (coords, mesh) in transparent_meshes {
+        for coords in transparent_points {
+            let (mesh, _) = self.meshes.get_mut(&coords).unwrap();
+            let transparent_part = mesh.transparent_part.as_mut().unwrap();
             let delta = coords.cast() * Chunk::DIM as f32 - frustum.origin;
             BlockImmediates::new(coords).set(&mut render_pass);
-            mesh.draw(renderer, &mut render_pass, |&coords| {
+            transparent_part.draw(renderer, &mut render_pass, |&coords| {
                 TotalOrd((coords.coords + delta).magnitude_squared())
             });
         }
@@ -237,6 +254,66 @@ impl World {
                 }
             }
         }
+    }
+
+    #[rustfmt::skip]
+    fn cull_chunks(&self, frustum: &Frustum) -> Vec<Point3<i32>> {
+        let camera_coords = utils::chunk_coords(frustum.origin);
+        let mut visible = vec![camera_coords];
+        let mut queue = VecDeque::from([camera_coords]);
+        let mut entries = FxHashMap::from_iter([(camera_coords, SideSet::default())]);
+
+        while let Some(coords) = queue.pop_front() {
+            let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
+            let entry_sides = entries[&coords];
+
+            for (side, delta) in *SIDE_DELTAS {
+                if delta.cast().dot(&(coords - camera_coords)) < 0 {
+                    continue;
+                }
+
+                let neighbor_coords = coords + delta.cast();
+
+                if (neighbor_coords - camera_coords)
+                    .abs()
+                    .iter()
+                    .any(|&c| c > CLIENT_CONFIG.player.render_distance as i32)
+                {
+                    continue;
+                }
+
+                if !Chunk::bounding_sphere(neighbor_coords).is_visible(frustum) {
+                    continue;
+                }
+
+                if coords != camera_coords
+                    && let Some(graph) = visibility_graph
+                    && !Side::variants()
+                        .filter(|&side| entry_sides.contains(side))
+                        .any(|entry| graph.connected(entry, side))
+                {
+                    continue;
+                }
+
+                let entry_side = side.opp();
+                match entries.entry(neighbor_coords) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(SideSet::from([entry_side]));
+                        visible.push(neighbor_coords);
+                        queue.push_back(neighbor_coords);
+                    }
+                    Entry::Occupied(mut entry) => {
+                        let sides = entry.get_mut();
+                        if !sides.contains(entry_side) {
+                            sides.insert(entry_side);
+                            queue.push_back(neighbor_coords);
+                        }
+                    }
+                }
+            }
+        }
+
+        visible
     }
 
     fn compute(
@@ -386,14 +463,6 @@ impl ChunkMesh {
             transparent_part,
             visibility_graph,
         })
-    }
-
-    fn opaque_part(&self) -> Option<&VertexBuffer<BlockVertex>> {
-        self.opaque_part.as_ref()
-    }
-
-    fn transparent_part_mut(&mut self) -> Option<&mut TransparentMesh<Point3<f32>, BlockVertex>> {
-        self.transparent_part.as_mut()
     }
 }
 

@@ -58,6 +58,10 @@ impl VisibilityGraph {
         graph
     }
 
+    pub fn connected(&self, a: Side, b: Side) -> bool {
+        self.0.bit(Self::pair_index(a, b))
+    }
+
     fn set_connected(&mut self, a: Side, b: Side, value: bool) {
         self.0.set_bit(Self::pair_index(a, b), value);
     }
@@ -69,15 +73,25 @@ impl VisibilityGraph {
     }
 }
 
-#[derive(Default)]
-struct SideSet(u8);
+#[derive(Clone, Copy, Default)]
+pub struct SideSet(u8);
 
 impl SideSet {
-    fn contains(&self, side: Side) -> bool {
+    pub fn contains(&self, side: Side) -> bool {
         self.0.bit(side.to_index())
     }
 
-    fn insert(&mut self, side: Side) {
+    pub fn insert(&mut self, side: Side) {
         self.0.set_bit(side.to_index(), true);
+    }
+}
+
+impl<const N: usize> From<[Side; N]> for SideSet {
+    fn from(sides: [Side; N]) -> Self {
+        let mut set = Self::default();
+        for side in sides {
+            set.insert(side);
+        }
+        set
     }
 }
