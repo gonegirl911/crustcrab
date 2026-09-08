@@ -267,7 +267,7 @@ impl World {
         let mut entries = FxHashMap::from_iter([(origin, SideSet::default())]);
         let area = WorldArea {
             center: origin,
-            radius: CLIENT_CONFIG.player.render_distance as i32
+            radius: CLIENT_CONFIG.player.render_distance as i32,
         };
 
         while let Some(coords) = queue.pop_front() {
