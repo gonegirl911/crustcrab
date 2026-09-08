@@ -158,7 +158,7 @@ fn main() {
                             continue;
                         }
                     };
-                    client_tx.send(event).uwrap();
+                    client_tx.send(event).unwrap();
                 }
                 eprintln!("[{priority_addr}] reading CLOSED");
             });
