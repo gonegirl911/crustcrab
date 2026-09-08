@@ -68,8 +68,8 @@ impl EventHandler<Event> for Player {
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct WorldArea {
-    center: Point3<i32>,
-    radius: i32,
+    pub center: Point3<i32>,
+    pub radius: i32,
 }
 
 impl WorldArea {

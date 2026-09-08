@@ -14,15 +14,18 @@ use crate::{
     },
     server::{
         GroupId, ServerEvent,
-        game::world::{
-            ChunkData,
-            block::{
-                BlockLight,
-                data::{SIDE_DELTAS, Side, SideShade},
-            },
-            chunk::{
-                Chunk,
-                visibility::{SideSet, VisibilityGraph},
+        game::{
+            player::WorldArea,
+            world::{
+                ChunkData,
+                block::{
+                    BlockLight,
+                    data::{SIDE_DELTAS, Side, SideShade},
+                },
+                chunk::{
+                    Chunk,
+                    visibility::{SideSet, VisibilityGraph},
+                },
             },
         },
     },
@@ -258,27 +261,27 @@ impl World {
 
     #[rustfmt::skip]
     fn cull_chunks(&self, frustum: &Frustum) -> Vec<Point3<i32>> {
-        let camera_coords = utils::chunk_coords(frustum.origin);
-        let mut visible = vec![camera_coords];
-        let mut queue = VecDeque::from([camera_coords]);
-        let mut entries = FxHashMap::from_iter([(camera_coords, SideSet::default())]);
+        let origin = utils::chunk_coords(frustum.origin);
+        let mut visible = vec![origin];
+        let mut queue = VecDeque::from([origin]);
+        let mut entries = FxHashMap::from_iter([(origin, SideSet::default())]);
 
         while let Some(coords) = queue.pop_front() {
             let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
             let entry_sides = entries[&coords];
 
             for (side, delta) in *SIDE_DELTAS {
-                if delta.cast().dot(&(coords - camera_coords)) < 0 {
+                if delta.cast().dot(&(coords - origin)) < 0 {
                     continue;
                 }
 
                 let neighbor_coords = coords + delta.cast();
 
-                if (neighbor_coords - camera_coords)
-                    .abs()
-                    .iter()
-                    .any(|&c| c > CLIENT_CONFIG.player.render_distance as i32)
-                {
+                let area = WorldArea {
+                    center: origin,
+                    radius: CLIENT_CONFIG.player.render_distance as i32
+                };
+                if !area.client_contains(neighbor_coords) {
                     continue;
                 }
 
@@ -286,7 +289,7 @@ impl World {
                     continue;
                 }
 
-                if coords != camera_coords
+                if coords != origin
                     && let Some(graph) = visibility_graph
                     && !Side::variants()
                         .filter(|&side| entry_sides.contains(side))
