@@ -1,5 +1,6 @@
 pub mod area;
 pub mod generator;
+pub mod visibility;
 
 use super::{
     action::BlockAction,
@@ -9,17 +10,19 @@ use crate::shared::{
     bound::{Aabb, BoundingSphere},
     utils,
 };
+use bitvec::{BitArr, bitarr};
 use nalgebra::{Point3, Vector3, point};
 use std::{
     array, mem,
     ops::{Index, IndexMut},
 };
+use visibility::VisibilityGraph;
 
-#[derive(Default)]
 pub struct Chunk {
     blocks: ChunkDataStore<Block>,
     non_air_count: u16,
     glowing_count: u16,
+    pub mut(self) visibility_graph: VisibilityGraph,
 }
 
 impl Chunk {
@@ -37,6 +40,7 @@ impl Chunk {
             }),
             non_air_count,
             glowing_count,
+            visibility_graph: VisibilityGraph::ALL_CONNECTED,
         }
     }
 
@@ -68,6 +72,11 @@ impl Chunk {
         self.adjust_counts(prev, curr);
     }
 
+    pub fn recompute_visibility_graph(&mut self) {
+        let opaque_set = ChunkBitSet::from_fn(|coords| self[coords].data().is_opaque());
+        self.visibility_graph = VisibilityGraph::compute(opaque_set);
+    }
+
     pub fn as_slice(&self) -> &[Block] {
         self.blocks.as_slice()
     }
@@ -88,6 +97,14 @@ impl Chunk {
         })
     }
 
+    fn is_in_bounds(coords: Point3<i8>) -> Option<Point3<u8>> {
+        const { assert!(Self::DIM <= i8::MAX as usize) };
+        coords
+            .iter()
+            .all(|c| (0..Self::DIM as i8).contains(c))
+            .then(|| coords.map(|c| c as u8))
+    }
+
     fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
             utils::coords(coords, Default::default()).cast(),
@@ -97,6 +114,17 @@ impl Chunk {
 
     pub fn bounding_sphere(coords: Point3<i32>) -> BoundingSphere {
         Self::bounding_box(coords).into()
+    }
+}
+
+impl Default for Chunk {
+    fn default() -> Self {
+        Self {
+            blocks: Default::default(),
+            non_air_count: 0,
+            glowing_count: 0,
+            visibility_graph: VisibilityGraph::ALL_CONNECTED,
+        }
     }
 }
 
@@ -184,5 +212,36 @@ impl<T> Index<Point3<u8>> for ChunkDataStore<T> {
 impl<T> IndexMut<Point3<u8>> for ChunkDataStore<T> {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
         &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
+    }
+}
+
+pub struct ChunkBitSet(BitArr!(for Chunk::DIM.pow(3)));
+
+impl ChunkBitSet {
+    fn from_fn<F: FnMut(Point3<u8>) -> bool>(mut f: F) -> Self {
+        let mut data = Self::default();
+        for coords in Chunk::points() {
+            data.set(coords, f(coords));
+        }
+        data
+    }
+
+    fn set(&mut self, coords: Point3<u8>, value: bool) {
+        self.0.set(Self::index_unchecked(coords), value);
+    }
+
+    fn replace(&mut self, coords: Point3<u8>, value: bool) -> bool {
+        self.0.replace(Self::index_unchecked(coords), value)
+    }
+
+    fn index_unchecked(coords: Point3<u8>) -> usize {
+        let coords = coords.cast::<usize>();
+        coords.x * Chunk::DIM.pow(2) + coords.y * Chunk::DIM + coords.z
+    }
+}
+
+impl Default for ChunkBitSet {
+    fn default() -> Self {
+        Self(bitarr![0; Chunk::DIM.pow(3)])
     }
 }

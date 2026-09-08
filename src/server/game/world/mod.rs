@@ -28,6 +28,7 @@ use chunk::{
     Chunk, ChunkDataStore,
     area::{ChunkArea, ChunkAreaLight},
     generator::ChunkGenerator,
+    visibility::VisibilityGraph,
 };
 use crossbeam_channel::SendError;
 use height::HeightMap;
@@ -223,7 +224,12 @@ impl World {
             for (coords, action) in self.actions.chunk_actions(coords) {
                 chunk.apply_unchecked(coords, action);
             }
-            (!chunk.is_empty()).then_some(chunk)
+            if !chunk.is_empty() {
+                chunk.recompute_visibility_graph();
+                Some(chunk)
+            } else {
+                None
+            }
         }
     }
 
@@ -414,6 +420,8 @@ impl Branch {
                     if chunk.is_empty() {
                         entry.remove();
                         removals.insert(chunk_coords);
+                    } else {
+                        chunk.recompute_visibility_graph();
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -428,6 +436,7 @@ impl Branch {
                             chunk.apply_unchecked(block_coords, action);
                             hits.push((utils::coords(chunk_coords, block_coords), action));
                         }
+                        chunk.recompute_visibility_graph();
                         inserts.insert(chunk_coords);
                     }
                 }
@@ -493,6 +502,7 @@ impl Branch {
 pub struct ChunkData {
     area: ChunkArea,
     area_light: ChunkAreaLight,
+    visibility_graph: VisibilityGraph,
 }
 
 impl ChunkData {
@@ -500,6 +510,7 @@ impl ChunkData {
         Self {
             area: chunks.chunk_area(coords),
             area_light: light.chunk_area_light(coords),
+            visibility_graph: chunks[coords].visibility_graph,
         }
     }
 
