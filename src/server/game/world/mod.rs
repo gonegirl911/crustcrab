@@ -502,7 +502,7 @@ impl Branch {
 pub struct ChunkData {
     area: ChunkArea,
     area_light: ChunkAreaLight,
-    visibility_graph: VisibilityGraph,
+    pub visibility_graph: VisibilityGraph,
 }
 
 impl ChunkData {

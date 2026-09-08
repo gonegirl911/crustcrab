@@ -17,7 +17,7 @@ use crate::{
         game::world::{
             ChunkData,
             block::{BlockLight, data::SideShade},
-            chunk::Chunk,
+            chunk::{Chunk, visibility::VisibilityGraph},
         },
     },
     shared::{color::Rgb, pool::ThreadPool, utils},
@@ -38,10 +38,6 @@ pub struct World {
     group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
     workers: ThreadPool<ChunkInput, ChunkOutput>,
 }
-
-type ChunkInput = (Point3<i32>, Arc<ChunkData>, Instant);
-
-type ChunkOutput = (Point3<i32>, (Vec<BlockVertex>, Vec<BlockVertex>), Instant);
 
 impl World {
     pub fn new(
@@ -77,8 +73,8 @@ impl World {
                 .build(),
             unloaded: Default::default(),
             groups: Default::default(),
-            group_workers: ThreadPool::new(|(input, group_id)| (Self::vertices(input), group_id)),
-            workers: ThreadPool::new(Self::vertices),
+            group_workers: ThreadPool::new(|(input, group_id)| (Self::compute(input), group_id)),
+            workers: ThreadPool::new(Self::compute),
         }
     }
 
@@ -204,7 +200,13 @@ impl World {
     }
 
     fn apply_output(&mut self, renderer: &Renderer, output: Result<ChunkOutput, Point3<i32>>) {
-        let (coords, (vertices, transparent_vertices), updated_at) = match output {
+        let ChunkOutput {
+            coords,
+            vertices,
+            transparent_vertices,
+            visibility_graph,
+            updated_at,
+        } = match output {
             Ok(output) => output,
             Err(coords) => {
                 self.meshes.remove(&coords);
@@ -220,7 +222,9 @@ impl World {
             Entry::Occupied(mut entry) => {
                 let (chunk_mesh, last_updated_at) = entry.get_mut();
                 if *last_updated_at < updated_at {
-                    if let Some(mesh) = ChunkMesh::new(renderer, &vertices, &transparent_vertices) {
+                    if let Some(mesh) =
+                        ChunkMesh::new(renderer, &vertices, &transparent_vertices, visibility_graph)
+                    {
                         *chunk_mesh = mesh;
                     } else {
                         entry.remove();
@@ -228,15 +232,30 @@ impl World {
                 }
             }
             Entry::Vacant(entry) => {
-                if let Some(mesh) = ChunkMesh::new(renderer, &vertices, &transparent_vertices) {
+                if let Some(mesh) =
+                    ChunkMesh::new(renderer, &vertices, &transparent_vertices, visibility_graph)
+                {
                     entry.insert((mesh, updated_at));
                 }
             }
         }
     }
 
-    fn vertices((coords, data, updated_at): ChunkInput) -> ChunkOutput {
-        (coords, data.vertices(), updated_at)
+    fn compute(
+        ChunkInput {
+            coords,
+            data,
+            updated_at,
+        }: ChunkInput,
+    ) -> ChunkOutput {
+        let (vertices, transparent_vertices) = data.vertices();
+        ChunkOutput {
+            coords,
+            vertices,
+            transparent_vertices,
+            visibility_graph: data.visibility_graph,
+            updated_at,
+        }
     }
 
     fn render_pass<'a>(
@@ -284,7 +303,14 @@ impl EventHandler for World {
                     group_id,
                 } => {
                     self.unloaded.remove(coords);
-                    self.send((*coords, data.clone(), Instant::now()), *group_id);
+                    self.send(
+                        ChunkInput {
+                            coords: *coords,
+                            data: data.clone(),
+                            updated_at: Instant::now(),
+                        },
+                        *group_id,
+                    );
                 }
                 &ServerEvent::ChunkUnloaded { coords, group_id } => {
                     self.unloaded.insert(coords);
@@ -295,7 +321,14 @@ impl EventHandler for World {
                     data,
                     group_id,
                 } => {
-                    self.send((*coords, data.clone(), Instant::now()), *group_id);
+                    self.send(
+                        ChunkInput {
+                            coords: *coords,
+                            data: data.clone(),
+                            updated_at: Instant::now(),
+                        },
+                        *group_id,
+                    );
                 }
                 _ => {}
             },
@@ -313,9 +346,24 @@ impl EventHandler for World {
     }
 }
 
+struct ChunkInput {
+    coords: Point3<i32>,
+    data: Arc<ChunkData>,
+    updated_at: Instant,
+}
+
+struct ChunkOutput {
+    coords: Point3<i32>,
+    vertices: Vec<BlockVertex>,
+    transparent_vertices: Vec<BlockVertex>,
+    visibility_graph: VisibilityGraph,
+    updated_at: Instant,
+}
+
 struct ChunkMesh {
     opaque_part: Option<VertexBuffer<BlockVertex>>,
     transparent_part: Option<TransparentMesh<Point3<f32>, BlockVertex>>,
+    visibility_graph: VisibilityGraph,
 }
 
 impl ChunkMesh {
@@ -323,6 +371,7 @@ impl ChunkMesh {
         renderer: &Renderer,
         vertices: &[BlockVertex],
         transparent_vertices: &[BlockVertex],
+        visibility_graph: VisibilityGraph,
     ) -> Option<Self> {
         let opaque_part = VertexBuffer::try_new(renderer, MemoryState::Immutable(vertices));
         let transparent_part = TransparentMesh::try_new(renderer, transparent_vertices, |v| {
@@ -331,9 +380,13 @@ impl ChunkMesh {
                 .cast()
                 / v.len() as f32
         });
-        (opaque_part.is_some() || transparent_part.is_some()).then_some(Self {
+        let is_empty = opaque_part.is_none()
+            && transparent_part.is_none()
+            && visibility_graph == VisibilityGraph::ALL_CONNECTED;
+        (!is_empty).then_some(Self {
             opaque_part,
             transparent_part,
+            visibility_graph,
         })
     }
 
