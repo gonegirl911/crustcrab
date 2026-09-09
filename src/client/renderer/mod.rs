@@ -1,6 +1,6 @@
 pub mod buffer;
 pub mod effect;
-pub mod program;
+pub mod render_pipeline;
 pub mod texture;
 pub mod uniform;
 pub mod utils;

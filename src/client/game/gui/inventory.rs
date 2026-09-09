@@ -8,7 +8,7 @@ use crate::{
             Renderer, Surface,
             buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::Program,
+            render_pipeline::RenderPipeline,
             texture::screen::DepthBuffer,
             uniform::Uniform,
             utils::{Vertex, read_wgsl},
@@ -35,7 +35,7 @@ use winit::{
 pub struct Inventory {
     vertex_buffer: Option<VertexBuffer<BlockVertex>>,
     uniform: Uniform<InventoryUniformData>,
-    program: Program,
+    render_pipeline: RenderPipeline,
     contents: Arc<[Block]>,
     index: usize,
     is_icon_flat: bool,
@@ -49,7 +49,7 @@ impl Inventory {
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
-        let program = Program::builder()
+        let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/inventory.wgsl"))
             .bind_group_layouts(&[
@@ -72,7 +72,7 @@ impl Inventory {
         Self {
             vertex_buffer: None,
             uniform,
-            program,
+            render_pipeline,
             contents: Default::default(),
             index: 0,
             is_icon_flat: false,
@@ -91,7 +91,7 @@ impl Inventory {
         textures_bind_group: &wgpu::BindGroup,
     ) {
         if let Some(buffer) = &self.vertex_buffer {
-            self.program.bind(
+            self.render_pipeline.bind(
                 render_pass,
                 [
                     self.uniform.bind_group(),

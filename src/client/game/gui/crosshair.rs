@@ -6,7 +6,7 @@ use crate::client::{
         Renderer, Surface,
         buffer::MemoryState,
         effect::PostProcessor,
-        program::Program,
+        render_pipeline::RenderPipeline,
         texture::image::ImageTexture,
         uniform::Uniform,
         utils::{load_rgba, read_wgsl},
@@ -19,7 +19,7 @@ use serde::Deserialize;
 pub struct Crosshair {
     uniform: Uniform<CrosshairUniformData>,
     texture: ImageTexture,
-    program: Program,
+    render_pipeline: RenderPipeline,
 }
 
 impl Crosshair {
@@ -35,7 +35,7 @@ impl Crosshair {
             .image(load_rgba("assets/textures/gui/crosshair.png"))
             .is_srgb(false)
             .build();
-        let program = Program::builder()
+        let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/crosshair.wgsl"))
             .bind_group_layouts(&[
@@ -49,12 +49,12 @@ impl Crosshair {
         Self {
             uniform,
             texture,
-            program,
+            render_pipeline,
         }
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
-        self.program.bind(
+        self.render_pipeline.bind(
             render_pass,
             [
                 self.uniform.bind_group(),

@@ -6,7 +6,7 @@ use crate::{
             Renderer,
             buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::Program,
+            render_pipeline::RenderPipeline,
             utils::{Immediates, Vertex, billboard, read_wgsl},
         },
     },
@@ -25,9 +25,9 @@ use std::f32::consts::{FRAC_PI_2, PI};
 use winit::event::WindowEvent;
 
 pub struct StarDome {
-    stars: Box<[Star]>,
     instance_buffer: VertexBuffer<StarInstance>,
-    program: Program,
+    render_pipeline: RenderPipeline,
+    stars: Box<[Star]>,
     imm: StarImmediates,
     updated_rotation: Option<UnitQuaternion<f32>>,
 }
@@ -41,7 +41,7 @@ impl StarDome {
             (0..count).map(|_| generator.generate(&mut rng)).collect()
         };
         let instance_buffer = VertexBuffer::new(renderer, MemoryState::Uninit(count));
-        let program = Program::builder()
+        let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/star.wgsl"))
             .bind_group_layouts(&[player_bind_group_layout])
@@ -54,7 +54,7 @@ impl StarDome {
         Self {
             stars,
             instance_buffer,
-            program,
+            render_pipeline,
             imm: StarImmediates::new(time.nightness()),
             updated_rotation: Some(time.sky_rotation()),
         }
@@ -62,7 +62,7 @@ impl StarDome {
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, player_bind_group: &wgpu::BindGroup) {
         if self.imm.opacity != 0.0 {
-            self.program.bind(render_pass, [player_bind_group]);
+            self.render_pipeline.bind(render_pass, [player_bind_group]);
             self.imm.set(render_pass);
             render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
             render_pass.draw(0..6, 0..self.instance_buffer.len());

@@ -5,7 +5,7 @@ use crate::{
         renderer::{
             Renderer, Surface,
             effect::PostProcessor,
-            program::Program,
+            render_pipeline::RenderPipeline,
             texture::image::ImageTextureArray,
             utils::{Immediates, billboard, load_rgba, read_wgsl},
         },
@@ -19,7 +19,7 @@ use serde::Deserialize;
 
 pub struct ObjectSet {
     textures: ImageTextureArray,
-    program: Program,
+    render_pipeline: RenderPipeline,
     sun_imm: ObjectImmediates,
     moon_imm: ObjectImmediates,
 }
@@ -40,7 +40,7 @@ impl ObjectSet {
             ])
             .is_srgb(true)
             .build();
-        let program = Program::builder()
+        let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/object.wgsl"))
             .bind_group_layouts(&[
@@ -54,7 +54,7 @@ impl ObjectSet {
         let (sun_imm, moon_imm) = Self::imm(Default::default());
         Self {
             textures,
-            program,
+            render_pipeline,
             sun_imm,
             moon_imm,
         }
@@ -66,7 +66,7 @@ impl ObjectSet {
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
     ) {
-        self.program.bind(
+        self.render_pipeline.bind(
             render_pass,
             [
                 player_bind_group,

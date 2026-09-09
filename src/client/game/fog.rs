@@ -1,14 +1,14 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer, Surface, effect::PostProcessor, program::Program, texture::screen::ScreenTexture,
-        utils::read_wgsl,
+        Renderer, Surface, effect::PostProcessor, render_pipeline::RenderPipeline,
+        texture::screen::ScreenTexture, utils::read_wgsl,
     },
 };
 
 pub struct Fog {
     texture: ScreenTexture,
-    program: Program,
+    render_pipeline: RenderPipeline,
 }
 
 impl Fog {
@@ -20,7 +20,7 @@ impl Fog {
         depth_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let texture = ScreenTexture::new(renderer, surface, PostProcessor::FORMAT);
-        let program = Program::builder()
+        let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/fog.wgsl"))
             .bind_group_layouts(&[
@@ -32,7 +32,10 @@ impl Fog {
             .format(PostProcessor::FORMAT)
             .blend(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING)
             .build();
-        Self { texture, program }
+        Self {
+            texture,
+            render_pipeline,
+        }
     }
 
     pub fn view(&self) -> &wgpu::TextureView {
@@ -59,7 +62,7 @@ impl Fog {
             })],
             ..Default::default()
         });
-        self.program.bind(
+        self.render_pipeline.bind(
             &mut render_pass,
             [
                 player_bind_group,

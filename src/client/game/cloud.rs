@@ -7,7 +7,7 @@ use crate::{
             Renderer, Surface,
             buffer::{MemoryState, VertexBuffer},
             effect::{Blender, PostProcessor},
-            program::Program,
+            render_pipeline::RenderPipeline,
             texture::{image::ImageTexture, screen::DepthBuffer},
             utils::{Immediates, Vertex, load_rgba, read_wgsl},
         },
@@ -37,7 +37,7 @@ pub struct CloudLayer {
     vertex_buffer: VertexBuffer<BlockVertex>,
     instance_buffer: VertexBuffer<CloudInstance>,
     texture: ImageTexture,
-    program: Program,
+    render_pipeline: RenderPipeline,
     blender: Blender,
     imm: CloudImmediates,
     opacity: f32,
@@ -64,7 +64,7 @@ impl CloudLayer {
             .is_srgb(false)
             .address_mode(wgpu::AddressMode::Repeat)
             .build();
-        let program = Program::builder()
+        let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/cloud.wgsl"))
             .bind_group_layouts(&[
@@ -89,7 +89,7 @@ impl CloudLayer {
             vertex_buffer,
             instance_buffer,
             texture,
-            program,
+            render_pipeline,
             blender,
             imm: CloudImmediates::new(image.dimensions(), nightness),
             opacity: CLIENT_CONFIG.cloud.opacity(nightness),
@@ -129,7 +129,7 @@ impl CloudLayer {
                 }),
                 ..Default::default()
             });
-            self.program.bind(
+            self.render_pipeline.bind(
                 &mut render_pass,
                 [
                     player_bind_group,

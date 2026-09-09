@@ -7,7 +7,7 @@ use crate::{
             Renderer,
             buffer::{MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::Program,
+            render_pipeline::RenderPipeline,
             texture::screen::DepthBuffer,
             utils::{BlendedMesh, Immediates, TotalOrd, Vertex, read_wgsl},
         },
@@ -47,8 +47,8 @@ use uuid::Uuid;
 use winit::event::WindowEvent;
 
 pub struct World {
-    programs: EnumMap<RenderLayer, Program>,
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
+    render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
     unloaded: FxHashSet<Point3<i32>>,
     groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
     group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
@@ -69,14 +69,14 @@ impl World {
             lighting_bind_group_layout,
             textures_bind_group_layout,
         ];
-        let programs = enum_map! {
+        let render_pipelines = enum_map! {
             RenderLayer::Opaque => {
-                Self::program(renderer, bind_group_layouts, Some("fs_main"), None)
+                Self::render_pipeline(renderer, bind_group_layouts, Some("fs_main"), None)
             }
             RenderLayer::Cutout => {
-                Self::program(renderer, bind_group_layouts, Some("fs_cutout"), None)
+                Self::render_pipeline(renderer, bind_group_layouts, Some("fs_cutout"), None)
             }
-            RenderLayer::Blended => Self::program(
+            RenderLayer::Blended => Self::render_pipeline(
                 renderer,
                 bind_group_layouts,
                 Some("fs_cutout"),
@@ -86,8 +86,8 @@ impl World {
         let group_workers = ThreadPool::new(|(input, group_id)| (Self::compute(input), group_id));
         let workers = ThreadPool::new(Self::compute);
         Self {
-            programs,
             meshes: Default::default(),
+            render_pipelines,
             unloaded: Default::default(),
             groups: Default::default(),
             group_workers,
@@ -122,7 +122,7 @@ impl World {
         {
             let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
-            self.programs[RenderLayer::Opaque].bind(&mut render_pass, bind_groups);
+            self.render_pipelines[RenderLayer::Opaque].bind(&mut render_pass, bind_groups);
 
             for coords in visible_points {
                 let Some((mesh, _)) = self.meshes.get(&coords) else {
@@ -143,7 +143,7 @@ impl World {
                 }
             }
 
-            self.programs[RenderLayer::Cutout].bind(&mut render_pass, bind_groups);
+            self.render_pipelines[RenderLayer::Cutout].bind(&mut render_pass, bind_groups);
 
             for (coords, cutout_part) in cutout_parts {
                 BlockImmediates::new(coords).set(&mut render_pass);
@@ -155,7 +155,7 @@ impl World {
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
 
-        self.programs[RenderLayer::Blended].bind(&mut render_pass, bind_groups);
+        self.render_pipelines[RenderLayer::Blended].bind(&mut render_pass, bind_groups);
 
         blended_points.sort_unstable_by_key(|&coords| {
             Reverse(utils::magnitude_squared(
@@ -312,13 +312,13 @@ impl World {
         visited.into_keys()
     }
 
-    fn program(
+    fn render_pipeline(
         renderer: &Renderer,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         fragment_entry: Option<&str>,
         blend: Option<wgpu::BlendState>,
-    ) -> Program {
-        Program::builder()
+    ) -> RenderPipeline {
+        RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/block.wgsl"))
             .bind_group_layouts(bind_group_layouts)

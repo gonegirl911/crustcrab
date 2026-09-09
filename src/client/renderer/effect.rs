@@ -1,6 +1,6 @@
 use super::{
     Renderer, Surface,
-    program::Program,
+    render_pipeline::RenderPipeline,
     texture::screen::ScreenTextureArray,
     utils::{Immediates, read_wgsl},
 };
@@ -100,7 +100,7 @@ impl EventHandler for PostProcessor {
     }
 }
 
-pub struct Blit(Program);
+pub struct Blit(RenderPipeline);
 
 impl Blit {
     pub fn new(
@@ -109,7 +109,7 @@ impl Blit {
         format: wgpu::TextureFormat,
     ) -> Self {
         Self(
-            Program::builder()
+            RenderPipeline::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/blit.wgsl"))
                 .bind_group_layouts(&[input_bind_group_layout])
@@ -126,7 +126,7 @@ impl Effect for Blit {
     }
 }
 
-pub struct Blender(Program);
+pub struct Blender(RenderPipeline);
 
 impl Blender {
     pub fn new(
@@ -135,7 +135,7 @@ impl Blender {
         format: wgpu::TextureFormat,
     ) -> Self {
         Self(
-            Program::builder()
+            RenderPipeline::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/blender.wgsl"))
                 .bind_group_layouts(&[input_bind_group_layout])
@@ -190,7 +190,7 @@ impl BlenderImmediates {
 
 impl Immediates for BlenderImmediates {}
 
-pub struct Aces(Program);
+pub struct Aces(RenderPipeline);
 
 impl Aces {
     pub fn new(
@@ -199,7 +199,7 @@ impl Aces {
         format: wgpu::TextureFormat,
     ) -> Self {
         Self(
-            Program::builder()
+            RenderPipeline::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/aces.wgsl"))
                 .bind_group_layouts(&[input_bind_group_layout])

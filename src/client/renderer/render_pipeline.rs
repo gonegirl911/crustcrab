@@ -2,10 +2,10 @@ use super::Renderer;
 use bon::bon;
 use std::slice;
 
-pub struct Program(wgpu::RenderPipeline);
+pub struct RenderPipeline(wgpu::RenderPipeline);
 
 #[bon]
-impl Program {
+impl RenderPipeline {
     #[builder]
     pub fn new<'a>(
         #[expect(unused)] renderer @ Renderer { device, .. }: &'a Renderer,

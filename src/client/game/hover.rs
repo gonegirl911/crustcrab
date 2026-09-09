@@ -6,7 +6,7 @@ use crate::{
             Renderer,
             buffer::{IndexBuffer, MemoryState, VertexBuffer},
             effect::PostProcessor,
-            program::Program,
+            render_pipeline::RenderPipeline,
             texture::screen::DepthBuffer,
             utils::{Immediates, Vertex, read_wgsl},
         },
@@ -100,7 +100,7 @@ impl EventHandler for BlockHover {
 struct BlockHighlight {
     vertex_buffer: VertexBuffer<BlockHighlightVertex>,
     index_buffer: IndexBuffer<u16>,
-    program: Program,
+    render_pipeline: RenderPipeline,
 }
 
 impl BlockHighlight {
@@ -116,7 +116,7 @@ impl BlockHighlight {
                 MemoryState::Immutable(&DELTAS.map(BlockHighlightVertex::new)),
             ),
             index_buffer: IndexBuffer::new(renderer, MemoryState::Immutable(&INDICES)),
-            program: Program::builder()
+            render_pipeline: RenderPipeline::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/highlight.wgsl"))
                 .bind_group_layouts(&[
@@ -149,7 +149,7 @@ impl BlockHighlight {
         lighting_bind_group: &wgpu::BindGroup,
         imm: &BlockHighlightImmediates,
     ) {
-        self.program.bind(
+        self.render_pipeline.bind(
             render_pass,
             [player_bind_group, sky_bind_group, lighting_bind_group],
         );

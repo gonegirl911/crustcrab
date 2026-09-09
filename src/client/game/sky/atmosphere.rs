@@ -1,8 +1,8 @@
 use crate::client::renderer::{
-    Renderer, effect::PostProcessor, program::Program, utils::read_wgsl,
+    Renderer, effect::PostProcessor, render_pipeline::RenderPipeline, utils::read_wgsl,
 };
 
-pub struct Atmosphere(Program);
+pub struct Atmosphere(RenderPipeline);
 
 impl Atmosphere {
     pub fn new(
@@ -11,7 +11,7 @@ impl Atmosphere {
         sky_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self(
-            Program::builder()
+            RenderPipeline::builder()
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/atmosphere.wgsl"))
                 .bind_group_layouts(&[player_bind_group_layout, sky_bind_group_layout])
