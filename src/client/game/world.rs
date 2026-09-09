@@ -315,7 +315,7 @@ impl World {
     fn render_pipeline(
         renderer: &Renderer,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
-        fragment_entry: Option<&str>,
+        fragment_entry_point: Option<&str>,
         blend: Option<wgpu::BlendState>,
     ) -> RenderPipeline {
         RenderPipeline::builder()
@@ -332,7 +332,7 @@ impl World {
                 stencil: Default::default(),
                 bias: Default::default(),
             })
-            .maybe_fragment_entry(fragment_entry)
+            .maybe_fragment_entry_point(fragment_entry_point)
             .format(PostProcessor::FORMAT)
             .maybe_blend(blend)
             .build()
