@@ -198,7 +198,7 @@ impl From<Option<Side>> for SideShade {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
-    Bottom,
+    Bottom, // DO NOT MOVE
     Front,
     Right,
     Back,
@@ -220,14 +220,22 @@ impl Side {
         })
     }
 
+    pub fn axis(self) -> usize {
+        match self {
+            Self::Left | Self::Right => 0,
+            Self::Top | Self::Bottom => 1,
+            Self::Front | Self::Back => 2,
+        }
+    }
+
     pub fn opp(self) -> Self {
         match self {
-            Side::Top => Side::Bottom,
-            Side::Bottom => Side::Top,
             Side::Front => Side::Back,
+            Side::Right => Side::Left,
             Side::Back => Side::Front,
             Side::Left => Side::Right,
-            Side::Right => Side::Left,
+            Side::Top => Side::Bottom,
+            Side::Bottom => Side::Top,
         }
     }
 }

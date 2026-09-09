@@ -273,11 +273,12 @@ impl World {
         };
 
         while let Some(coords) = queue.pop_front() {
+            let offset = coords - origin;
             let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
             let sources = visited[&coords];
 
-            for (side, delta) in *SIDE_DELTAS {
-                if delta.cast().dot(&(coords - origin)) < 0 {
+            for (exit, delta) in *SIDE_DELTAS {
+                if delta.cast().dot(&offset) < 0 {
                     continue;
                 }
 
@@ -293,14 +294,22 @@ impl World {
 
                 if coords != origin
                     && let Some(graph) = visibility_graph
-                    && !sources
-                        .into_iter()
-                        .any(|source| graph.connected(source, side))
+                    && !sources.into_iter().any(|source| {
+                        if !graph.connected(source, exit) {
+                            return false;
+                        }
+
+                        if exit != source.opp() {
+                            return true;
+                        }
+
+                        offset.amax() <= offset[exit.axis()].abs() + 1
+                    })
                 {
                     continue;
                 }
 
-                let neighbor_source = side.opp();
+                let neighbor_source = exit.opp();
                 let neighbor_sources = visited.entry(neighbor_coords).or_default();
                 if !neighbor_sources.contains(neighbor_source) {
                     neighbor_sources.insert(neighbor_source);
