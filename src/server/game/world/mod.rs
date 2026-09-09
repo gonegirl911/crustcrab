@@ -22,7 +22,7 @@ use action::{ActionStore, BlockAction};
 use block::{
     Block, BlockLight,
     area::{BlockArea, BlockAreaLight},
-    data::{Corner, SIDE_DELTAS, SIDE_MASKS, Side},
+    data::{Corner, RenderLayer, SIDE_DELTAS, SIDE_MASKS, Side},
 };
 use chunk::{
     Chunk, ChunkDataStore,
@@ -300,6 +300,7 @@ impl EventHandler<WorldEvent> for World {
                         self.chunks
                             .block(coords)
                             .data()
+                            .model
                             .hitbox(coords)
                             .intersects(ray)
                     },
@@ -514,19 +515,18 @@ impl ChunkData {
         }
     }
 
-    pub fn vertices(&self) -> (Vec<BlockVertex>, Vec<BlockVertex>) {
-        let mut vertices = vec![];
-        let mut transparent_vertices = vec![];
+    pub fn vertices(&self) -> EnumMap<RenderLayer, Vec<BlockVertex>> {
+        let mut vertices = EnumMap::<_, Vec<_>>::default();
         let areas = ChunkDataStore::from_fn(|coords| {
             let area = self.area.block_area(coords);
             let area_light = self.area_light.block_area_light(coords);
             let data = area.kernel().data();
 
-            if data.requires_blending {
-                transparent_vertices.extend(data.mesh(coords, &area, &area_light));
+            if data.render_layer == RenderLayer::Blended {
+                vertices[RenderLayer::Blended].extend(data.mesh(coords, &area, &area_light));
             } else {
                 let is_externally_lit = data.is_externally_lit();
-                vertices.extend(data.vertices(
+                vertices[data.render_layer].extend(data.vertices(
                     None,
                     coords,
                     point![1, 1, 1],
@@ -564,7 +564,8 @@ impl ChunkData {
                             let height = Self::height(&quads, cur, secondary, quad, width);
 
                             if let Some(quad) = quad {
-                                vertices.extend(quad.vertices(
+                                let render_layer = quad.block.data().render_layer;
+                                vertices[render_layer].extend(quad.vertices(
                                     side,
                                     mask,
                                     [axis as u8, main as u8, secondary as u8],
@@ -589,7 +590,7 @@ impl ChunkData {
             }
         }
 
-        (vertices, transparent_vertices)
+        vertices
     }
 
     fn quad(
@@ -655,7 +656,6 @@ impl ChunkData {
 #[derive(Clone, Copy)]
 struct Quad {
     block: Block,
-    tex_index: u8,
     corner_aos: EnumMap<Corner, u8>,
     corner_lights: EnumMap<Corner, BlockLight>,
 }
@@ -665,11 +665,12 @@ impl Quad {
         let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
-        (!data.requires_blending && area.is_side_visible(Some(side))).then(|| Self {
-            block,
-            tex_index: data.tex_index(),
-            corner_aos: area.corner_aos(Some(side), is_externally_lit),
-            corner_lights: area_light.corner_lights(Some(side), area),
+        (data.render_layer != RenderLayer::Blended && area.is_side_visible(Some(side))).then(|| {
+            Self {
+                block,
+                corner_aos: area.corner_aos(Some(side), is_externally_lit),
+                corner_lights: area_light.corner_lights(Some(side), area),
+            }
         })
     }
 
@@ -693,11 +694,13 @@ impl Quad {
 
 impl PartialEq for Quad {
     fn eq(&self, other: &Self) -> bool {
-        self.tex_index == other.tex_index
+        self.block == other.block
             && self.corner_aos == other.corner_aos
             && self.corner_lights == other.corner_lights
     }
 }
+
+impl Eq for Quad {}
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct BlockHoverData {
@@ -708,7 +711,7 @@ pub struct BlockHoverData {
 impl BlockHoverData {
     fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
         let data = area.kernel().data();
-        let hitbox = data.hitbox(coords);
+        let hitbox = data.model.hitbox(coords);
         let brightness = data
             .mesh(utils::block_coords(coords), area, area_light)
             .max_by(|a, b| {

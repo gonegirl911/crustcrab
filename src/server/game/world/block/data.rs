@@ -8,7 +8,6 @@ use crate::{
     enum_map,
     server::game::world::chunk::Chunk,
     shared::{
-        bound::Aabb,
         color::Rgb,
         enum_map::{Enum, EnumMap},
         indexmap::FxIndexSet,
@@ -23,10 +22,10 @@ use serde::{
 use std::{array, collections::BTreeMap, fs, ops::Deref, sync::LazyLock};
 
 pub struct BlockData {
-    model: Model,
+    pub model: Model,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<bool>,
-    pub requires_blending: bool,
+    pub render_layer: RenderLayer,
     pub valid_surface: Option<Block>,
 }
 
@@ -81,14 +80,6 @@ impl BlockData {
             })
     }
 
-    pub fn tex_index(&self) -> u8 {
-        self.model.tex_index
-    }
-
-    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
-        self.model.hitbox(coords)
-    }
-
     pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex>> {
         let tex_idx = self.model.flat_icon()?;
         let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];
@@ -108,12 +99,8 @@ impl BlockData {
         self.luminance != Default::default()
     }
 
-    pub fn is_transparent(&self) -> bool {
-        self.light_filter != Default::default() || self.requires_blending
-    }
-
     pub fn is_opaque(&self) -> bool {
-        !self.is_transparent()
+        self.light_filter == Default::default() && self.render_layer == RenderLayer::Opaque
     }
 
     pub fn is_externally_lit(&self) -> bool {
@@ -139,7 +126,7 @@ impl From<RawBlockData<'_>> for BlockData {
             model: data.model.into(),
             luminance: data.luminance,
             light_filter: data.light_filter,
-            requires_blending: data.requires_blending,
+            render_layer: data.render_layer,
             valid_surface: data.valid_surface.map(|str| STR_TO_BLOCK[str]),
         }
     }
@@ -153,7 +140,7 @@ struct RawBlockData<'a> {
     luminance: Rgb<u8>,
     #[serde(deserialize_with = "RawBlockData::deserialize_light_filter")]
     light_filter: Rgb<bool>,
-    requires_blending: bool,
+    render_layer: RenderLayer,
     valid_surface: Option<&'a str>,
 }
 
@@ -178,6 +165,15 @@ impl<'a> RawBlockData<'a> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RenderLayer {
+    #[default]
+    Opaque,
+    Cutout,
+    Blended,
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -199,7 +195,7 @@ impl From<Option<Side>> for SideShade {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Enum, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Bottom,

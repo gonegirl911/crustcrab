@@ -13,7 +13,7 @@ use serde::{
 use std::{array, ops::Range};
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Default, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Serialize)]
 pub struct Block(u8);
 
 impl Block {
@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for Block {
 }
 
 bitfield! {
-    #[derive(Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+    #[derive(Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
     pub struct BlockLight(u32);
     pub u8, component, set_component: Self::COMPONENT_MAX.ilog2() as usize, 0, Self::LEN;
 }

@@ -15,6 +15,7 @@ impl Program {
         #[builder(default)] buffers: &'a [wgpu::VertexBufferLayout<'a>],
         cull_mode: Option<wgpu::Face>,
         depth_stencil: Option<wgpu::DepthStencilState>,
+        fragment_entry: Option<&'a str>,
         format: wgpu::TextureFormat,
         blend: Option<wgpu::BlendState>,
     ) -> Self {
@@ -43,7 +44,7 @@ impl Program {
             multisample: Default::default(),
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: None,
+                entry_point: fragment_entry,
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,

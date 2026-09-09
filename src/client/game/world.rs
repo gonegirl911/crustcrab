@@ -9,9 +9,10 @@ use crate::{
             effect::PostProcessor,
             program::Program,
             texture::screen::DepthBuffer,
-            utils::{Immediates, TotalOrd, TransparentMesh, Vertex, read_wgsl},
+            utils::{BlendedMesh, Immediates, TotalOrd, Vertex, read_wgsl},
         },
     },
+    enum_map,
     server::{
         GroupId, ServerEvent,
         game::{
@@ -20,7 +21,7 @@ use crate::{
                 ChunkData,
                 block::{
                     BlockLight,
-                    data::{SIDE_DELTAS, SideShade},
+                    data::{RenderLayer, SIDE_DELTAS, SideShade},
                 },
                 chunk::{
                     Chunk,
@@ -29,7 +30,7 @@ use crate::{
             },
         },
     },
-    shared::{color::Rgb, indexmap::FxIndexMap, pool::ThreadPool, utils},
+    shared::{color::Rgb, enum_map::EnumMap, indexmap::FxIndexMap, pool::ThreadPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -46,8 +47,8 @@ use uuid::Uuid;
 use winit::event::WindowEvent;
 
 pub struct World {
+    programs: EnumMap<RenderLayer, Program>,
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
-    program: Program,
     unloaded: FxHashSet<Point3<i32>>,
     groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
     group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
@@ -62,34 +63,35 @@ impl World {
         lighting_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
+        let bind_group_layouts = &[
+            player_bind_group_layout,
+            sky_bind_group_layout,
+            lighting_bind_group_layout,
+            textures_bind_group_layout,
+        ];
+        let programs = enum_map! {
+            RenderLayer::Opaque => {
+                Self::program(renderer, bind_group_layouts, Some("fs_main"), None)
+            }
+            RenderLayer::Cutout => {
+                Self::program(renderer, bind_group_layouts, Some("fs_cutout"), None)
+            }
+            RenderLayer::Blended => Self::program(
+                renderer,
+                bind_group_layouts,
+                Some("fs_cutout"),
+                Some(wgpu::BlendState::ALPHA_BLENDING),
+            ),
+        };
+        let group_workers = ThreadPool::new(|(input, group_id)| (Self::compute(input), group_id));
+        let workers = ThreadPool::new(Self::compute);
         Self {
+            programs,
             meshes: Default::default(),
-            program: Program::builder()
-                .renderer(renderer)
-                .shader_desc(read_wgsl("assets/shaders/block.wgsl"))
-                .bind_group_layouts(&[
-                    player_bind_group_layout,
-                    sky_bind_group_layout,
-                    lighting_bind_group_layout,
-                    textures_bind_group_layout,
-                ])
-                .immediate_size(BlockImmediates::SIZE)
-                .buffers(&[BlockVertex::desc()])
-                .cull_mode(wgpu::Face::Back)
-                .depth_stencil(wgpu::DepthStencilState {
-                    format: DepthBuffer::FORMAT,
-                    depth_write_enabled: Some(true),
-                    depth_compare: Some(wgpu::CompareFunction::Less),
-                    stencil: Default::default(),
-                    bias: Default::default(),
-                })
-                .format(PostProcessor::FORMAT)
-                .blend(wgpu::BlendState::ALPHA_BLENDING)
-                .build(),
             unloaded: Default::default(),
             groups: Default::default(),
-            group_workers: ThreadPool::new(|(input, group_id)| (Self::compute(input), group_id)),
-            workers: ThreadPool::new(Self::compute),
+            group_workers,
+            workers,
         }
     }
 
@@ -108,20 +110,19 @@ impl World {
         intermediate_action: F,
     ) {
         let visible_points = self.cull_chunks(frustum);
-        let mut transparent_points = vec![];
+        let mut cutout_parts = vec![];
+        let mut blended_points = vec![];
+        let bind_groups = [
+            player_bind_group,
+            sky_bind_group,
+            lighting_bind_group,
+            textures_bind_group,
+        ];
 
         {
             let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
-            self.program.bind(
-                &mut render_pass,
-                [
-                    player_bind_group,
-                    sky_bind_group,
-                    lighting_bind_group,
-                    textures_bind_group,
-                ],
-            );
+            self.programs[RenderLayer::Opaque].bind(&mut render_pass, bind_groups);
 
             for coords in visible_points {
                 let Some((mesh, _)) = self.meshes.get(&coords) else {
@@ -133,9 +134,20 @@ impl World {
                     opaque_part.draw(&mut render_pass);
                 }
 
-                if mesh.transparent_part.is_some() {
-                    transparent_points.push(coords);
+                if let Some(cutout_part) = &mesh.cutout_part {
+                    cutout_parts.push((coords, cutout_part));
                 }
+
+                if mesh.blended_part.is_some() {
+                    blended_points.push(coords);
+                }
+            }
+
+            self.programs[RenderLayer::Cutout].bind(&mut render_pass, bind_groups);
+
+            for (coords, cutout_part) in cutout_parts {
+                BlockImmediates::new(coords).set(&mut render_pass);
+                cutout_part.draw(&mut render_pass);
             }
         }
 
@@ -143,29 +155,21 @@ impl World {
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
 
-        self.program.bind(
-            &mut render_pass,
-            [
-                player_bind_group,
-                sky_bind_group,
-                lighting_bind_group,
-                textures_bind_group,
-            ],
-        );
+        self.programs[RenderLayer::Blended].bind(&mut render_pass, bind_groups);
 
-        transparent_points.sort_unstable_by_key(|&coords| {
+        blended_points.sort_unstable_by_key(|&coords| {
             Reverse(utils::magnitude_squared(
                 coords,
                 utils::chunk_coords(frustum.origin),
             ))
         });
 
-        for coords in transparent_points {
+        for coords in blended_points {
             let (mesh, _) = self.meshes.get_mut(&coords).unwrap();
-            let transparent_part = mesh.transparent_part.as_mut().unwrap();
+            let blended_part = mesh.blended_part.as_mut().unwrap();
             let delta = coords.cast() * Chunk::DIM as f32 - frustum.origin;
             BlockImmediates::new(coords).set(&mut render_pass);
-            transparent_part.draw(renderer, &mut render_pass, |&coords| {
+            blended_part.draw(renderer, &mut render_pass, |&coords| {
                 TotalOrd((coords.coords + delta).magnitude_squared())
             });
         }
@@ -221,7 +225,6 @@ impl World {
         let ChunkOutput {
             coords,
             vertices,
-            transparent_vertices,
             visibility_graph,
             updated_at,
         } = match output {
@@ -241,7 +244,7 @@ impl World {
                 let (chunk_mesh, last_updated_at) = entry.get_mut();
                 if *last_updated_at < updated_at {
                     if let Some(mesh) =
-                        ChunkMesh::new(renderer, &vertices, &transparent_vertices, visibility_graph)
+                        ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph)
                     {
                         *chunk_mesh = mesh;
                     } else {
@@ -251,7 +254,7 @@ impl World {
             }
             Entry::Vacant(entry) => {
                 if let Some(mesh) =
-                    ChunkMesh::new(renderer, &vertices, &transparent_vertices, visibility_graph)
+                    ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph)
                 {
                     entry.insert((mesh, updated_at));
                 }
@@ -309,6 +312,32 @@ impl World {
         visited.into_keys()
     }
 
+    fn program(
+        renderer: &Renderer,
+        bind_group_layouts: &[&wgpu::BindGroupLayout],
+        fragment_entry: Option<&str>,
+        blend: Option<wgpu::BlendState>,
+    ) -> Program {
+        Program::builder()
+            .renderer(renderer)
+            .shader_desc(read_wgsl("assets/shaders/block.wgsl"))
+            .bind_group_layouts(bind_group_layouts)
+            .immediate_size(BlockImmediates::SIZE)
+            .buffers(&[BlockVertex::desc()])
+            .cull_mode(wgpu::Face::Back)
+            .depth_stencil(wgpu::DepthStencilState {
+                format: DepthBuffer::FORMAT,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: Default::default(),
+                bias: Default::default(),
+            })
+            .maybe_fragment_entry(fragment_entry)
+            .format(PostProcessor::FORMAT)
+            .maybe_blend(blend)
+            .build()
+    }
+
     fn compute(
         ChunkInput {
             coords,
@@ -316,11 +345,9 @@ impl World {
             updated_at,
         }: ChunkInput,
     ) -> ChunkOutput {
-        let (vertices, transparent_vertices) = data.vertices();
         ChunkOutput {
             coords,
-            vertices,
-            transparent_vertices,
+            vertices: data.vertices(),
             visibility_graph: data.visibility_graph,
             updated_at,
         }
@@ -422,38 +449,46 @@ struct ChunkInput {
 
 struct ChunkOutput {
     coords: Point3<i32>,
-    vertices: Vec<BlockVertex>,
-    transparent_vertices: Vec<BlockVertex>,
+    vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
     visibility_graph: VisibilityGraph,
     updated_at: Instant,
 }
 
 struct ChunkMesh {
     opaque_part: Option<VertexBuffer<BlockVertex>>,
-    transparent_part: Option<TransparentMesh<Point3<f32>, BlockVertex>>,
+    cutout_part: Option<VertexBuffer<BlockVertex>>,
+    blended_part: Option<BlendedMesh<Point3<f32>, BlockVertex>>,
     visibility_graph: VisibilityGraph,
 }
 
 impl ChunkMesh {
     fn new(
         renderer: &Renderer,
-        vertices: &[BlockVertex],
-        transparent_vertices: &[BlockVertex],
+        vertices: EnumMap<RenderLayer, &[BlockVertex]>,
         visibility_graph: VisibilityGraph,
     ) -> Option<Self> {
-        let opaque_part = VertexBuffer::try_new(renderer, MemoryState::Immutable(vertices));
-        let transparent_part = TransparentMesh::try_new(renderer, transparent_vertices, |v| {
+        let opaque_part = VertexBuffer::try_new(
+            renderer,
+            MemoryState::Immutable(vertices[RenderLayer::Opaque]),
+        );
+        let cutout_part = VertexBuffer::try_new(
+            renderer,
+            MemoryState::Immutable(vertices[RenderLayer::Cutout]),
+        );
+        let blended_part = BlendedMesh::try_new(renderer, vertices[RenderLayer::Blended], |v| {
             v.iter()
                 .fold(Point3::default(), |acc, v| acc + v.coords().coords)
                 .cast()
                 / v.len() as f32
         });
         let is_empty = opaque_part.is_none()
-            && transparent_part.is_none()
+            && cutout_part.is_none()
+            && blended_part.is_none()
             && visibility_graph == VisibilityGraph::ALL_CONNECTED;
         (!is_empty).then_some(Self {
             opaque_part,
-            transparent_part,
+            cutout_part,
+            blended_part,
             visibility_graph,
         })
     }

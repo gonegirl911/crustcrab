@@ -11,7 +11,7 @@ use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VisibilityGraph(u16);
 
 impl VisibilityGraph {

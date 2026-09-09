@@ -12,7 +12,7 @@ use std::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
-    ops::{Add, Index, IndexMut},
+    ops::{Add, Deref, Index, IndexMut},
     slice,
 };
 
@@ -72,6 +72,12 @@ impl<E: Enum, T> EnumMap<E, T> {
     }
 }
 
+impl<E: Enum, T: Deref> EnumMap<E, T> {
+    pub fn each_deref(&self) -> EnumMap<E, &T::Target> {
+        EnumMap(self.0.each_ref().map(Deref::deref))
+    }
+}
+
 impl<E: Enum, T> EnumMap<E, MaybeUninit<T>> {
     unsafe fn assume_init(self) -> EnumMap<E, T> {
         EnumMap(unsafe { GenericArray::assume_init(self.0) })
@@ -91,6 +97,8 @@ impl<E: Enum, T: PartialEq> PartialEq for EnumMap<E, T> {
         self.0.eq(&other.0)
     }
 }
+
+impl<E: Enum, T: Eq> Eq for EnumMap<E, T> {}
 
 impl<E: Enum, T: Default> Default for EnumMap<E, T> {
     fn default() -> Self {

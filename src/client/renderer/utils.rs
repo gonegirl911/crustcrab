@@ -51,13 +51,13 @@ pub trait Immediates: Pod {
 
 // ------------------------------------------------------------------------------------------------
 
-pub struct TransparentMesh<C, V> {
+pub struct BlendedMesh<C, V> {
     faces: Vec<(C, [V; 6])>,
     vertices: Vec<V>,
     buffer: VertexBuffer<V>,
 }
 
-impl<C, V: Pod> TransparentMesh<C, V> {
+impl<C, V: Pod> BlendedMesh<C, V> {
     pub fn try_new<F>(renderer: &Renderer, vertices: &[V], mut coords: F) -> Option<Self>
     where
         F: FnMut(&[V]) -> C,

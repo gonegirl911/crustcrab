@@ -31,7 +31,7 @@ impl BlockArea {
     pub fn is_side_visible(&self, side: Option<Side>) -> bool {
         side.is_none_or(|side| {
             let neighbor = self[SIDE_DELTAS[side]];
-            neighbor != self.kernel() && neighbor.data().is_transparent()
+            neighbor != self.kernel() && !neighbor.data().is_opaque()
         })
     }
 
@@ -141,7 +141,7 @@ impl BlockAreaLight {
         let (count, sum) = component_deltas
             .into_values()
             .chain([SIDE_DELTAS[side]])
-            .filter(|&delta| area[delta].data().is_transparent())
+            .filter(|&delta| !area[delta].data().is_opaque())
             .map(|delta| self[delta])
             .fold((0, [0; _]), |(count, sum), light| {
                 (count + 1, array::from_fn(|i| sum[i] + light.component(i)))
