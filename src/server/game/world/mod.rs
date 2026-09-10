@@ -22,7 +22,7 @@ use action::{ActionStore, BlockAction};
 use block::{
     Block, BlockLight,
     area::{BlockArea, BlockAreaLight},
-    data::{Corner, RenderLayer, SIDE_DELTAS, SIDE_MASKS, Side},
+    data::{Corner, RenderLayer, SIDE_AXES, Side},
 };
 use chunk::{
     Chunk, ChunkDataStore,
@@ -525,13 +525,12 @@ impl ChunkData {
             if data.render_layer == RenderLayer::Blended {
                 vertices[RenderLayer::Blended].extend(data.mesh(coords, &area, &area_light));
             } else {
-                let is_externally_lit = data.is_externally_lit();
                 vertices[data.render_layer].extend(data.vertices(
                     None,
                     coords,
                     point![1, 1, 1],
                     point![1, 1],
-                    area.corner_aos(None, is_externally_lit),
+                    area.corner_aos(None, data.is_externally_lit()),
                     area_light.corner_lights(None, &area),
                 ));
             }
@@ -540,51 +539,43 @@ impl ChunkData {
         });
 
         for side in Enum::variants() {
-            let mask = SIDE_MASKS[side].map(|c| c.0);
-            let delta = SIDE_DELTAS[side];
-            let is_negative = delta.sum() == -1;
-            let abs_delta = delta.map(i8::abs);
+            let axes = SIDE_AXES[side];
 
-            for axis in 0..=Chunk::DIM as i8 {
-                let mut quads = array::from_fn(|i| {
-                    let axis = axis - 1;
-                    let secondary = i / Chunk::DIM;
-                    let main = i % Chunk::DIM;
-                    let coords = mask.map(|i| [axis, axis, main as i8, secondary as i8][i]);
-                    Self::quad(&areas, side, is_negative, abs_delta, axis, coords)
+            for normal in 0..Chunk::DIM as u8 {
+                let mut quads = array::from_fn(|v| {
+                    array::from_fn(|u| {
+                        let coords = axes.swizzle(point![normal, u as u8, v as u8]);
+                        let (area, area_light) = &areas[coords];
+                        Quad::new(side, area, area_light)
+                    })
                 });
-                let mut cur = 0;
+                let plane = normal + side.is_positive() as u8;
 
-                for secondary in 0..Chunk::DIM {
-                    let mut main = 0;
+                for v in 0..Chunk::DIM {
+                    let mut u = 0;
 
-                    while main < Chunk::DIM {
-                        if let Some(quad) = quads[secondary * Chunk::DIM + main] {
-                            let width = Self::width(&quads, cur, main, quad);
-                            let height = Self::height(&quads, cur, secondary, quad, width);
+                    while u < Chunk::DIM {
+                        let Some(quad) = quads[v][u] else {
+                            u += 1;
+                            continue;
+                        };
 
-                            if let Some(quad) = quad {
-                                let render_layer = quad.block.data().render_layer;
-                                vertices[render_layer].extend(quad.vertices(
-                                    side,
-                                    mask,
-                                    [axis as u8, main as u8, secondary as u8],
-                                    point![width as u8, height as u8],
-                                ));
+                        let width = Self::merge_width(&quads, v, u, &quad);
+                        let height = Self::merge_height(&quads, v, u, &quad, width);
+
+                        vertices[quad.block.data().render_layer].extend(quad.vertices(
+                            side,
+                            point![plane, u as u8, v as u8],
+                            point![width as u8, height as u8],
+                        ));
+
+                        for dv in 0..height {
+                            for du in 0..width {
+                                quads[v + dv][u + du] = None;
                             }
-
-                            for secondary in 0..height {
-                                for main in 0..width {
-                                    quads[cur + secondary * Chunk::DIM + main] = None;
-                                }
-                            }
-
-                            cur += width;
-                            main += width;
-                        } else {
-                            cur += 1;
-                            main += 1;
                         }
+
+                        u += width;
                     }
                 }
             }
@@ -593,57 +584,30 @@ impl ChunkData {
         vertices
     }
 
-    fn quad(
-        areas: &ChunkDataStore<(BlockArea, BlockAreaLight)>,
-        side: Side,
-        is_negative: bool,
-        abs_delta: Vector3<i8>,
-        axis: i8,
-        coords: Point3<i8>,
-    ) -> Option<Option<Quad>> {
-        let quad = (axis >= 0).then(|| {
-            let coords = coords.map(|c| c as u8);
-            let (area, area_light) = &areas[coords];
-            Quad::new(side, area, area_light)
-        });
-        let neighbor = (axis < Chunk::DIM as i8 - 1).then(|| {
-            let coords = (coords + abs_delta).map(|c| c as u8);
-            let (area, area_light) = &areas[coords];
-            Quad::new(side, area, area_light)
-        });
-        if quad == neighbor {
-            None
-        } else if is_negative {
-            neighbor
-        } else {
-            quad
-        }
-    }
-
-    fn width(
-        quads: &[Option<Option<Quad>>; Chunk::DIM * Chunk::DIM],
-        index: usize,
-        main: usize,
-        quad: Option<Quad>,
+    fn merge_width(
+        quads: &[[Option<Quad>; Chunk::DIM]; Chunk::DIM],
+        v: usize,
+        u: usize,
+        quad: &Quad,
     ) -> usize {
         let mut width = 1;
-        while main + width < Chunk::DIM && quads[index + width] == Some(quad) {
+        while u + width < Chunk::DIM && quads[v][u + width].as_ref() == Some(quad) {
             width += 1;
         }
         width
     }
 
-    fn height(
-        quads: &[Option<Option<Quad>>; Chunk::DIM * Chunk::DIM],
-        index: usize,
-        secondary: usize,
-        quad: Option<Quad>,
+    fn merge_height(
+        quads: &[[Option<Quad>; Chunk::DIM]; Chunk::DIM],
+        v: usize,
+        u: usize,
+        quad: &Quad,
         width: usize,
     ) -> usize {
         let mut height = 1;
-        'outer: while secondary + height < Chunk::DIM {
-            for main in 0..width {
-                if quads[index + height * Chunk::DIM + main] != Some(quad) {
+        'outer: while v + height < Chunk::DIM {
+            for du in 0..width {
+                if quads[v + height][u + du].as_ref() != Some(quad) {
                     break 'outer;
                 }
             }
@@ -677,14 +641,14 @@ impl Quad {
     fn vertices(
         self,
         side: Side,
-        mask: Point3<usize>,
-        [axis, main, secondary]: [u8; 3],
+        coords: Point3<u8>,
         dims: Point2<u8>,
     ) -> impl Iterator<Item = BlockVertex> {
+        let axes = SIDE_AXES[side];
         self.block.data().vertices(
             Some(side),
-            mask.map(|i| [axis, axis, main, secondary][i]),
-            mask.map(|i| [0, 0, dims.x, dims.y][i]),
+            axes.swizzle(coords),
+            axes.swizzle(point![0, dims.x, dims.y]),
             dims,
             self.corner_aos,
             self.corner_lights,

@@ -13,7 +13,7 @@ use crate::{
         indexmap::FxIndexSet,
     },
 };
-use nalgebra::{Point2, Point3, Vector3, point};
+use nalgebra::{Point2, Point3, Scalar, Vector3, point};
 use rustc_hash::FxHashMap;
 use serde::{
     Deserialize, Deserializer,
@@ -207,14 +207,16 @@ pub enum Side {
 }
 
 impl Side {
+    #[rustfmt::skip]
     pub fn block_points(self) -> impl Iterator<Item = (Point3<u8>, Point3<u8>)> {
-        let masks = SIDE_MASKS[self];
-        (0..Chunk::DIM as u8).flat_map(move |x| {
-            (0..Chunk::DIM as u8).map(move |y| {
-                let components = [0, Chunk::DIM as u8 - 1, x, y];
+        let axes = SIDE_AXES[self];
+        let dim = Chunk::DIM as u8;
+        let [normal, neighbor] = if self.is_positive() { [dim - 1, 0] } else { [0, dim - 1] };
+        (0..dim).flat_map(move |u| {
+            (0..dim).map(move |v| {
                 (
-                    masks.map(|(i, _)| components[i]),
-                    masks.map(|(_, i)| components[i]),
+                    axes.swizzle(point![normal, u, v]),
+                    axes.swizzle(point![neighbor, u, v]),
                 )
             })
         })
@@ -226,6 +228,10 @@ impl Side {
             Self::Top | Self::Bottom => 1,
             Self::Front | Self::Back => 2,
         }
+    }
+
+    pub fn is_positive(self) -> bool {
+        matches!(self, Self::Back | Self::Right | Self::Top)
     }
 
     pub fn opp(self) -> Self {
@@ -254,6 +260,23 @@ pub enum Component {
     Edge1,
     Edge2,
     Corner,
+}
+
+#[derive(Clone, Copy)]
+pub struct SideAxes {
+    normal: usize,
+    u: usize,
+    v: usize,
+}
+
+impl SideAxes {
+    pub fn swizzle<T: Scalar + Default>(&self, coords: Point3<T>) -> Point3<T> {
+        let mut swizzled = <[_; _]>::default();
+        swizzled[self.normal] = coords.x.clone();
+        swizzled[self.u] = coords.y.clone();
+        swizzled[self.v] = coords.z.clone();
+        swizzled.into()
+    }
 }
 
 pub(super) static BLOCK_DATA: LazyLock<Box<[BlockData]>> = LazyLock::new(|| {
@@ -378,17 +401,6 @@ pub static SIDE_DELTAS: LazyLock<EnumMap<Side, Vector3<i8>>> = LazyLock::new(|| 
     }
 });
 
-pub static SIDE_MASKS: LazyLock<EnumMap<Side, Point3<(usize, usize)>>> = LazyLock::new(|| {
-    enum_map! {
-        Side::Front => point![(2, 2), (3, 3), (0, 1)],
-        Side::Right => point![(1, 0), (3, 3), (2, 2)],
-        Side::Back => point![(2, 2), (3, 3), (1, 0)],
-        Side::Left => point![(0, 1), (3, 3), (2, 2)],
-        Side::Top => point![(2, 2), (1, 0), (3, 3)],
-        Side::Bottom => point![(2, 2), (0, 1), (3, 3)],
-    }
-});
-
 static SIDE_CORNER_DELTAS: LazyLock<EnumMap<Side, EnumMap<Corner, Vector3<u8>>>> =
     LazyLock::new(|| {
         SIDE_CORNER_SIDES.map(|s1, corner_sides| {
@@ -434,3 +446,14 @@ const LR_UL_TRIANGULATION: [Corner; 6] = [
     Corner::UpperRight,
     Corner::UpperLeft,
 ];
+
+pub static SIDE_AXES: LazyLock<EnumMap<Side, SideAxes>> = LazyLock::new(|| {
+    SIDE_CORNER_SIDES.map(|side, corner_sides| {
+        let [lower, left] = corner_sides[Corner::LowerLeft];
+        SideAxes {
+            normal: side.axis(),
+            u: left.axis(),
+            v: lower.axis(),
+        }
+    })
+});
