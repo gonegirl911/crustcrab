@@ -8,12 +8,11 @@ struct InventoryUniform {
     transform: mat4x4<f32>,
 }
 
-struct LightingUniform {
+struct ShadingUniform {
     side_factors: vec4<f32>,
-    attenuation: f32,
     ao_factor_min: f32,
     ao_factor_max: f32,
-    padding: f32,
+    light_attenuation: f32,
 }
 
 struct VertexOutput {
@@ -27,7 +26,7 @@ struct VertexOutput {
 var<uniform> inventory: InventoryUniform;
 
 @group(1) @binding(0)
-var<uniform> lighting: LightingUniform;
+var<uniform> shading: ShadingUniform;
 
 @vertex
 fn vs_main(vertex: VertexInput) -> VertexOutput {
@@ -42,7 +41,7 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 27u, 5u)),
     );
     let side_shade = extractBits(vertex.data[0], 23u, 2u);
-    let side_factor = lighting.side_factors[side_shade];
+    let side_factor = shading.side_factors[side_shade];
     return VertexOutput(
         inventory.transform * vec4(coords, 1.0),
         tex_idx,

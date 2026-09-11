@@ -31,11 +31,11 @@ brightness = 15.0
 [sky.object.night]
 brightness = 1.0
 
-[lighting]
+[shading]
 side_factors = { x = 0.6, top = 1.0, bottom = 0.5, z = 0.8 }
 ao_factor_min = 0.0
 ao_factor_max = 0.8
-attenuation = 0.8
+light_attenuation = 0.8
 
 [cloud]
 size = [12, 4]

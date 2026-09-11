@@ -24,12 +24,11 @@ struct Immediates {
     offset: vec2<f32>,
 }
 
-struct LightingUniform {
+struct ShadingUniform {
     side_factors: vec4<f32>,
-    attenuation: f32,
     ao_factor_min: f32,
     ao_factor_max: f32,
-    padding: f32,
+    light_attenuation: f32,
 }
 
 struct VertexOutput {
@@ -44,7 +43,7 @@ var<uniform> player: PlayerUniform;
 var<immediate> imm: Immediates;
 
 @group(1) @binding(0)
-var<uniform> lighting: LightingUniform;
+var<uniform> shading: ShadingUniform;
 
 @vertex
 fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -60,7 +59,7 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
     let world_pos = scaled_coords * cloud_dims + vec3(offset.x, -player.origin.y + CLOUD_ALTITUDE, offset.y);
     let scroll_xz = player.origin.xz + instance.offset - imm.offset;
     let tex_coords = scroll_xz / imm.size.x / imm.tex_dims;
-    let side_factor = lighting.side_factors[side_shade];
+    let side_factor = shading.side_factors[side_shade];
     return VertexOutput(player.vp * vec4(world_pos, 1.0), tex_coords, side_factor);
 }
 

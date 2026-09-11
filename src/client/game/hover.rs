@@ -30,14 +30,14 @@ impl BlockHover {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
-        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
             highlight: BlockHighlight::new(
                 renderer,
                 player_bind_group_layout,
                 sky_bind_group_layout,
-                lighting_bind_group_layout,
+                shading_bind_group_layout,
             ),
             data: None,
         }
@@ -49,7 +49,7 @@ impl BlockHover {
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        lighting_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
     ) {
         if let Some(BlockHoverData {
@@ -80,7 +80,7 @@ impl BlockHover {
                 }),
                 player_bind_group,
                 sky_bind_group,
-                lighting_bind_group,
+                shading_bind_group,
                 &BlockHighlightImmediates::new(hitbox, brightness),
             );
         }
@@ -108,7 +108,7 @@ impl BlockHighlight {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
-        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
             vertex_buffer: VertexBuffer::new(
@@ -122,7 +122,7 @@ impl BlockHighlight {
                 .bind_group_layouts(&[
                     player_bind_group_layout,
                     sky_bind_group_layout,
-                    lighting_bind_group_layout,
+                    shading_bind_group_layout,
                 ])
                 .immediate_size(BlockHighlightImmediates::SIZE)
                 .buffers(&[BlockHighlightVertex::desc()])
@@ -146,12 +146,12 @@ impl BlockHighlight {
         render_pass: &mut wgpu::RenderPass,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        lighting_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
         imm: &BlockHighlightImmediates,
     ) {
         self.render_pipeline.bind(
             render_pass,
-            [player_bind_group, sky_bind_group, lighting_bind_group],
+            [player_bind_group, sky_bind_group, shading_bind_group],
         );
         imm.set(render_pass);
         self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);

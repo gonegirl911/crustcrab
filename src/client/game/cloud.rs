@@ -48,7 +48,7 @@ impl CloudLayer {
         renderer: &Renderer,
         surface: &Surface,
         player_bind_group_layout: &wgpu::BindGroupLayout,
-        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&Self::vertices()));
@@ -69,7 +69,7 @@ impl CloudLayer {
             .shader_desc(read_wgsl("assets/shaders/cloud.wgsl"))
             .bind_group_layouts(&[
                 player_bind_group_layout,
-                lighting_bind_group_layout,
+                shading_bind_group_layout,
                 texture.bind_group_layout(),
             ])
             .immediate_size(CloudImmediates::SIZE)
@@ -104,7 +104,7 @@ impl CloudLayer {
         encoder: &mut wgpu::CommandEncoder,
         spare_view: &wgpu::TextureView,
         player_bind_group: &wgpu::BindGroup,
-        lighting_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         spare_bind_group: &wgpu::BindGroup,
     ) {
@@ -133,7 +133,7 @@ impl CloudLayer {
                 &mut render_pass,
                 [
                     player_bind_group,
-                    lighting_bind_group,
+                    shading_bind_group,
                     self.texture.bind_group(),
                 ],
             );

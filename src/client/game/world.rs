@@ -60,13 +60,13 @@ impl World {
         renderer: &Renderer,
         player_bind_group_layout: &wgpu::BindGroupLayout,
         sky_bind_group_layout: &wgpu::BindGroupLayout,
-        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let bind_group_layouts = &[
             player_bind_group_layout,
             sky_bind_group_layout,
-            lighting_bind_group_layout,
+            shading_bind_group_layout,
             textures_bind_group_layout,
         ];
         let render_pipelines = enum_map! {
@@ -103,7 +103,7 @@ impl World {
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
-        lighting_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         frustum: &Frustum,
@@ -115,7 +115,7 @@ impl World {
         let bind_groups = [
             player_bind_group,
             sky_bind_group,
-            lighting_bind_group,
+            shading_bind_group,
             textures_bind_group,
         ];
 
@@ -560,11 +560,11 @@ impl BlockVertex {
     }
 
     pub fn light_factor(self, nightness: f32) -> Rgb<f32> {
-        let lighting = &CLIENT_CONFIG.lighting;
+        let shading = &CLIENT_CONFIG.shading;
 
-        let side_factors = lighting.side_factors;
-        let ao_factor_min = lighting.ao_factor_min;
-        let ao_factor_max = lighting.ao_factor_max;
+        let side_factors = shading.side_factors;
+        let ao_factor_min = shading.ao_factor_min;
+        let ao_factor_max = shading.ao_factor_max;
         let ao_max = 3.0;
 
         let side_shade = self.side_shade();
@@ -576,10 +576,10 @@ impl BlockVertex {
 
     pub fn world_light(self, nightness: f32) -> Rgb<f32> {
         let sky = &CLIENT_CONFIG.sky;
-        let lighting = &CLIENT_CONFIG.lighting;
+        let shading = &CLIENT_CONFIG.shading;
 
         let sunlight_intensity = sky.sunlight_intensity(nightness);
-        let light_attenuation = lighting.attenuation;
+        let light_attenuation = shading.light_attenuation;
         let light_max = BlockLight::COMPONENT_MAX;
 
         let skylight = self.skylight();

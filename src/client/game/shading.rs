@@ -9,11 +9,11 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
 
-pub struct Lighting {
-    uniform: Uniform<LightingUniformData>,
+pub struct Shading {
+    uniform: Uniform<ShadingUniformData>,
 }
 
-impl Lighting {
+impl Shading {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
             uniform: Uniform::new(
@@ -35,31 +35,29 @@ impl Lighting {
 
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct LightingUniformData {
+struct ShadingUniformData {
     side_factors: [f32; 4],
-    attenuation: f32,
     ao_factor_min: f32,
     ao_factor_max: f32,
-    padding: f32,
+    light_attenuation: f32,
 }
 
-impl Default for LightingUniformData {
+impl Default for ShadingUniformData {
     fn default() -> Self {
-        let config = &CLIENT_CONFIG.lighting;
+        let config = &CLIENT_CONFIG.shading;
         Self {
             side_factors: config.side_factors.inner().into_array(),
-            attenuation: config.attenuation,
             ao_factor_min: config.ao_factor_min,
             ao_factor_max: config.ao_factor_max,
-            padding: Default::default(),
+            light_attenuation: config.light_attenuation,
         }
     }
 }
 
 #[derive(Deserialize)]
-pub struct LightingConfig {
+pub struct ShadingConfig {
     pub side_factors: EnumMap<SideShade, f32>,
-    pub attenuation: f32,
     pub ao_factor_min: f32,
     pub ao_factor_max: f32,
+    pub light_attenuation: f32,
 }

@@ -45,7 +45,7 @@ pub struct Inventory {
 impl Inventory {
     pub fn new(
         renderer: &Renderer,
-        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
@@ -54,7 +54,7 @@ impl Inventory {
             .shader_desc(read_wgsl("assets/shaders/inventory.wgsl"))
             .bind_group_layouts(&[
                 uniform.bind_group_layout(),
-                lighting_bind_group_layout,
+                shading_bind_group_layout,
                 textures_bind_group_layout,
             ])
             .buffers(&[BlockVertex::desc()])
@@ -87,7 +87,7 @@ impl Inventory {
     pub fn draw(
         &self,
         render_pass: &mut wgpu::RenderPass,
-        lighting_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
     ) {
         if let Some(buffer) = &self.vertex_buffer {
@@ -95,7 +95,7 @@ impl Inventory {
                 render_pass,
                 [
                     self.uniform.bind_group(),
-                    lighting_bind_group,
+                    shading_bind_group,
                     textures_bind_group,
                 ],
             );

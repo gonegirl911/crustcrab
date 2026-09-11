@@ -12,10 +12,7 @@ use crate::{
 use app::App;
 use crossbeam_channel::{Receiver, Sender};
 use game::{
-    cloud::CloudConfig,
-    gui::GuiConfig,
-    lighting::LightingConfig,
-    player::PlayerConfig,
+    cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, shading::ShadingConfig,
     sky::SkyConfig,
 };
 use nalgebra::{Point3, Vector3};
@@ -84,7 +81,7 @@ struct ClientConfig {
     player: PlayerConfig,
     sky: SkyConfig,
     cloud: CloudConfig,
-    lighting: LightingConfig,
+    shading: ShadingConfig,
     gui: GuiConfig,
 }
 

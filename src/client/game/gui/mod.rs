@@ -24,7 +24,7 @@ impl Gui {
     pub fn new(
         renderer: &Renderer,
         surface: &Surface,
-        lighting_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_bind_group_layout: &wgpu::BindGroupLayout,
         input_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
@@ -33,7 +33,7 @@ impl Gui {
             crosshair: Crosshair::new(renderer, surface, input_bind_group_layout),
             inventory: Inventory::new(
                 renderer,
-                lighting_bind_group_layout,
+                shading_bind_group_layout,
                 textures_bind_group_layout,
             ),
         }
@@ -43,7 +43,7 @@ impl Gui {
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        lighting_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
         input_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
@@ -85,7 +85,7 @@ impl Gui {
                 }),
                 ..Default::default()
             }),
-            lighting_bind_group,
+            shading_bind_group,
             textures_bind_group,
         );
     }
