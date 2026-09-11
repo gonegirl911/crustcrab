@@ -103,9 +103,9 @@ impl IndexMut<Vector3<i8>> for BlockArea {
 }
 
 #[derive(Default)]
-pub struct BlockAreaLight([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
+pub struct BlockLightArea([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
-impl BlockAreaLight {
+impl BlockLightArea {
     pub fn from_fn<F: FnMut(Vector3<i8>) -> BlockLight>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(BlockArea::delta_unchecked([x, y, z]))))
@@ -151,7 +151,7 @@ impl BlockAreaLight {
     }
 }
 
-impl Index<Vector3<i8>> for BlockAreaLight {
+impl Index<Vector3<i8>> for BlockLightArea {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {

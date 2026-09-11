@@ -1,6 +1,6 @@
 use super::{
     Block, BlockLight,
-    area::{BlockArea, BlockAreaLight},
+    area::{BlockArea, BlockLightArea},
     model::{Model, RawModel},
 };
 use crate::{
@@ -63,7 +63,7 @@ impl BlockData {
         &self,
         coords: Point3<u8>,
         area: &BlockArea,
-        area_light: &BlockAreaLight,
+        light_area: &BlockLightArea,
     ) -> impl Iterator<Item = BlockVertex> {
         let is_externally_lit = self.is_externally_lit();
         Enum::variants()
@@ -75,7 +75,7 @@ impl BlockData {
                     point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(side, is_externally_lit),
-                    area_light.corner_lights(side, area),
+                    light_area.corner_lights(side, area),
                 )
             })
     }

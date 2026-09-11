@@ -21,12 +21,12 @@ use crate::{
 use action::{ActionStore, BlockAction};
 use block::{
     Block, BlockLight,
-    area::{BlockArea, BlockAreaLight},
+    area::{BlockArea, BlockLightArea},
     data::{Corner, RenderLayer, SIDE_AXES, Side},
 };
 use chunk::{
     Chunk, ChunkDataStore,
-    area::{ChunkArea, ChunkAreaLight},
+    area::{ChunkArea, ChunkLightArea},
     generator::ChunkGenerator,
     visibility::VisibilityGraph,
 };
@@ -312,7 +312,7 @@ impl EventHandler<WorldEvent> for World {
                             BlockHoverData::new(
                                 coords,
                                 &self.chunks.block_area(coords),
-                                &self.light.block_area_light(coords),
+                                &self.light.block_light_area(coords),
                             )
                         },
                     )));
@@ -511,7 +511,7 @@ impl Branch {
 #[derive(Serialize, Deserialize)]
 pub struct ChunkData {
     area: ChunkArea,
-    area_light: ChunkAreaLight,
+    light_area: ChunkLightArea,
     pub visibility_graph: VisibilityGraph,
 }
 
@@ -519,7 +519,7 @@ impl ChunkData {
     fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Self {
         Self {
             area: chunks.chunk_area(coords),
-            area_light: light.chunk_area_light(coords),
+            light_area: light.chunk_light_area(coords),
             visibility_graph: chunks[coords].visibility_graph,
         }
     }
@@ -528,11 +528,11 @@ impl ChunkData {
         let mut vertices = EnumMap::<_, Vec<_>>::default();
         let areas = ChunkDataStore::from_fn(|coords| {
             let area = self.area.block_area(coords);
-            let area_light = self.area_light.block_area_light(coords);
+            let light_area = self.light_area.block_light_area(coords);
             let data = area.kernel().data();
 
             if data.render_layer == RenderLayer::Blended {
-                vertices[RenderLayer::Blended].extend(data.mesh(coords, &area, &area_light));
+                vertices[RenderLayer::Blended].extend(data.mesh(coords, &area, &light_area));
             } else {
                 vertices[data.render_layer].extend(data.vertices(
                     None,
@@ -540,11 +540,11 @@ impl ChunkData {
                     point![1, 1, 1],
                     point![1, 1],
                     area.corner_aos(None, data.is_externally_lit()),
-                    area_light.corner_lights(None, &area),
+                    light_area.corner_lights(None, &area),
                 ));
             }
 
-            (area, area_light)
+            (area, light_area)
         });
 
         for side in Enum::variants() {
@@ -634,7 +634,7 @@ struct Quad {
 }
 
 impl Quad {
-    fn new(side: Side, area: &BlockArea, area_light: &BlockAreaLight) -> Option<Self> {
+    fn new(side: Side, area: &BlockArea, light_area: &BlockLightArea) -> Option<Self> {
         let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
@@ -642,7 +642,7 @@ impl Quad {
             Self {
                 block,
                 corner_aos: area.corner_aos(Some(side), is_externally_lit),
-                corner_lights: area_light.corner_lights(Some(side), area),
+                corner_lights: light_area.corner_lights(Some(side), area),
             }
         })
     }
@@ -682,11 +682,11 @@ pub struct BlockHoverData {
 }
 
 impl BlockHoverData {
-    fn new(coords: Point3<i64>, area: &BlockArea, area_light: &BlockAreaLight) -> Self {
+    fn new(coords: Point3<i64>, area: &BlockArea, light_area: &BlockLightArea) -> Self {
         let data = area.kernel().data();
         let hitbox = data.model.hitbox(coords);
         let brightness = data
-            .mesh(utils::block_coords(coords), area, area_light)
+            .mesh(utils::block_coords(coords), area, light_area)
             .max_by(|a, b| {
                 let a = a.world_light(0.0).lum();
                 let b = b.world_light(0.0).lum();

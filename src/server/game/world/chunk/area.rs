@@ -1,7 +1,7 @@
 use super::Chunk;
 use crate::server::game::world::block::{
     Block, BlockLight,
-    area::{BlockArea, BlockAreaLight},
+    area::{BlockArea, BlockLightArea},
 };
 use nalgebra::{Point3, Vector3, vector};
 use serde::{
@@ -69,11 +69,11 @@ impl IndexMut<Vector3<i8>> for ChunkArea {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct ChunkAreaLight(ChunkAreaDataStore<BlockLight>);
+pub struct ChunkLightArea(ChunkAreaDataStore<BlockLight>);
 
-impl ChunkAreaLight {
-    pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
-        BlockAreaLight::from_fn(|delta| self[coords.coords.cast() + delta])
+impl ChunkLightArea {
+    pub fn block_light_area(&self, coords: Point3<u8>) -> BlockLightArea {
+        BlockLightArea::from_fn(|delta| self[coords.coords.cast() + delta])
     }
 
     pub fn copy_row(&mut self, delta: Vector3<i8>, src: &[BlockLight]) {
@@ -81,7 +81,7 @@ impl ChunkAreaLight {
     }
 }
 
-impl Index<Vector3<i8>> for ChunkAreaLight {
+impl Index<Vector3<i8>> for ChunkLightArea {
     type Output = BlockLight;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
@@ -89,7 +89,7 @@ impl Index<Vector3<i8>> for ChunkAreaLight {
     }
 }
 
-impl IndexMut<Vector3<i8>> for ChunkAreaLight {
+impl IndexMut<Vector3<i8>> for ChunkLightArea {
     fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
         &mut self.0[delta]
     }

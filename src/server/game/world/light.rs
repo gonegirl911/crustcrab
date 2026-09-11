@@ -3,12 +3,12 @@ use super::{
     action::BlockAction,
     block::{
         Block, BlockLight,
-        area::{BlockArea, BlockAreaLight},
+        area::{BlockArea, BlockLightArea},
         data::{BlockData, SIDE_DELTAS, Side},
     },
     chunk::{
         Chunk, ChunkLight,
-        area::{ChunkArea, ChunkAreaLight},
+        area::{ChunkArea, ChunkLightArea},
     },
     height::HeightMap,
 };
@@ -28,8 +28,8 @@ use std::{
 pub struct WorldLight(FxHashMap<Point3<i32>, Box<ChunkLight>>);
 
 impl WorldLight {
-    pub fn chunk_area_light(&self, coords: Point3<i32>) -> ChunkAreaLight {
-        let mut value = ChunkAreaLight::default();
+    pub fn chunk_light_area(&self, coords: Point3<i32>) -> ChunkLightArea {
+        let mut value = ChunkLightArea::default();
         for delta in ChunkArea::chunk_deltas() {
             if let Some(light) = self.get(coords + delta) {
                 let [dx, dy, dz] = delta.into();
@@ -49,8 +49,8 @@ impl WorldLight {
         value
     }
 
-    pub fn block_area_light(&self, coords: Point3<i64>) -> BlockAreaLight {
-        BlockAreaLight::from_fn(|delta| self.block_light(coords + delta.cast()))
+    pub fn block_light_area(&self, coords: Point3<i64>) -> BlockLightArea {
+        BlockLightArea::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
     pub fn extend_placeholders<P>(&mut self, heights: &HeightMap, new_surface_points: P)
