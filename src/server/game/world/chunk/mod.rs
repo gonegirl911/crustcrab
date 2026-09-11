@@ -77,6 +77,10 @@ impl Chunk {
         self.visibility_graph = VisibilityGraph::compute(opaque_set);
     }
 
+    pub fn row(&self, coords: Point3<u8>, len: usize) -> &[Block] {
+        self.blocks.row(coords, len)
+    }
+
     pub fn as_slice(&self) -> &[Block] {
         self.blocks.as_slice()
     }
@@ -176,6 +180,10 @@ impl ChunkLight {
     pub fn is_empty(&self) -> bool {
         self.non_zero_count == 0
     }
+
+    pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
+        self.lights.row(coords, len)
+    }
 }
 
 impl Index<Point3<u8>> for ChunkLight {
@@ -194,6 +202,10 @@ impl<T> ChunkDataStore<T> {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
+    }
+
+    fn row(&self, coords: Point3<u8>, len: usize) -> &[T] {
+        &self.0[coords.x as usize][coords.y as usize][coords.z as usize..][..len]
     }
 
     fn as_slice(&self) -> &[T] {

@@ -356,8 +356,17 @@ impl ChunkStore {
         let mut value = ChunkArea::default();
         for delta in ChunkArea::chunk_deltas() {
             if let Some(chunk) = self.get(coords + delta) {
-                for (coords, delta) in ChunkArea::block_deltas(delta) {
-                    value[delta] = chunk[coords];
+                let [dx, dy, dz] = delta.into();
+                for x in ChunkArea::block_axis_range(dx) {
+                    for y in ChunkArea::block_axis_range(dy) {
+                        let z = ChunkArea::block_axis_range(dz);
+                        value.copy_row(
+                            utils::coords(point![dx, dy, dz], point![x, y, z.start])
+                                .coords
+                                .cast(),
+                            chunk.row(point![x, y, z.start], z.len()),
+                        );
+                    }
                 }
             }
         }

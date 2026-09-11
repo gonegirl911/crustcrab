@@ -13,7 +13,7 @@ use super::{
     height::HeightMap,
 };
 use crate::shared::{enum_map::Enum, utils};
-use nalgebra::Point3;
+use nalgebra::{Point3, point};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -32,8 +32,17 @@ impl WorldLight {
         let mut value = ChunkAreaLight::default();
         for delta in ChunkArea::chunk_deltas() {
             if let Some(light) = self.get(coords + delta) {
-                for (coords, delta) in ChunkArea::block_deltas(delta) {
-                    value[delta] = light[coords];
+                let [dx, dy, dz] = delta.into();
+                for x in ChunkArea::block_axis_range(dx) {
+                    for y in ChunkArea::block_axis_range(dy) {
+                        let z = ChunkArea::block_axis_range(dz);
+                        value.copy_row(
+                            utils::coords(point![dx, dy, dz], point![x, y, z.start])
+                                .coords
+                                .cast(),
+                            light.row(point![x, y, z.start], z.len()),
+                        );
+                    }
                 }
             }
         }

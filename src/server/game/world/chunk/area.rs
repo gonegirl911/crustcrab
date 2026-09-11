@@ -1,12 +1,9 @@
 use super::Chunk;
-use crate::{
-    server::game::world::block::{
-        Block, BlockLight,
-        area::{BlockArea, BlockAreaLight},
-    },
-    shared::utils,
+use crate::server::game::world::block::{
+    Block, BlockLight,
+    area::{BlockArea, BlockAreaLight},
 };
-use nalgebra::{Point3, Vector3, point, vector};
+use nalgebra::{Point3, Vector3, vector};
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{self, SeqAccess, Visitor},
@@ -32,6 +29,10 @@ impl ChunkArea {
         BlockArea::from_fn(|delta| self[coords.coords.cast() + delta])
     }
 
+    pub fn copy_row(&mut self, delta: Vector3<i8>, src: &[Block]) {
+        self.0.copy_row(delta, src);
+    }
+
     pub fn chunk_points(coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
         Self::chunk_deltas().map(move |delta| coords + delta)
     }
@@ -42,23 +43,7 @@ impl ChunkArea {
         })
     }
 
-    pub fn block_deltas(delta: Vector3<i32>) -> impl Iterator<Item = (Point3<u8>, Vector3<i8>)> {
-        let [dx, dy, dz] = delta.into();
-        Self::block_axis_range(dx).flat_map(move |x| {
-            Self::block_axis_range(dy).flat_map(move |y| {
-                Self::block_axis_range(dz).map(move |z| {
-                    (
-                        point![x, y, z],
-                        utils::coords(point![dx, dy, dz], point![x, y, z])
-                            .cast()
-                            .coords,
-                    )
-                })
-            })
-        })
-    }
-
-    fn block_axis_range(dc: i32) -> Range<u8> {
+    pub fn block_axis_range(dc: i32) -> Range<u8> {
         if dc == Self::AXIS_RANGE.start {
             (Chunk::DIM - Self::REM) as u8..Chunk::DIM as u8
         } else if dc == Self::AXIS_RANGE.end - 1 {
@@ -90,6 +75,10 @@ impl ChunkAreaLight {
     pub fn block_area_light(&self, coords: Point3<u8>) -> BlockAreaLight {
         BlockAreaLight::from_fn(|delta| self[coords.coords.cast() + delta])
     }
+
+    pub fn copy_row(&mut self, delta: Vector3<i8>, src: &[BlockLight]) {
+        self.0.copy_row(delta, src);
+    }
 }
 
 impl Index<Vector3<i8>> for ChunkAreaLight {
@@ -118,6 +107,13 @@ impl<T> ChunkAreaDataStore<T> {
         delta
             .map(|c| (c + BlockArea::PADDING as i8) as usize)
             .into()
+    }
+}
+
+impl<T: Copy> ChunkAreaDataStore<T> {
+    fn copy_row(&mut self, delta: Vector3<i8>, src: &[T]) {
+        let [x, y, z] = Self::index_unchecked(delta);
+        self.0[x][y][z..][..src.len()].copy_from_slice(src);
     }
 }
 
