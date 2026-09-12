@@ -490,16 +490,20 @@ impl ChunkMesh {
                 .cast()
                 / v.len() as f32
         });
-        let is_empty = opaque_part.is_none()
-            && cutout_part.is_none()
-            && blended_part.is_none()
-            && visibility_graph == VisibilityGraph::ALL_CONNECTED;
-        (!is_empty).then_some(Self {
-            opaque_part,
-            cutout_part,
-            blended_part,
-            visibility_graph,
-        })
+        if opaque_part.is_some()
+            || cutout_part.is_some()
+            || blended_part.is_some()
+            || visibility_graph != VisibilityGraph::ALL_CONNECTED
+        {
+            Some(Self {
+                opaque_part,
+                cutout_part,
+                blended_part,
+                visibility_graph,
+            })
+        } else {
+            None
+        }
     }
 }
 

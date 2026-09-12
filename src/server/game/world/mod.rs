@@ -343,15 +343,6 @@ impl EventHandler<WorldEvent> for World {
 pub struct ChunkStore(FxHashMap<Point3<i32>, Box<Chunk>>);
 
 impl ChunkStore {
-    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords).map(|v| &**v)
-    }
-
-    fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(utils::chunk_coords(coords))
-            .map_or_default(|chunk| chunk[utils::block_coords(coords)])
-    }
-
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
         for delta in ChunkArea::chunk_deltas() {
@@ -375,6 +366,15 @@ impl ChunkStore {
 
     fn block_area(&self, coords: Point3<i64>) -> BlockArea {
         BlockArea::from_fn(|delta| self.block(coords + delta.cast()))
+    }
+
+    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
+        self.0.get(&coords).map(|v| &**v)
+    }
+
+    fn block(&self, coords: Point3<i64>) -> Block {
+        self.get(utils::chunk_coords(coords))
+            .map_or_default(|chunk| chunk[utils::block_coords(coords)])
     }
 }
 
@@ -638,13 +638,15 @@ impl Quad {
         let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
-        (data.render_layer != RenderLayer::Blended && area.is_side_visible(Some(side))).then(|| {
-            Self {
+        if data.render_layer != RenderLayer::Blended && area.is_side_visible(Some(side)) {
+            Some(Self {
                 block,
                 corner_aos: area.corner_aos(Some(side), is_externally_lit),
                 corner_lights: light_area.corner_lights(Some(side), area),
-            }
-        })
+            })
+        } else {
+            None
+        }
     }
 
     fn vertices(

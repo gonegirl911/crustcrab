@@ -6,10 +6,9 @@ use crate::{enum_map, shared::enum_map::EnumMap};
 use nalgebra::{Point3, Vector3, vector};
 use std::{
     array,
-    ops::{Index, IndexMut, Range},
+    ops::{Index, Range},
 };
 
-#[derive(Default)]
 pub struct BlockArea([[[Block; Self::DIM]; Self::DIM]; Self::DIM]);
 
 impl BlockArea {
@@ -83,14 +82,6 @@ impl Index<Vector3<i8>> for BlockArea {
     }
 }
 
-impl IndexMut<Vector3<i8>> for BlockArea {
-    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = Self::index_unchecked(delta);
-        &mut self.0[x][y][z]
-    }
-}
-
-#[derive(Default)]
 pub struct BlockLightArea([[[BlockLight; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl BlockLightArea {
