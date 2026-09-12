@@ -52,7 +52,8 @@ impl BlockArea {
     }
 
     fn ao(&self, side: Side, corner: Corner) -> u8 {
-        let components = self.components(side, corner);
+        let components = SIDE_CORNER_COMPONENT_DELTAS[side][corner]
+            .map(|_, delta| self[delta].data().is_opaque());
         let edge1 = components[Component::Edge1];
         let edge2 = components[Component::Edge2];
         let corner = components[Component::Corner];
@@ -61,10 +62,6 @@ impl BlockArea {
         } else {
             edge1 as u8 + edge2 as u8 + corner as u8
         }
-    }
-
-    fn components(&self, side: Side, corner: Corner) -> EnumMap<Component, bool> {
-        SIDE_CORNER_COMPONENT_DELTAS[side][corner].map(|_, delta| self[delta].data().is_opaque())
     }
 
     pub fn points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {

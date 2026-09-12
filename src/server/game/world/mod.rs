@@ -554,8 +554,8 @@ impl ChunkData {
                 let mut quads = array::from_fn(|v| {
                     array::from_fn(|u| {
                         let coords = axes.swizzle(point![normal, u as u8, v as u8]);
-                        let (area, area_light) = &areas[coords];
-                        Quad::new(side, area, area_light)
+                        let (area, light_area) = &areas[coords];
+                        Quad::new(side, area, light_area)
                     })
                 });
                 let plane = normal + side.is_positive() as u8;
