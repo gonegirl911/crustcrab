@@ -23,11 +23,6 @@ impl BlockArea {
         }))
     }
 
-    pub fn with_kernel(mut self, kernel: Block) -> Self {
-        *self.kernel_mut() = kernel;
-        self
-    }
-
     pub fn is_side_visible(&self, side: Option<Side>) -> bool {
         side.is_none_or(|side| {
             let neighbor = self[SIDE_DELTAS[side]];
@@ -45,10 +40,6 @@ impl BlockArea {
 
     pub fn kernel(&self) -> Block {
         self[Default::default()]
-    }
-
-    fn kernel_mut(&mut self) -> &mut Block {
-        &mut self[Default::default()]
     }
 
     fn ao(&self, side: Side, corner: Corner) -> u8 {

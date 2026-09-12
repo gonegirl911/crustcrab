@@ -80,6 +80,19 @@ impl BlockData {
             })
     }
 
+    pub fn isolated_mesh(&self) -> impl Iterator<Item = BlockVertex> {
+        Enum::variants().flat_map(|side| {
+            self.vertices(
+                side,
+                Default::default(),
+                point![1, 1, 1],
+                point![1, 1],
+                Default::default(),
+                Default::default(),
+            )
+        })
+    }
+
     pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex>> {
         let tex_idx = self.model.flat_icon()?;
         let corner_deltas = SIDE_CORNER_DELTAS[Side::Front];

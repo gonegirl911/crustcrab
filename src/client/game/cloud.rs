@@ -16,10 +16,7 @@ use crate::{
         ServerEvent,
         game::{
             clock::Time,
-            world::{
-                block::{Block, area::BlockArea},
-                chunk::Chunk,
-            },
+            world::{block::Block, chunk::Chunk},
         },
     },
     shared::{
@@ -51,7 +48,10 @@ impl CloudLayer {
         shading_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let vertex_buffer = VertexBuffer::new(renderer, MemoryState::Immutable(&Self::vertices()));
+        let vertex_buffer = VertexBuffer::new(
+            renderer,
+            MemoryState::Immutable(&Self::vertices().collect::<Vec<_>>()),
+        );
         let instance_buffer = VertexBuffer::new(
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
@@ -143,15 +143,8 @@ impl CloudLayer {
         self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
     }
 
-    fn vertices() -> Vec<BlockVertex> {
-        Block::SAND
-            .data()
-            .mesh(
-                Default::default(),
-                &BlockArea::default().with_kernel(Block::SAND),
-                &Default::default(),
-            )
-            .collect()
+    fn vertices() -> impl Iterator<Item = BlockVertex> {
+        Block::SAND.data().isolated_mesh()
     }
 
     fn instances() -> impl Iterator<Item = CloudInstance> {

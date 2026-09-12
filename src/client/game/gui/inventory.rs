@@ -14,10 +14,7 @@ use crate::{
             utils::{Vertex, read_wgsl},
         },
     },
-    server::{
-        ServerEvent,
-        game::world::block::{Block, area::BlockArea},
-    },
+    server::{ServerEvent, game::world::block::Block},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
@@ -154,12 +151,7 @@ impl EventHandler for Inventory {
                                 is_icon_flat = true;
                                 vertices.collect::<Vec<_>>()
                             } else {
-                                data.mesh(
-                                    Default::default(),
-                                    &BlockArea::default().with_kernel(block),
-                                    &Default::default(),
-                                )
-                                .collect()
+                                data.isolated_mesh().collect()
                             };
                             VertexBuffer::try_new(renderer, MemoryState::Immutable(&vertices))
                         });
