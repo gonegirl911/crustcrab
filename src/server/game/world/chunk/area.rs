@@ -13,7 +13,7 @@ use std::{
     fmt::{self, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
-    ops::{Index, IndexMut, Range},
+    ops::{Index, Range},
 };
 
 #[derive(Default, Serialize, Deserialize)]
@@ -62,12 +62,6 @@ impl Index<Vector3<i8>> for ChunkArea {
     }
 }
 
-impl IndexMut<Vector3<i8>> for ChunkArea {
-    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        &mut self.0[delta]
-    }
-}
-
 #[derive(Default, Serialize, Deserialize)]
 pub struct ChunkLightArea(ChunkAreaDataStore<BlockLight>);
 
@@ -86,12 +80,6 @@ impl Index<Vector3<i8>> for ChunkLightArea {
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
         &self.0[delta]
-    }
-}
-
-impl IndexMut<Vector3<i8>> for ChunkLightArea {
-    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        &mut self.0[delta]
     }
 }
 
@@ -140,13 +128,6 @@ impl<T> Index<Vector3<i8>> for ChunkAreaDataStore<T> {
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
         let [x, y, z] = Self::index_unchecked(delta);
         &self.0[x][y][z]
-    }
-}
-
-impl<T> IndexMut<Vector3<i8>> for ChunkAreaDataStore<T> {
-    fn index_mut(&mut self, delta: Vector3<i8>) -> &mut Self::Output {
-        let [x, y, z] = Self::index_unchecked(delta);
-        &mut self.0[x][y][z]
     }
 }
 
