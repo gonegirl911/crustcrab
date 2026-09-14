@@ -53,15 +53,13 @@ impl WorldLight {
         BlockLightArea::from_fn(|delta| self.block_light(coords + delta.cast()))
     }
 
-    pub fn extend_placeholders<P>(&mut self, heights: &HeightMap, new_surface_points: P)
+    pub fn extend_placeholders<P>(&mut self, new_surface_points: P)
     where
         P: IntoIterator<Item = Point3<i32>>,
     {
         for coords in new_surface_points {
             for neighbor_coords in ChunkArea::chunk_points(coords) {
-                if let Some(&max_y) = heights.0.get(&neighbor_coords.xz())
-                    && neighbor_coords.y > max_y
-                {
+                if neighbor_coords.y > coords.y {
                     self.0
                         .entry(neighbor_coords)
                         .or_insert_with(|| ChunkLight::placeholder().into());
