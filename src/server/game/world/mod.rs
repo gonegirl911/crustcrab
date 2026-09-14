@@ -21,11 +21,11 @@ use crate::{
 use action::{ActionStore, BlockAction};
 use block::{
     Block, BlockLight,
-    area::{BlockArea, BlockLightArea},
+    area::{BlockArea, BlockAreaSource, BlockContext, BlockLightAreaSource},
     data::{Corner, RenderLayer, SIDE_AXES, Side},
 };
 use chunk::{
-    Chunk, ChunkDataStore,
+    Chunk,
     area::{ChunkArea, ChunkLightArea},
     generator::ChunkGenerator,
     visibility::VisibilityGraph,
@@ -526,9 +526,10 @@ impl ChunkData {
 
     pub fn vertices(&self) -> EnumMap<RenderLayer, Vec<BlockVertex>> {
         let mut vertices = EnumMap::<_, Vec<_>>::default();
-        let areas = ChunkDataStore::from_fn(|coords| {
-            let area = self.area.block_area(coords);
-            let light_area = self.light_area.block_light_area(coords);
+
+        for coords in Chunk::points() {
+            let area = self.area.block_area_view(coords);
+            let light_area = self.light_area.block_light_area_view(coords);
             let data = area.kernel().data();
 
             if data.render_layer == RenderLayer::Blended {
@@ -543,9 +544,7 @@ impl ChunkData {
                     light_area.corner_lights(None, &area),
                 ));
             }
-
-            (area, light_area)
-        });
+        }
 
         for side in Enum::variants() {
             let axes = SIDE_AXES[side];
@@ -554,8 +553,11 @@ impl ChunkData {
                 let mut quads = array::from_fn(|v| {
                     array::from_fn(|u| {
                         let coords = axes.swizzle(point![normal, u as u8, v as u8]);
-                        let (area, light_area) = &areas[coords];
-                        Quad::new(side, area, light_area)
+                        Quad::new(
+                            side,
+                            &self.area.block_area_view(coords),
+                            &self.light_area.block_light_area_view(coords),
+                        )
                     })
                 });
                 let plane = normal + side.is_positive() as u8;
@@ -634,7 +636,11 @@ struct Quad {
 }
 
 impl Quad {
-    fn new(side: Side, area: &BlockArea, light_area: &BlockLightArea) -> Option<Self> {
+    fn new(
+        side: Side,
+        area: &BlockContext<impl BlockAreaSource>,
+        light_area: &BlockContext<impl BlockLightAreaSource>,
+    ) -> Option<Self> {
         let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
@@ -684,7 +690,11 @@ pub struct BlockHoverData {
 }
 
 impl BlockHoverData {
-    fn new(coords: Point3<i64>, area: &BlockArea, light_area: &BlockLightArea) -> Self {
+    fn new(
+        coords: Point3<i64>,
+        area: &BlockContext<impl BlockAreaSource>,
+        light_area: &BlockContext<impl BlockLightAreaSource>,
+    ) -> Self {
         let data = area.kernel().data();
         let hitbox = data.model.hitbox(coords);
         let brightness = data

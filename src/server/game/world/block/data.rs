@@ -1,6 +1,6 @@
 use super::{
     Block, BlockLight,
-    area::{BlockArea, BlockLightArea},
+    area::{BlockAreaSource, BlockContext, BlockLightAreaSource},
     model::{Model, RawModel},
 };
 use crate::{
@@ -62,8 +62,8 @@ impl BlockData {
     pub fn mesh(
         &self,
         coords: Point3<u8>,
-        area: &BlockArea,
-        light_area: &BlockLightArea,
+        area: &BlockContext<impl BlockAreaSource>,
+        light_area: &BlockContext<impl BlockLightAreaSource>,
     ) -> impl Iterator<Item = BlockVertex> {
         let is_externally_lit = self.is_externally_lit();
         Enum::variants()

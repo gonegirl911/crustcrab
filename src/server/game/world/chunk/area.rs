@@ -1,7 +1,7 @@
 use super::Chunk;
 use crate::server::game::world::block::{
     Block, BlockLight,
-    area::{BlockArea, BlockLightArea},
+    area::{BlockArea, BlockAreaView, BlockLightAreaView},
 };
 use nalgebra::{Point3, Vector3, vector};
 use serde::{
@@ -25,8 +25,8 @@ impl ChunkArea {
     const AXIS_RANGE: Range<i32> = -(Self::PADDING as i32)..1 + Self::PADDING as i32;
     const REM: usize = BlockArea::PADDING % Chunk::DIM;
 
-    pub fn block_area(&self, coords: Point3<u8>) -> BlockArea {
-        BlockArea::from_fn(|delta| self[coords.coords.cast() + delta])
+    pub fn block_area_view(&self, coords: Point3<u8>) -> BlockAreaView<'_> {
+        BlockAreaView::new(&self.0, coords)
     }
 
     pub fn copy_row(&mut self, delta: Vector3<i8>, src: &[Block]) {
@@ -66,8 +66,8 @@ impl Index<Vector3<i8>> for ChunkArea {
 pub struct ChunkLightArea(ChunkAreaDataStore<BlockLight>);
 
 impl ChunkLightArea {
-    pub fn block_light_area(&self, coords: Point3<u8>) -> BlockLightArea {
-        BlockLightArea::from_fn(|delta| self[coords.coords.cast() + delta])
+    pub fn block_light_area_view(&self, coords: Point3<u8>) -> BlockLightAreaView<'_> {
+        BlockLightAreaView::new(&self.0, coords)
     }
 
     pub fn copy_row(&mut self, delta: Vector3<i8>, src: &[BlockLight]) {
@@ -84,7 +84,7 @@ impl Index<Vector3<i8>> for ChunkLightArea {
 }
 
 #[derive(Default)]
-struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
+pub struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
 impl<T> ChunkAreaDataStore<T> {
     fn as_slice(&self) -> &[T] {
