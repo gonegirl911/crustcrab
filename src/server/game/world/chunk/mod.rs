@@ -81,10 +81,6 @@ impl Chunk {
         self.blocks.row(coords, len)
     }
 
-    pub fn as_slice(&self) -> &[Block] {
-        self.blocks.as_slice()
-    }
-
     fn adjust_counts(&mut self, prev: Block, curr: Block) {
         self.non_air_count -= (prev != Block::AIR) as u16;
         self.non_air_count += (curr != Block::AIR) as u16;
@@ -140,7 +136,7 @@ impl Index<Point3<u8>> for Chunk {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ChunkLight {
     lights: ChunkDataStore<BlockLight>,
     non_zero_count: u16,
@@ -168,15 +164,6 @@ impl ChunkLight {
         }
     }
 
-    pub fn set_unchecked(&mut self, coords: Point3<u8>, value: BlockLight) {
-        let prev = mem::replace(&mut self.lights[coords], value);
-        if prev == Default::default() {
-            self.non_zero_count += 1;
-        } else if value == Default::default() {
-            self.non_zero_count -= 1;
-        }
-    }
-
     pub fn is_empty(&self) -> bool {
         self.non_zero_count == 0
     }
@@ -194,7 +181,7 @@ impl Index<Point3<u8>> for ChunkLight {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct ChunkDataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
 impl<T> ChunkDataStore<T> {
@@ -206,10 +193,6 @@ impl<T> ChunkDataStore<T> {
 
     fn row(&self, coords: Point3<u8>, len: usize) -> &[T] {
         &self.0[coords.x as usize][coords.y as usize][coords.z as usize..][..len]
-    }
-
-    fn as_slice(&self) -> &[T] {
-        self.0.as_flattened().as_flattened()
     }
 }
 

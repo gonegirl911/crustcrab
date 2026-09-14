@@ -44,7 +44,6 @@ use std::{
     time::Instant,
 };
 use uuid::Uuid;
-use winit::event::WindowEvent;
 
 pub struct World {
     meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
@@ -436,7 +435,7 @@ impl EventHandler for World {
                 }
                 _ => {}
             },
-            Event::WindowEvent(WindowEvent::RedrawRequested) => {
+            Event::AboutToWait => {
                 while let Ok((output, group_id)) = self.group_workers.try_recv() {
                     self.process_output(renderer, Ok(output), Some(group_id));
                 }

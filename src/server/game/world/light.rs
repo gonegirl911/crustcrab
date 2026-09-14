@@ -18,10 +18,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp::Ordering,
-    collections::{
-        VecDeque,
-        hash_map::{Entry, VacantEntry},
-    },
+    collections::{VecDeque, hash_map::Entry},
 };
 
 #[derive(Default)]
@@ -73,6 +70,7 @@ impl WorldLight {
         chunks: &ChunkStore,
         heights: &HeightMap,
         points: &[Point3<i32>],
+        collect_hits: bool,
     ) -> Vec<Point3<i64>> {
         if points.is_empty() {
             return vec![];
@@ -94,9 +92,11 @@ impl WorldLight {
                     let light = self.get(chunk_coords);
 
                     if chunk.is_glowing() {
-                        for (block_coords, &block) in Chunk::points().zip(chunk.as_slice()) {
+                        for block_coords in Chunk::points() {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
+                            for (i, c) in BlockLight::TORCHLIGHT_RANGE
+                                .zip(chunk[block_coords].data().luminance)
+                            {
                                 branch.insert(i, node.with_value(c));
                             }
                         }
@@ -134,7 +134,7 @@ impl WorldLight {
             )
             .map(|branch| branch.evaluate(chunks, self))
             .reduce(Default::default, Branch::sup)
-            .merge(self)
+            .merge(self, collect_hits)
     }
 
     pub fn apply<A>(&mut self, chunks: &ChunkStore, actions: A) -> Vec<Point3<i64>>
@@ -152,7 +152,7 @@ impl WorldLight {
                 }
             }
         }
-        branch.merge(self)
+        branch.merge(self, true)
     }
 
     fn get(&self, coords: Point3<i32>) -> Option<&ChunkLight> {
@@ -231,7 +231,7 @@ impl<'a> LazyBranch<'a> {
 
 #[derive(Default)]
 struct Branch {
-    values: FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockLight>>,
+    values: FxHashMap<Point3<i32>, Box<ChunkLight>>,
 }
 
 impl Branch {
@@ -268,53 +268,58 @@ impl Branch {
     }
 
     fn sup(mut self, other: Self) -> Self {
-        for (chunk_coords, values) in other.values {
+        for (chunk_coords, other) in other.values {
             match self.values.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
-                    for (block_coords, value) in values {
-                        entry
-                            .get_mut()
-                            .entry(block_coords)
-                            .and_modify(|light| *light = light.sup(value))
-                            .or_insert(value);
+                    let values = entry.get_mut();
+                    for block_coords in Chunk::points() {
+                        let value = values[block_coords].sup(other[block_coords]);
+                        values.set(block_coords, value);
                     }
                 }
                 Entry::Vacant(entry) => {
-                    entry.insert(values);
+                    entry.insert(other);
                 }
             }
         }
         self
     }
 
-    fn merge(self, light: &mut WorldLight) -> Vec<Point3<i64>> {
+    fn merge(self, light: &mut WorldLight, collect_hits: bool) -> Vec<Point3<i64>> {
         let mut hits = vec![];
         for (chunk_coords, values) in self.values {
             match light.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let light = entry.get_mut();
-                    for (block_coords, value) in values {
-                        if light.set(block_coords, value) {
-                            hits.push(utils::coords(chunk_coords, block_coords));
-                        }
+
+                    if collect_hits {
+                        hits.extend(
+                            Chunk::points()
+                                .filter(|&block_coords| values[block_coords] != light[block_coords])
+                                .map(|block_coords| utils::coords(chunk_coords, block_coords)),
+                        );
                     }
-                    if light.is_empty() {
+
+                    if values.is_empty() {
                         entry.remove();
+                    } else {
+                        *light = values;
                     }
                 }
                 Entry::Vacant(entry) => {
-                    let mut values = values
-                        .into_iter()
-                        .filter(|(_, value)| *value != Default::default())
-                        .peekable();
-
-                    if values.peek().is_some() {
-                        let light = entry.insert(Default::default());
-                        for (block_coords, value) in values {
-                            light.set_unchecked(block_coords, value);
-                            hits.push(utils::coords(chunk_coords, block_coords));
-                        }
+                    if values.is_empty() {
+                        continue;
                     }
+
+                    if collect_hits {
+                        hits.extend(
+                            Chunk::points()
+                                .filter(|&block_coords| values[block_coords] != Default::default())
+                                .map(|block_coords| utils::coords(chunk_coords, block_coords)),
+                        );
+                    }
+
+                    entry.insert(values);
                 }
             }
         }
@@ -330,14 +335,16 @@ impl Branch {
         value: u8,
         filter: bool,
     ) {
-        if !filter {
-            let node = Self::node(chunks, light, coords, 0);
-            let block_light = BlockLightRefMut::new(self, &node);
-            let component = block_light.component(index);
-            if component > value {
-                block_light.set_component(index, 0);
-                self.unspread_node(chunks, light, index, node.with_value(component));
-            }
+        if filter {
+            return;
+        }
+
+        let node = Self::node(chunks, light, coords, 0);
+        let block_light = BlockLightRefMut::new(self, &node);
+        let component = block_light.component(index);
+        if component > value {
+            block_light.set_component(index, 0);
+            self.unspread_node(chunks, light, index, node.with_value(component));
         }
     }
 
@@ -424,7 +431,7 @@ impl Branch {
         sources.retain(|node| {
             self.values
                 .get(&node.chunk_coords)
-                .and_then(|values| values.get(&node.block_coords))
+                .map(|value| value[node.block_coords])
                 .is_none_or(|value| value.component(index) == node.value)
         });
 
@@ -447,12 +454,18 @@ impl Branch {
         }
     }
 
-    fn block_light(&self, light: &WorldLight, coords: Point3<i64>) -> BlockLight {
+    fn chunk_light_mut(&mut self, node: &Node) -> &mut ChunkLight {
         self.values
-            .get(&utils::chunk_coords(coords))
-            .and_then(|values| values.get(&utils::block_coords(coords)))
-            .copied()
-            .unwrap_or_else(|| light.block_light(coords))
+            .entry(node.chunk_coords)
+            .or_insert_with(|| node.light.cloned().unwrap_or_default().into())
+    }
+
+    fn block_light(&self, light: &WorldLight, coords: Point3<i64>) -> BlockLight {
+        if let Some(values) = self.values.get(&utils::chunk_coords(coords)) {
+            values[utils::block_coords(coords)]
+        } else {
+            light.block_light(coords)
+        }
     }
 
     fn node<'a>(
@@ -526,6 +539,7 @@ impl<'a> NodeSet<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct Node<'a> {
     chunk: Option<&'a Chunk>,
     light: Option<&'a ChunkLight>,
@@ -605,60 +619,48 @@ impl<'a> Node<'a> {
 }
 
 enum BlockLightRefMut<'a> {
-    Init(&'a mut BlockLight),
-    UninitChunk {
-        entry: VacantEntry<'a, Point3<i32>, FxHashMap<Point3<u8>, BlockLight>>,
+    Init {
+        chunk_light: &'a mut ChunkLight,
         coords: Point3<u8>,
-        fallback: BlockLight,
     },
-    UninitBlock {
-        entry: VacantEntry<'a, Point3<u8>, BlockLight>,
-        fallback: BlockLight,
+    Uninit {
+        branch: &'a mut Branch,
+        node: Node<'a>,
     },
 }
 
 impl<'a> BlockLightRefMut<'a> {
     fn new(branch: &'a mut Branch, node: &Node<'a>) -> Self {
-        match branch.values.entry(node.chunk_coords) {
-            Entry::Occupied(entry) => match entry.into_mut().entry(node.block_coords) {
-                Entry::Occupied(entry) => Self::Init(entry.into_mut()),
-                Entry::Vacant(entry) => Self::UninitBlock {
-                    entry,
-                    fallback: node.block_light(),
-                },
-            },
-            Entry::Vacant(entry) => Self::UninitChunk {
-                entry,
+        if let Some(chunk_light) = branch.values.get_mut(&node.chunk_coords) {
+            Self::Init {
+                chunk_light,
                 coords: node.block_coords,
-                fallback: node.block_light(),
-            },
+            }
+        } else {
+            Self::Uninit {
+                branch,
+                node: *node,
+            }
         }
     }
 
+    #[rustfmt::skip]
     fn component(&self, index: usize) -> u8 {
         match self {
-            Self::Init(light) => light,
-            Self::UninitChunk { fallback, .. } | Self::UninitBlock { fallback, .. } => fallback,
+            Self::Init { chunk_light, coords } => chunk_light[*coords],
+            Self::Uninit { node, .. } => node.block_light(),
         }
         .component(index)
     }
 
+    #[rustfmt::skip]
     fn set_component(self, index: usize, value: u8) {
-        match self {
-            Self::Init(light) => {
-                light.set_component(index, value);
-            }
-            Self::UninitChunk {
-                entry,
-                coords,
-                mut fallback,
-            } => {
-                fallback.set_component(index, value);
-                entry.insert([(coords, fallback)].into_iter().collect());
-            }
-            Self::UninitBlock { entry, fallback } => {
-                entry.insert(fallback).set_component(index, value);
-            }
-        }
+        let (chunk_light, coords) = match self {
+            Self::Init { chunk_light, coords } => (chunk_light, coords),
+            Self::Uninit { branch, node } => (branch.chunk_light_mut(&node), node.block_coords),
+        };
+        let mut block_light = chunk_light[coords];
+        block_light.set_component(index, value);
+        chunk_light.set(coords, block_light);
     }
 }

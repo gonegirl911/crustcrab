@@ -256,7 +256,7 @@ impl EventHandler<WorldEvent> for World {
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
                 self.light.extend_placeholders(new_surface_points);
-                self.light.par_insert_many(&self.chunks, &self.heights, &inserts);
+                self.light.par_insert_many(&self.chunks, &self.heights, &inserts, false);
 
                 let mut loads = area
                     .client_points()
@@ -276,7 +276,7 @@ impl EventHandler<WorldEvent> for World {
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
                 self.light.extend_placeholders(new_surface_points);
-                let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts);
+                let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts, true);
 
                 let loads = cur
                     .exclusive_client_points(prev)
