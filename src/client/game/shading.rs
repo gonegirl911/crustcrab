@@ -40,6 +40,7 @@ struct ShadingUniformData {
     ao_factor_min: f32,
     ao_factor_max: f32,
     light_attenuation: f32,
+    padding: f32,
 }
 
 impl Default for ShadingUniformData {
@@ -50,6 +51,7 @@ impl Default for ShadingUniformData {
             ao_factor_min: config.ao_factor_min,
             ao_factor_max: config.ao_factor_max,
             light_attenuation: config.light_attenuation,
+            padding: Default::default(),
         }
     }
 }
