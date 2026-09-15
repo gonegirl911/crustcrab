@@ -269,7 +269,14 @@ impl Branch {
         for (chunk_coords, other) in other.values {
             match self.values.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
-                    if Arc::ptr_eq(entry.get(), &other) {
+                    let values = entry.get_mut();
+
+                    if Arc::ptr_eq(values, &other) || other.is_empty() {
+                        continue;
+                    }
+
+                    if values.is_empty() {
+                        *values = other;
                         continue;
                     }
 
