@@ -36,10 +36,10 @@ impl VisibilityGraph {
                 }
 
                 for delta in BlockArea::neighborhood_deltas() {
-                    if let Some(neighbor_coords) = Chunk::is_in_bounds(coords.cast() + delta)
-                        && !visited.replace(neighbor_coords, true)
+                    if let Some(neighborhood_coords) = Chunk::is_in_bounds(coords.cast() + delta)
+                        && !visited.replace(neighborhood_coords, true)
                     {
-                        queue.push_back(neighbor_coords);
+                        queue.push_back(neighborhood_coords);
                     }
                 }
             }
