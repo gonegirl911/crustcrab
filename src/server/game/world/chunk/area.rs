@@ -20,9 +20,9 @@ use std::{
 pub struct ChunkArea(ChunkAreaDataStore<Block>);
 
 impl ChunkArea {
-    const DIM: usize = Chunk::DIM + BlockArea::PADDING * 2;
-    pub const PADDING: usize = BlockArea::PADDING.div_ceil(Chunk::DIM);
-    const AXIS_RANGE: Range<i32> = -(Self::PADDING as i32)..1 + Self::PADDING as i32;
+    const PADDING: usize = BlockArea::PADDING;
+    pub const CHUNK_PADDING: usize = Self::PADDING.div_ceil(Chunk::DIM);
+    const DIM: usize = Chunk::DIM + 2 * Self::PADDING;
 
     pub fn block_area_view(&self, coords: Point3<u8>) -> BlockAreaView<'_> {
         BlockAreaView::new(&self.0, coords)
@@ -37,14 +37,16 @@ impl ChunkArea {
     }
 
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        Self::AXIS_RANGE.flat_map(|dx| {
-            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
+        let padding = Self::CHUNK_PADDING as i32;
+        (-padding..1 + padding).flat_map(move |dx| {
+            (-padding..1 + padding)
+                .flat_map(move |dy| (-padding..1 + padding).map(move |dz| vector![dx, dy, dz]))
         })
     }
 
-    pub fn block_axis_range(dc: i32) -> Range<u8> {
+    pub fn axis_range(dc: i32) -> Range<u8> {
         let dim = Chunk::DIM as i32;
-        let padding = BlockArea::PADDING as i32;
+        let padding = Self::PADDING as i32;
         let start = (-padding - dc * dim).max(0);
         let end = (dim + padding - dc * dim).min(dim);
         start as u8..end as u8
@@ -90,7 +92,7 @@ impl<T> ChunkAreaDataStore<T> {
 
     fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
         delta
-            .map(|c| (c + BlockArea::PADDING as i8) as usize)
+            .map(|c| (c + ChunkArea::PADDING as i8) as usize)
             .into()
     }
 }

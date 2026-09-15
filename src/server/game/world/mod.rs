@@ -131,14 +131,10 @@ impl World {
         loads: &FxHashSet<Point3<i32>>,
         unloads: &FxHashSet<Point3<i32>>,
     ) -> FxHashSet<Point3<i32>> {
-        inserts
+        updates
             .into_iter()
-            .flat_map(ChunkArea::chunk_points)
-            .chain(
-                updates
-                    .into_iter()
-                    .flat_map(|(coords, reach)| reach.into_iter().map(move |delta| coords + delta)),
-            )
+            .flat_map(|(coords, reach)| reach.into_iter().map(move |delta| coords + delta))
+            .chain(inserts.into_iter().flat_map(ChunkArea::chunk_points))
             .filter(|coords| {
                 area.client_contains(*coords)
                     && self.chunks.0.contains_key(coords)
@@ -344,9 +340,9 @@ impl ChunkStore {
         for delta in ChunkArea::chunk_deltas() {
             if let Some(chunk) = self.get(coords + delta) {
                 let [dx, dy, dz] = delta.into();
-                for x in ChunkArea::block_axis_range(dx) {
-                    for y in ChunkArea::block_axis_range(dy) {
-                        let z = ChunkArea::block_axis_range(dz);
+                for x in ChunkArea::axis_range(dx) {
+                    for y in ChunkArea::axis_range(dy) {
+                        let z = ChunkArea::axis_range(dz);
                         value.copy_row(
                             utils::coords(point![dx, dy, dz], point![x, y, z.start])
                                 .coords

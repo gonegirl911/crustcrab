@@ -94,6 +94,8 @@ impl Chunk {
     }
 
     pub fn points() -> impl Iterator<Item = Point3<u8>> {
+        const { assert!(Self::DIM.is_power_of_two()) };
+
         (0..Self::DIM.pow(3)).map(|i| {
             let x = i / Self::DIM.pow(2);
             let y = i % Self::DIM.pow(2) / Self::DIM;
@@ -104,6 +106,7 @@ impl Chunk {
 
     fn is_in_bounds(coords: Point3<i8>) -> Option<Point3<u8>> {
         const { assert!(Self::DIM <= i8::MAX as usize) };
+
         coords
             .iter()
             .all(|c| (0..Self::DIM as i8).contains(c))
@@ -287,7 +290,8 @@ impl ChunkReach {
     }
 
     fn index(delta: Vector3<i32>) -> usize {
-        const { assert!(ChunkArea::PADDING <= 1) };
+        const { assert!(ChunkArea::CHUNK_PADDING <= 1) };
+
         (9 * (delta.x + 1) + 3 * (delta.y + 1) + delta.z + 1) as usize
     }
 

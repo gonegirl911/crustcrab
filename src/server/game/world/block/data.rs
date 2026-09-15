@@ -13,7 +13,7 @@ use crate::{
         indexmap::FxIndexSet,
     },
 };
-use nalgebra::{Point2, Point3, Scalar, Vector3, point};
+use nalgebra::{Point2, Point3, Scalar, Vector3, point, vector};
 use rustc_hash::FxHashMap;
 use serde::{
     Deserialize, Deserializer,
@@ -361,6 +361,16 @@ static RAW_BLOCK_DATA: LazyLock<BTreeMap<&str, RawBlockData>> = LazyLock::new(||
     data
 });
 
+pub static NEIGHBORHOOD_DELTAS: LazyLock<[Vector3<i8>; 27]> = LazyLock::new(|| {
+    array::from_fn(|i| {
+        let i = i as i8;
+        let dx = -1 + i / 9;
+        let dy = -1 + i % 9 / 3;
+        let dz = -1 + i % 3;
+        vector![dx, dy, dz]
+    })
+});
+
 static SIDE_CORNER_SIDES: LazyLock<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> =
     LazyLock::new(|| {
         enum_map! {
@@ -442,6 +452,17 @@ pub static SIDE_CORNER_COMPONENT_DELTAS: LazyLock<
 static CORNER_TEX_COORDS: LazyLock<EnumMap<Corner, Point2<u8>>> =
     LazyLock::new(|| SIDE_CORNER_DELTAS[Side::Front].map(|_, delta| point![delta.x, 1 - delta.y]));
 
+pub static SIDE_AXES: LazyLock<EnumMap<Side, SideAxes>> = LazyLock::new(|| {
+    SIDE_CORNER_SIDES.map(|side, corner_sides| {
+        let [lower, left] = corner_sides[Corner::LowerLeft];
+        SideAxes {
+            normal: side.axis(),
+            u: left.axis(),
+            v: lower.axis(),
+        }
+    })
+});
+
 const LL_UR_TRIANGULATION: [Corner; 6] = [
     Corner::LowerLeft,
     Corner::LowerRight,
@@ -459,14 +480,3 @@ const LR_UL_TRIANGULATION: [Corner; 6] = [
     Corner::UpperRight,
     Corner::UpperLeft,
 ];
-
-pub static SIDE_AXES: LazyLock<EnumMap<Side, SideAxes>> = LazyLock::new(|| {
-    SIDE_CORNER_SIDES.map(|side, corner_sides| {
-        let [lower, left] = corner_sides[Corner::LowerLeft];
-        SideAxes {
-            normal: side.axis(),
-            u: left.axis(),
-            v: lower.axis(),
-        }
-    })
-});

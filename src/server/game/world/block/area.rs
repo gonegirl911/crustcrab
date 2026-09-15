@@ -5,7 +5,7 @@ use super::{
 use crate::{
     enum_map, server::game::world::chunk::area::ChunkAreaDataStore, shared::enum_map::EnumMap,
 };
-use nalgebra::{Point3, Vector3, vector};
+use nalgebra::{Point3, Vector3};
 use std::{array, ops::Index};
 
 pub struct BlockContext<S> {
@@ -109,13 +109,8 @@ impl<S: BlockLightAreaSource> BlockLightAreaSource for BlockContext<S> {
 pub type BlockArea = BlockContext<BlockAreaDataStore<Block>>;
 
 impl BlockArea {
-    const DIM: usize = 1 + Self::PADDING * 2;
     pub const PADDING: usize = 1;
-
-    pub fn neighborhood_deltas() -> impl Iterator<Item = Vector3<i8>> {
-        (-1..2)
-            .flat_map(|dx| (-1..2).flat_map(move |dy| (-1..2).map(move |dz| vector![dx, dy, dz])))
-    }
+    const DIM: usize = 1 + Self::PADDING * 2;
 }
 
 pub type BlockAreaView<'a> = BlockContext<BlockAreaDataRef<'a, Block>>;

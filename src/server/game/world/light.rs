@@ -31,9 +31,9 @@ impl WorldLight {
         for delta in ChunkArea::chunk_deltas() {
             if let Some(light) = self.0.get(&(coords + delta)) {
                 let [dx, dy, dz] = delta.into();
-                for x in ChunkArea::block_axis_range(dx) {
-                    for y in ChunkArea::block_axis_range(dy) {
-                        let z = ChunkArea::block_axis_range(dz);
+                for x in ChunkArea::axis_range(dx) {
+                    for y in ChunkArea::axis_range(dy) {
+                        let z = ChunkArea::axis_range(dz);
                         value.copy_row(
                             utils::coords(point![dx, dy, dz], point![x, y, z.start])
                                 .coords
@@ -56,10 +56,10 @@ impl WorldLight {
         P: IntoIterator<Item = Point3<i32>>,
     {
         for coords in new_surface_points {
-            for neighbor_coords in ChunkArea::chunk_points(coords) {
-                if neighbor_coords.y > coords.y {
+            for area_coords in ChunkArea::chunk_points(coords) {
+                if area_coords.y > coords.y {
                     self.0
-                        .entry(neighbor_coords)
+                        .entry(area_coords)
                         .or_insert_with(|| PLACEHOLDER.clone());
                 }
             }
