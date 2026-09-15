@@ -10,7 +10,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
     de::{self, Unexpected},
 };
-use std::{array, ops::Range};
+use std::ops::Range;
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, Default, Serialize)]
@@ -82,8 +82,13 @@ impl BlockLight {
     pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
     pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
-    fn from_fn<F: FnMut(usize) -> u8>(f: F) -> Self {
-        array::from_fn(f).into()
+    // DO NOT MODIFY
+    fn from_fn<F: FnMut(usize) -> u8>(mut f: F) -> Self {
+        let mut value = Self::default();
+        for i in 0..Self::LEN {
+            value.set_component(i, f(i));
+        }
+        value
     }
 
     pub fn placeholder() -> Self {
