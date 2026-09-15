@@ -7,7 +7,6 @@ use crate::{
     shared::enum_map::Enum,
 };
 use bitfield::{Bit, BitMut};
-use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -37,8 +36,7 @@ impl VisibilityGraph {
                 }
 
                 for delta in BlockArea::neighborhood_deltas() {
-                    if delta != Vector3::zeros()
-                        && let Some(neighbor_coords) = Chunk::is_in_bounds(coords.cast() + delta)
+                    if let Some(neighbor_coords) = Chunk::is_in_bounds(coords.cast() + delta)
                         && !visited.replace(neighbor_coords, true)
                     {
                         queue.push_back(neighbor_coords);
