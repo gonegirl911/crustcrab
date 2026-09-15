@@ -25,7 +25,7 @@ use block::{
     data::{Corner, RenderLayer, SIDE_AXES, Side},
 };
 use chunk::{
-    Chunk,
+    Chunk, ChunkReach,
     area::{ChunkArea, ChunkLightArea},
     generator::ChunkGenerator,
     visibility::VisibilityGraph,
@@ -95,6 +95,7 @@ impl World {
             actions,
             mut inserts,
             mut removals,
+            updates: action_updates,
         } = branch.merge(&mut self.chunks);
 
         let new_surface_points = self.heights.load_many(inserts.iter().copied());
@@ -104,7 +105,6 @@ impl World {
         inserts.retain(|&coords| area.client_contains(coords));
         removals.retain(|&coords| area.client_contains(coords));
 
-        let action_updates = actions.iter().map(|&(coords, _)| coords);
         let updates = self.mesh_updates(
             inserts.iter().copied(),
             iter::chain(action_updates, light_updates),
@@ -126,30 +126,26 @@ impl World {
     fn mesh_updates(
         &self,
         inserts: impl IntoIterator<Item = Point3<i32>>,
-        block_updates: impl IntoIterator<Item = Point3<i64>>,
+        updates: impl IntoIterator<Item = (Point3<i32>, ChunkReach)>,
         area: WorldArea,
         loads: &FxHashSet<Point3<i32>>,
         unloads: &FxHashSet<Point3<i32>>,
     ) -> FxHashSet<Point3<i32>> {
-        let mut updates = inserts
+        inserts
             .into_iter()
             .flat_map(ChunkArea::chunk_points)
             .chain(
-                block_updates
+                updates
                     .into_iter()
-                    .flat_map(BlockArea::points)
-                    .map(utils::chunk_coords),
+                    .flat_map(|(coords, reach)| reach.into_iter().map(move |delta| coords + delta)),
             )
-            .collect::<FxHashSet<_>>();
-
-        updates.retain(|coords| {
-            area.client_contains(*coords)
-                && self.chunks.0.contains_key(coords)
-                && !loads.contains(coords)
-                && !unloads.contains(coords)
-        });
-
-        updates
+            .filter(|coords| {
+                area.client_contains(*coords)
+                    && self.chunks.0.contains_key(coords)
+                    && !loads.contains(coords)
+                    && !unloads.contains(coords)
+            })
+            .collect()
     }
 
     fn send_loads<P: IntoIterator<Item = Point3<i32>>>(
@@ -395,6 +391,7 @@ struct Changelog {
     actions: Vec<(Point3<i64>, BlockAction)>,
     inserts: FxHashSet<Point3<i32>>,
     removals: FxHashSet<Point3<i32>>,
+    updates: Vec<(Point3<i32>, ChunkReach)>,
 }
 
 impl Branch {
@@ -417,21 +414,30 @@ impl Branch {
         let mut hits = vec![];
         let mut inserts = FxHashSet::default();
         let mut removals = FxHashSet::default();
+        let mut updates = vec![];
 
         for (chunk_coords, actions) in self.actions.0 {
             match chunks.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
                     let chunk = entry.get_mut();
+                    let mut reach = ChunkReach::default();
+
                     for (block_coords, action) in actions {
                         if chunk.apply(block_coords, action) {
                             hits.push((utils::coords(chunk_coords, block_coords), action));
+                            reach.insert_block(block_coords);
                         }
                     }
+
                     if chunk.is_empty() {
                         entry.remove();
                         removals.insert(chunk_coords);
                     } else {
                         chunk.recompute_visibility_graph();
+                    }
+
+                    if !reach.is_empty() {
+                        updates.push((chunk_coords, reach));
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -440,15 +446,22 @@ impl Branch {
                         .filter(|&(_, action)| Block::AIR.is_action_valid(action))
                         .peekable();
 
-                    if actions.peek().is_some() {
-                        let chunk = entry.insert(Default::default());
-                        for (block_coords, action) in actions {
-                            chunk.apply_unchecked(block_coords, action);
-                            hits.push((utils::coords(chunk_coords, block_coords), action));
-                        }
-                        chunk.recompute_visibility_graph();
-                        inserts.insert(chunk_coords);
+                    if actions.peek().is_none() {
+                        continue;
                     }
+
+                    let chunk = entry.insert(Default::default());
+                    let mut reach = ChunkReach::default();
+
+                    for (block_coords, action) in actions {
+                        chunk.apply_unchecked(block_coords, action);
+                        hits.push((utils::coords(chunk_coords, block_coords), action));
+                        reach.insert_block(block_coords);
+                    }
+
+                    chunk.recompute_visibility_graph();
+                    inserts.insert(chunk_coords);
+                    updates.push((chunk_coords, reach));
                 }
             }
         }
@@ -457,6 +470,7 @@ impl Branch {
             actions: hits,
             inserts,
             removals,
+            updates,
         }
     }
 

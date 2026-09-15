@@ -21,9 +21,8 @@ pub struct ChunkArea(ChunkAreaDataStore<Block>);
 
 impl ChunkArea {
     const DIM: usize = Chunk::DIM + BlockArea::PADDING * 2;
-    const PADDING: usize = BlockArea::PADDING.div_ceil(Chunk::DIM);
+    pub const PADDING: usize = BlockArea::PADDING.div_ceil(Chunk::DIM);
     const AXIS_RANGE: Range<i32> = -(Self::PADDING as i32)..1 + Self::PADDING as i32;
-    const REM: usize = BlockArea::PADDING % Chunk::DIM;
 
     pub fn block_area_view(&self, coords: Point3<u8>) -> BlockAreaView<'_> {
         BlockAreaView::new(&self.0, coords)
@@ -44,13 +43,11 @@ impl ChunkArea {
     }
 
     pub fn block_axis_range(dc: i32) -> Range<u8> {
-        if dc == Self::AXIS_RANGE.start {
-            (Chunk::DIM - Self::REM) as u8..Chunk::DIM as u8
-        } else if dc == Self::AXIS_RANGE.end - 1 {
-            0..Self::REM as u8
-        } else {
-            0..Chunk::DIM as u8
-        }
+        let dim = Chunk::DIM as i32;
+        let padding = BlockArea::PADDING as i32;
+        let start = (-padding - dc * dim).max(0);
+        let end = (dim + padding - dc * dim).min(dim);
+        start as u8..end as u8
     }
 }
 

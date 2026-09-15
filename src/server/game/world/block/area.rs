@@ -6,10 +6,7 @@ use crate::{
     enum_map, server::game::world::chunk::area::ChunkAreaDataStore, shared::enum_map::EnumMap,
 };
 use nalgebra::{Point3, Vector3, vector};
-use std::{
-    array,
-    ops::{Index, Range},
-};
+use std::{array, ops::Index};
 
 pub struct BlockContext<S> {
     source: S,
@@ -114,16 +111,10 @@ pub type BlockArea = BlockContext<BlockAreaDataStore<Block>>;
 impl BlockArea {
     const DIM: usize = 1 + Self::PADDING * 2;
     pub const PADDING: usize = 1;
-    const AXIS_RANGE: Range<i8> = -(Self::PADDING as i8)..1 + Self::PADDING as i8;
 
-    pub fn points(coords: Point3<i64>) -> impl Iterator<Item = Point3<i64>> {
-        Self::deltas().map(move |delta| coords + delta.cast())
-    }
-
-    pub fn deltas() -> impl Iterator<Item = Vector3<i8>> {
-        Self::AXIS_RANGE.flat_map(|dx| {
-            Self::AXIS_RANGE.flat_map(move |dy| Self::AXIS_RANGE.map(move |dz| vector![dx, dy, dz]))
-        })
+    pub fn neighborhood_deltas() -> impl Iterator<Item = Vector3<i8>> {
+        (-1..2)
+            .flat_map(|dx| (-1..2).flat_map(move |dy| (-1..2).map(move |dz| vector![dx, dy, dz])))
     }
 }
 

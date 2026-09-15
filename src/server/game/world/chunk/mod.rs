@@ -6,10 +6,15 @@ use super::{
     action::BlockAction,
     block::{Block, BlockLight},
 };
-use crate::shared::{
-    bound::{Aabb, BoundingSphere},
-    utils,
+use crate::{
+    server::game::world::block::area::BlockArea,
+    shared::{
+        bound::{Aabb, BoundingSphere},
+        utils,
+    },
 };
+use area::ChunkArea;
+use bitfield::Bit;
 use bitvec::{BitArr, bitarr};
 use nalgebra::{Point3, Vector3, point};
 use std::{
@@ -143,6 +148,18 @@ pub struct ChunkLight {
 }
 
 impl ChunkLight {
+    pub fn from_fn<F: FnMut(Point3<u8>) -> BlockLight>(mut f: F) -> Self {
+        let mut non_zero_count = 0;
+        Self {
+            lights: ChunkDataStore::from_fn(|coords| {
+                let light = f(coords);
+                non_zero_count += (light != Default::default()) as u16;
+                light
+            }),
+            non_zero_count,
+        }
+    }
+
     pub fn placeholder() -> Self {
         Self {
             lights: ChunkDataStore::from_fn(|_| BlockLight::placeholder()),
@@ -170,6 +187,16 @@ impl ChunkLight {
 
     pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
         self.lights.row(coords, len)
+    }
+
+    pub fn diff_reach(&self, other: &ChunkLight) -> Option<ChunkReach> {
+        let mut reach = ChunkReach::default();
+        for coords in Chunk::points() {
+            if self[coords] != other[coords] {
+                reach.insert_block(coords);
+            }
+        }
+        (!reach.is_empty()).then_some(reach)
     }
 }
 
@@ -238,5 +265,45 @@ impl ChunkBitSet {
 impl Default for ChunkBitSet {
     fn default() -> Self {
         Self(bitarr![0; Chunk::DIM.pow(3)])
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub struct ChunkReach(u32);
+
+impl ChunkReach {
+    pub fn insert_block(&mut self, coords: Point3<u8>) {
+        self.0 |= Self::block_reach(coords);
+    }
+
+    pub fn is_empty(self) -> bool {
+        self == Default::default()
+    }
+
+    fn block_reach(coords: Point3<u8>) -> u32 {
+        Self::axis_reach(coords.x, 9)
+            * Self::axis_reach(coords.y, 3)
+            * Self::axis_reach(coords.z, 1)
+    }
+
+    fn index(delta: Vector3<i32>) -> usize {
+        const { assert!(ChunkArea::PADDING <= 1) };
+        (9 * (delta.x + 1) + 3 * (delta.y + 1) + delta.z + 1) as usize
+    }
+
+    fn axis_reach(c: u8, stride: u32) -> u32 {
+        let padding = BlockArea::PADDING as u8;
+        let lo = (c < padding) as u32;
+        let hi = (c >= Chunk::DIM as u8 - padding) as u32;
+        lo | (1 << stride) | (hi << (stride * 2))
+    }
+}
+
+impl IntoIterator for ChunkReach {
+    type Item = Vector3<i32>;
+    type IntoIter = impl Iterator<Item = Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ChunkArea::chunk_deltas().filter(move |&delta| self.0.bit(Self::index(delta)))
     }
 }
