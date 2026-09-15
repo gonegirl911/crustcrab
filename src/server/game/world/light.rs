@@ -319,7 +319,7 @@ impl Branch {
                         continue;
                     }
 
-                    if collect_hits && let Some(reach) = DEFAULT.diff_reach(&values) {
+                    if collect_hits && let Some(reach) = DEFAULT_CHUNK_LIGHT.diff_reach(&values) {
                         updates.push((chunk_coords, reach));
                     }
 
@@ -459,9 +459,11 @@ impl Branch {
     }
 
     fn chunk_light_mut(&mut self, node: &Node) -> &mut Arc<ChunkLight> {
-        self.values
-            .entry(node.chunk_coords)
-            .or_insert_with(|| node.light.cloned().unwrap_or_else(|| DEFAULT.clone()))
+        self.values.entry(node.chunk_coords).or_insert_with(|| {
+            node.light
+                .cloned()
+                .unwrap_or_else(|| DEFAULT_CHUNK_LIGHT.clone())
+        })
     }
 
     fn block_light(&self, light: &WorldLight, coords: Point3<i64>) -> BlockLight {
@@ -644,7 +646,6 @@ impl<'a> BlockLightRefMut<'a> {
     }
 }
 
-static DEFAULT: LazyLock<Arc<ChunkLight>> = LazyLock::new(Arc::default);
+static DEFAULT_CHUNK_LIGHT: LazyLock<Arc<ChunkLight>> = LazyLock::new(Arc::default);
 
-static PLACEHOLDER: LazyLock<Arc<ChunkLight>> =
-    LazyLock::new(|| Arc::new(ChunkLight::placeholder()));
+static PLACEHOLDER: LazyLock<Arc<ChunkLight>> = LazyLock::new(|| ChunkLight::placeholder().into());
