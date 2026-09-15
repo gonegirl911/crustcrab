@@ -10,10 +10,12 @@ use serde::{
     ser::SerializeSeq,
 };
 use std::{
+    array,
     fmt::{self, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Index, Range},
+    sync::LazyLock,
 };
 
 #[derive(Default, Serialize, Deserialize)]
@@ -23,6 +25,7 @@ impl ChunkArea {
     const PADDING: usize = BlockArea::PADDING;
     pub const CHUNK_PADDING: usize = Self::PADDING.div_ceil(Chunk::DIM);
     const DIM: usize = Chunk::DIM + 2 * Self::PADDING;
+    const CHUNK_DIM: usize = 1 + 2 * Self::CHUNK_PADDING;
 
     pub fn block_area_view(&self, coords: Point3<u8>) -> BlockAreaView<'_> {
         BlockAreaView::new(&self.0, coords)
@@ -37,11 +40,20 @@ impl ChunkArea {
     }
 
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        let padding = Self::CHUNK_PADDING as i32;
-        (-padding..1 + padding).flat_map(move |dx| {
-            (-padding..1 + padding)
-                .flat_map(move |dy| (-padding..1 + padding).map(move |dz| vector![dx, dy, dz]))
-        })
+        static CHUNK_DELTAS: LazyLock<[Vector3<i32>; ChunkArea::CHUNK_DIM.pow(3)]> =
+            LazyLock::new(|| {
+                let padding = ChunkArea::CHUNK_PADDING as i32;
+                let dim = ChunkArea::CHUNK_DIM as i32;
+                array::from_fn(|i| {
+                    let i = i as i32;
+                    let dx = -padding + i / dim.pow(2);
+                    let dy = -padding + i % dim.pow(2) / dim;
+                    let dz = -padding + i % dim;
+                    vector![dx, dy, dz]
+                })
+            });
+
+        CHUNK_DELTAS.iter().copied()
     }
 
     pub fn axis_range(dc: i32) -> Range<u8> {
