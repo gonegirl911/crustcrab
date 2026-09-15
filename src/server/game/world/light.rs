@@ -71,7 +71,7 @@ impl WorldLight {
         chunks: &ChunkStore,
         heights: &HeightMap,
         points: &[Point3<i32>],
-        collect_hits: bool,
+        collect_updates: bool,
     ) -> Vec<(Point3<i32>, ChunkReach)> {
         if points.is_empty() {
             return vec![];
@@ -135,7 +135,7 @@ impl WorldLight {
             )
             .map(|branch| branch.evaluate(chunks, self))
             .reduce(Default::default, Branch::sup)
-            .merge(self, collect_hits)
+            .merge(self, collect_updates)
     }
 
     pub fn apply<A>(&mut self, chunks: &ChunkStore, actions: A) -> Vec<(Point3<i32>, ChunkReach)>
@@ -293,7 +293,11 @@ impl Branch {
         self
     }
 
-    fn merge(self, light: &mut WorldLight, collect_hits: bool) -> Vec<(Point3<i32>, ChunkReach)> {
+    fn merge(
+        self,
+        light: &mut WorldLight,
+        collect_updates: bool,
+    ) -> Vec<(Point3<i32>, ChunkReach)> {
         let mut updates = vec![];
         for (chunk_coords, values) in self.values {
             match light.0.entry(chunk_coords) {
@@ -304,7 +308,7 @@ impl Branch {
                         continue;
                     }
 
-                    if collect_hits && let Some(reach) = light.diff_reach(&values) {
+                    if collect_updates && let Some(reach) = light.diff_reach(&values) {
                         updates.push((chunk_coords, reach));
                     }
 
@@ -319,7 +323,8 @@ impl Branch {
                         continue;
                     }
 
-                    if collect_hits && let Some(reach) = DEFAULT_CHUNK_LIGHT.diff_reach(&values) {
+                    if collect_updates && let Some(reach) = DEFAULT_CHUNK_LIGHT.diff_reach(&values)
+                    {
                         updates.push((chunk_coords, reach));
                     }
 
