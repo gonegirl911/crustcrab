@@ -48,7 +48,7 @@ pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
     revisions: FxHashMap<Point3<i32>, u64>,
-    groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
+    pending_groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
     workers: JobPool<ChunkInput, ChunkOutput>,
     revision: u64,
 }
@@ -86,7 +86,7 @@ impl World {
             meshes: Default::default(),
             render_pipelines,
             revisions: Default::default(),
-            groups: Default::default(),
+            pending_groups: Default::default(),
             workers,
             revision: 0,
         }
@@ -208,7 +208,7 @@ impl World {
             return;
         };
 
-        match self.groups.entry(group_id) {
+        match self.pending_groups.entry(group_id) {
             Entry::Occupied(mut entry) => {
                 let group = entry.get_mut();
                 if group.len() == group_size - 1 {
@@ -220,7 +220,6 @@ impl World {
                 }
             }
             Entry::Vacant(entry) => {
-                assert_ne!(group_size, 0);
                 if group_size == 1 {
                     self.apply_output(renderer, output);
                 } else {
