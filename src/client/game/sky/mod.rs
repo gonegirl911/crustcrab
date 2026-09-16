@@ -105,7 +105,7 @@ impl EventHandler for Sky {
     type Context<'a> = &'a Renderer;
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.stars.handle(event, renderer);
+        self.stars.handle(event, ());
         self.objects.handle(event, ());
 
         match *event {

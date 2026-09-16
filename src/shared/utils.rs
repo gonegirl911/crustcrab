@@ -1,5 +1,5 @@
 use crate::server::game::world::chunk::Chunk;
-use nalgebra::{Point, Scalar};
+use nalgebra::{Point, SVector, Scalar};
 use rayon::iter::ParallelIterator;
 use std::{
     collections::linked_list,
@@ -42,7 +42,11 @@ impl<I: ParallelIterator> ParallelIteratorExt for I {}
 
 // ------------------------------------------------------------------------------------------------
 
-pub fn magnitude_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> u128 {
+pub fn magnitude_squared<const N: usize>(vector: SVector<i32, N>) -> u128 {
+    vector.map(|c| (c.unsigned_abs() as u128).pow(2)).sum()
+}
+
+pub fn distance_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> u128 {
     iter::zip(&a.coords, &b.coords)
         .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
         .sum()

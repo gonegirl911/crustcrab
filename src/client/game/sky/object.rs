@@ -7,14 +7,14 @@ use crate::{
             effect::PostProcessor,
             render_pipeline::RenderPipeline,
             texture::image::ImageTextureArray,
-            utils::{Immediates, billboard, load_rgba, read_wgsl},
+            utils::{Immediates, load_rgba, read_wgsl},
         },
     },
     server::{ServerEvent, game::clock::Time},
-    shared::utils,
+    shared::{color::Float3, utils},
 };
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Matrix4, Point3, Vector3, vector};
+use nalgebra::Vector3;
 use serde::Deserialize;
 
 pub struct ObjectSet {
@@ -104,20 +104,23 @@ impl EventHandler for ObjectSet {
 #[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
 struct ObjectImmediates {
-    m: Matrix4<f32>,
+    dir: Float3,
+    up: Vector3<f32>,
+    size: f32,
     tex_index: u32,
     brightness: f32,
+    padding: [f32; 2],
 }
 
 impl ObjectImmediates {
-    #[rustfmt::skip]
     fn new(tex_index: u32, dir: Vector3<f32>, up: Vector3<f32>, nightness: f32) -> Self {
-        let config = &CLIENT_CONFIG.sky.object;
         Self {
-            m: billboard(dir.into(), Point3::origin(), up)
-                .prepend_nonuniform_scaling(&vector![config.size, config.size, 1.0]),
+            dir: dir.into(),
+            up,
+            size: CLIENT_CONFIG.sky.object.size,
             tex_index,
-            brightness: config.brightness(nightness),
+            brightness: CLIENT_CONFIG.sky.object.brightness(nightness),
+            padding: Default::default(),
         }
     }
 }

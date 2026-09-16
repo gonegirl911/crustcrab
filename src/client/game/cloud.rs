@@ -150,11 +150,10 @@ impl CloudLayer {
     fn instances() -> impl Iterator<Item = CloudInstance> {
         let render_distance = CLIENT_CONFIG.player.render_distance as u64 * Chunk::DIM as u64;
         let radius = (render_distance / CLIENT_CONFIG.cloud.size.x) as i32;
-        (-radius..=radius).flat_map(move |dx| {
-            (-radius..=radius)
-                .filter(move |dz| dx.pow(2) + dz.pow(2) <= radius.pow(2))
-                .map(move |dz| CloudInstance::new(vector![dx, dz]))
-        })
+        (-radius..=radius)
+            .flat_map(move |dx| (-radius..=radius).map(move |dz| vector![dx, dz]))
+            .filter(move |&offset| utils::magnitude_squared(offset) <= (radius as u128).pow(2))
+            .map(CloudInstance::new)
     }
 }
 

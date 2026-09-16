@@ -157,7 +157,7 @@ impl World {
         self.render_pipelines[RenderLayer::Blended].bind(&mut render_pass, bind_groups);
 
         blended_points.sort_unstable_by_key(|&coords| {
-            Reverse(utils::magnitude_squared(
+            Reverse(utils::distance_squared(
                 coords,
                 utils::chunk_coords(frustum.origin),
             ))
@@ -166,10 +166,10 @@ impl World {
         for coords in blended_points {
             let (mesh, _) = self.meshes.get_mut(&coords).unwrap();
             let blended_part = mesh.blended_part.as_mut().unwrap();
-            let delta = coords.cast() * Chunk::DIM as f32 - frustum.origin;
+            let displacement = coords.cast() * Chunk::DIM as f32 - frustum.origin;
             BlockImmediates::new(coords).set(&mut render_pass);
             blended_part.draw(renderer, &mut render_pass, |&coords| {
-                TotalOrd((coords.coords + delta).magnitude_squared())
+                TotalOrd((coords.coords + displacement).magnitude_squared())
             });
         }
     }
@@ -272,12 +272,12 @@ impl World {
         };
 
         while let Some(coords) = queue.pop_front() {
-            let offset = coords - origin;
+            let displacement = coords - origin;
             let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
             let sources = visited[&coords];
 
             for (exit, delta) in *SIDE_DELTAS {
-                if delta.cast().dot(&offset) < 0 {
+                if delta.cast().dot(&displacement) < 0 {
                     continue;
                 }
 
@@ -302,7 +302,7 @@ impl World {
                             return true;
                         }
 
-                        offset.amax() <= offset[exit.axis()].abs() + 1
+                        displacement.amax() <= displacement[exit.axis()].abs() + 1
                     })
                 {
                     continue;

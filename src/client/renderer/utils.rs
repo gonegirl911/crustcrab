@@ -2,7 +2,6 @@ use super::{Renderer, buffer::VertexBuffer};
 use crate::client::renderer::buffer::MemoryState;
 use bytemuck::Pod;
 use image::RgbaImage;
-use nalgebra::{Matrix4, Point3, Vector3, vector};
 use std::{
     cmp::{Ordering, Reverse},
     fs,
@@ -119,11 +118,4 @@ pub fn load_rgba<P: AsRef<Path>>(path: P) -> RgbaImage {
     image::open(path)
         .unwrap_or_else(|e| panic!("failed to open {}: {e}", path.display()))
         .into_rgba8()
-}
-
-// ------------------------------------------------------------------------------------------------
-
-pub fn billboard(coords: Point3<f32>, target: Point3<f32>, up: Vector3<f32>) -> Matrix4<f32> {
-    Matrix4::face_towards(&coords, &target, &up)
-        .prepend_nonuniform_scaling(&vector![-1.0, 1.0, 1.0])
 }

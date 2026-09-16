@@ -16,19 +16,19 @@ struct PlayerUniform {
     zfar: f32,
 }
 
+struct ShadingUniform {
+    side_factors: vec4<f32>,
+    ao_factor_min: f32,
+    ao_factor_max: f32,
+    light_attenuation: f32,
+}
+
 struct Immediates {
     tex_dims: vec2<f32>,
     size: vec2<f32>,
     scale_factor: vec3<f32>,
     color: vec3<f32>,
     offset: vec2<f32>,
-}
-
-struct ShadingUniform {
-    side_factors: vec4<f32>,
-    ao_factor_min: f32,
-    ao_factor_max: f32,
-    light_attenuation: f32,
 }
 
 struct VertexOutput {
@@ -40,10 +40,10 @@ struct VertexOutput {
 @group(0) @binding(0)
 var<uniform> player: PlayerUniform;
 
-var<immediate> imm: Immediates;
-
 @group(1) @binding(0)
 var<uniform> shading: ShadingUniform;
+
+var<immediate> imm: Immediates;
 
 @vertex
 fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {

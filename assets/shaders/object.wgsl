@@ -15,7 +15,9 @@ struct PlayerUniform {
 }
 
 struct Immediates {
-    m: mat4x4<f32>,
+    dir: vec3<f32>,
+    up: vec3<f32>,
+    size: f32,
     tex_index: u32,
     brightness: f32,
 }
@@ -34,8 +36,22 @@ var<immediate> imm: Immediates;
 fn vs_main(vertex: VertexInput) -> VertexOutput {
     let x = f32(((vertex.index + 2u) / 3u) % 2u);
     let y = f32(((vertex.index + 1u) / 3u) % 2u);
-    let coords = player.vp * imm.m * vec4(x - 0.5, y - 0.5, 0.0, 1.0);
+    let m = billboard(imm.dir, vec3(0.0), imm.up);
+    let scaling = vec3(imm.size, imm.size, 1.0);
+    let coords = player.vp * m * (vec4(x - 0.5, y - 0.5, 0.0, 1.0) * vec4(scaling, 1.0));
     return VertexOutput(coords, vec2(x, 1.0 - y));
+}
+
+fn billboard(eye: vec3<f32>, towards: vec3<f32>, up: vec3<f32>) -> mat4x4<f32> {
+    let z_axis = normalize(towards - eye);
+    let x_axis = normalize(cross(up, z_axis));
+    let y_axis = cross(z_axis, x_axis);
+    return mat4x4(
+        vec4(-x_axis, 0.0),
+        vec4(y_axis, 0.0),
+        vec4(z_axis, 0.0),
+        vec4(eye, 1.0),
+    );
 }
 
 @group(2) @binding(0)

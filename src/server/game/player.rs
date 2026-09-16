@@ -113,7 +113,7 @@ impl WorldArea {
     }
 
     fn contains_xz(self, xz: Point2<i32>) -> bool {
-        utils::magnitude_squared(xz, self.center.xz()) <= (self.radius as u128).pow(2)
+        utils::distance_squared(xz, self.center.xz()) <= (self.radius as u128).pow(2)
     }
 
     fn client_contains_y(self, y: i32) -> bool {
