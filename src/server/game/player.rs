@@ -8,7 +8,7 @@ use crate::{
     },
     shared::{cuboid::Cuboid, ray::Ray, utils},
 };
-use nalgebra::{Point2, Point3, Vector3, point};
+use nalgebra::{Point2, Point3, Vector3, point, vector};
 use rayon::iter::ParallelIterator;
 use serde::{
     Deserialize, Deserializer,
@@ -128,7 +128,7 @@ impl WorldArea {
             point![-radius, y_start, -radius],
             point![radius, y_end - 1, radius],
         )
-        .translate(self.center.coords.cast())
+        .translate(vector![self.center.x as i64, 0, self.center.z as i64])
     }
 }
 
