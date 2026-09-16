@@ -47,10 +47,10 @@ use uuid::Uuid;
 pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
+    revision: u64,
     revisions: FxHashMap<Point3<i32>, u64>,
     pending_groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
     workers: JobPool<ChunkInput, ChunkOutput>,
-    revision: u64,
 }
 
 impl World {
@@ -85,10 +85,10 @@ impl World {
         Self {
             meshes: Default::default(),
             render_pipelines,
+            revision: 0,
             revisions: Default::default(),
             pending_groups: Default::default(),
             workers,
-            revision: 0,
         }
     }
 
