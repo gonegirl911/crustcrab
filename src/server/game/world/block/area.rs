@@ -3,7 +3,9 @@ use super::{
     data::{Component, Corner, SIDE_CORNER_COMPONENT_DELTAS, SIDE_DELTAS, Side},
 };
 use crate::{
-    enum_map, server::game::world::chunk::area::ChunkAreaDataStore, shared::enum_map::EnumMap,
+    enum_map,
+    server::game::world::chunk::area::ChunkAreaDataStore,
+    shared::{cuboid::Cuboid, enum_map::EnumMap},
 };
 use nalgebra::{Point3, Vector3};
 use std::{array, ops::Index};
@@ -111,6 +113,13 @@ pub type BlockArea = BlockContext<BlockAreaDataStore<Block>>;
 impl BlockArea {
     pub const PADDING: usize = 1;
     const DIM: usize = 1 + Self::PADDING * 2;
+
+    pub fn neighborhood_deltas() -> impl Iterator<Item = Vector3<i8>> {
+        Cuboid::unit()
+            .pad(1)
+            .into_points()
+            .map(|coords| coords.coords.cast())
+    }
 }
 
 pub type BlockAreaView<'a> = BlockContext<BlockAreaDataRef<'a, Block>>;

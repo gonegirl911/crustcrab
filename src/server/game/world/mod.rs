@@ -134,7 +134,11 @@ impl World {
         updates
             .into_iter()
             .flat_map(|(coords, reach)| reach.into_iter().map(move |delta| coords + delta))
-            .chain(inserts.into_iter().flat_map(ChunkArea::chunk_points))
+            .chain(
+                inserts
+                    .into_iter()
+                    .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta)),
+            )
             .filter(|coords| {
                 area.client_contains(*coords)
                     && self.chunks.0.contains_key(coords)
@@ -292,7 +296,6 @@ impl EventHandler<WorldEvent> for World {
                         self.chunks
                             .block(coords)
                             .data()
-                            .model
                             .hitbox(coords)
                             .intersects(ray)
                     },
@@ -706,7 +709,7 @@ impl BlockHoverData {
         light_area: &BlockContext<impl BlockLightAreaSource>,
     ) -> Self {
         let data = area.kernel().data();
-        let hitbox = data.model.hitbox(coords);
+        let hitbox = data.hitbox(coords);
         let brightness = data
             .mesh(utils::block_coords(coords), area, light_area)
             .max_by(|a, b| {

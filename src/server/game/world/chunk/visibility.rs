@@ -1,6 +1,9 @@
 use super::{Chunk, ChunkBitSet};
 use crate::{
-    server::game::world::block::data::{NEIGHBORHOOD_DELTAS, SIDE_DELTAS, Side},
+    server::game::world::block::{
+        area::BlockArea,
+        data::{SIDE_DELTAS, Side},
+    },
     shared::enum_map::Enum,
 };
 use bitfield::{Bit, BitMut};
@@ -32,7 +35,7 @@ impl VisibilityGraph {
                     }
                 }
 
-                for delta in *NEIGHBORHOOD_DELTAS {
+                for delta in BlockArea::neighborhood_deltas() {
                     if let Some(neighborhood_coords) = Chunk::is_in_bounds(coords.cast() + delta)
                         && !visited.replace(neighborhood_coords, true)
                     {

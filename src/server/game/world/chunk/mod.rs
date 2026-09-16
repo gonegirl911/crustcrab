@@ -10,6 +10,7 @@ use crate::{
     server::game::world::block::area::BlockArea,
     shared::{
         bound::{Aabb, BoundingSphere},
+        cuboid::Cuboid,
         utils,
     },
 };
@@ -94,14 +95,10 @@ impl Chunk {
     }
 
     pub fn points() -> impl Iterator<Item = Point3<u8>> {
-        const { assert!(Self::DIM.is_power_of_two()) };
-
-        (0..Self::DIM.pow(3)).map(|i| {
-            let x = i / Self::DIM.pow(2);
-            let y = i % Self::DIM.pow(2) / Self::DIM;
-            let z = i % Self::DIM;
-            point![x, y, z].cast()
-        })
+        Cuboid::unit()
+            .scale(Self::DIM as i64)
+            .into_points()
+            .map(|coords| coords.map(|c| c as u8))
     }
 
     fn is_in_bounds(coords: Point3<i8>) -> Option<Point3<u8>> {
@@ -115,8 +112,8 @@ impl Chunk {
 
     fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
-            utils::coords(coords, Default::default()).cast(),
-            Vector3::repeat(Self::DIM).cast(),
+            utils::coords(coords, Point3::origin()).cast(),
+            Vector3::repeat(Self::DIM as f32),
         )
     }
 
@@ -188,10 +185,6 @@ impl ChunkLight {
         self.non_zero_count == 0
     }
 
-    pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
-        self.lights.row(coords, len)
-    }
-
     pub fn diff_reach(&self, other: &ChunkLight) -> Option<ChunkReach> {
         let mut reach = ChunkReach::default();
         for coords in Chunk::points() {
@@ -200,6 +193,10 @@ impl ChunkLight {
             }
         }
         (!reach.is_empty()).then_some(reach)
+    }
+
+    pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
+        self.lights.row(coords, len)
     }
 }
 

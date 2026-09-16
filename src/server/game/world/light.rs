@@ -56,10 +56,10 @@ impl WorldLight {
         P: IntoIterator<Item = Point3<i32>>,
     {
         for coords in new_surface_points {
-            for area_coords in ChunkArea::chunk_points(coords) {
-                if area_coords.y > coords.y {
+            for delta in ChunkArea::chunk_deltas() {
+                if delta.y > 0 {
                     self.0
-                        .entry(area_coords)
+                        .entry(coords + delta)
                         .or_insert_with(|| PLACEHOLDER.clone());
                 }
             }

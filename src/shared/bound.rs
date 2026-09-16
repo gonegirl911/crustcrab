@@ -20,9 +20,9 @@ impl Aabb {
         }
     }
 
-    pub fn pad(mut self, amount: f32) -> Self {
-        self.min.apply(|c| *c -= amount);
-        self.max.apply(|c| *c += amount);
+    pub fn pad(mut self, padding: f32) -> Self {
+        self.min.apply(|c| *c -= padding);
+        self.max.apply(|c| *c += padding);
         self
     }
 

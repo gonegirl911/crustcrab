@@ -31,7 +31,7 @@ pub struct Player {
 impl Player {
     pub fn new(renderer: &Renderer) -> Self {
         let config = &CLIENT_CONFIG.player;
-        let view = View::new(Default::default(), Vector3::x());
+        let view = View::new(Point3::origin(), Vector3::x());
         let projection = Projection::new(config.fovy, 0.0, 0.1, Self::zfar());
         let controller = Controller::new(0.0, config.sensitivity);
         let uniform = Uniform::new(

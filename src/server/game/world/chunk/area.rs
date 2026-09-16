@@ -1,21 +1,22 @@
 use super::Chunk;
-use crate::server::game::world::block::{
-    Block, BlockLight,
-    area::{BlockArea, BlockAreaView, BlockLightAreaView},
+use crate::{
+    server::game::world::block::{
+        Block, BlockLight,
+        area::{BlockArea, BlockAreaView, BlockLightAreaView},
+    },
+    shared::cuboid::Cuboid,
 };
-use nalgebra::{Point3, Vector3, vector};
+use nalgebra::{Point3, Vector3};
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{self, SeqAccess, Visitor},
     ser::SerializeSeq,
 };
 use std::{
-    array,
     fmt::{self, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Index, Range},
-    sync::LazyLock,
 };
 
 #[derive(Default, Serialize, Deserialize)]
@@ -35,25 +36,12 @@ impl ChunkArea {
         self.0.copy_row(delta, src);
     }
 
-    pub fn chunk_points(coords: Point3<i32>) -> impl Iterator<Item = Point3<i32>> {
-        Self::chunk_deltas().map(move |delta| coords + delta)
-    }
-
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
-        static CHUNK_DELTAS: LazyLock<[Vector3<i32>; ChunkArea::CHUNK_DIM.pow(3)]> =
-            LazyLock::new(|| {
-                let padding = ChunkArea::CHUNK_PADDING as i32;
-                let dim = ChunkArea::CHUNK_DIM as i32;
-                array::from_fn(|i| {
-                    let i = i as i32;
-                    let dx = -padding + i / dim.pow(2);
-                    let dy = -padding + i % dim.pow(2) / dim;
-                    let dz = -padding + i % dim;
-                    vector![dx, dy, dz]
-                })
-            });
-
-        CHUNK_DELTAS.iter().copied()
+        Cuboid::unit()
+            .scale(Self::CHUNK_DIM as i64)
+            .pad(Self::CHUNK_PADDING as i64)
+            .into_points()
+            .map(|coords| coords.coords.cast())
     }
 
     pub fn axis_range(dc: i32) -> Range<u8> {

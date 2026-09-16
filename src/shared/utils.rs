@@ -30,6 +30,18 @@ pub fn inv_lerp(a: f32, b: f32, value: f32) -> f32 {
 
 // ------------------------------------------------------------------------------------------------
 
+pub impl(self) trait ParallelIteratorExt: ParallelIterator {
+    fn into_seq_iter(self) -> IntoSeqIter<Self::Item> {
+        self.collect_vec_list().into_iter().flatten()
+    }
+}
+
+type IntoSeqIter<T> = Flatten<linked_list::IntoIter<Vec<T>>>;
+
+impl<I: ParallelIterator> ParallelIteratorExt for I {}
+
+// ------------------------------------------------------------------------------------------------
+
 pub fn magnitude_squared<const N: usize>(a: Point<i32, N>, b: Point<i32, N>) -> u128 {
     iter::zip(&a.coords, &b.coords)
         .map(|(a, &b)| (a.abs_diff(b) as u128).pow(2))
@@ -84,15 +96,3 @@ pub fn coords<const D: usize>(
 ) -> Point<i64, D> {
     chunk_coords.cast() * Chunk::DIM as i64 + block_coords.cast().coords
 }
-
-// ------------------------------------------------------------------------------------------------
-
-pub impl(self) trait ParallelIteratorExt: ParallelIterator {
-    fn into_seq_iter(self) -> IntoSeqIter<Self::Item> {
-        self.collect_vec_list().into_iter().flatten()
-    }
-}
-
-type IntoSeqIter<T> = Flatten<linked_list::IntoIter<Vec<T>>>;
-
-impl<I: ParallelIterator> ParallelIteratorExt for I {}

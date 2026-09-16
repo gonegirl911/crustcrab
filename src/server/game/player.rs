@@ -6,10 +6,10 @@ use crate::{
         event_loop::{Event, EventHandler},
         game::world::block::data::STR_TO_BLOCK,
     },
-    shared::{ray::Ray, utils},
+    shared::{cuboid::Cuboid, ray::Ray, utils},
 };
 use nalgebra::{Point2, Point3, Vector3, point};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::ParallelIterator;
 use serde::{
     Deserialize, Deserializer,
     de::{self, Unexpected},
@@ -105,24 +105,11 @@ impl WorldArea {
     }
 
     fn cuboid_points(self) -> impl Iterator<Item = Point3<i32>> {
-        (-self.radius..=self.radius).flat_map(move |dx| {
-            World::Y_RANGE.flat_map(move |y| {
-                (-self.radius..=self.radius)
-                    .map(move |dz| point![self.center.x + dx, y, self.center.z + dz])
-            })
-        })
+        self.cuboid().into_points().map(Point3::cast)
     }
 
     fn par_cuboid_points(self) -> impl ParallelIterator<Item = Point3<i32>> {
-        (-self.radius..=self.radius)
-            .into_par_iter()
-            .flat_map(move |dx| {
-                World::Y_RANGE.into_par_iter().flat_map(move |y| {
-                    (-self.radius..=self.radius)
-                        .into_par_iter()
-                        .map(move |dz| point![self.center.x + dx, y, self.center.z + dz])
-                })
-            })
+        self.cuboid().into_par_points().map(Point3::cast)
     }
 
     fn contains_xz(self, xz: Point2<i32>) -> bool {
@@ -131,6 +118,16 @@ impl WorldArea {
 
     fn client_contains_y(self, y: i32) -> bool {
         y.abs_diff(self.center.y) <= self.radius as u32
+    }
+
+    fn cuboid(self) -> Cuboid {
+        let radius = self.radius as i64;
+        let y_start = World::Y_RANGE.start as i64;
+        let y_end = World::Y_RANGE.end as i64;
+        Cuboid::from_corners(
+            point![-radius, y_start, -radius],
+            point![radius, y_end, radius],
+        )
     }
 }
 

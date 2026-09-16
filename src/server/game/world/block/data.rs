@@ -8,12 +8,13 @@ use crate::{
     enum_map,
     server::game::world::chunk::Chunk,
     shared::{
+        bound::Aabb,
         color::Rgb,
         enum_map::{Enum, EnumMap},
         indexmap::FxIndexSet,
     },
 };
-use nalgebra::{Point2, Point3, Scalar, Vector3, point, vector};
+use nalgebra::{Point2, Point3, Scalar, Vector3, point};
 use rustc_hash::FxHashMap;
 use serde::{
     Deserialize, Deserializer,
@@ -22,7 +23,7 @@ use serde::{
 use std::{array, collections::BTreeMap, fs, ops::Deref, sync::LazyLock};
 
 pub struct BlockData {
-    pub model: Model,
+    model: Model,
     pub luminance: Rgb<u8>,
     pub light_filter: Rgb<bool>,
     pub render_layer: RenderLayer,
@@ -91,6 +92,10 @@ impl BlockData {
                 Default::default(),
             )
         })
+    }
+
+    pub fn hitbox(&self, coords: Point3<i64>) -> Aabb {
+        self.model.hitbox(coords)
     }
 
     pub fn flat_icon(&self) -> Option<impl Iterator<Item = BlockVertex>> {
@@ -359,16 +364,6 @@ static RAW_BLOCK_DATA: LazyLock<BTreeMap<&str, RawBlockData>> = LazyLock::new(||
     }
 
     data
-});
-
-pub static NEIGHBORHOOD_DELTAS: LazyLock<[Vector3<i8>; 27]> = LazyLock::new(|| {
-    array::from_fn(|i| {
-        let i = i as i8;
-        let dx = -1 + i / 9;
-        let dy = -1 + i % 9 / 3;
-        let dz = -1 + i % 3;
-        vector![dx, dy, dz]
-    })
 });
 
 static SIDE_CORNER_SIDES: LazyLock<EnumMap<Side, EnumMap<Corner, [Side; 2]>>> =
