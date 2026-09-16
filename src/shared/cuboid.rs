@@ -12,7 +12,7 @@ impl Cuboid {
         let max = a.sup(&b);
         Self {
             origin: min,
-            diagonal: max - min,
+            diagonal: max - min + Vector3::repeat(1),
         }
     }
 
@@ -30,7 +30,7 @@ impl Cuboid {
 
     pub fn pad(mut self, padding: i64) -> Self {
         self.origin.apply(|c| *c -= padding);
-        self.diagonal.apply(|c| *c += padding);
+        self.diagonal.apply(|c| *c += padding * 2);
         self
     }
 

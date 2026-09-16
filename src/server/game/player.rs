@@ -126,7 +126,7 @@ impl WorldArea {
         let y_end = World::Y_RANGE.end as i64;
         Cuboid::from_corners(
             point![-radius, y_start, -radius],
-            point![radius, y_end, radius],
+            point![radius, y_end - 1, radius],
         )
     }
 }

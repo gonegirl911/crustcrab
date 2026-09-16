@@ -26,7 +26,6 @@ impl ChunkArea {
     const PADDING: usize = BlockArea::PADDING;
     pub const CHUNK_PADDING: usize = Self::PADDING.div_ceil(Chunk::DIM);
     const DIM: usize = Chunk::DIM + 2 * Self::PADDING;
-    const CHUNK_DIM: usize = 1 + 2 * Self::CHUNK_PADDING;
 
     pub fn block_area_view(&self, coords: Point3<u8>) -> BlockAreaView<'_> {
         BlockAreaView::new(&self.0, coords)
@@ -38,7 +37,6 @@ impl ChunkArea {
 
     pub fn chunk_deltas() -> impl Iterator<Item = Vector3<i32>> {
         Cuboid::unit()
-            .scale(Self::CHUNK_DIM as i64)
             .pad(Self::CHUNK_PADDING as i64)
             .into_points()
             .map(|coords| coords.coords.cast())
