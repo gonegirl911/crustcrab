@@ -93,11 +93,9 @@ impl WorldLight {
                     let light = self.0.get(&chunk_coords);
 
                     if chunk.is_glowing() {
-                        for block_coords in Chunk::points() {
+                        for (block_coords, block) in Chunk::points().zip(chunk.as_slice()) {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            for (i, c) in BlockLight::TORCHLIGHT_RANGE
-                                .zip(chunk[block_coords].data().luminance)
-                            {
+                            for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
                                 branch.insert(i, node.with_value(c));
                             }
                         }

@@ -50,14 +50,6 @@ impl Chunk {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.non_air_count == 0
-    }
-
-    pub fn is_glowing(&self) -> bool {
-        self.glowing_count != 0
-    }
-
     pub fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
         let block = &mut self.blocks[coords];
         let prev = *block;
@@ -78,9 +70,21 @@ impl Chunk {
         self.adjust_counts(prev, curr);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.non_air_count == 0
+    }
+
     pub fn recompute_visibility_graph(&mut self) {
         let opaque_set = ChunkBitSet::from_fn(|coords| self[coords].data().is_opaque());
         self.visibility_graph = VisibilityGraph::compute(opaque_set);
+    }
+
+    pub fn is_glowing(&self) -> bool {
+        self.glowing_count != 0
+    }
+
+    pub fn as_slice(&self) -> &[Block] {
+        self.blocks.as_slice()
     }
 
     pub fn row(&self, coords: Point3<u8>, len: usize) -> &[Block] {
@@ -187,12 +191,16 @@ impl ChunkLight {
 
     pub fn diff_reach(&self, other: &ChunkLight) -> Option<ChunkReach> {
         let mut reach = ChunkReach::default();
-        for coords in Chunk::points() {
-            if self[coords] != other[coords] {
+        for ((coords, a), b) in Chunk::points().zip(self.as_slice()).zip(other.as_slice()) {
+            if a != b {
                 reach.insert_block(coords);
             }
         }
         (!reach.is_empty()).then_some(reach)
+    }
+
+    fn as_slice(&self) -> &[BlockLight] {
+        self.lights.as_slice()
     }
 
     pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
@@ -216,6 +224,10 @@ impl<T> ChunkDataStore<T> {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
         }))
+    }
+
+    fn as_slice(&self) -> &[T] {
+        self.0.as_flattened().as_flattened()
     }
 
     fn row(&self, coords: Point3<u8>, len: usize) -> &[T] {
