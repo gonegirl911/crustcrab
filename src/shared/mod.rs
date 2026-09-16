@@ -4,7 +4,7 @@ pub(crate) mod color;
 pub(crate) mod cuboid;
 pub(crate) mod enum_map;
 pub(crate) mod indexmap;
-pub(crate) mod pool;
+pub mod pool;
 pub(crate) mod ray;
 pub(crate) mod toml;
 pub(crate) mod utils;

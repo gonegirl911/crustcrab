@@ -2,7 +2,7 @@ use clap::Parser;
 use crustcrab::{
     client::ClientEvent,
     server::{Server, ServerEvent, ServerSender},
-    shared::bincode,
+    shared::{bincode, pool},
 };
 use std::{
     io::{BufReader, BufWriter, ErrorKind, Write},
@@ -19,6 +19,8 @@ struct Args {
 }
 
 fn main() {
+    pool::init(2);
+
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
     let mut server = Server::new(ServerSender::Disconnected, client_rx);
 

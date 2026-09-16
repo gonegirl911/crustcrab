@@ -1,7 +1,7 @@
 use clap::Parser;
 use crustcrab::{
     client::{Client, ClientEvent},
-    shared::bincode,
+    shared::{bincode, pool},
 };
 use std::{
     io::{BufReader, BufWriter, ErrorKind, Write},
@@ -18,6 +18,8 @@ struct Args {
 }
 
 fn main() {
+    pool::init(1);
+
     let (client_tx, client_rx) = crossbeam_channel::unbounded();
     let (client, server_tx) = Client::new(client_tx.clone());
 

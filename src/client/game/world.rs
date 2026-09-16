@@ -30,28 +30,27 @@ use crate::{
             },
         },
     },
-    shared::{color::Rgb, enum_map::EnumMap, indexmap::FxIndexMap, pool::ThreadPool, utils},
+    shared::{color::Rgb, enum_map::EnumMap, indexmap::FxIndexMap, pool::JobPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::{
     cmp::Reverse,
     collections::{VecDeque, hash_map::Entry},
     iter, mem,
     sync::Arc,
-    time::Instant,
 };
 use uuid::Uuid;
 
 pub struct World {
-    meshes: FxHashMap<Point3<i32>, (ChunkMesh, Instant)>,
+    meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
-    unloaded: FxHashSet<Point3<i32>>,
+    revisions: FxHashMap<Point3<i32>, u64>,
     groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
-    group_workers: ThreadPool<(ChunkInput, GroupId), (ChunkOutput, GroupId)>,
-    workers: ThreadPool<ChunkInput, ChunkOutput>,
+    workers: JobPool<ChunkInput, ChunkOutput>,
+    revision: u64,
 }
 
 impl World {
@@ -82,15 +81,14 @@ impl World {
                 Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
         };
-        let group_workers = ThreadPool::new(|(input, group_id)| (Self::compute(input), group_id));
-        let workers = ThreadPool::new(Self::compute);
+        let workers = JobPool::new(Self::compute);
         Self {
             meshes: Default::default(),
             render_pipelines,
-            unloaded: Default::default(),
+            revisions: Default::default(),
             groups: Default::default(),
-            group_workers,
             workers,
+            revision: 0,
         }
     }
 
@@ -124,7 +122,7 @@ impl World {
             self.render_pipelines[RenderLayer::Opaque].bind(&mut render_pass, bind_groups);
 
             for coords in visible_points {
-                let Some((mesh, _)) = self.meshes.get(&coords) else {
+                let Some(mesh) = self.meshes.get(&coords) else {
                     continue;
                 };
 
@@ -164,7 +162,7 @@ impl World {
         });
 
         for coords in blended_points {
-            let (mesh, _) = self.meshes.get_mut(&coords).unwrap();
+            let mesh = self.meshes.get_mut(&coords).unwrap();
             let blended_part = mesh.blended_part.as_mut().unwrap();
             let displacement = coords.cast() * Chunk::DIM as f32 - frustum.origin;
             BlockImmediates::new(coords).set(&mut render_pass);
@@ -174,19 +172,32 @@ impl World {
         }
     }
 
-    fn send(&self, input: ChunkInput, group_id: Option<GroupId>) {
-        if let Some(group_id) = group_id {
-            self.group_workers.send((input, group_id)).unwrap();
-        } else {
-            self.workers.send(input).unwrap();
-        }
+    fn schedule_remesh(
+        &mut self,
+        coords: Point3<i32>,
+        data: Arc<ChunkData>,
+        group_id: Option<GroupId>,
+    ) {
+        self.revision += 1;
+        self.revisions.insert(coords, self.revision);
+
+        let has_priority = group_id.is_some();
+        self.workers.submit(
+            ChunkInput {
+                coords,
+                data,
+                revision: self.revision,
+                group_id,
+            },
+            has_priority,
+        );
     }
 
     fn process_output(
         &mut self,
         renderer: &Renderer,
-        output: Result<ChunkOutput, Point3<i32>>,
         group_id: Option<GroupId>,
+        output: Result<ChunkOutput, Point3<i32>>,
     ) {
         let Some(GroupId {
             id: group_id,
@@ -209,10 +220,11 @@ impl World {
                 }
             }
             Entry::Vacant(entry) => {
+                assert_ne!(group_size, 0);
                 if group_size == 1 {
                     self.apply_output(renderer, output);
                 } else {
-                    let mut group = Vec::with_capacity(group_size);
+                    let mut group = Vec::with_capacity(group_size - 1);
                     group.push(output);
                     entry.insert(group);
                 }
@@ -220,43 +232,34 @@ impl World {
         }
     }
 
+    #[rustfmt::skip]
     fn apply_output(&mut self, renderer: &Renderer, output: Result<ChunkOutput, Point3<i32>>) {
         let ChunkOutput {
             coords,
             vertices,
             visibility_graph,
-            updated_at,
+            revision,
+            ..
         } = match output {
             Ok(output) => output,
             Err(coords) => {
-                self.meshes.remove(&coords);
+                if self.revisions.get(&coords) == Some(&u64::MAX) {
+                    self.meshes.remove(&coords);
+                }
                 return;
             }
         };
 
-        if self.unloaded.contains(&coords) {
+        if self.revisions.get(&coords).is_some_and(|&latest| revision < latest) {
             return;
         }
 
-        match self.meshes.entry(coords) {
-            Entry::Occupied(mut entry) => {
-                let (chunk_mesh, last_updated_at) = entry.get_mut();
-                if *last_updated_at < updated_at {
-                    if let Some(mesh) =
-                        ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph)
-                    {
-                        *chunk_mesh = mesh;
-                    } else {
-                        entry.remove();
-                    }
-                }
+        match ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph) {
+            Some(mesh) => {
+                self.meshes.insert(coords, mesh);
             }
-            Entry::Vacant(entry) => {
-                if let Some(mesh) =
-                    ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph)
-                {
-                    entry.insert((mesh, updated_at));
-                }
+            None => {
+                self.meshes.remove(&coords);
             }
         }
     }
@@ -273,7 +276,7 @@ impl World {
 
         while let Some(coords) = queue.pop_front() {
             let displacement = coords - origin;
-            let visibility_graph = self.meshes.get(&coords).map(|(mesh, _)| mesh.visibility_graph);
+            let visibility_graph = self.meshes.get(&coords).map(|mesh| mesh.visibility_graph);
             let sources = visited[&coords];
 
             for (exit, delta) in *SIDE_DELTAS {
@@ -350,14 +353,16 @@ impl World {
         ChunkInput {
             coords,
             data,
-            updated_at,
+            revision,
+            group_id,
         }: ChunkInput,
     ) -> ChunkOutput {
         ChunkOutput {
             coords,
             vertices: data.vertices(),
             visibility_graph: data.visibility_graph,
-            updated_at,
+            revision,
+            group_id,
         }
     }
 
@@ -405,43 +410,24 @@ impl EventHandler for World {
                     data,
                     group_id,
                 } => {
-                    self.unloaded.remove(coords);
-                    self.send(
-                        ChunkInput {
-                            coords: *coords,
-                            data: data.clone(),
-                            updated_at: Instant::now(),
-                        },
-                        *group_id,
-                    );
+                    self.schedule_remesh(*coords, data.clone(), *group_id);
                 }
                 &ServerEvent::ChunkUnloaded { coords, group_id } => {
-                    self.unloaded.insert(coords);
-                    self.process_output(renderer, Err(coords), group_id);
+                    self.revisions.insert(coords, u64::MAX);
+                    self.process_output(renderer, group_id, Err(coords));
                 }
                 ServerEvent::ChunkUpdated {
                     coords,
                     data,
                     group_id,
                 } => {
-                    self.send(
-                        ChunkInput {
-                            coords: *coords,
-                            data: data.clone(),
-                            updated_at: Instant::now(),
-                        },
-                        *group_id,
-                    );
+                    self.schedule_remesh(*coords, data.clone(), *group_id);
                 }
                 _ => {}
             },
             Event::AboutToWait => {
-                while let Ok((output, group_id)) = self.group_workers.try_recv() {
-                    self.process_output(renderer, Ok(output), Some(group_id));
-                }
-
                 while let Ok(output) = self.workers.try_recv() {
-                    self.process_output(renderer, Ok(output), None);
+                    self.process_output(renderer, output.group_id, Ok(output));
                 }
             }
             _ => {}
@@ -452,14 +438,16 @@ impl EventHandler for World {
 struct ChunkInput {
     coords: Point3<i32>,
     data: Arc<ChunkData>,
-    updated_at: Instant,
+    group_id: Option<GroupId>,
+    revision: u64,
 }
 
 struct ChunkOutput {
     coords: Point3<i32>,
     vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
     visibility_graph: VisibilityGraph,
-    updated_at: Instant,
+    group_id: Option<GroupId>,
+    revision: u64,
 }
 
 struct ChunkMesh {
