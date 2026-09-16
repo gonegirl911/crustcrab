@@ -14,10 +14,8 @@ impl Aabb {
     }
 
     fn from_corners(a: Point3<f32>, b: Point3<f32>) -> Self {
-        Self {
-            min: a.inf(&b),
-            max: a.sup(&b),
-        }
+        let (min, max) = a.inf_sup(&b);
+        Self { min, max }
     }
 
     pub fn pad(mut self, padding: f32) -> Self {

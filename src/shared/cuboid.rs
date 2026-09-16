@@ -8,8 +8,7 @@ pub struct Cuboid {
 
 impl Cuboid {
     pub fn from_corners(a: Point3<i64>, b: Point3<i64>) -> Self {
-        let min = a.inf(&b);
-        let max = a.sup(&b);
+        let (min, max) = a.inf_sup(&b);
         Self {
             origin: min,
             diagonal: max - min + Vector3::repeat(1),
@@ -31,6 +30,11 @@ impl Cuboid {
     pub fn pad(mut self, padding: i64) -> Self {
         self.origin.apply(|c| *c -= padding);
         self.diagonal.apply(|c| *c += padding * 2);
+        self
+    }
+
+    pub fn translate(mut self, translation: Vector3<i64>) -> Self {
+        self.origin += translation;
         self
     }
 

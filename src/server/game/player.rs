@@ -128,6 +128,7 @@ impl WorldArea {
             point![-radius, y_start, -radius],
             point![radius, y_end - 1, radius],
         )
+        .translate(self.center.coords.cast())
     }
 }
 
