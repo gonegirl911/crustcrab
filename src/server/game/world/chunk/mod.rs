@@ -53,21 +53,18 @@ impl Chunk {
     pub fn apply(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
         let block = &mut self.blocks[coords];
         let prev = *block;
-        if block.apply(action) {
-            let curr = *block;
-            self.adjust_counts(prev, curr);
-            true
-        } else {
-            false
-        }
+        let is_valid = block.apply(action);
+        let cur = *block;
+        self.adjust_counts(prev, cur);
+        is_valid
     }
 
     pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: BlockAction) {
         let block = &mut self.blocks[coords];
         let prev = *block;
         block.apply_unchecked(action);
-        let curr = *block;
-        self.adjust_counts(prev, curr);
+        let cur = *block;
+        self.adjust_counts(prev, cur);
     }
 
     pub fn is_empty(&self) -> bool {
@@ -91,11 +88,11 @@ impl Chunk {
         self.blocks.row(coords, len)
     }
 
-    fn adjust_counts(&mut self, prev: Block, curr: Block) {
+    fn adjust_counts(&mut self, prev: Block, cur: Block) {
         self.non_air_count -= (prev != Block::AIR) as u16;
-        self.non_air_count += (curr != Block::AIR) as u16;
+        self.non_air_count += (cur != Block::AIR) as u16;
         self.glowing_count -= prev.data().is_glowing() as u16;
-        self.glowing_count += curr.data().is_glowing() as u16;
+        self.glowing_count += cur.data().is_glowing() as u16;
     }
 
     pub fn points() -> impl Iterator<Item = Point3<u8>> {
@@ -173,16 +170,9 @@ impl ChunkLight {
 
     pub fn set(&mut self, coords: Point3<u8>, value: BlockLight) -> bool {
         let prev = mem::replace(&mut self.lights[coords], value);
-        if prev == value {
-            false
-        } else {
-            if prev == Default::default() {
-                self.non_zero_count += 1;
-            } else if value == Default::default() {
-                self.non_zero_count -= 1;
-            }
-            true
-        }
+        let cur = value;
+        self.adjust_count(prev, cur);
+        prev == cur
     }
 
     pub fn is_empty(&self) -> bool {
@@ -205,6 +195,11 @@ impl ChunkLight {
 
     pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
         self.lights.row(coords, len)
+    }
+
+    fn adjust_count(&mut self, prev: BlockLight, cur: BlockLight) {
+        self.non_zero_count -= (prev != Default::default()) as u16;
+        self.non_zero_count += (cur != Default::default()) as u16;
     }
 }
 
