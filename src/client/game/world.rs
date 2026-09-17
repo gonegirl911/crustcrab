@@ -427,7 +427,7 @@ impl EventHandler for World {
                 _ => {}
             },
             Event::AboutToWait => {
-                let time_budget = Duration::from_millis(CLIENT_CONFIG.world.upload_budget_ms);
+                let time_budget = Duration::from_millis(CLIENT_CONFIG.world.output_budget_ms);
                 let deadline = Instant::now() + time_budget;
                 while let Ok(output) = self.workers.try_recv() {
                     self.process_output(renderer, output.group_id, Ok(output));
@@ -609,5 +609,5 @@ impl Immediates for BlockImmediates {}
 
 #[derive(Deserialize)]
 pub struct WorldConfig {
-    upload_budget_ms: u64,
+    output_budget_ms: u64,
 }

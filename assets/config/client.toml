@@ -61,4 +61,4 @@ size = 1.0
 size = 3.6
 
 [world]
-upload_budget_ms = 4
+output_budget_ms = 4
