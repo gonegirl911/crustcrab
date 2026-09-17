@@ -228,7 +228,6 @@ impl World {
         }
     }
 
-    #[rustfmt::skip]
     fn apply_output(&mut self, renderer: &Renderer, output: Result<ChunkOutput, Point3<i32>>) {
         let ChunkOutput {
             coords,
@@ -246,7 +245,9 @@ impl World {
             }
         };
 
-        if self.revisions.get(&coords).is_some_and(|&latest| revision < latest) {
+        if let Some(&latest) = self.revisions.get(&coords)
+            && revision < latest
+        {
             return;
         }
 
@@ -415,8 +416,8 @@ impl EventHandler for World {
                 _ => {}
             },
             Event::AboutToWait => {
-                let time_budget = Duration::from_millis(CLIENT_CONFIG.world.output_budget_ms);
-                let deadline = Instant::now() + time_budget;
+                let output_budget = Duration::from_millis(CLIENT_CONFIG.world.output_budget_ms);
+                let deadline = Instant::now() + output_budget;
                 while let Ok(output) = self.workers.try_recv() {
                     self.process_output(renderer, output.group_id, Ok(output));
                     if Instant::now() > deadline {
