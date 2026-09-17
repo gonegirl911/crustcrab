@@ -174,23 +174,18 @@ impl World {
         }
     }
 
-    fn schedule_remesh(
-        &mut self,
-        coords: Point3<i32>,
-        data: Arc<ChunkData>,
-        group_id: Option<GroupId>,
-    ) {
+    #[rustfmt::skip]
+    fn schedule_remeshes(&mut self, data: &[Arc<ChunkData>], group_id: Option<GroupId>) {
         self.revision += 1;
-        self.revisions.insert(coords, self.revision);
+        self.revisions.extend(data.iter().map(|data| (data.coords, self.revision)));
 
         let has_priority = group_id.is_some();
-        self.workers.submit(
-            ChunkInput {
-                coords,
+        self.workers.submit_batch(
+            data.iter().cloned().map(|data| ChunkInput {
                 data,
                 revision: self.revision,
                 group_id,
-            },
+            }),
             has_priority,
         );
     }
@@ -352,14 +347,13 @@ impl World {
 
     fn compute(
         ChunkInput {
-            coords,
             data,
             revision,
             group_id,
         }: ChunkInput,
     ) -> ChunkOutput {
         ChunkOutput {
-            coords,
+            coords: data.coords,
             vertices: data.vertices(),
             visibility_graph: data.visibility_graph,
             revision,
@@ -407,9 +401,7 @@ impl EventHandler for World {
         match event {
             Event::ServerEvent(event) => match event {
                 ServerEvent::ChunksLoaded { data, group_id } => {
-                    for data in data {
-                        self.schedule_remesh(data.coords, data.clone(), *group_id);
-                    }
+                    self.schedule_remeshes(data, *group_id);
                 }
                 ServerEvent::ChunksUnloaded { points, group_id } => {
                     for &coords in points {
@@ -418,9 +410,7 @@ impl EventHandler for World {
                     }
                 }
                 ServerEvent::ChunksUpdated { data, group_id } => {
-                    for data in data {
-                        self.schedule_remesh(data.coords, data.clone(), *group_id);
-                    }
+                    self.schedule_remeshes(data, *group_id);
                 }
                 _ => {}
             },
@@ -440,7 +430,6 @@ impl EventHandler for World {
 }
 
 struct ChunkInput {
-    coords: Point3<i32>,
     data: Arc<ChunkData>,
     group_id: Option<GroupId>,
     revision: u64,

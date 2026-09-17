@@ -154,11 +154,17 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
+        let data = points
+            .into_iter()
+            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+            .collect::<Box<[_]>>();
+
+        if data.is_empty() {
+            return Ok(());
+        }
+
         server_tx.send(ServerEvent::ChunksLoaded {
-            data: points
-                .into_iter()
-                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-                .collect(),
+            data,
             group_id: Some(group_id),
         })
     }
@@ -168,11 +174,17 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
+        let data = points
+            .into_par_iter()
+            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+            .collect::<Box<[_]>>();
+
+        if data.is_empty() {
+            return Ok(());
+        }
+
         server_tx.send(ServerEvent::ChunksLoaded {
-            data: points
-                .into_par_iter()
-                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-                .collect(),
+            data,
             group_id: None,
         })
     }
@@ -183,11 +195,17 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
+        let data = points
+            .into_iter()
+            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+            .collect::<Box<[_]>>();
+
+        if data.is_empty() {
+            return Ok(());
+        }
+
         server_tx.send(ServerEvent::ChunksUpdated {
-            data: points
-                .into_iter()
-                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-                .collect(),
+            data,
             group_id: Some(group_id),
         })
     }
@@ -197,11 +215,17 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
+        let data = points
+            .into_par_iter()
+            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+            .collect::<Box<[_]>>();
+
+        if data.is_empty() {
+            return Ok(());
+        }
+
         server_tx.send(ServerEvent::ChunksUpdated {
-            data: points
-                .into_par_iter()
-                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-                .collect(),
+            data,
             group_id: None,
         })
     }
@@ -228,10 +252,11 @@ impl World {
         group_id: Option<GroupId>,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send(ServerEvent::ChunksUnloaded {
-            points: points.into_iter().collect(),
-            group_id,
-        })
+        let points = points.into_iter().collect::<Box<[_]>>();
+        if points.is_empty() {
+            return Ok(());
+        }
+        server_tx.send(ServerEvent::ChunksUnloaded { points, group_id })
     }
 }
 
