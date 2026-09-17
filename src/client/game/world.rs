@@ -36,11 +36,13 @@ use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::FxHashMap;
+use serde::Deserialize;
 use std::{
     cmp::Reverse,
     collections::{VecDeque, hash_map::Entry},
     iter, mem,
     sync::Arc,
+    time::{Duration, Instant},
 };
 use uuid::Uuid;
 
@@ -425,8 +427,13 @@ impl EventHandler for World {
                 _ => {}
             },
             Event::AboutToWait => {
+                let time_budget = Duration::from_millis(CLIENT_CONFIG.world.upload_budget_ms);
+                let deadline = Instant::now() + time_budget;
                 while let Ok(output) = self.workers.try_recv() {
                     self.process_output(renderer, output.group_id, Ok(output));
+                    if Instant::now() > deadline {
+                        break;
+                    }
                 }
             }
             _ => {}
@@ -599,3 +606,8 @@ impl BlockImmediates {
 }
 
 impl Immediates for BlockImmediates {}
+
+#[derive(Deserialize)]
+pub struct WorldConfig {
+    upload_budget_ms: u64,
+}

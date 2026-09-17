@@ -13,7 +13,7 @@ use app::App;
 use crossbeam_channel::{Receiver, Sender};
 use game::{
     cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, shading::ShadingConfig,
-    sky::SkyConfig,
+    sky::SkyConfig, world::WorldConfig,
 };
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
@@ -83,6 +83,7 @@ struct ClientConfig {
     cloud: CloudConfig,
     shading: ShadingConfig,
     gui: GuiConfig,
+    world: WorldConfig,
 }
 
 static CLIENT_CONFIG: LazyLock<ClientConfig> =
