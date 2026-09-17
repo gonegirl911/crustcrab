@@ -41,18 +41,16 @@ pub enum ServerEvent {
         inventory: Arc<[Block]>,
     },
     TimeUpdated(Time),
-    ChunkLoaded {
-        coords: Point3<i32>,
-        data: Arc<ChunkData>,
+    ChunksLoaded {
+        data: Box<[Arc<ChunkData>]>,
         group_id: Option<GroupId>,
     },
-    ChunkUnloaded {
-        coords: Point3<i32>,
+    ChunksUnloaded {
+        points: Box<[Point3<i32>]>,
         group_id: Option<GroupId>,
     },
-    ChunkUpdated {
-        coords: Point3<i32>,
-        data: Arc<ChunkData>,
+    ChunksUpdated {
+        data: Box<[Arc<ChunkData>]>,
         group_id: Option<GroupId>,
     },
     BlockHovered(Option<BlockHoverData>),
@@ -69,7 +67,7 @@ impl ServerEvent {
         assert!(!self.is_special());
         !matches!(
             self,
-            Self::ChunkLoaded { .. } | Self::ChunkUnloaded { .. } | Self::ChunkUpdated { .. }
+            Self::ChunksLoaded { .. } | Self::ChunksUnloaded { .. } | Self::ChunksUpdated { .. }
         )
     }
 }

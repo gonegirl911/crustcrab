@@ -154,14 +154,13 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        points
-            .into_iter()
-            .map(|coords| ServerEvent::ChunkLoaded {
-                coords,
-                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                group_id: Some(group_id),
-            })
-            .try_for_each(|event| server_tx.send(event))
+        server_tx.send(ServerEvent::ChunksLoaded {
+            data: points
+                .into_iter()
+                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+                .collect(),
+            group_id: Some(group_id),
+        })
     }
 
     fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
@@ -169,15 +168,13 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        points
-            .into_par_iter()
-            .map(|coords| ServerEvent::ChunkLoaded {
-                coords,
-                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                group_id: None,
-            })
-            .into_seq_iter()
-            .try_for_each(|event| server_tx.send(event))
+        server_tx.send(ServerEvent::ChunksLoaded {
+            data: points
+                .into_par_iter()
+                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+                .collect(),
+            group_id: None,
+        })
     }
 
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
@@ -186,14 +183,13 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        points
-            .into_iter()
-            .map(|coords| ServerEvent::ChunkUpdated {
-                coords,
-                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                group_id: Some(group_id),
-            })
-            .try_for_each(|event| server_tx.send(event))
+        server_tx.send(ServerEvent::ChunksUpdated {
+            data: points
+                .into_iter()
+                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+                .collect(),
+            group_id: Some(group_id),
+        })
     }
 
     fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
@@ -201,15 +197,13 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        points
-            .into_par_iter()
-            .map(|coords| ServerEvent::ChunkUpdated {
-                coords,
-                data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                group_id: None,
-            })
-            .into_seq_iter()
-            .try_for_each(|event| server_tx.send(event))
+        server_tx.send(ServerEvent::ChunksUpdated {
+            data: points
+                .into_par_iter()
+                .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
+                .collect(),
+            group_id: None,
+        })
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -234,10 +228,10 @@ impl World {
         group_id: Option<GroupId>,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        points
-            .into_iter()
-            .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id })
-            .try_for_each(|event| server_tx.send(event))
+        server_tx.send(ServerEvent::ChunksUnloaded {
+            points: points.into_iter().collect(),
+            group_id,
+        })
     }
 }
 
@@ -523,6 +517,7 @@ impl Branch {
 
 #[derive(Serialize, Deserialize)]
 pub struct ChunkData {
+    pub coords: Point3<i32>,
     area: ChunkArea,
     light_area: ChunkLightArea,
     pub visibility_graph: VisibilityGraph,
@@ -531,6 +526,7 @@ pub struct ChunkData {
 impl ChunkData {
     fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Self {
         Self {
+            coords,
             area: chunks.chunk_area(coords),
             light_area: light.chunk_light_area(coords),
             visibility_graph: chunks[coords].visibility_graph,

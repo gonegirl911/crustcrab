@@ -406,23 +406,21 @@ impl EventHandler for World {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::ServerEvent(event) => match event {
-                ServerEvent::ChunkLoaded {
-                    coords,
-                    data,
-                    group_id,
-                } => {
-                    self.schedule_remesh(*coords, data.clone(), *group_id);
+                ServerEvent::ChunksLoaded { data, group_id } => {
+                    for data in data {
+                        self.schedule_remesh(data.coords, data.clone(), *group_id);
+                    }
                 }
-                &ServerEvent::ChunkUnloaded { coords, group_id } => {
-                    self.revisions.insert(coords, u64::MAX);
-                    self.process_output(renderer, group_id, Err(coords));
+                ServerEvent::ChunksUnloaded { points, group_id } => {
+                    for &coords in points {
+                        self.revisions.insert(coords, u64::MAX);
+                        self.process_output(renderer, *group_id, Err(coords));
+                    }
                 }
-                ServerEvent::ChunkUpdated {
-                    coords,
-                    data,
-                    group_id,
-                } => {
-                    self.schedule_remesh(*coords, data.clone(), *group_id);
+                ServerEvent::ChunksUpdated { data, group_id } => {
+                    for data in data {
+                        self.schedule_remesh(data.coords, data.clone(), *group_id);
+                    }
                 }
                 _ => {}
             },
