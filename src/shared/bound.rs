@@ -2,7 +2,7 @@ use super::ray::{Intersectable, Ray};
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Aabb {
     min: Point3<f64>,
     max: Point3<f64>,
