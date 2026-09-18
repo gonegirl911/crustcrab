@@ -22,7 +22,7 @@ use std::{f32::consts::SQRT_2, mem, time::Duration};
 use winit::event::WindowEvent;
 
 pub struct Player {
-    view: View,
+    pub mut(self) view: View,
     projection: Projection,
     controller: Controller,
     uniform: Uniform<PlayerUniformData>,
@@ -53,10 +53,6 @@ impl Player {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.uniform.bind_group()
-    }
-
-    pub fn origin(&self) -> Point3<f32> {
-        self.view.origin
     }
 
     pub fn frustum(&self) -> Frustum {

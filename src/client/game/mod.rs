@@ -156,7 +156,7 @@ impl Game {
             self.shading.bind_group(),
             self.textures.bind_group(),
             self.depth.view(),
-            self.player.origin(),
+            self.player.view.origin,
         );
 
         self.fog.draw(

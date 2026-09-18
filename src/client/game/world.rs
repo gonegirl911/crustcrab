@@ -160,13 +160,10 @@ impl World {
         shading_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
-        player_origin: Point3<f32>,
+        origin: Point3<f32>,
     ) {
         blended_points.sort_unstable_by_key(|&coords| {
-            Reverse(utils::distance_squared(
-                coords,
-                utils::chunk_coords(player_origin),
-            ))
+            Reverse(utils::distance_squared(coords, utils::chunk_coords(origin)))
         });
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
@@ -184,7 +181,7 @@ impl World {
         for coords in blended_points {
             let mesh = self.meshes.get_mut(&coords).unwrap();
             let blended_part = mesh.blended_part.as_mut().unwrap();
-            let displacement = coords.cast() * Chunk::DIM as f32 - player_origin;
+            let displacement = coords.cast() * Chunk::DIM as f32 - origin;
             BlockImmediates::new(coords).set(&mut render_pass);
             blended_part.draw(renderer, &mut render_pass, |&coords| {
                 TotalOrd((coords.coords + displacement).magnitude_squared())
