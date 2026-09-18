@@ -109,14 +109,14 @@ impl Game {
         }
     }
 
+    #[rustfmt::skip]
     fn draw(
         &mut self,
         renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
-        self.sky
-            .draw(self.processor.view(), encoder, self.player.bind_group());
+        self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
 
         let blended_points = self.world.draw_opaque(
             self.fog.view(),
