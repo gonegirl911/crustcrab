@@ -41,6 +41,7 @@ light_attenuation = 0.8
 size = [12, 4]
 padding = 0.005
 speed = 1.0
+altitude = 192.0
 
 [cloud.day]
 color = [1.0, 1.0, 1.0]

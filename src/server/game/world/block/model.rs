@@ -44,7 +44,7 @@ impl From<RawModel<'_>> for Model {
 #[derive(Default, Deserialize)]
 #[serde(from = "RawModelData")]
 struct ModelData {
-    diagonal: Vector3<f32>,
+    diagonal: Vector3<f64>,
     has_flat_icon: bool,
     side_corner_deltas: SideCornerDeltas,
 }
@@ -133,7 +133,7 @@ impl Default for RawModel<'_> {
 #[derive(Default, Deserialize)]
 #[serde(default)]
 struct RawModelData {
-    diagonal: Vector3<f32>,
+    diagonal: Vector3<f64>,
     has_flat_icon: bool,
     side_corner_deltas: EnumMap<Side, Box<CornerDeltas>>,
     internal_corner_deltas: Box<CornerDeltas>,

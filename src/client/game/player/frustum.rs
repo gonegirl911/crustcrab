@@ -2,7 +2,7 @@ use crate::shared::bound::BoundingSphere;
 use nalgebra::{Point3, Vector3};
 
 pub struct Frustum {
-    pub origin: Point3<f32>,
+    pub origin: Point3<f64>,
     forward: Vector3<f32>,
     right: Vector3<f32>,
     up: Vector3<f32>,
@@ -17,7 +17,7 @@ pub struct Frustum {
 impl Frustum {
     #[expect(clippy::too_many_arguments)]
     pub fn new(
-        origin: Point3<f32>,
+        origin: Point3<f64>,
         forward: Vector3<f32>,
         right: Vector3<f32>,
         up: Vector3<f32>,
@@ -51,7 +51,7 @@ pub trait Cullable {
 
 impl Cullable for BoundingSphere {
     fn is_visible(&self, frustum: &Frustum) -> bool {
-        let v = self.center - frustum.origin;
+        let v = (self.center - frustum.origin).cast();
 
         let az = v.dot(&frustum.forward);
         if !(frustum.znear - self.radius..=frustum.zfar + self.radius).contains(&az) {

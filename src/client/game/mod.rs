@@ -116,6 +116,10 @@ impl Game {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
+        let origin = self.player.view.origin;
+        let anchor = self.player.view.anchor();
+        let frustum = self.player.frustum();
+
         self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
 
         let blended_points = self.world.draw_opaque(
@@ -126,7 +130,8 @@ impl Game {
             self.shading.bind_group(),
             self.textures.bind_group(),
             self.depth.view(),
-            &self.player.frustum(),
+            anchor,
+            &frustum,
         );
 
         self.fog.draw(
@@ -144,6 +149,7 @@ impl Game {
             self.sky.bind_group(),
             self.shading.bind_group(),
             self.depth.view(),
+            anchor,
         );
 
         self.world.draw_blended(
@@ -156,7 +162,8 @@ impl Game {
             self.shading.bind_group(),
             self.textures.bind_group(),
             self.depth.view(),
-            self.player.view.origin,
+            origin,
+            anchor,
         );
 
         self.fog.draw(
@@ -175,6 +182,7 @@ impl Game {
             self.shading.bind_group(),
             self.depth.view(),
             self.processor.spare_bind_group(),
+            origin,
         );
 
         self.fog.draw(

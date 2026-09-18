@@ -89,7 +89,7 @@ impl<C, V: Pod> BlendedMesh<C, V> {
     }
 }
 
-pub struct TotalOrd(pub f32);
+pub struct TotalOrd(pub f64);
 
 impl PartialEq for TotalOrd {
     fn eq(&self, other: &Self) -> bool {

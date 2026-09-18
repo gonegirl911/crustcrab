@@ -44,7 +44,10 @@ impl EventHandler<Event> for Player {
                         center: utils::chunk_coords(origin),
                         radius: render_distance as i32,
                     };
-                    self.ray = Ray { origin, dir };
+                    self.ray = Ray {
+                        origin,
+                        dir: dir.cast(),
+                    };
 
                     _ = server_tx.send(ServerEvent::PlayerInitialized {
                         origin,
@@ -54,7 +57,7 @@ impl EventHandler<Event> for Player {
                     });
                 }
                 ClientEvent::PlayerOrientationChanged { dir } => {
-                    self.ray.dir = dir;
+                    self.ray.dir = dir.cast();
                 }
                 ClientEvent::PlayerPositionChanged { origin } => {
                     self.cur.center = utils::chunk_coords(origin);
@@ -134,10 +137,10 @@ impl WorldArea {
 
 #[derive(Deserialize)]
 pub struct PlayerConfig {
-    pub origin: Point3<f32>,
+    pub origin: Point3<f64>,
     pub dir: Vector3<f32>,
-    pub speed: f32,
-    pub reach: f32,
+    pub speed: f64,
+    pub reach: f64,
     #[serde(deserialize_with = "PlayerConfig::deserialize_inventory")]
     pub inventory: Arc<[Block]>,
 }
@@ -149,26 +152,25 @@ impl PlayerConfig {
     {
         let inventory = Box::<[_]>::deserialize(deserializer)?;
         if inventory.len() > 9 {
-            Err(de::Error::custom("inventory has only 9 available slots"))
-        } else {
-            inventory
-                .into_iter()
-                .map(|str| {
-                    STR_TO_BLOCK.get(str).copied().ok_or_else(|| {
-                        de::Error::invalid_value(
-                            Unexpected::Str(str),
-                            &&*format!(
-                                "one of [\"{}\"]",
-                                STR_TO_BLOCK
-                                    .keys()
-                                    .map(Deref::deref)
-                                    .collect::<Vec<_>>()
-                                    .join("\", \"")
-                            ),
-                        )
-                    })
-                })
-                .collect()
+            return Err(de::Error::custom("inventory has only 9 available slots"));
         }
+        inventory
+            .into_iter()
+            .map(|str| {
+                STR_TO_BLOCK.get(str).copied().ok_or_else(|| {
+                    de::Error::invalid_value(
+                        Unexpected::Str(str),
+                        &&*format!(
+                            "one of [\"{}\"]",
+                            STR_TO_BLOCK
+                                .keys()
+                                .map(Deref::deref)
+                                .collect::<Vec<_>>()
+                                .join("\", \"")
+                        ),
+                    )
+                })
+            })
+            .collect()
     }
 }

@@ -63,7 +63,7 @@ pub enum ClientEvent {
         render_distance: u32,
     },
     PlayerPositionChanged {
-        origin: Point3<f32>,
+        origin: Point3<f64>,
     },
     PlayerOrientationChanged {
         dir: Vector3<f32>,

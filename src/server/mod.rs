@@ -35,9 +35,9 @@ impl Server {
 #[derive(Serialize, Deserialize)]
 pub enum ServerEvent {
     PlayerInitialized {
-        origin: Point3<f32>,
+        origin: Point3<f64>,
         dir: Vector3<f32>,
-        speed: f32,
+        speed: f64,
         inventory: Arc<[Block]>,
     },
     TimeUpdated(Time),

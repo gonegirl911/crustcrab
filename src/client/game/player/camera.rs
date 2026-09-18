@@ -5,6 +5,7 @@ use crate::{
         event_loop::{Event, EventHandler},
     },
     server::ServerEvent,
+    shared::utils,
 };
 use bitflags::bitflags;
 use nalgebra::{Matrix4, Point3, Vector3, matrix, vector};
@@ -18,7 +19,7 @@ use winit::{
 };
 
 pub struct View {
-    pub origin: Point3<f32>,
+    pub origin: Point3<f64>,
     pub mut(self) forward: Vector3<f32>,
     pub mut(self) right: Vector3<f32>,
     pub mut(self) up: Vector3<f32>,
@@ -27,7 +28,7 @@ pub struct View {
 }
 
 impl View {
-    pub fn new(origin: Point3<f32>, dir: Vector3<f32>) -> Self {
+    pub fn new(origin: Point3<f64>, dir: Vector3<f32>) -> Self {
         let forward = dir.normalize();
         let right = Self::right(forward);
         let up = Self::up(forward, right);
@@ -41,6 +42,10 @@ impl View {
             yaw,
             pitch,
         }
+    }
+
+    pub fn anchor(&self) -> Point3<f64> {
+        utils::coords(utils::chunk_coords(self.origin), Point3::origin()).cast()
     }
 
     pub fn mat(&self) -> Matrix4<f32> {
@@ -107,13 +112,13 @@ pub struct Controller {
     key_history: Keys,
     relevant_buttons: MouseButtons,
     button_history: MouseButtons,
-    speed: f32,
+    speed: f64,
     sensitivity: f32,
     pub applied_external_updates: bool,
 }
 
 impl Controller {
-    pub fn new(speed: f32, sensitivity: f32) -> Self {
+    pub fn new(speed: f64, sensitivity: f32) -> Self {
         Self {
             speed,
             sensitivity,
@@ -163,7 +168,8 @@ impl Controller {
 
     fn apply_movement(&self, view: &mut View, dt: Duration) {
         let mut dir = Vector3::zeros();
-        let forward = view.right.cross(&Vector3::y());
+        let right = view.right.cast();
+        let forward = right.cross(&Vector3::y());
 
         if self.relevant_keys.contains(Keys::W) {
             dir += forward;
@@ -172,9 +178,9 @@ impl Controller {
         }
 
         if self.relevant_keys.contains(Keys::A) {
-            dir -= view.right;
+            dir -= right;
         } else if self.relevant_keys.contains(Keys::D) {
-            dir += view.right;
+            dir += right;
         }
 
         if self.relevant_keys.contains(Keys::SPACE) {
@@ -183,7 +189,7 @@ impl Controller {
             dir.y -= 1.0;
         }
 
-        view.origin += dir.normalize() * self.speed * dt.as_secs_f32();
+        view.origin += dir.normalize() * self.speed * dt.as_secs_f64();
     }
 }
 

@@ -28,7 +28,8 @@ struct Immediates {
     size: vec2<f32>,
     scale_factor: vec3<f32>,
     color: vec3<f32>,
-    offset: vec2<f32>,
+    phase: vec2<f32>,
+    altitude: f32,
 }
 
 struct VertexOutput {
@@ -53,11 +54,11 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
         f32(extractBits(vertex.data[0], 10u, 5u)),
     );
     let side_shade = extractBits(vertex.data[0], 23u, 2u);
-    let offset = instance.offset - rem_euclid(player.origin.xz - imm.offset, imm.size.x);
+    let offset = instance.offset - rem_euclid(imm.phase, imm.size.x);
     let scaled_coords = (coords - 0.5) * imm.scale_factor + 0.5;
     let cloud_dims = vec3(imm.size, imm.size.x);
-    let world_pos = scaled_coords * cloud_dims + vec3(offset.x, -player.origin.y + CLOUD_ALTITUDE, offset.y);
-    let scroll_xz = player.origin.xz + instance.offset - imm.offset;
+    let world_pos = scaled_coords * cloud_dims + vec3(offset.x, imm.altitude, offset.y);
+    let scroll_xz = imm.phase + instance.offset;
     let tex_coords = scroll_xz / imm.size.x / imm.tex_dims;
     let side_factor = shading.side_factors[side_shade];
     return VertexOutput(player.vp * vec4(world_pos, 1.0), tex_coords, side_factor);
@@ -82,5 +83,3 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 }
-
-const CLOUD_ALTITUDE = 192.0;

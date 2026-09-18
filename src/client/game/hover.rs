@@ -43,6 +43,7 @@ impl BlockHover {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -51,6 +52,7 @@ impl BlockHover {
         sky_bind_group: &wgpu::BindGroup,
         shading_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
+        anchor: Point3<f64>,
     ) {
         if let Some(BlockHoverData {
             hitbox,
@@ -81,7 +83,7 @@ impl BlockHover {
                 player_bind_group,
                 sky_bind_group,
                 shading_bind_group,
-                &BlockHighlightImmediates::new(hitbox, brightness),
+                &BlockHighlightImmediates::new(hitbox, brightness, anchor),
             );
         }
     }
@@ -184,9 +186,13 @@ struct BlockHighlightImmediates {
 }
 
 impl BlockHighlightImmediates {
-    fn new(hitbox: Aabb, brightness: BlockLight) -> Self {
+    fn new(hitbox: Aabb, brightness: BlockLight, anchor: Point3<f64>) -> Self {
         Self {
-            m: hitbox.pad(CLIENT_CONFIG.cloud.padding).to_homogeneous(),
+            m: hitbox
+                .pad(CLIENT_CONFIG.cloud.padding as f64)
+                .translate(-anchor.coords)
+                .to_homogeneous()
+                .cast(),
             brightness: brightness.0,
         }
     }

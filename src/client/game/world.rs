@@ -96,7 +96,7 @@ impl World {
 
     #[expect(clippy::too_many_arguments)]
     pub fn draw_opaque(
-        &mut self,
+        &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
@@ -104,6 +104,7 @@ impl World {
         shading_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
+        anchor: Point3<f64>,
         frustum: &Frustum,
     ) -> Vec<Point3<i32>> {
         let visible_points = self.cull_chunks(frustum);
@@ -125,7 +126,7 @@ impl World {
             };
 
             if let Some(opaque_part) = &mesh.opaque_part {
-                BlockImmediates::new(coords).set(&mut render_pass);
+                BlockImmediates::new(coords, anchor).set(&mut render_pass);
                 opaque_part.draw(&mut render_pass);
             }
 
@@ -141,7 +142,7 @@ impl World {
         self.render_pipelines[RenderLayer::Cutout].bind(&mut render_pass, bind_groups);
 
         for (coords, cutout_part) in cutout_parts {
-            BlockImmediates::new(coords).set(&mut render_pass);
+            BlockImmediates::new(coords, anchor).set(&mut render_pass);
             cutout_part.draw(&mut render_pass);
         }
 
@@ -160,7 +161,8 @@ impl World {
         shading_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
-        origin: Point3<f32>,
+        origin: Point3<f64>,
+        anchor: Point3<f64>,
     ) {
         blended_points.sort_unstable_by_key(|&coords| {
             Reverse(utils::distance_squared(coords, utils::chunk_coords(origin)))
@@ -181,10 +183,10 @@ impl World {
         for coords in blended_points {
             let mesh = self.meshes.get_mut(&coords).unwrap();
             let blended_part = mesh.blended_part.as_mut().unwrap();
-            let displacement = coords.cast() * Chunk::DIM as f32 - origin;
-            BlockImmediates::new(coords).set(&mut render_pass);
+            let displacement = coords.cast() * Chunk::DIM as f64 - origin;
+            BlockImmediates::new(coords, anchor).set(&mut render_pass);
             blended_part.draw(renderer, &mut render_pass, |&coords| {
-                TotalOrd((coords.coords + displacement).magnitude_squared())
+                TotalOrd((coords.coords.cast() + displacement).magnitude_squared())
             });
         }
     }
@@ -601,7 +603,9 @@ struct BlockImmediates {
 }
 
 impl BlockImmediates {
-    fn new(chunk_coords: Point3<i32>) -> Self {
+    fn new(chunk_coords: Point3<i32>, anchor: Point3<f64>) -> Self {
+        let anchor = utils::chunk_coords(anchor);
+        let chunk_coords = chunk_coords - anchor.coords;
         Self {
             chunk_coords: chunk_coords.cast(),
         }

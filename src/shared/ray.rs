@@ -3,17 +3,17 @@ use std::{cmp::Ordering, iter};
 
 #[derive(Clone, Copy, Default)]
 pub struct Ray {
-    pub origin: Point3<f32>,
-    pub dir: Vector3<f32>,
+    pub origin: Point3<f64>,
+    pub dir: Vector3<f64>,
 }
 
 impl Ray {
     #[rustfmt::skip]
-    pub fn cast(self, reach: f32) -> impl Iterator<Item = BlockIntersection> {
+    pub fn cast(&self, reach: f64) -> impl Iterator<Item = BlockIntersection> + use<> {
         let precalcs = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap() {
                 Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
-                Ordering::Equal => (0, 1.0, f32::INFINITY),
+                Ordering::Equal => (0, 1.0, f64::INFINITY),
                 Ordering::Greater => (1, if o % 1.0 == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
             }
         });
@@ -47,7 +47,7 @@ pub struct BlockIntersection {
 }
 
 pub trait Intersectable {
-    fn intersect(&self, ray: Ray) -> Option<f32>;
+    fn intersect(&self, ray: Ray) -> Option<f64>;
 
     fn intersects(&self, ray: Ray) -> bool {
         self.intersect(ray).is_some()
