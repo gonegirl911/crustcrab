@@ -5,11 +5,11 @@ use generic_array::{
     typenum::{Add1, Unsigned, bit::B1},
 };
 use serde::{
-    Deserialize, Deserializer,
+    Deserialize, Deserializer, Serialize,
     de::{self, MapAccess, Visitor},
 };
 use std::{
-    fmt::{self, Debug, Formatter},
+    fmt::{self, Display, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ops::{Add, Deref, Index, IndexMut},
@@ -157,7 +157,7 @@ impl<'a, E: Enum, T> IntoIterator for &'a EnumMap<E, T> {
 
 impl<'de, E, T> Deserialize<'de> for EnumMap<E, T>
 where
-    E: Enum + Deserialize<'de> + Debug,
+    E: Enum + Serialize + Deserialize<'de>,
     T: Deserialize<'de>,
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -165,7 +165,7 @@ where
 
         impl<'de, E, T> Visitor<'de> for MapVisitor<E, T>
         where
-            E: Enum + Deserialize<'de> + Debug,
+            E: Enum + Serialize + Deserialize<'de>,
             T: Deserialize<'de>,
         {
             type Value = EnumMap<E, T>;
@@ -181,7 +181,8 @@ where
                 while let Some((variant, value)) = access.next_entry()? {
                     if !guard.init(variant, value) {
                         return Err(de::Error::custom(format_args!(
-                            "duplicate variant \"{variant:?}\"",
+                            "duplicate variant \"{}\"",
+                            SerializeDisplay(variant),
                         )));
                     }
                 }
@@ -189,11 +190,7 @@ where
                 if let Err(guard) = guard.finish() {
                     Err(de::Error::custom(format_args!(
                         "missing variants [\"{}\"]",
-                        guard
-                            .missing_variants()
-                            .map(|variant| format!("{variant:?}"))
-                            .collect::<Vec<_>>()
-                            .join("\", \""),
+                        MissingVariants(&guard.is_init),
                     )))
                 } else {
                     Ok(unsafe { uninit.assume_init() })
@@ -202,6 +199,31 @@ where
         }
 
         deserializer.deserialize_map(MapVisitor(PhantomData))
+    }
+}
+
+struct SerializeDisplay<T>(T);
+
+impl<T: Serialize> Display for SerializeDisplay<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.serialize(f)
+    }
+}
+
+struct MissingVariants<'a, E: Enum>(&'a EnumMap<E, bool>);
+
+impl<E: Enum + Serialize> Display for MissingVariants<'_, E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0
+            .iter()
+            .filter(|&(_, &is_init)| !is_init)
+            .enumerate()
+            .try_for_each(|(i, (variant, _))| {
+                if i > 0 {
+                    write!(f, "\", \"")?;
+                }
+                write!(f, "{}", SerializeDisplay(variant))
+            })
     }
 }
 
@@ -242,13 +264,6 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
         } else {
             Err(self)
         }
-    }
-
-    fn missing_variants(&self) -> impl Iterator<Item = E> {
-        self.is_init
-            .iter()
-            .filter(|&(_, is_init)| !is_init)
-            .map(|(variant, _)| variant)
     }
 }
 

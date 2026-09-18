@@ -55,6 +55,10 @@ impl Player {
         self.uniform.bind_group()
     }
 
+    pub fn origin(&self) -> Point3<f32> {
+        self.view.origin
+    }
+
     pub fn frustum(&self) -> Frustum {
         Frustum::new(
             self.view.origin,

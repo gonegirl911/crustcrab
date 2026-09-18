@@ -95,9 +95,8 @@ impl World {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub fn draw<F: FnOnce(&mut wgpu::CommandEncoder)>(
+    pub fn draw_opaque(
         &mut self,
-        renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
@@ -106,8 +105,7 @@ impl World {
         textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         frustum: &Frustum,
-        intermediate_action: F,
-    ) {
+    ) -> Vec<Point3<i32>> {
         let visible_points = self.cull_chunks(frustum);
         let mut cutout_parts = vec![];
         let mut blended_points = vec![];
@@ -117,56 +115,76 @@ impl World {
             shading_bind_group,
             textures_bind_group,
         ];
+        let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
-        {
-            let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
+        self.render_pipelines[RenderLayer::Opaque].bind(&mut render_pass, bind_groups);
 
-            self.render_pipelines[RenderLayer::Opaque].bind(&mut render_pass, bind_groups);
+        for coords in visible_points {
+            let Some(mesh) = self.meshes.get(&coords) else {
+                continue;
+            };
 
-            for coords in visible_points {
-                let Some(mesh) = self.meshes.get(&coords) else {
-                    continue;
-                };
-
-                if let Some(opaque_part) = &mesh.opaque_part {
-                    BlockImmediates::new(coords).set(&mut render_pass);
-                    opaque_part.draw(&mut render_pass);
-                }
-
-                if let Some(cutout_part) = &mesh.cutout_part {
-                    cutout_parts.push((coords, cutout_part));
-                }
-
-                if mesh.blended_part.is_some() {
-                    blended_points.push(coords);
-                }
+            if let Some(opaque_part) = &mesh.opaque_part {
+                BlockImmediates::new(coords).set(&mut render_pass);
+                opaque_part.draw(&mut render_pass);
             }
 
-            self.render_pipelines[RenderLayer::Cutout].bind(&mut render_pass, bind_groups);
+            if let Some(cutout_part) = &mesh.cutout_part {
+                cutout_parts.push((coords, cutout_part));
+            }
 
-            for (coords, cutout_part) in cutout_parts {
-                BlockImmediates::new(coords).set(&mut render_pass);
-                cutout_part.draw(&mut render_pass);
+            if mesh.blended_part.is_some() {
+                blended_points.push(coords);
             }
         }
 
-        intermediate_action(encoder);
+        self.render_pipelines[RenderLayer::Cutout].bind(&mut render_pass, bind_groups);
 
-        let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
+        for (coords, cutout_part) in cutout_parts {
+            BlockImmediates::new(coords).set(&mut render_pass);
+            cutout_part.draw(&mut render_pass);
+        }
 
-        self.render_pipelines[RenderLayer::Blended].bind(&mut render_pass, bind_groups);
+        blended_points
+    }
 
+    #[expect(clippy::too_many_arguments)]
+    pub fn draw_blended(
+        &mut self,
+        renderer: &Renderer,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        mut blended_points: Vec<Point3<i32>>,
+        player_bind_group: &wgpu::BindGroup,
+        sky_bind_group: &wgpu::BindGroup,
+        shading_bind_group: &wgpu::BindGroup,
+        textures_bind_group: &wgpu::BindGroup,
+        depth_view: &wgpu::TextureView,
+        player_origin: Point3<f32>,
+    ) {
         blended_points.sort_unstable_by_key(|&coords| {
             Reverse(utils::distance_squared(
                 coords,
-                utils::chunk_coords(frustum.origin),
+                utils::chunk_coords(player_origin),
             ))
         });
+
+        let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
+
+        self.render_pipelines[RenderLayer::Blended].bind(
+            &mut render_pass,
+            [
+                player_bind_group,
+                sky_bind_group,
+                shading_bind_group,
+                textures_bind_group,
+            ],
+        );
 
         for coords in blended_points {
             let mesh = self.meshes.get_mut(&coords).unwrap();
             let blended_part = mesh.blended_part.as_mut().unwrap();
-            let displacement = coords.cast() * Chunk::DIM as f32 - frustum.origin;
+            let displacement = coords.cast() * Chunk::DIM as f32 - player_origin;
             BlockImmediates::new(coords).set(&mut render_pass);
             blended_part.draw(renderer, &mut render_pass, |&coords| {
                 TotalOrd((coords.coords + displacement).magnitude_squared())

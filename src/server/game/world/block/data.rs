@@ -17,7 +17,7 @@ use crate::{
 use nalgebra::{Point2, Point3, Scalar, Vector3, point};
 use rustc_hash::FxHashMap;
 use serde::{
-    Deserialize, Deserializer,
+    Deserialize, Deserializer, Serialize,
     de::{self, Unexpected},
 };
 use std::{array, collections::BTreeMap, fs, ops::Deref, sync::LazyLock};
@@ -193,7 +193,7 @@ pub enum RenderLayer {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Enum, Deserialize)]
+#[derive(Clone, Copy, Debug, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SideShade {
     X = 0,
@@ -213,7 +213,7 @@ impl From<Option<Side>> for SideShade {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Enum, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Bottom, // DO NOT MOVE
@@ -264,7 +264,7 @@ impl Side {
     }
 }
 
-#[derive(Clone, Copy, Debug, Enum, Deserialize)]
+#[derive(Clone, Copy, Debug, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Corner {
     LowerLeft,

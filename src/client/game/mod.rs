@@ -118,8 +118,7 @@ impl Game {
         self.sky
             .draw(self.processor.view(), encoder, self.player.bind_group());
 
-        self.world.draw(
-            renderer,
+        let blended_points = self.world.draw_opaque(
             self.fog.view(),
             encoder,
             self.player.bind_group(),
@@ -128,24 +127,36 @@ impl Game {
             self.textures.bind_group(),
             self.depth.view(),
             &self.player.frustum(),
-            |encoder| {
-                self.fog.draw(
-                    self.processor.view(),
-                    encoder,
-                    self.player.bind_group(),
-                    self.sky.bind_group(),
-                    self.depth.bind_group(),
-                );
+        );
 
-                self.hover.draw(
-                    self.processor.view(),
-                    encoder,
-                    self.player.bind_group(),
-                    self.sky.bind_group(),
-                    self.shading.bind_group(),
-                    self.depth.view(),
-                );
-            },
+        self.fog.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.sky.bind_group(),
+            self.depth.bind_group(),
+        );
+
+        self.hover.draw(
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            self.sky.bind_group(),
+            self.shading.bind_group(),
+            self.depth.view(),
+        );
+
+        self.world.draw_blended(
+            renderer,
+            self.fog.view(),
+            encoder,
+            blended_points,
+            self.player.bind_group(),
+            self.sky.bind_group(),
+            self.shading.bind_group(),
+            self.textures.bind_group(),
+            self.depth.view(),
+            self.player.origin(),
         );
 
         self.fog.draw(

@@ -52,12 +52,14 @@ impl StarDome {
     }
 
     pub fn draw(&self, render_pass: &mut wgpu::RenderPass, player_bind_group: &wgpu::BindGroup) {
-        if self.imm.opacity != 0.0 {
-            self.render_pipeline.bind(render_pass, [player_bind_group]);
-            self.imm.set(render_pass);
-            render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
-            render_pass.draw(0..6, 0..self.instance_buffer.len());
+        if self.imm.opacity == 0.0 {
+            return;
         }
+
+        self.render_pipeline.bind(render_pass, [player_bind_group]);
+        self.imm.set(render_pass);
+        render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
+        render_pass.draw(0..6, 0..self.instance_buffer.len());
     }
 
     fn instances() -> impl Iterator<Item = StarInstance> {
