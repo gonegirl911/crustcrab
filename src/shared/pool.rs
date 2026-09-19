@@ -3,7 +3,7 @@ use std::{
     collections::VecDeque,
     mem::DropGuard,
     num::NonZero,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
     thread,
 };
 
@@ -43,16 +43,13 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
     }
 
     pub fn submit_batch(&self, inputs: impl IntoIterator<Item = I>, has_priority: bool) {
-        {
-            let mut pending = self.inner.pending.lock().unwrap();
-            pending.extend(inputs, has_priority);
-        }
-        Self::dispatch(&self.inner);
+        let mut pending = self.inner.pending.lock().unwrap();
+        pending.extend(inputs, has_priority);
+        Self::dispatch(&self.inner, pending);
     }
 
-    fn dispatch(inner: &Arc<Inner<I, O>>) {
+    fn dispatch(inner: &Arc<Inner<I, O>>, mut pending: MutexGuard<Pending<I>>) {
         let current_num_threads = rayon::current_num_threads();
-        let mut pending = inner.pending.lock().unwrap();
 
         while pending.in_flight < current_num_threads
             && let Some(input) = pending.pop()
@@ -62,11 +59,9 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
             let inner = inner.clone();
             rayon::spawn(move || {
                 let inner = DropGuard::new(inner, |inner| {
-                    {
-                        let mut pending = inner.pending.lock().unwrap();
-                        pending.in_flight -= 1;
-                    }
-                    Self::dispatch(&inner);
+                    let mut pending = inner.pending.lock().unwrap();
+                    pending.in_flight -= 1;
+                    Self::dispatch(&inner, pending);
                 });
 
                 let output = (inner.f)(input);

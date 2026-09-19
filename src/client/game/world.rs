@@ -210,8 +210,8 @@ impl World {
     fn process_output(
         &mut self,
         renderer: &Renderer,
-        group_id: Option<GroupId>,
         output: Result<ChunkOutput, Point3<i32>>,
+        group_id: Option<GroupId>,
     ) {
         let Some(GroupId {
             id: group_id,
@@ -424,7 +424,7 @@ impl EventHandler for World {
                 ServerEvent::ChunksUnloaded { points, group_id } => {
                     for &coords in points {
                         self.revisions.insert(coords, u64::MAX);
-                        self.process_output(renderer, *group_id, Err(coords));
+                        self.process_output(renderer, Err(coords), *group_id);
                     }
                 }
                 ServerEvent::ChunksUpdated { data, group_id } => {
@@ -436,7 +436,8 @@ impl EventHandler for World {
                 let output_budget = Duration::from_millis(CLIENT_CONFIG.world.output_budget_ms);
                 let deadline = Instant::now() + output_budget;
                 while let Ok(output) = self.workers.try_recv() {
-                    self.process_output(renderer, output.group_id, Ok(output));
+                    let group_id = output.group_id;
+                    self.process_output(renderer, Ok(output), group_id);
                     if Instant::now() > deadline {
                         break;
                     }
