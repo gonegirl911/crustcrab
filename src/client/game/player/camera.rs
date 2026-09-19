@@ -44,10 +44,6 @@ impl View {
         }
     }
 
-    pub fn anchor(&self) -> Point3<f64> {
-        utils::coords(utils::chunk_coords(self.origin), Point3::origin()).cast()
-    }
-
     pub fn mat(&self) -> Matrix4<f32> {
         matrix![
             self.right.x,   self.right.y,   self.right.z,   0.0;
@@ -55,6 +51,10 @@ impl View {
             self.forward.x, self.forward.y, self.forward.z, 0.0;
             0.0,            0.0,            0.0,            1.0;
         ]
+    }
+
+    pub fn anchor(&self) -> Point3<f64> {
+        utils::coords(utils::chunk_coords(self.origin), Point3::origin()).cast()
     }
 
     fn forward(yaw: f32, pitch: f32) -> Vector3<f32> {
