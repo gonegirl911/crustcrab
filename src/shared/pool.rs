@@ -85,12 +85,10 @@ struct Pending<I> {
 
 impl<I> Pending<I> {
     fn extend(&mut self, inputs: impl IntoIterator<Item = I>, has_priority: bool) {
-        for input in inputs {
-            if has_priority {
-                self.priority_inputs.push_back(input);
-            } else {
-                self.inputs.push_back(input);
-            }
+        if has_priority {
+            self.priority_inputs.extend(inputs);
+        } else {
+            self.inputs.extend(inputs);
         }
     }
 

@@ -266,6 +266,12 @@ impl EventHandler for Controller {
                         }
                     }
                 }
+                WindowEvent::Focused(false) => {
+                    self.relevant_keys = Default::default();
+                    self.key_history = Default::default();
+                    self.relevant_buttons = Default::default();
+                    self.button_history = Default::default();
+                }
                 _ => {}
             },
             _ => {}
