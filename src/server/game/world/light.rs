@@ -17,7 +17,7 @@ use nalgebra::{Point3, point};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
-    cmp::Ordering,
+    cmp,
     collections::{VecDeque, hash_map::Entry},
     sync::{Arc, LazyLock},
 };
@@ -381,12 +381,12 @@ impl Branch {
         let block_light = BlockLightRefMut::new(self, &node);
         let component = block_light.component(index);
         match component.cmp(&value) {
-            Ordering::Less => {
+            cmp::Ordering::Less => {
                 block_light.set_component(index, value);
                 self.spread_nodes(chunks, light, index, [node].into());
             }
-            Ordering::Equal => {}
-            Ordering::Greater => {
+            cmp::Ordering::Equal => {}
+            cmp::Ordering::Greater => {
                 block_light.set_component(index, 0);
                 self.unspread_node(chunks, light, index, node.with_value(component));
             }
@@ -419,13 +419,13 @@ impl Branch {
                     let block_light = BlockLightRefMut::new(self, &node);
                     let component = block_light.component(index);
                     match component.cmp(&node.value) {
-                        Ordering::Less => {}
-                        Ordering::Equal => {
+                        cmp::Ordering::Less => {}
+                        cmp::Ordering::Equal => {
                             block_light.set_component(index, luminance);
                             sources.insert(node.with_value(luminance));
                             queue.push(node);
                         }
-                        Ordering::Greater => {
+                        cmp::Ordering::Greater => {
                             sources.insert(node.with_value(component));
                         }
                     }

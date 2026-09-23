@@ -23,7 +23,6 @@ use crossbeam_channel::Sender;
 use fog::Fog;
 use gui::Gui;
 use hover::BlockHover;
-use image::RgbaImage;
 use player::Player;
 use shading::Shading;
 use sky::Sky;
@@ -271,22 +270,20 @@ struct BlockTextureArray(ImageTextureArray);
 
 impl BlockTextureArray {
     fn new(renderer: &Renderer, surface: &Surface) -> Self {
+        let images = TEX_PATHS
+            .iter()
+            .map(|path| load_rgba(format!("assets/textures/blocks/{path}")))
+            .collect::<Vec<_>>();
         Self(
             ImageTextureArray::builder()
                 .renderer(renderer)
                 .surface(surface)
-                .images(Self::images())
+                .images(&images)
                 .mip_level_count(4)
                 .is_srgb(true)
                 .address_mode(wgpu::AddressMode::Repeat)
                 .build(),
         )
-    }
-
-    fn images() -> impl Iterator<Item = RgbaImage> {
-        TEX_PATHS
-            .iter()
-            .map(|path| load_rgba(format!("assets/textures/blocks/{path}")))
     }
 }
 

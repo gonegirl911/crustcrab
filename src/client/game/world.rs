@@ -36,7 +36,6 @@ use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::FxHashMap;
-use serde::Deserialize;
 use std::{
     cmp::Reverse,
     collections::{VecDeque, hash_map::Entry},
@@ -191,18 +190,17 @@ impl World {
         }
     }
 
-    #[rustfmt::skip]
-    fn schedule_remeshes(&mut self, data: &[Arc<ChunkData>], group_id: Option<GroupId>) {
+    fn schedule_remesh(&mut self, data: Arc<ChunkData>, group_id: Option<GroupId>) {
         self.revision += 1;
-        self.revisions.extend(data.iter().map(|data| (data.coords, self.revision)));
+        self.revisions.insert(data.coords, self.revision);
 
         let has_priority = group_id.is_some();
-        self.workers.submit_batch(
-            data.iter().cloned().map(|data| ChunkInput {
+        self.workers.submit(
+            ChunkInput {
                 data,
                 revision: self.revision,
                 group_id,
-            }),
+            },
             has_priority,
         );
     }
@@ -417,24 +415,22 @@ impl EventHandler for World {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::ServerEvent(event) => match event {
-                ServerEvent::ChunksLoaded { data, group_id } => {
-                    self.schedule_remeshes(data, *group_id);
+            Event::ServerEvent(event) => match *event {
+                ServerEvent::ChunkLoaded { ref data, group_id } => {
+                    self.schedule_remesh(data.clone(), group_id);
                 }
-                ServerEvent::ChunksUnloaded { points, group_id } => {
-                    for &coords in points {
-                        self.revisions.insert(coords, u64::MAX);
-                        self.process_output(renderer, Err(coords), *group_id);
-                    }
+                ServerEvent::ChunkUnloaded { coords, group_id } => {
+                    self.revisions.insert(coords, u64::MAX);
+                    self.process_output(renderer, Err(coords), group_id);
                 }
-                ServerEvent::ChunksUpdated { data, group_id } => {
-                    self.schedule_remeshes(data, *group_id);
+                ServerEvent::ChunkUpdated { ref data, group_id } => {
+                    self.schedule_remesh(data.clone(), group_id);
                 }
                 _ => {}
             },
             Event::AboutToWait => {
-                let output_budget = Duration::from_millis(CLIENT_CONFIG.world.output_budget_ms);
-                let deadline = Instant::now() + output_budget;
+                let drain_budget = Duration::from_millis(CLIENT_CONFIG.app.drain_budget_ms);
+                let deadline = Instant::now() + drain_budget;
                 while let Ok(output) = self.workers.try_recv() {
                     let group_id = output.group_id;
                     self.process_output(renderer, Ok(output), group_id);
@@ -614,8 +610,3 @@ impl BlockImmediates {
 }
 
 impl Immediates for BlockImmediates {}
-
-#[derive(Deserialize)]
-pub struct WorldConfig {
-    output_budget_ms: u64,
-}

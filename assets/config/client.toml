@@ -61,5 +61,5 @@ size = 1.0
 [gui.inventory]
 size = 3.6
 
-[world]
-output_budget_ms = 4
+[app]
+drain_budget_ms = 4

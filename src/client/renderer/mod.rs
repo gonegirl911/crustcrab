@@ -13,7 +13,7 @@ use std::{
     mem,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{self, AtomicBool},
     },
 };
 use winit::{dpi::PhysicalSize, event::WindowEvent};
@@ -55,7 +55,7 @@ impl Renderer {
             let is_device_lost = is_device_lost.clone();
             move |reason, _| {
                 if reason != wgpu::DeviceLostReason::Destroyed {
-                    is_device_lost.store(true, Ordering::Relaxed);
+                    is_device_lost.store(true, atomic::Ordering::Relaxed);
                 }
             }
         });
@@ -77,7 +77,7 @@ impl Renderer {
     }
 
     pub fn is_device_lost(&self) -> bool {
-        self.is_device_lost.load(Ordering::Relaxed)
+        self.is_device_lost.load(atomic::Ordering::Relaxed)
     }
 }
 

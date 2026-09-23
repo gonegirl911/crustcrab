@@ -9,11 +9,11 @@ use crate::{
     server::{ServerEvent, ServerSender, game::world::block::Block},
     shared::toml,
 };
-use app::App;
+use app::{App, AppConfig};
 use crossbeam_channel::{Receiver, Sender};
 use game::{
     cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, shading::ShadingConfig,
-    sky::SkyConfig, world::WorldConfig,
+    sky::SkyConfig,
 };
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 pub struct Client {
     event_loop: EventLoop,
     client_tx: Sender<ClientEvent>,
+    server_priority_rx: Receiver<ServerEvent>,
     server_rx: Receiver<ServerEvent>,
 }
 
@@ -33,6 +34,7 @@ impl Client {
         let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
 
+        let (server_priority_tx, server_priority_rx) = crossbeam_channel::unbounded();
         let (server_tx, server_rx) = crossbeam_channel::unbounded();
         let proxy = event_loop.create_proxy();
 
@@ -40,9 +42,11 @@ impl Client {
             Self {
                 event_loop,
                 client_tx,
+                server_priority_rx,
                 server_rx,
             },
             ServerSender::Proxy {
+                priority_tx: server_priority_tx,
                 tx: server_tx,
                 wake_up: Arc::new(move || proxy.wake_up()),
             },
@@ -50,7 +54,7 @@ impl Client {
     }
 
     pub fn run(self) {
-        let app = App::new(self.client_tx, self.server_rx);
+        let app = App::new(self.client_tx, self.server_priority_rx, self.server_rx);
         self.event_loop
             .run_app(app)
             .expect("event loop should be runnable");
@@ -83,7 +87,7 @@ struct ClientConfig {
     cloud: CloudConfig,
     shading: ShadingConfig,
     gui: GuiConfig,
-    world: WorldConfig,
+    app: AppConfig,
 }
 
 static CLIENT_CONFIG: LazyLock<ClientConfig> =

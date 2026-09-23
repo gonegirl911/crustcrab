@@ -15,7 +15,7 @@ use crate::{
         bound::Aabb,
         enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
-        utils::{self, ParallelIteratorExt},
+        utils,
     },
 };
 use action::{ActionStore, BlockAction};
@@ -68,7 +68,9 @@ impl World {
             .into_par_iter()
             .filter(|coords| !self.chunks.0.contains_key(coords))
             .filter_map(|coords| Some((coords, self.generate(coords)?)))
-            .into_seq_iter()
+            .collect_vec_list()
+            .into_iter()
+            .flatten()
             .map(|(coords, chunk)| {
                 self.chunks.0.insert(coords, chunk);
                 coords
@@ -154,19 +156,10 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        let data = points
-            .into_iter()
-            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-            .collect::<Box<[_]>>();
-
-        if data.is_empty() {
-            return Ok(());
-        }
-
-        server_tx.send(ServerEvent::ChunksLoaded {
-            data,
+        server_tx.send_many(points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
+            data: ChunkData::new(&self.chunks, &self.light, coords).into(),
             group_id: Some(group_id),
-        })
+        }))
     }
 
     fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
@@ -174,19 +167,17 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        let data = points
-            .into_par_iter()
-            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-            .collect::<Box<[_]>>();
-
-        if data.is_empty() {
-            return Ok(());
-        }
-
-        server_tx.send(ServerEvent::ChunksLoaded {
-            data,
-            group_id: None,
-        })
+        server_tx.send_many(
+            points
+                .into_par_iter()
+                .map(|coords| ServerEvent::ChunkLoaded {
+                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                    group_id: None,
+                })
+                .collect_vec_list()
+                .into_iter()
+                .flatten(),
+        )
     }
 
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
@@ -195,19 +186,10 @@ impl World {
         group_id: GroupId,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        let data = points
-            .into_iter()
-            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-            .collect::<Box<[_]>>();
-
-        if data.is_empty() {
-            return Ok(());
-        }
-
-        server_tx.send(ServerEvent::ChunksUpdated {
-            data,
+        server_tx.send_many(points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
+            data: ChunkData::new(&self.chunks, &self.light, coords).into(),
             group_id: Some(group_id),
-        })
+        }))
     }
 
     fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
@@ -215,19 +197,17 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        let data = points
-            .into_par_iter()
-            .map(|coords| ChunkData::new(&self.chunks, &self.light, coords).into())
-            .collect::<Box<[_]>>();
-
-        if data.is_empty() {
-            return Ok(());
-        }
-
-        server_tx.send(ServerEvent::ChunksUpdated {
-            data,
-            group_id: None,
-        })
+        server_tx.send_many(
+            points
+                .into_par_iter()
+                .map(|coords| ServerEvent::ChunkUpdated {
+                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
+                    group_id: None,
+                })
+                .collect_vec_list()
+                .into_iter()
+                .flatten(),
+        )
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -252,11 +232,11 @@ impl World {
         group_id: Option<GroupId>,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        let points = points.into_iter().collect::<Box<[_]>>();
-        if points.is_empty() {
-            return Ok(());
-        }
-        server_tx.send(ServerEvent::ChunksUnloaded { points, group_id })
+        server_tx.send_many(
+            points
+                .into_iter()
+                .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id }),
+        )
     }
 }
 

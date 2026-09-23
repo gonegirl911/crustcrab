@@ -1,5 +1,5 @@
 use super::{
-    ClientEvent,
+    CLIENT_CONFIG, ClientEvent,
     event_loop::{Event, EventHandler},
     game::Game,
     renderer::{Renderer, Surface},
@@ -8,6 +8,8 @@ use super::{
 };
 use crate::server::ServerEvent;
 use crossbeam_channel::{Receiver, Sender};
+use serde::Deserialize;
+use std::time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
@@ -17,16 +19,43 @@ use winit::{
 
 pub struct App {
     client_tx: Sender<ClientEvent>,
+    server_priority_rx: Receiver<ServerEvent>,
     server_rx: Receiver<ServerEvent>,
     instance: Option<Instance>,
 }
 
 impl App {
-    pub fn new(client_tx: Sender<ClientEvent>, server_rx: Receiver<ServerEvent>) -> Self {
+    pub fn new(
+        client_tx: Sender<ClientEvent>,
+        server_priority_rx: Receiver<ServerEvent>,
+        server_rx: Receiver<ServerEvent>,
+    ) -> Self {
         Self {
             client_tx,
+            server_priority_rx,
             server_rx,
             instance: None,
+        }
+    }
+
+    fn dispatch_server_events(&mut self) {
+        let Some(instance) = &mut self.instance else {
+            self.server_priority_rx.try_iter().for_each(drop);
+            self.server_rx.try_iter().for_each(drop);
+            return;
+        };
+
+        for event in self.server_priority_rx.try_iter() {
+            instance.handle(&Event::ServerEvent(event), &self.client_tx);
+        }
+
+        let drain_budget = Duration::from_millis(CLIENT_CONFIG.app.drain_budget_ms);
+        let deadline = Instant::now() + drain_budget;
+        while let Ok(event) = self.server_rx.try_recv() {
+            instance.handle(&Event::ServerEvent(event), &self.client_tx);
+            if Instant::now() > deadline {
+                break;
+            }
         }
     }
 }
@@ -48,14 +77,7 @@ impl ApplicationHandler for App {
     }
 
     fn proxy_wake_up(&mut self, _: &dyn ActiveEventLoop) {
-        let Some(instance) = &mut self.instance else {
-            self.server_rx.try_iter().for_each(drop);
-            return;
-        };
-
-        for event in self.server_rx.try_iter() {
-            instance.handle(&Event::ServerEvent(event), &self.client_tx);
-        }
+        self.dispatch_server_events();
     }
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -79,6 +101,7 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
+        self.dispatch_server_events();
         self.instance
             .as_mut()
             .unwrap()
@@ -151,4 +174,9 @@ impl EventHandler for Instance {
             }
         }
     }
+}
+
+#[derive(Deserialize)]
+pub struct AppConfig {
+    pub drain_budget_ms: u64,
 }

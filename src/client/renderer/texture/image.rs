@@ -14,10 +14,10 @@ pub struct ImageTexture {
 #[bon]
 impl ImageTexture {
     #[builder]
-    pub fn new<R: AsRgbaImage>(
+    pub fn new(
         renderer @ Renderer { device, .. }: &Renderer,
         surface: &Surface,
-        image: R,
+        image: &RgbaImage,
         #[builder(default = 1)] mip_level_count: u32,
         is_srgb: bool,
         #[builder(default)] address_mode: wgpu::AddressMode,
@@ -53,14 +53,13 @@ impl ImageTexture {
         &self.bind_group
     }
 
-    fn create_view<R: AsRgbaImage>(
+    fn create_view(
         renderer @ Renderer { device, queue, .. }: &Renderer,
         surface: &Surface,
-        image: R,
+        image: &RgbaImage,
         mip_level_count: u32,
         is_srgb: bool,
     ) -> wgpu::TextureView {
-        let image = image.as_rgba_image();
         let (width, height) = image.dimensions();
         let size = wgpu::Extent3d {
             width,
@@ -209,7 +208,7 @@ pub struct ImageTextureArray {
 #[bon]
 impl ImageTextureArray {
     #[builder]
-    pub fn new<R: IntoIterator<Item: AsRgbaImage>>(
+    pub fn new<'a, R: IntoIterator<Item = &'a RgbaImage>>(
         renderer @ Renderer { device, .. }: &Renderer,
         surface: &Surface,
         images: R,
@@ -250,7 +249,7 @@ impl ImageTextureArray {
         &self.bind_group
     }
 
-    fn create_views<R: IntoIterator<Item: AsRgbaImage>>(
+    fn create_views<'a, R: IntoIterator<Item = &'a RgbaImage>>(
         renderer: &Renderer,
         surface: &Surface,
         images: R,
@@ -290,21 +289,5 @@ impl ImageTextureArray {
                 },
             ],
         })
-    }
-}
-
-pub trait AsRgbaImage {
-    fn as_rgba_image(&self) -> &RgbaImage;
-}
-
-impl AsRgbaImage for RgbaImage {
-    fn as_rgba_image(&self) -> &RgbaImage {
-        self
-    }
-}
-
-impl AsRgbaImage for &RgbaImage {
-    fn as_rgba_image(&self) -> &RgbaImage {
-        self
     }
 }

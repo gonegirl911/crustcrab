@@ -2,10 +2,10 @@ use clap::Parser;
 use crustcrab::{
     client::ClientEvent,
     server::{Server, ServerEvent, ServerSender},
-    shared::{bincode, pool},
+    shared::{codec, pool},
 };
 use std::{
-    io::{BufReader, BufWriter, ErrorKind, Write},
+    io::{BufReader, BufWriter},
     net::TcpListener,
     thread,
 };
@@ -93,76 +93,51 @@ fn main() {
             thread::scope(|s| {
                 s.spawn(|| {
                     let mut priority_writer = BufWriter::new(&priority_stream);
+                    let mut buf = Vec::new();
                     for event in priority_server_rx {
                         if matches!(event, ServerEvent::ClientDisconnected) {
                             break;
                         }
-                        if let Err(e) = bincode::serialize_into(event, &mut priority_writer) {
-                            if let bincode::SerializeError::Io { inner, .. } = &e
-                                && inner.kind() == ErrorKind::BrokenPipe
-                            {
-                                break;
-                            }
+                        if let Err(e) = codec::send(&mut priority_writer, &event, &mut buf) {
                             eprintln!("[{priority_addr}] write server event FAILED: {e}");
-                            continue;
-                        }
-                        if let Err(e) = priority_writer.flush() {
-                            if e.kind() == ErrorKind::BrokenPipe {
-                                break;
-                            }
-                            eprintln!("[{priority_addr}] write server event FAILED: {e}");
+                            break;
                         }
                     }
                     eprintln!("[{priority_addr}] writing CLOSED");
                 });
 
                 s.spawn(|| {
-                    let mut writer = BufWriter::new(stream);
+                    let mut writer = BufWriter::new(&stream);
+                    let mut buf = Vec::new();
                     for event in server_rx {
                         if matches!(event, ServerEvent::ClientDisconnected) {
                             break;
                         }
-                        if let Err(e) = bincode::serialize_into(event, &mut writer) {
-                            if let bincode::SerializeError::Io { inner, .. } = &e
-                                && inner.kind() == ErrorKind::BrokenPipe
-                            {
-                                break;
-                            }
+                        if let Err(e) = codec::send(&mut writer, &event, &mut buf) {
                             eprintln!("[{addr}] write server event FAILED: {e}");
-                            continue;
-                        }
-                        if let Err(e) = writer.flush() {
-                            if e.kind() == ErrorKind::BrokenPipe {
-                                break;
-                            }
-                            eprintln!("[{addr}] write server event FAILED: {e}");
+                            break;
                         }
                     }
                     eprintln!("[{addr}] writing CLOSED");
                 });
 
                 let mut priority_reader = BufReader::new(&priority_stream);
+                let mut buf = Vec::new();
                 loop {
-                    let event = match bincode::deserialize_from(&mut priority_reader) {
+                    let event = match codec::recv(&mut priority_reader, &mut buf) {
                         Ok(event) => event,
-                        Err(bincode::DeserializeError::Io { inner, .. })
-                            if matches!(
-                                inner.kind(),
-                                ErrorKind::ConnectionReset | ErrorKind::UnexpectedEof,
-                            ) =>
-                        {
-                            _ = priority_server_tx.send(ServerEvent::ClientDisconnected);
-                            _ = server_tx.send(ServerEvent::ClientDisconnected);
-                            break;
-                        }
+                        Err(codec::Error::ConnectionClosed) => break,
                         Err(e) => {
                             eprintln!("[{priority_addr}] read client event FAILED: {e}");
-                            continue;
+                            break;
                         }
                     };
                     client_tx.send(event).unwrap();
                 }
                 eprintln!("[{priority_addr}] reading CLOSED");
+
+                _ = priority_server_tx.send(ServerEvent::ClientDisconnected);
+                _ = server_tx.send(ServerEvent::ClientDisconnected);
             });
         }
     });

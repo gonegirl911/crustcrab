@@ -1,9 +1,7 @@
 use crate::server::game::world::chunk::Chunk;
 use nalgebra::{Point, SVector, Scalar};
-use rayon::iter::ParallelIterator;
 use std::{
-    collections::linked_list,
-    iter::{self, Flatten},
+    iter,
     ops::{Add, Mul},
 };
 
@@ -27,18 +25,6 @@ where
 pub fn inv_lerp(a: f32, b: f32, value: f32) -> f32 {
     (value - a) / (b - a)
 }
-
-// ------------------------------------------------------------------------------------------------
-
-pub impl(self) trait ParallelIteratorExt: ParallelIterator {
-    fn into_seq_iter(self) -> IntoSeqIter<Self::Item> {
-        self.collect_vec_list().into_iter().flatten()
-    }
-}
-
-type IntoSeqIter<T> = Flatten<linked_list::IntoIter<Vec<T>>>;
-
-impl<I: ParallelIterator> ParallelIteratorExt for I {}
 
 // ------------------------------------------------------------------------------------------------
 

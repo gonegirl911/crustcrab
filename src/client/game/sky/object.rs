@@ -35,8 +35,8 @@ impl ObjectSet {
             .renderer(renderer)
             .surface(surface)
             .images([
-                load_rgba("assets/textures/sky/sun.png"),
-                load_rgba("assets/textures/sky/moon.png"),
+                &load_rgba("assets/textures/sky/sun.png"),
+                &load_rgba("assets/textures/sky/moon.png"),
             ])
             .is_srgb(true)
             .build();

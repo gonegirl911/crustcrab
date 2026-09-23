@@ -42,9 +42,9 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
         }
     }
 
-    pub fn submit_batch(&self, inputs: impl IntoIterator<Item = I>, has_priority: bool) {
+    pub fn submit(&self, input: I, has_priority: bool) {
         let mut pending = self.inner.pending.lock().unwrap();
-        pending.extend(inputs, has_priority);
+        pending.push(input, has_priority);
         Self::dispatch(&self.inner, pending);
     }
 
@@ -84,11 +84,11 @@ struct Pending<I> {
 }
 
 impl<I> Pending<I> {
-    fn extend(&mut self, inputs: impl IntoIterator<Item = I>, has_priority: bool) {
+    fn push(&mut self, input: I, has_priority: bool) {
         if has_priority {
-            self.priority_inputs.extend(inputs);
+            self.priority_inputs.push_back(input);
         } else {
-            self.inputs.extend(inputs);
+            self.inputs.push_back(input);
         }
     }
 

@@ -1,5 +1,5 @@
 use nalgebra::{Point3, Vector3};
-use std::{cmp::Ordering, iter};
+use std::{cmp, iter};
 
 #[derive(Clone, Copy, Default)]
 pub struct Ray {
@@ -12,9 +12,9 @@ impl Ray {
     pub fn cast(&self, reach: f64) -> impl Iterator<Item = BlockIntersection> + use<> {
         let precalcs = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap() {
-                Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
-                Ordering::Equal => (0, 1.0, f64::INFINITY),
-                Ordering::Greater => (1, if o % 1.0 == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
+                cmp::Ordering::Less => (-1, o - o.floor(), 1.0 / -d),
+                cmp::Ordering::Equal => (0, 1.0, f64::INFINITY),
+                cmp::Ordering::Greater => (1, if o % 1.0 == 0.0 { 1.0 } else { o.ceil() - o }, 1.0 / d),
             }
         });
         let step = precalcs.map(|c| c.0);

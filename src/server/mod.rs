@@ -41,16 +41,16 @@ pub enum ServerEvent {
         inventory: Arc<[Block]>,
     },
     TimeUpdated(Time),
-    ChunksLoaded {
-        data: Box<[Arc<ChunkData>]>,
+    ChunkLoaded {
+        data: Arc<ChunkData>,
         group_id: Option<GroupId>,
     },
-    ChunksUnloaded {
-        points: Box<[Point3<i32>]>,
+    ChunkUnloaded {
+        coords: Point3<i32>,
         group_id: Option<GroupId>,
     },
-    ChunksUpdated {
-        data: Box<[Arc<ChunkData>]>,
+    ChunkUpdated {
+        data: Arc<ChunkData>,
         group_id: Option<GroupId>,
     },
     BlockHovered(Option<BlockHoverData>),
@@ -59,15 +59,10 @@ pub enum ServerEvent {
 }
 
 impl ServerEvent {
-    fn is_special(&self) -> bool {
-        matches!(self, ServerEvent::ClientDisconnected)
-    }
-
     fn has_priority(&self) -> bool {
-        assert!(!self.is_special());
         !matches!(
             self,
-            Self::ChunksLoaded { .. } | Self::ChunksUnloaded { .. } | Self::ChunksUpdated { .. }
+            Self::ChunkLoaded { .. } | Self::ChunkUnloaded { .. } | Self::ChunkUpdated { .. }
         )
     }
 }
@@ -90,36 +85,59 @@ impl GroupId {
 #[derive(Clone)]
 pub enum ServerSender {
     Proxy {
+        priority_tx: Sender<ServerEvent>,
         tx: Sender<ServerEvent>,
         wake_up: Arc<dyn Fn() + Send + Sync>,
     },
-    Disconnected,
     Sender {
         priority_tx: Sender<ServerEvent>,
         tx: Sender<ServerEvent>,
     },
+    Disconnected,
 }
 
 impl ServerSender {
     pub fn send(&self, event: ServerEvent) -> Result<(), SendError<ServerEvent>> {
-        assert!(!event.is_special());
+        let has_priority = event.has_priority();
+        self.route(event, has_priority)?;
+        self.finish(has_priority);
+        Ok(())
+    }
+
+    pub fn send_many<E>(&self, events: E) -> Result<(), SendError<ServerEvent>>
+    where
+        E: IntoIterator<Item = ServerEvent>,
+    {
+        let mut has_priority = false;
+        for event in events {
+            let event_has_priority = event.has_priority();
+            has_priority |= event_has_priority;
+            self.route(event, event_has_priority)?;
+        }
+        self.finish(has_priority);
+        Ok(())
+    }
+
+    fn route(&self, event: ServerEvent, has_priority: bool) -> Result<(), SendError<ServerEvent>> {
         match self {
-            Self::Proxy { tx, wake_up } => {
-                tx.send(event)?;
-                wake_up();
+            Self::Proxy {
+                tx, priority_tx, ..
             }
-            Self::Disconnected => {
-                return Err(SendError(event));
-            }
-            Self::Sender { priority_tx, tx } => {
-                if event.has_priority() {
-                    priority_tx.send(event)?;
+            | Self::Sender { priority_tx, tx } => {
+                if has_priority {
+                    priority_tx.send(event)
                 } else {
-                    tx.send(event)?;
+                    tx.send(event)
                 }
             }
+            Self::Disconnected => Err(SendError(event)),
         }
-        Ok(())
+    }
+
+    fn finish(&self, has_priority: bool) {
+        if has_priority && let Self::Proxy { wake_up, .. } = self {
+            wake_up();
+        }
     }
 }
 

@@ -32,7 +32,7 @@ impl Crosshair {
         let texture = ImageTexture::builder()
             .renderer(renderer)
             .surface(surface)
-            .image(load_rgba("assets/textures/gui/crosshair.png"))
+            .image(&load_rgba("assets/textures/gui/crosshair.png"))
             .is_srgb(false)
             .build();
         let render_pipeline = RenderPipeline::builder()

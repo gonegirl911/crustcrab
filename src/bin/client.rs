@@ -1,10 +1,10 @@
 use clap::Parser;
 use crustcrab::{
     client::{Client, ClientEvent},
-    shared::{bincode, pool},
+    shared::{codec, pool},
 };
 use std::{
-    io::{BufReader, BufWriter, ErrorKind, Write},
+    io::{self, BufReader, BufWriter},
     net::{Shutdown, TcpStream},
     thread,
 };
@@ -57,17 +57,14 @@ fn main() {
     thread::scope(|s| {
         s.spawn(|| {
             let mut priority_reader = BufReader::new(&priority_stream);
+            let mut buf = Vec::new();
             loop {
-                let event = match bincode::deserialize_from(&mut priority_reader) {
+                let event = match codec::recv(&mut priority_reader, &mut buf) {
                     Ok(event) => event,
-                    Err(bincode::DeserializeError::Io { inner, .. })
-                        if inner.kind() == ErrorKind::UnexpectedEof =>
-                    {
-                        break;
-                    }
+                    Err(codec::Error::ConnectionClosed) => break,
                     Err(e) => {
                         eprintln!("[{priority_addr}] read server event FAILED: {e}");
-                        continue;
+                        break;
                     }
                 };
                 if server_tx.send(event).is_err() {
@@ -80,24 +77,14 @@ fn main() {
 
         s.spawn(|| {
             let mut priority_writer = BufWriter::new(&priority_stream);
+            let mut buf = Vec::new();
             for event in client_rx {
                 if matches!(event, ClientEvent::ServerDisconnected) {
                     break;
                 }
-                if let Err(e) = bincode::serialize_into(event, &mut priority_writer) {
-                    if let bincode::SerializeError::Io { inner, .. } = &e
-                        && inner.kind() == ErrorKind::BrokenPipe
-                    {
-                        break;
-                    }
+                if let Err(e) = codec::send(&mut priority_writer, &event, &mut buf) {
                     eprintln!("[{priority_addr}] write client event FAILED: {e}");
-                    continue;
-                }
-                if let Err(e) = priority_writer.flush() {
-                    if e.kind() == ErrorKind::BrokenPipe {
-                        break;
-                    }
-                    eprintln!("[{priority_addr}] write client event FAILED: {e}");
+                    break;
                 }
             }
             eprintln!("[{priority_addr}] writing CLOSED");
@@ -105,17 +92,14 @@ fn main() {
 
         s.spawn(|| {
             let mut reader = BufReader::new(&stream);
+            let mut buf = Vec::new();
             loop {
-                let event = match bincode::deserialize_from(&mut reader) {
+                let event = match codec::recv(&mut reader, &mut buf) {
                     Ok(event) => event,
-                    Err(bincode::DeserializeError::Io { inner, .. })
-                        if inner.kind() == ErrorKind::UnexpectedEof =>
-                    {
-                        break;
-                    }
+                    Err(codec::Error::ConnectionClosed) => break,
                     Err(e) => {
                         eprintln!("[{addr}] read server event FAILED: {e}");
-                        continue;
+                        break;
                     }
                 };
                 if server_tx.send(event).is_err() {
@@ -128,12 +112,12 @@ fn main() {
         client.run();
 
         if let Err(e) = priority_stream.shutdown(Shutdown::Both)
-            && e.kind() != ErrorKind::NotConnected
+            && e.kind() != io::ErrorKind::NotConnected
         {
             eprintln!("[{priority_addr}] graceful shutdown FAILED: {e}");
         }
         if let Err(e) = stream.shutdown(Shutdown::Both)
-            && e.kind() != ErrorKind::NotConnected
+            && e.kind() != io::ErrorKind::NotConnected
         {
             eprintln!("[{addr}] graceful shutdown FAILED: {e}");
         }

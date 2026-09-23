@@ -1,5 +1,5 @@
-pub mod bincode;
 pub(crate) mod bound;
+pub mod codec;
 pub(crate) mod color;
 pub(crate) mod cuboid;
 pub(crate) mod enum_map;
