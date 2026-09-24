@@ -12,8 +12,12 @@ use game::{
     world::{BlockHoverData, ChunkData, block::Block},
 };
 use nalgebra::{Point3, Vector3};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, LazyLock};
+use std::sync::{
+    Arc, LazyLock,
+    atomic::{self, AtomicBool},
+};
 use uuid::Uuid;
 
 pub struct Server {
@@ -115,6 +119,22 @@ impl ServerSender {
             self.route(event, event_has_priority)?;
         }
         self.finish(has_priority);
+        Ok(())
+    }
+
+    pub fn par_send_many<E>(&self, events: E) -> Result<(), SendError<ServerEvent>>
+    where
+        E: IntoParallelIterator<Item = ServerEvent>,
+    {
+        let mut has_priority = AtomicBool::new(false);
+        events.into_par_iter().try_for_each(|event| {
+            let event_has_priority = event.has_priority();
+            if event_has_priority {
+                has_priority.store(event_has_priority, atomic::Ordering::Relaxed);
+            }
+            self.route(event, event_has_priority)
+        })?;
+        self.finish(*has_priority.get_mut());
         Ok(())
     }
 

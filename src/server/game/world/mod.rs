@@ -167,16 +167,13 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send_many(
+        server_tx.par_send_many(
             points
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkLoaded {
                     data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                     group_id: None,
-                })
-                .collect_vec_list()
-                .into_iter()
-                .flatten(),
+                }),
         )
     }
 
@@ -197,16 +194,13 @@ impl World {
         points: P,
         server_tx: &ServerSender,
     ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send_many(
+        server_tx.par_send_many(
             points
                 .into_par_iter()
                 .map(|coords| ServerEvent::ChunkUpdated {
                     data: ChunkData::new(&self.chunks, &self.light, coords).into(),
                     group_id: None,
-                })
-                .collect_vec_list()
-                .into_iter()
-                .flatten(),
+                }),
         )
     }
 
