@@ -48,9 +48,8 @@ use uuid::Uuid;
 pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
-    revision: u64,
-    revisions: FxHashMap<Point3<i32>, u64>,
-    pending_groups: FxHashMap<Uuid, Vec<Result<ChunkOutput, Point3<i32>>>>,
+    revisions: FxHashMap<Point3<i32>, ChunkRevision>,
+    pending_groups: FxHashMap<Uuid, Vec<ChunkAction>>,
     workers: JobPool<ChunkInput, ChunkOutput>,
 }
 
@@ -86,7 +85,6 @@ impl World {
         Self {
             meshes: Default::default(),
             render_pipelines,
-            revision: 0,
             revisions: Default::default(),
             pending_groups: Default::default(),
             workers,
@@ -191,24 +189,25 @@ impl World {
     }
 
     fn schedule_remesh(&mut self, data: Arc<ChunkData>, group_id: Option<GroupId>) {
-        self.revision += 1;
-        self.revisions.insert(data.coords, self.revision);
+        let revision = self.revisions.entry(data.coords).or_default();
+        revision.counter += 1;
+        revision.pending += 1;
 
         let has_priority = group_id.is_some();
         self.workers.submit(
             ChunkInput {
                 data,
-                revision: self.revision,
+                snapshot_revision: revision.counter,
                 group_id,
             },
             has_priority,
         );
     }
 
-    fn process_output(
+    fn process_action(
         &mut self,
         renderer: &Renderer,
-        output: Result<ChunkOutput, Point3<i32>>,
+        action: ChunkAction,
         group_id: Option<GroupId>,
     ) {
         let Some(GroupId {
@@ -216,7 +215,7 @@ impl World {
             size: group_size,
         }) = group_id
         else {
-            self.apply_output(renderer, output);
+            self.apply_action(renderer, action);
             return;
         };
 
@@ -224,53 +223,57 @@ impl World {
             Entry::Occupied(mut entry) => {
                 let group = entry.get_mut();
                 if group.len() == group_size - 1 {
-                    for output in iter::chain(entry.remove(), [output]) {
-                        self.apply_output(renderer, output);
+                    for action in iter::chain(entry.remove(), [action]) {
+                        self.apply_action(renderer, action);
                     }
                 } else {
-                    group.push(output);
+                    group.push(action);
                 }
             }
             Entry::Vacant(entry) => {
                 if group_size == 1 {
-                    self.apply_output(renderer, output);
+                    self.apply_action(renderer, action);
                 } else {
                     let mut group = Vec::with_capacity(group_size - 1);
-                    group.push(output);
+                    group.push(action);
                     entry.insert(group);
                 }
             }
         }
     }
 
-    fn apply_output(&mut self, renderer: &Renderer, output: Result<ChunkOutput, Point3<i32>>) {
-        let ChunkOutput {
+    fn apply_action(
+        &mut self,
+        renderer: &Renderer,
+        ChunkAction {
             coords,
-            vertices,
-            visibility_graph,
-            revision,
-            ..
-        } = match output {
-            Ok(output) => output,
-            Err(coords) => {
-                if self.revisions.get(&coords) == Some(&u64::MAX) {
-                    self.meshes.remove(&coords);
-                }
-                return;
-            }
+            data,
+            snapshot_revision,
+        }: ChunkAction,
+    ) {
+        let Entry::Occupied(mut revision_entry) = self.revisions.entry(coords) else {
+            unreachable!();
         };
+        let revision = revision_entry.get_mut();
+        let is_stale = snapshot_revision < revision.counter;
 
-        if let Some(&latest) = self.revisions.get(&coords)
-            && revision < latest
-        {
+        revision.pending -= 1;
+        if revision.pending == 0 {
+            revision_entry.remove();
+        }
+
+        if is_stale {
             return;
         }
 
-        match ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph) {
-            Some(mesh) => {
-                self.meshes.insert(coords, mesh);
+        match data {
+            ChunkActionData::Remesh {
+                vertices,
+                visibility_graph,
+            } => {
+                self.apply_remesh(renderer, coords, vertices, visibility_graph);
             }
-            None => {
+            ChunkActionData::Unload => {
                 self.meshes.remove(&coords);
             }
         }
@@ -335,6 +338,23 @@ impl World {
         visited.into_keys()
     }
 
+    fn apply_remesh(
+        &mut self,
+        renderer: &Renderer,
+        coords: Point3<i32>,
+        vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
+        visibility_graph: VisibilityGraph,
+    ) {
+        match ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph) {
+            Some(mesh) => {
+                self.meshes.insert(coords, mesh);
+            }
+            None => {
+                self.meshes.remove(&coords);
+            }
+        }
+    }
+
     fn render_pipeline(
         renderer: &Renderer,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
@@ -364,7 +384,7 @@ impl World {
     fn compute(
         ChunkInput {
             data,
-            revision,
+            snapshot_revision,
             group_id,
         }: ChunkInput,
     ) -> ChunkOutput {
@@ -372,7 +392,7 @@ impl World {
             coords: data.coords,
             vertices: data.vertices(),
             visibility_graph: data.visibility_graph,
-            revision,
+            snapshot_revision,
             group_id,
         }
     }
@@ -420,8 +440,20 @@ impl EventHandler for World {
                     self.schedule_remesh(data.clone(), group_id);
                 }
                 ServerEvent::ChunkUnloaded { coords, group_id } => {
-                    self.revisions.insert(coords, u64::MAX);
-                    self.process_output(renderer, Err(coords), group_id);
+                    let revision = self.revisions.entry(coords).or_default();
+                    revision.counter += 1;
+                    revision.pending += 1;
+
+                    let snapshot_revision = revision.counter;
+                    self.process_action(
+                        renderer,
+                        ChunkAction {
+                            coords,
+                            data: ChunkActionData::Unload,
+                            snapshot_revision,
+                        },
+                        group_id,
+                    );
                 }
                 ServerEvent::ChunkUpdated { ref data, group_id } => {
                     self.schedule_remesh(data.clone(), group_id);
@@ -431,9 +463,28 @@ impl EventHandler for World {
             Event::AboutToWait => {
                 let drain_budget = Duration::from_millis(CLIENT_CONFIG.app.drain_budget_ms);
                 let deadline = Instant::now() + drain_budget;
-                while let Ok(output) = self.workers.try_recv() {
-                    let group_id = output.group_id;
-                    self.process_output(renderer, Ok(output), group_id);
+
+                while let Ok(ChunkOutput {
+                    coords,
+                    vertices,
+                    visibility_graph,
+                    group_id,
+                    snapshot_revision,
+                }) = self.workers.try_recv()
+                {
+                    self.process_action(
+                        renderer,
+                        ChunkAction {
+                            coords,
+                            data: ChunkActionData::Remesh {
+                                vertices,
+                                visibility_graph,
+                            },
+                            snapshot_revision,
+                        },
+                        group_id,
+                    );
+
                     if Instant::now() > deadline {
                         break;
                     }
@@ -444,10 +495,30 @@ impl EventHandler for World {
     }
 }
 
+#[derive(Default)]
+struct ChunkRevision {
+    counter: u32,
+    pending: u32,
+}
+
+struct ChunkAction {
+    coords: Point3<i32>,
+    data: ChunkActionData,
+    snapshot_revision: u32,
+}
+
+enum ChunkActionData {
+    Remesh {
+        vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
+        visibility_graph: VisibilityGraph,
+    },
+    Unload,
+}
+
 struct ChunkInput {
     data: Arc<ChunkData>,
     group_id: Option<GroupId>,
-    revision: u64,
+    snapshot_revision: u32,
 }
 
 struct ChunkOutput {
@@ -455,7 +526,7 @@ struct ChunkOutput {
     vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
     visibility_graph: VisibilityGraph,
     group_id: Option<GroupId>,
-    revision: u64,
+    snapshot_revision: u32,
 }
 
 struct ChunkMesh {
