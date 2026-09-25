@@ -171,9 +171,15 @@ impl<'de, T: Deserialize<'de> + Clone> Deserialize<'de> for ChunkAreaDataStore<T
                 let mut cur = 0;
 
                 while let Some((value, count)) = seq.next_element::<(T, u16)>()? {
-                    let count = count as usize;
-                    uninit[cur..cur + count].write_filled(value);
-                    cur += count;
+                    let next = cur + count as usize;
+                    if next > uninit.len() {
+                        return Err(de::Error::invalid_length(
+                            next,
+                            &&*format!("unpacked length of {}", uninit.len()),
+                        ));
+                    }
+                    uninit[cur..next].write_filled(value);
+                    cur = next;
                 }
 
                 if cur == uninit.len() {
