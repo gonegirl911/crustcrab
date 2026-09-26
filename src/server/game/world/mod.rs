@@ -539,19 +539,14 @@ impl ChunkData {
             let area = self.area.block_area_view(coords);
             let light_area = self.light_area.block_light_area_view(coords);
             let data = area.kernel().data();
-
-            if data.render_layer == RenderLayer::Blended {
-                vertices[RenderLayer::Blended].extend(data.mesh(coords, &area, &light_area));
-            } else {
-                vertices[data.render_layer].extend(data.vertices(
-                    None,
-                    coords,
-                    point![1, 1, 1],
-                    point![1, 1],
-                    area.corner_aos(None, data.is_externally_lit()),
-                    light_area.corner_lights(None, &area),
-                ));
-            }
+            vertices[data.render_layer].extend(data.vertices(
+                None,
+                coords,
+                point![1, 1, 1],
+                point![1, 1],
+                area.corner_aos(None, data.is_externally_lit()),
+                light_area.corner_lights(None, &area),
+            ));
         }
 
         for side in Enum::variants() {
@@ -578,7 +573,6 @@ impl ChunkData {
                             u += 1;
                             continue;
                         };
-
                         let width = Self::merge_width(&quads, v, u, &quad);
                         let height = Self::merge_height(&quads, v, u, &quad, width);
 
@@ -589,9 +583,7 @@ impl ChunkData {
                         ));
 
                         for dv in 0..height {
-                            for du in 0..width {
-                                quads[v + dv][u + du] = None;
-                            }
+                            quads[v + dv][u..u + width].fill(None);
                         }
 
                         u += width;
@@ -652,15 +644,11 @@ impl Quad {
         let block = area.kernel();
         let data = block.data();
         let is_externally_lit = data.is_externally_lit();
-        if data.render_layer != RenderLayer::Blended && area.is_side_visible(Some(side)) {
-            Some(Self {
-                block,
-                corner_aos: area.corner_aos(Some(side), is_externally_lit),
-                corner_lights: light_area.corner_lights(Some(side), area),
-            })
-        } else {
-            None
-        }
+        area.is_side_visible(Some(side)).then(|| Self {
+            block,
+            corner_aos: area.corner_aos(Some(side), is_externally_lit),
+            corner_lights: light_area.corner_lights(Some(side), area),
+        })
     }
 
     fn vertices(

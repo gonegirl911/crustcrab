@@ -5,9 +5,10 @@ use super::{
 use crate::client::renderer::buffer::MemoryState;
 use bytemuck::Pod;
 use image::RgbaImage;
+use nalgebra::Vector3;
 use std::{
     cmp::{Ordering, Reverse},
-    fs,
+    fs, mem,
     path::Path,
     slice,
 };
@@ -58,6 +59,7 @@ pub struct BlendedMesh<C, V> {
     vertex_buffer: VertexBuffer<V>,
     index_buffer: IndexBuffer<u32>,
     indices: Vec<u32>,
+    sorted_displacement: Vector3<f64>,
 }
 
 impl<C, V: Pod> BlendedMesh<C, V> {
@@ -78,6 +80,7 @@ impl<C, V: Pod> BlendedMesh<C, V> {
             vertex_buffer,
             index_buffer: IndexBuffer::new(renderer, MemoryState::Uninit(vertices.len())),
             indices: Vec::with_capacity(vertices.len()),
+            sorted_displacement: Vector3::repeat(f64::NAN),
         })
     }
 
@@ -86,16 +89,28 @@ impl<C, V: Pod> BlendedMesh<C, V> {
         &mut self,
         renderer: &Renderer,
         render_pass: &mut wgpu::RenderPass,
-        mut dist: F,
+        displacement: Vector3<f64>,
+        dist: F,
     ) where
+        D: Ord,
+        F: FnMut(&C) -> D,
+    {
+        if mem::replace(&mut self.sorted_displacement, displacement) != displacement {
+            self.sort_indices(dist);
+            self.index_buffer.write(renderer, &self.indices);
+        }
+        self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
+    }
+
+    #[rustfmt::skip]
+    fn sort_indices<D, F>(&mut self, mut dist: F)
+    where
         D: Ord,
         F: FnMut(&C) -> D,
     {
         self.face_indices.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
         self.indices.clear();
         self.indices.extend(self.face_indices.iter().flat_map(|&(_, base)| base..base + 6));
-        self.index_buffer.write(renderer, &self.indices);
-        self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
     }
 }
 

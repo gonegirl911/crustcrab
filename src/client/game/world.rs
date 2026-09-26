@@ -182,7 +182,7 @@ impl World {
             let blended_part = mesh.blended_part.as_mut().unwrap();
             let displacement = coords.cast() * Chunk::DIM as f64 - origin;
             BlockImmediates::new(coords, anchor).set(&mut render_pass);
-            blended_part.draw(renderer, &mut render_pass, |&coords| {
+            blended_part.draw(renderer, &mut render_pass, displacement, |&coords| {
                 TotalOrd((coords.coords.cast() + displacement).magnitude_squared())
             });
         }
