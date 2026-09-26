@@ -19,6 +19,8 @@ pub struct Model {
 }
 
 impl Model {
+    pub const MAX_TEX_COUNT: usize = u8::MAX as usize + 1;
+
     pub fn corner_deltas(&self, side: Option<Side>) -> &'static CornerDeltas {
         self.data.corner_deltas(side)
     }
@@ -36,7 +38,7 @@ impl From<RawModel<'_>> for Model {
     fn from(model: RawModel) -> Self {
         Self {
             data: &MODEL_DATA[model.variant],
-            tex_index: model.tex_index(),
+            tex_index: TEX_PATHS.get_index_of(model.tex_path).unwrap() as u8,
         }
     }
 }
@@ -92,9 +94,8 @@ pub struct RawModel<'a> {
 }
 
 impl RawModel<'_> {
-    fn tex_index(&self) -> u8 {
-        TEX_PATHS.get_index_of(self.tex_path).unwrap() as u8
-    }
+    const DEFAULT_VARIANT: &str = "cube";
+    const DEFAULT_TEX_PATH: &str = "missing_texture.png";
 
     fn deserialize_variant<'de, D>(deserializer: D) -> Result<&'de str, D::Error>
     where
@@ -121,11 +122,9 @@ impl RawModel<'_> {
 
 impl Default for RawModel<'_> {
     fn default() -> Self {
-        const DEFAULT_TEX_PATH: &str = "missing_texture.png";
-
         Self {
-            variant: DEFAULT_VARIANT,
-            tex_path: DEFAULT_TEX_PATH,
+            variant: Self::DEFAULT_VARIANT,
+            tex_path: Self::DEFAULT_TEX_PATH,
         }
     }
 }
@@ -167,11 +166,10 @@ static MODEL_DATA: LazyLock<FxHashMap<String, ModelData>> = LazyLock::new(|| {
         .collect::<FxHashMap<_, _>>();
 
     assert!(
-        data.contains_key(DEFAULT_VARIANT),
-        "\"{DEFAULT_VARIANT}\" model must be configured",
+        data.contains_key(RawModel::DEFAULT_VARIANT),
+        "\"{}\" model must be configured",
+        RawModel::DEFAULT_VARIANT,
     );
 
     data
 });
-
-const DEFAULT_VARIANT: &str = "cube";

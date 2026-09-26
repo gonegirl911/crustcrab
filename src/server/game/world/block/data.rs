@@ -322,10 +322,18 @@ pub static STR_TO_BLOCK: LazyLock<FxHashMap<&str, Block>> = LazyLock::new(|| {
 });
 
 pub static TEX_PATHS: LazyLock<FxIndexSet<&str>> = LazyLock::new(|| {
-    RAW_BLOCK_DATA
+    let paths = RAW_BLOCK_DATA
         .values()
         .map(RawBlockData::tex_path)
-        .collect()
+        .collect::<FxIndexSet<_>>();
+
+    assert!(
+        paths.len() <= Model::MAX_TEX_COUNT,
+        "texture count must not exceed {}",
+        Model::MAX_TEX_COUNT,
+    );
+
+    paths
 });
 
 static RAW_BLOCK_DATA: LazyLock<BTreeMap<&str, RawBlockData>> = LazyLock::new(|| {

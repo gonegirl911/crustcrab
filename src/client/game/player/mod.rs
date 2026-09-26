@@ -99,7 +99,7 @@ impl EventHandler for Player {
             }
             &Event::ServerEvent(ServerEvent::PlayerInitialized { origin, dir, .. }) => {
                 self.view = View::new(origin, dir);
-                self.controller.applied_external_updates = true;
+                self.controller.external_updates_applied = true;
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
@@ -128,10 +128,10 @@ impl EventHandler for Player {
                     _ = client_tx.send(ClientEvent::BlockDestroyed);
                 }
 
-                let applied_external_updates =
-                    mem::take(&mut self.controller.applied_external_updates);
+                let external_updates_applied =
+                    mem::take(&mut self.controller.external_updates_applied);
 
-                if applied_external_updates
+                if external_updates_applied
                     || changes.intersects(Changes::VIEW)
                     || surface.is_resized
                 {

@@ -114,7 +114,7 @@ pub struct Controller {
     button_history: MouseButtons,
     speed: f64,
     sensitivity: f32,
-    pub applied_external_updates: bool,
+    pub external_updates_applied: bool,
 }
 
 impl Controller {
