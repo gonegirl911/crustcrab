@@ -1,7 +1,6 @@
 use super::event_loop::{Event, EventHandler};
 use std::sync::Arc;
 use winit::{
-    error::RequestError,
     event::{ButtonSource, ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::{KeyCode, PhysicalKey},
@@ -28,17 +27,6 @@ impl Window {
     pub fn to_owned_raw(&self) -> Arc<RawWindow> {
         self.0.clone()
     }
-
-    fn set_cursor_grab<M>(&self, modes: M) -> Result<(), Vec<RequestError>>
-    where
-        M: IntoIterator<Item = CursorGrabMode>,
-    {
-        modes
-            .into_iter()
-            .map(|mode| self.0.set_cursor_grab(mode).err())
-            .collect::<Option<_>>()
-            .map_or(Ok(()), Err)
-    }
 }
 
 impl EventHandler for Window {
@@ -52,7 +40,9 @@ impl EventHandler for Window {
                     state: ElementState::Pressed,
                     ..
                 } => {
-                    self.set_cursor_grab([CursorGrabMode::Confined, CursorGrabMode::Locked])
+                    self.0
+                        .set_cursor_grab(CursorGrabMode::Confined)
+                        .or_else(|_| self.0.set_cursor_grab(CursorGrabMode::Locked))
                         .expect("cursor should be grabbable");
                     self.0.set_cursor_visible(false);
                 }
@@ -65,7 +55,7 @@ impl EventHandler for Window {
                         },
                     ..
                 } => {
-                    self.set_cursor_grab([CursorGrabMode::None]).unwrap();
+                    self.0.set_cursor_grab(CursorGrabMode::None).unwrap();
                     self.0.set_cursor_visible(true);
                 }
                 _ => {}
