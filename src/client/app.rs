@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
-    event_loop::ActiveEventLoop,
+    event_loop::{ActiveEventLoop, ControlFlow},
     window::WindowId,
 };
 
@@ -22,6 +22,7 @@ pub struct App {
     server_priority_rx: Receiver<ServerEvent>,
     server_rx: Receiver<ServerEvent>,
     instance: Option<Instance>,
+    is_focused: bool,
 }
 
 impl App {
@@ -35,6 +36,7 @@ impl App {
             server_priority_rx,
             server_rx,
             instance: None,
+            is_focused: false,
         }
     }
 
@@ -81,7 +83,22 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        let should_exit = event == WindowEvent::CloseRequested;
+        let mut should_exit = false;
+
+        match event {
+            WindowEvent::Focused(true) => {
+                event_loop.set_control_flow(ControlFlow::Poll);
+                self.is_focused = true;
+            }
+            WindowEvent::Focused(false) => {
+                event_loop.set_control_flow(ControlFlow::Wait);
+                self.is_focused = false;
+            }
+            WindowEvent::CloseRequested => {
+                should_exit = true;
+            }
+            _ => {}
+        }
 
         self.instance
             .as_mut()
@@ -102,10 +119,13 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
         self.dispatch_server_events();
-        self.instance
-            .as_mut()
-            .unwrap()
-            .handle(&Event::AboutToWait, &self.client_tx);
+
+        if self.is_focused {
+            self.instance
+                .as_mut()
+                .unwrap()
+                .handle(&Event::AboutToWait, &self.client_tx);
+        }
     }
 
     fn destroy_surfaces(&mut self, _: &dyn ActiveEventLoop) {
