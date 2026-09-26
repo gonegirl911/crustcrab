@@ -1,4 +1,7 @@
-use super::{Renderer, buffer::VertexBuffer};
+use super::{
+    Renderer,
+    buffer::{IndexBuffer, VertexBuffer},
+};
 use crate::client::renderer::buffer::MemoryState;
 use bytemuck::Pod;
 use image::RgbaImage;
@@ -51,9 +54,10 @@ pub trait Immediates: Pod {
 // ------------------------------------------------------------------------------------------------
 
 pub struct BlendedMesh<C, V> {
-    faces: Vec<(C, [V; 6])>,
-    vertices: Vec<V>,
-    buffer: VertexBuffer<V>,
+    face_indices: Vec<(C, u32)>,
+    vertex_buffer: VertexBuffer<V>,
+    index_buffer: IndexBuffer<u32>,
+    indices: Vec<u32>,
 }
 
 impl<C, V: Pod> BlendedMesh<C, V> {
@@ -61,13 +65,19 @@ impl<C, V: Pod> BlendedMesh<C, V> {
     where
         F: FnMut(&[V]) -> C,
     {
-        let (faces, []) = vertices.as_chunks() else {
+        let (faces, []) = vertices.as_chunks::<6>() else {
             unreachable!();
         };
+        let vertex_buffer = VertexBuffer::try_new(renderer, MemoryState::Immutable(vertices))?;
         Some(Self {
-            buffer: VertexBuffer::try_new(renderer, MemoryState::Uninit(vertices.len()))?,
-            faces: faces.iter().map(|v| (coords(v), *v)).collect(),
-            vertices: Vec::with_capacity(vertices.len()),
+            face_indices: faces
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (coords(v), i as u32 * 6))
+                .collect(),
+            vertex_buffer,
+            index_buffer: IndexBuffer::new(renderer, MemoryState::Uninit(vertices.len())),
+            indices: Vec::with_capacity(vertices.len()),
         })
     }
 
@@ -81,11 +91,11 @@ impl<C, V: Pod> BlendedMesh<C, V> {
         D: Ord,
         F: FnMut(&C) -> D,
     {
-        self.faces.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
-        self.vertices.clear();
-        self.vertices.extend(self.faces.iter().flat_map(|&(_, v)| v));
-        self.buffer.write(renderer, &self.vertices);
-        self.buffer.draw(render_pass);
+        self.face_indices.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
+        self.indices.clear();
+        self.indices.extend(self.face_indices.iter().flat_map(|&(_, base)| base..base + 6));
+        self.index_buffer.write(renderer, &self.indices);
+        self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
     }
 }
 
