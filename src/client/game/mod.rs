@@ -8,7 +8,7 @@ pub mod sky;
 pub mod world;
 
 use super::{
-    ClientEvent,
+    PlayerEvent,
     event_loop::{Event, EventHandler},
     renderer::{
         Renderer, Surface,
@@ -211,7 +211,7 @@ impl Game {
 
 impl EventHandler for Game {
     type Context<'a> = (
-        &'a Sender<ClientEvent>,
+        &'a Sender<PlayerEvent>,
         &'a RawWindow,
         &'a Renderer,
         &'a Surface,
@@ -224,7 +224,7 @@ impl EventHandler for Game {
         &mut self,
         event: &Event,
         (
-            client_tx,
+            player_tx,
             window,
             renderer @ Renderer { device, queue, .. },
             surface,
@@ -238,7 +238,7 @@ impl EventHandler for Game {
         self.fog.handle(event, (renderer, surface));
         self.hover.handle(event, ());
         self.gui.handle(event, (renderer, surface));
-        self.player.handle(event, (client_tx, renderer, surface, &self.gui, dt));
+        self.player.handle(event, (player_tx, renderer, surface, &self.gui, dt));
         self.depth.handle(event, (renderer, surface));
         self.processor.handle(event, (renderer, surface));
 

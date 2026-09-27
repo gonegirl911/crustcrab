@@ -12,7 +12,7 @@ use crate::{
         },
     },
     server::{
-        ServerEvent,
+        ControlEvent,
         game::world::{BlockHoverData, block::BlockLight},
     },
     shared::bound::Aabb,
@@ -93,7 +93,7 @@ impl EventHandler for BlockHover {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ServerEvent(ServerEvent::BlockHovered(data)) = *event {
+        if let Event::ControlEvent(ControlEvent::BlockHovered(data)) = *event {
             self.data = data;
         }
     }

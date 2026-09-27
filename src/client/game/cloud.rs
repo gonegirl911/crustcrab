@@ -13,7 +13,7 @@ use crate::{
         },
     },
     server::{
-        ServerEvent,
+        ControlEvent,
         game::{
             clock::Time,
             world::{block::Block, chunk::Chunk},
@@ -171,7 +171,7 @@ impl EventHandler for CloudLayer {
 
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
         match event {
-            Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
+            Event::ControlEvent(ControlEvent::TimeUpdated(time)) => {
                 let nightness = time.nightness();
                 self.imm.update_color(nightness);
                 self.opacity = CLIENT_CONFIG.cloud.opacity(nightness);

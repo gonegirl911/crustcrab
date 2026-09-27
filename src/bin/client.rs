@@ -1,6 +1,6 @@
 use clap::Parser;
 use crustcrab::{
-    client::{Client, ClientEvent},
+    client::Client,
     shared::{codec, pool},
 };
 use std::{
@@ -12,114 +12,113 @@ use std::{
 #[derive(Parser)]
 struct Args {
     #[arg(long, default_value = "localhost:8008")]
-    priority_addr: String,
+    control_addr: String,
     #[arg(long, default_value = "localhost:8009")]
-    addr: String,
+    chunk_addr: String,
 }
 
 fn main() {
     pool::init(1);
 
-    let (client_tx, client_rx) = crossbeam_channel::unbounded();
-    let (client, server_tx) = Client::new(client_tx.clone());
+    let (player_tx, player_rx) = crossbeam_channel::unbounded();
+    let (control_tx, control_rx) = crossbeam_channel::unbounded();
+    let (chunk_tx, chunk_rx) = crossbeam_channel::unbounded();
+
+    let client = Client::new(player_tx, control_rx, chunk_rx);
 
     let Args {
-        priority_addr,
-        addr,
+        control_addr,
+        chunk_addr,
     } = Parser::parse();
-    let priority_stream = match TcpStream::connect(&priority_addr) {
+    let control_stream = match TcpStream::connect(&control_addr) {
         Ok(stream) => {
-            eprintln!("[{priority_addr}] open TCP connection SUCCEEDED");
+            eprintln!("[{control_addr}] open TCP connection SUCCEEDED");
             stream
         }
         Err(e) => {
-            eprintln!("[{priority_addr}] open TCP connection FAILED: {e}");
+            eprintln!("[{control_addr}] open TCP connection FAILED: {e}");
             return;
         }
     };
-    if let Err(e) = priority_stream.set_nodelay(true) {
-        eprintln!("[{priority_addr}] disable Nagle algorithm FAILED: {e}");
+    if let Err(e) = control_stream.set_nodelay(true) {
+        eprintln!("[{control_addr}] disable Nagle algorithm FAILED: {e}");
     }
-    let stream = match TcpStream::connect(&addr) {
+    let chunk_stream = match TcpStream::connect(&chunk_addr) {
         Ok(stream) => {
-            eprintln!("[{addr}] open TCP connection SUCCEEDED");
+            eprintln!("[{chunk_addr}] open TCP connection SUCCEEDED");
             stream
         }
         Err(e) => {
-            eprintln!("[{addr}] open TCP connection FAILED: {e}");
+            eprintln!("[{chunk_addr}] open TCP connection FAILED: {e}");
             return;
         }
     };
-    if let Err(e) = stream.set_nodelay(true) {
-        eprintln!("[{addr}] disable Nagle algorithm FAILED: {e}");
+    if let Err(e) = chunk_stream.set_nodelay(true) {
+        eprintln!("[{chunk_addr}] disable Nagle algorithm FAILED: {e}");
     }
 
     thread::scope(|s| {
         s.spawn(|| {
-            let mut priority_reader = BufReader::new(&priority_stream);
+            let mut control_reader = BufReader::new(&control_stream);
             let mut buf = Vec::new();
             loop {
-                let event = match codec::recv(&mut priority_reader, &mut buf) {
+                let event = match codec::recv(&mut control_reader, &mut buf) {
                     Ok(event) => event,
                     Err(codec::Error::ConnectionClosed) => break,
                     Err(e) => {
-                        eprintln!("[{priority_addr}] read server event FAILED: {e}");
+                        eprintln!("[{control_addr}] read server event FAILED: {e}");
                         break;
                     }
                 };
-                if server_tx.send(event).is_err() {
+                if control_tx.send(event).is_err() {
                     break;
                 }
             }
-            _ = client_tx.send(ClientEvent::ServerDisconnected);
-            eprintln!("[{priority_addr}] reading CLOSED");
+            eprintln!("[{control_addr}] reading CLOSED");
         });
 
         s.spawn(|| {
-            let mut priority_writer = BufWriter::new(&priority_stream);
+            let mut control_writer = BufWriter::new(&control_stream);
             let mut buf = Vec::new();
-            for event in client_rx {
-                if matches!(event, ClientEvent::ServerDisconnected) {
-                    break;
-                }
-                if let Err(e) = codec::send(&mut priority_writer, &event, &mut buf) {
-                    eprintln!("[{priority_addr}] write client event FAILED: {e}");
+            for event in player_rx {
+                if let Err(e) = codec::send(&mut control_writer, &event, &mut buf) {
+                    eprintln!("[{control_addr}] write client event FAILED: {e}");
                     break;
                 }
             }
-            eprintln!("[{priority_addr}] writing CLOSED");
+            eprintln!("[{control_addr}] writing CLOSED");
         });
 
         s.spawn(|| {
-            let mut reader = BufReader::new(&stream);
+            let mut chunk_reader = BufReader::new(&chunk_stream);
             let mut buf = Vec::new();
             loop {
-                let event = match codec::recv(&mut reader, &mut buf) {
+                let event = match codec::recv(&mut chunk_reader, &mut buf) {
                     Ok(event) => event,
                     Err(codec::Error::ConnectionClosed) => break,
                     Err(e) => {
-                        eprintln!("[{addr}] read server event FAILED: {e}");
+                        eprintln!("[{chunk_addr}] read server event FAILED: {e}");
                         break;
                     }
                 };
-                if server_tx.send(event).is_err() {
+                if chunk_tx.send(event).is_err() {
                     break;
                 }
             }
-            eprintln!("[{addr}] reading CLOSED");
+            eprintln!("[{chunk_addr}] reading CLOSED");
         });
 
         client.run();
 
-        if let Err(e) = priority_stream.shutdown(Shutdown::Both)
+        if let Err(e) = control_stream.shutdown(Shutdown::Both)
             && e.kind() != io::ErrorKind::NotConnected
         {
-            eprintln!("[{priority_addr}] graceful shutdown FAILED: {e}");
+            eprintln!("[{control_addr}] graceful shutdown FAILED: {e}");
         }
-        if let Err(e) = stream.shutdown(Shutdown::Both)
+        if let Err(e) = chunk_stream.shutdown(Shutdown::Both)
             && e.kind() != io::ErrorKind::NotConnected
         {
-            eprintln!("[{addr}] graceful shutdown FAILED: {e}");
+            eprintln!("[{chunk_addr}] graceful shutdown FAILED: {e}");
         }
     });
 }

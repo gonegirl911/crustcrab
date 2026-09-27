@@ -1,12 +1,12 @@
 use super::{
-    CLIENT_CONFIG, ClientEvent,
+    CLIENT_CONFIG, PlayerEvent,
     event_loop::{Event, EventHandler},
     game::Game,
     renderer::{Renderer, Surface},
     stopwatch::Stopwatch,
     window::Window,
 };
-use crate::server::ServerEvent;
+use crate::server::{ChunkEvent, ControlEvent};
 use crossbeam_channel::{Receiver, Sender};
 use serde::Deserialize;
 use std::time::{Duration, Instant};
@@ -18,23 +18,23 @@ use winit::{
 };
 
 pub struct App {
-    client_tx: Sender<ClientEvent>,
-    server_priority_rx: Receiver<ServerEvent>,
-    server_rx: Receiver<ServerEvent>,
+    player_tx: Sender<PlayerEvent>,
+    control_rx: Receiver<ControlEvent>,
+    chunk_rx: Receiver<ChunkEvent>,
     instance: Option<Instance>,
     is_focused: bool,
 }
 
 impl App {
     pub fn new(
-        client_tx: Sender<ClientEvent>,
-        server_priority_rx: Receiver<ServerEvent>,
-        server_rx: Receiver<ServerEvent>,
+        player_tx: Sender<PlayerEvent>,
+        control_rx: Receiver<ControlEvent>,
+        chunk_rx: Receiver<ChunkEvent>,
     ) -> Self {
         Self {
-            client_tx,
-            server_priority_rx,
-            server_rx,
+            player_tx,
+            control_rx,
+            chunk_rx,
             instance: None,
             is_focused: false,
         }
@@ -42,19 +42,19 @@ impl App {
 
     fn dispatch_server_events(&mut self) {
         let Some(instance) = &mut self.instance else {
-            self.server_priority_rx.try_iter().for_each(drop);
-            self.server_rx.try_iter().for_each(drop);
+            self.control_rx.try_iter().for_each(drop);
+            self.chunk_rx.try_iter().for_each(drop);
             return;
         };
 
-        for event in self.server_priority_rx.try_iter() {
-            instance.handle(&Event::ServerEvent(event), &self.client_tx);
+        for event in self.control_rx.try_iter() {
+            instance.handle(&Event::ControlEvent(event), &self.player_tx);
         }
 
         let drain_budget = Duration::from_millis(CLIENT_CONFIG.app.drain_budget_ms);
         let deadline = Instant::now() + drain_budget;
-        while let Ok(event) = self.server_rx.try_recv() {
-            instance.handle(&Event::ServerEvent(event), &self.client_tx);
+        while let Ok(event) = self.chunk_rx.try_recv() {
+            instance.handle(&Event::ChunkEvent(event), &self.player_tx);
             if Instant::now() > deadline {
                 break;
             }
@@ -75,11 +75,11 @@ impl ApplicationHandler for App {
         assert!(self.instance.is_none());
         self.instance
             .insert(pollster::block_on(Instance::new(event_loop)))
-            .handle(&Event::Resumed, &self.client_tx);
+            .handle(&Event::Resumed, &self.player_tx);
     }
 
     fn proxy_wake_up(&mut self, _: &dyn ActiveEventLoop) {
-        self.dispatch_server_events();
+        unreachable!();
     }
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -103,7 +103,7 @@ impl ApplicationHandler for App {
         self.instance
             .as_mut()
             .unwrap()
-            .handle(&Event::WindowEvent(event), &self.client_tx);
+            .handle(&Event::WindowEvent(event), &self.player_tx);
 
         if should_exit {
             event_loop.exit();
@@ -114,7 +114,7 @@ impl ApplicationHandler for App {
         self.instance
             .as_mut()
             .unwrap()
-            .handle(&Event::DeviceEvent(event), &self.client_tx);
+            .handle(&Event::DeviceEvent(event), &self.player_tx);
     }
 
     fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
@@ -124,7 +124,7 @@ impl ApplicationHandler for App {
             self.instance
                 .as_mut()
                 .unwrap()
-                .handle(&Event::AboutToWait, &self.client_tx);
+                .handle(&Event::AboutToWait, &self.player_tx);
         }
     }
 
@@ -162,10 +162,10 @@ impl Instance {
 }
 
 impl EventHandler for Instance {
-    type Context<'a> = &'a Sender<ClientEvent>;
+    type Context<'a> = &'a Sender<PlayerEvent>;
 
     #[rustfmt::skip]
-    fn handle(&mut self, event: &Event, client_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, player_tx: Self::Context<'_>) {
         let mut is_surface_texture_lost = false;
 
         self.stopwatch.handle(event, ());
@@ -174,7 +174,7 @@ impl EventHandler for Instance {
         self.game.handle(
             event,
             (
-                client_tx,
+                player_tx,
                 self.window.as_raw(),
                 &self.renderer,
                 &self.surface,

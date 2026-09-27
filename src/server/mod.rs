@@ -2,8 +2,8 @@ pub(crate) mod event_loop;
 pub(crate) mod game;
 pub(crate) mod ticker;
 
-use crate::{client::ClientEvent, shared::toml};
-use crossbeam_channel::{Receiver, SendError, Sender};
+use crate::{client::PlayerEvent, shared::toml};
+use crossbeam_channel::{Receiver, Sender};
 use event_loop::{EventLoop, EventLoopConfig};
 use game::{
     Game,
@@ -12,22 +12,17 @@ use game::{
     world::{BlockHoverData, ChunkData, block::Block},
 };
 use nalgebra::{Point3, Vector3};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    Arc, LazyLock,
-    atomic::{self, AtomicBool},
-};
-use uuid::Uuid;
+use std::sync::{Arc, LazyLock, OnceLock};
 
 pub struct Server {
     event_loop: EventLoop,
 }
 
 impl Server {
-    pub fn new(server_tx: ServerSender, client_rx: Receiver<ClientEvent>) -> Self {
+    pub fn new(connection_rx: Receiver<Connection>, player_rx: Receiver<PlayerEvent>) -> Self {
         Self {
-            event_loop: EventLoop::new(server_tx, client_rx),
+            event_loop: EventLoop::new(connection_rx, player_rx),
         }
     }
 
@@ -36,8 +31,31 @@ impl Server {
     }
 }
 
+#[derive(Clone)]
+pub struct Connection {
+    pub control_tx: Sender<ControlEvent>,
+    pub chunk_tx: Sender<ChunkEvent>,
+}
+
+impl Connection {
+    pub fn closed() -> Self {
+        static CLOSED: OnceLock<Connection> = OnceLock::new();
+
+        CLOSED
+            .get_or_init(|| {
+                let (control_tx, _) = crossbeam_channel::unbounded();
+                let (chunk_tx, _) = crossbeam_channel::unbounded();
+                Self {
+                    control_tx,
+                    chunk_tx,
+                }
+            })
+            .clone()
+    }
+}
+
 #[derive(Serialize, Deserialize)]
-pub enum ServerEvent {
+pub enum ControlEvent {
     PlayerInitialized {
         origin: Point3<f64>,
         dir: Vector3<f32>,
@@ -45,120 +63,16 @@ pub enum ServerEvent {
         inventory: Arc<[Block]>,
     },
     TimeUpdated(Time),
-    ChunkLoaded {
-        data: Arc<ChunkData>,
-        group_id: Option<GroupId>,
-    },
-    ChunkUnloaded {
-        coords: Point3<i32>,
-        group_id: Option<GroupId>,
-    },
-    ChunkUpdated {
-        data: Arc<ChunkData>,
-        group_id: Option<GroupId>,
-    },
     BlockHovered(Option<BlockHoverData>),
-    #[serde(skip)]
-    ClientDisconnected,
 }
 
-impl ServerEvent {
-    fn has_priority(&self) -> bool {
-        !matches!(
-            self,
-            Self::ChunkLoaded { .. } | Self::ChunkUnloaded { .. } | Self::ChunkUpdated { .. }
-        )
-    }
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub struct GroupId {
-    pub id: Uuid,
-    pub size: usize,
-}
-
-impl GroupId {
-    fn new(size: usize) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            size,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum ServerSender {
-    Proxy {
-        priority_tx: Sender<ServerEvent>,
-        tx: Sender<ServerEvent>,
-        wake_up: Arc<dyn Fn() + Send + Sync>,
-    },
-    Sender {
-        priority_tx: Sender<ServerEvent>,
-        tx: Sender<ServerEvent>,
-    },
-    Disconnected,
-}
-
-impl ServerSender {
-    pub fn send(&self, event: ServerEvent) -> Result<(), SendError<ServerEvent>> {
-        let has_priority = event.has_priority();
-        self.route(event, has_priority)?;
-        self.finish(has_priority);
-        Ok(())
-    }
-
-    pub fn send_many<E>(&self, events: E) -> Result<(), SendError<ServerEvent>>
-    where
-        E: IntoIterator<Item = ServerEvent>,
-    {
-        let mut has_priority = false;
-        for event in events {
-            let event_has_priority = event.has_priority();
-            has_priority |= event_has_priority;
-            self.route(event, event_has_priority)?;
-        }
-        self.finish(has_priority);
-        Ok(())
-    }
-
-    pub fn par_send_many<E>(&self, events: E) -> Result<(), SendError<ServerEvent>>
-    where
-        E: IntoParallelIterator<Item = ServerEvent>,
-    {
-        let mut has_priority = AtomicBool::new(false);
-        events.into_par_iter().try_for_each(|event| {
-            let event_has_priority = event.has_priority();
-            if event_has_priority {
-                has_priority.store(event_has_priority, atomic::Ordering::Relaxed);
-            }
-            self.route(event, event_has_priority)
-        })?;
-        self.finish(*has_priority.get_mut());
-        Ok(())
-    }
-
-    fn route(&self, event: ServerEvent, has_priority: bool) -> Result<(), SendError<ServerEvent>> {
-        match self {
-            Self::Proxy {
-                tx, priority_tx, ..
-            }
-            | Self::Sender { priority_tx, tx } => {
-                if has_priority {
-                    priority_tx.send(event)
-                } else {
-                    tx.send(event)
-                }
-            }
-            Self::Disconnected => Err(SendError(event)),
-        }
-    }
-
-    fn finish(&self, has_priority: bool) {
-        if has_priority && let Self::Proxy { wake_up, .. } = self {
-            wake_up();
-        }
-    }
+#[derive(Serialize, Deserialize)]
+pub enum ChunkEvent {
+    Loaded(Arc<ChunkData>),
+    Unloaded { coords: Point3<i32> },
+    Updated(Arc<ChunkData>),
+    BatchStarted,
+    BatchEnded,
 }
 
 #[derive(Deserialize)]

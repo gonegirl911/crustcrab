@@ -14,7 +14,7 @@ use crate::{
     },
     enum_map,
     server::{
-        GroupId, ServerEvent,
+        ChunkEvent,
         game::{
             player::WorldArea,
             world::{
@@ -39,7 +39,7 @@ use rustc_hash::FxHashMap;
 use std::{
     cmp::Reverse,
     collections::{VecDeque, hash_map::Entry},
-    iter, mem,
+    mem,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -48,8 +48,9 @@ use uuid::Uuid;
 pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
-    revisions: FxHashMap<Point3<i32>, ChunkRevision>,
-    pending_groups: FxHashMap<Uuid, Vec<ChunkAction>>,
+    revisions: FxHashMap<Point3<i32>, RevisionTracker>,
+    open_batch_id: Uuid,
+    pending_batches: FxHashMap<Uuid, ChunkBatch>,
     workers: JobPool<ChunkInput, ChunkOutput>,
 }
 
@@ -86,7 +87,8 @@ impl World {
             meshes: Default::default(),
             render_pipelines,
             revisions: Default::default(),
-            pending_groups: Default::default(),
+            open_batch_id: Uuid::nil(),
+            pending_batches: Default::default(),
             workers,
         }
     }
@@ -188,94 +190,45 @@ impl World {
         }
     }
 
-    fn schedule_remesh(&mut self, data: Arc<ChunkData>, group_id: Option<GroupId>) {
-        let revision = self.revisions.entry(data.coords).or_default();
-        revision.counter += 1;
+    fn bump_revision(&mut self, coords: Point3<i32>) -> Revision {
+        let revision = self.revisions.entry(coords).or_default();
+        revision.current.0 += 1;
         revision.pending += 1;
-
-        let has_priority = group_id.is_some();
-        self.workers.submit(
-            ChunkInput {
-                data,
-                snapshot_revision: revision.counter,
-                group_id,
-            },
-            has_priority,
-        );
+        revision.current
     }
 
-    fn process_action(
-        &mut self,
-        renderer: &Renderer,
-        action: ChunkAction,
-        group_id: Option<GroupId>,
-    ) {
-        let Some(GroupId {
-            id: group_id,
-            size: group_size,
-        }) = group_id
-        else {
-            self.apply_action(renderer, action);
-            return;
-        };
-
-        match self.pending_groups.entry(group_id) {
-            Entry::Occupied(mut entry) => {
-                let group = entry.get_mut();
-                if group.len() == group_size - 1 {
-                    for action in iter::chain(entry.remove(), [action]) {
-                        self.apply_action(renderer, action);
-                    }
-                } else {
-                    group.push(action);
-                }
-            }
-            Entry::Vacant(entry) => {
-                if group_size == 1 {
-                    self.apply_action(renderer, action);
-                } else {
-                    let mut group = Vec::with_capacity(group_size - 1);
-                    group.push(action);
-                    entry.insert(group);
-                }
-            }
+    fn join_open_batch(&mut self) -> bool {
+        if let Some(batch) = self.pending_batches.get_mut(&self.open_batch_id) {
+            batch.expected += 1;
+            true
+        } else {
+            false
         }
     }
 
-    fn apply_action(
-        &mut self,
-        renderer: &Renderer,
-        ChunkAction {
-            coords,
-            data,
-            snapshot_revision,
-        }: ChunkAction,
-    ) {
-        let Entry::Occupied(mut revision_entry) = self.revisions.entry(coords) else {
-            unreachable!();
-        };
-        let revision = revision_entry.get_mut();
-        let is_stale = snapshot_revision < revision.counter;
-
-        revision.pending -= 1;
-        if revision.pending == 0 {
-            revision_entry.remove();
+    fn batch_or_apply_change(&mut self, renderer: &Renderer, change: ChunkChange, batch_id: Uuid) {
+        if let Some(batch) = self.pending_batches.get_mut(&batch_id) {
+            batch.changes.push(change);
+            if batch_id != self.open_batch_id {
+                self.flush_batch_if_completed(renderer, batch_id);
+            }
+        } else {
+            self.apply_change(renderer, change);
         }
+    }
 
-        if is_stale {
+    fn flush_batch_if_completed(&mut self, renderer: &Renderer, batch_id: Uuid) {
+        let Entry::Occupied(mut entry) = self.pending_batches.entry(batch_id) else {
+            return;
+        };
+        let batch = entry.get_mut();
+
+        if batch.changes.len() < batch.expected {
             return;
         }
 
-        match data {
-            ChunkActionData::Remesh {
-                vertices,
-                visibility_graph,
-            } => {
-                self.apply_remesh(renderer, coords, vertices, visibility_graph);
-            }
-            ChunkActionData::Unload => {
-                self.meshes.remove(&coords);
-            }
+        for change in entry.remove().changes {
+            self.apply_change(renderer, change);
         }
     }
 
@@ -338,6 +291,43 @@ impl World {
         visited.into_keys()
     }
 
+    fn apply_change(
+        &mut self,
+        renderer: &Renderer,
+        ChunkChange {
+            coords,
+            data,
+            snapshot_revision,
+        }: ChunkChange,
+    ) {
+        let Entry::Occupied(mut revision_entry) = self.revisions.entry(coords) else {
+            unreachable!();
+        };
+        let revision = revision_entry.get_mut();
+        let is_stale = snapshot_revision < revision.current;
+
+        revision.pending -= 1;
+        if revision.pending == 0 {
+            revision_entry.remove();
+        }
+
+        if is_stale {
+            return;
+        }
+
+        match data {
+            ChunkChangeData::Remesh {
+                vertices,
+                visibility_graph,
+            } => {
+                self.apply_remesh(renderer, coords, vertices, visibility_graph);
+            }
+            ChunkChangeData::Unload => {
+                self.meshes.remove(&coords);
+            }
+        }
+    }
+
     fn apply_remesh(
         &mut self,
         renderer: &Renderer,
@@ -385,7 +375,7 @@ impl World {
         ChunkInput {
             data,
             snapshot_revision,
-            group_id,
+            batch_id,
         }: ChunkInput,
     ) -> ChunkOutput {
         ChunkOutput {
@@ -393,7 +383,7 @@ impl World {
             vertices: data.vertices(),
             visibility_graph: data.visibility_graph,
             snapshot_revision,
-            group_id,
+            batch_id,
         }
     }
 
@@ -435,30 +425,53 @@ impl EventHandler for World {
 
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
-            Event::ServerEvent(event) => match *event {
-                ServerEvent::ChunkLoaded { ref data, group_id } => {
-                    self.schedule_remesh(data.clone(), group_id);
-                }
-                ServerEvent::ChunkUnloaded { coords, group_id } => {
-                    let revision = self.revisions.entry(coords).or_default();
-                    revision.counter += 1;
-                    revision.pending += 1;
-
-                    let snapshot_revision = revision.counter;
-                    self.process_action(
-                        renderer,
-                        ChunkAction {
-                            coords,
-                            data: ChunkActionData::Unload,
+            Event::ChunkEvent(event) => match event {
+                ChunkEvent::Loaded(data) => {
+                    let snapshot_revision = self.bump_revision(data.coords);
+                    let has_priority = self.join_open_batch();
+                    self.workers.submit(
+                        ChunkInput {
+                            data: data.clone(),
                             snapshot_revision,
+                            batch_id: self.open_batch_id,
                         },
-                        group_id,
+                        has_priority,
                     );
                 }
-                ServerEvent::ChunkUpdated { ref data, group_id } => {
-                    self.schedule_remesh(data.clone(), group_id);
+                &ChunkEvent::Unloaded { coords } => {
+                    let snapshot_revision = self.bump_revision(coords);
+                    self.join_open_batch();
+                    self.batch_or_apply_change(
+                        renderer,
+                        ChunkChange {
+                            coords,
+                            data: ChunkChangeData::Unload,
+                            snapshot_revision,
+                        },
+                        self.open_batch_id,
+                    );
                 }
-                _ => {}
+                ChunkEvent::Updated(data) => {
+                    let snapshot_revision = self.bump_revision(data.coords);
+                    let has_priority = self.join_open_batch();
+                    self.workers.submit(
+                        ChunkInput {
+                            data: data.clone(),
+                            batch_id: self.open_batch_id,
+                            snapshot_revision,
+                        },
+                        has_priority,
+                    );
+                }
+                ChunkEvent::BatchStarted => {
+                    self.flush_batch_if_completed(renderer, self.open_batch_id);
+                    self.open_batch_id = Uuid::new_v4();
+                    self.pending_batches.entry(self.open_batch_id).or_default();
+                }
+                ChunkEvent::BatchEnded => {
+                    self.flush_batch_if_completed(renderer, self.open_batch_id);
+                    self.open_batch_id = Uuid::nil();
+                }
             },
             Event::AboutToWait => {
                 let drain_budget = Duration::from_millis(CLIENT_CONFIG.app.drain_budget_ms);
@@ -468,21 +481,21 @@ impl EventHandler for World {
                     coords,
                     vertices,
                     visibility_graph,
-                    group_id,
+                    batch_id,
                     snapshot_revision,
                 }) = self.workers.try_recv()
                 {
-                    self.process_action(
+                    self.batch_or_apply_change(
                         renderer,
-                        ChunkAction {
+                        ChunkChange {
                             coords,
-                            data: ChunkActionData::Remesh {
+                            data: ChunkChangeData::Remesh {
                                 vertices,
                                 visibility_graph,
                             },
                             snapshot_revision,
                         },
-                        group_id,
+                        batch_id,
                     );
 
                     if Instant::now() > deadline {
@@ -496,18 +509,27 @@ impl EventHandler for World {
 }
 
 #[derive(Default)]
-struct ChunkRevision {
-    counter: u32,
+struct RevisionTracker {
+    current: Revision,
     pending: u32,
 }
 
-struct ChunkAction {
-    coords: Point3<i32>,
-    data: ChunkActionData,
-    snapshot_revision: u32,
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+struct Revision(u32);
+
+#[derive(Default)]
+struct ChunkBatch {
+    changes: Vec<ChunkChange>,
+    expected: usize,
 }
 
-enum ChunkActionData {
+struct ChunkChange {
+    coords: Point3<i32>,
+    data: ChunkChangeData,
+    snapshot_revision: Revision,
+}
+
+enum ChunkChangeData {
     Remesh {
         vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
         visibility_graph: VisibilityGraph,
@@ -517,16 +539,16 @@ enum ChunkActionData {
 
 struct ChunkInput {
     data: Arc<ChunkData>,
-    group_id: Option<GroupId>,
-    snapshot_revision: u32,
+    snapshot_revision: Revision,
+    batch_id: Uuid,
 }
 
 struct ChunkOutput {
     coords: Point3<i32>,
     vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
     visibility_graph: VisibilityGraph,
-    group_id: Option<GroupId>,
-    snapshot_revision: u32,
+    snapshot_revision: Revision,
+    batch_id: Uuid,
 }
 
 struct ChunkMesh {

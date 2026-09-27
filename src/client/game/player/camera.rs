@@ -4,7 +4,7 @@ use crate::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
     },
-    server::ServerEvent,
+    server::ControlEvent,
     shared::utils,
 };
 use bitflags::bitflags;
@@ -198,7 +198,7 @@ impl EventHandler for Controller {
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
         match event {
-            &Event::ServerEvent(ServerEvent::PlayerInitialized { speed, .. }) => {
+            &Event::ControlEvent(ControlEvent::PlayerInitialized { speed, .. }) => {
                 self.speed = speed;
             }
             &Event::DeviceEvent(DeviceEvent::PointerMotion { delta: (dx, dy) }) => {

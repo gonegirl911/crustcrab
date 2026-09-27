@@ -6,7 +6,7 @@ pub(crate) mod stopwatch;
 pub(crate) mod window;
 
 use crate::{
-    server::{ServerEvent, ServerSender, game::world::block::Block},
+    server::{ChunkEvent, ControlEvent, game::world::block::Block},
     shared::toml,
 };
 use app::{App, AppConfig};
@@ -17,44 +17,36 @@ use game::{
 };
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 pub struct Client {
     event_loop: EventLoop,
-    client_tx: Sender<ClientEvent>,
-    server_priority_rx: Receiver<ServerEvent>,
-    server_rx: Receiver<ServerEvent>,
+    player_tx: Sender<PlayerEvent>,
+    control_rx: Receiver<ControlEvent>,
+    chunk_rx: Receiver<ChunkEvent>,
 }
 
 impl Client {
-    pub fn new(client_tx: Sender<ClientEvent>) -> (Self, ServerSender) {
+    pub fn new(
+        player_tx: Sender<PlayerEvent>,
+        control_rx: Receiver<ControlEvent>,
+        chunk_rx: Receiver<ChunkEvent>,
+    ) -> Self {
         env_logger::init();
 
         let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
-
-        let (server_priority_tx, server_priority_rx) = crossbeam_channel::unbounded();
-        let (server_tx, server_rx) = crossbeam_channel::unbounded();
-        let proxy = event_loop.create_proxy();
-
-        (
-            Self {
-                event_loop,
-                client_tx,
-                server_priority_rx,
-                server_rx,
-            },
-            ServerSender::Proxy {
-                priority_tx: server_priority_tx,
-                tx: server_tx,
-                wake_up: Arc::new(move || proxy.wake_up()),
-            },
-        )
+        Self {
+            event_loop,
+            player_tx,
+            control_rx,
+            chunk_rx,
+        }
     }
 
     pub fn run(self) {
-        let app = App::new(self.client_tx, self.server_priority_rx, self.server_rx);
+        let app = App::new(self.player_tx, self.control_rx, self.chunk_rx);
         self.event_loop
             .run_app(app)
             .expect("event loop should be runnable");
@@ -62,22 +54,12 @@ impl Client {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum ClientEvent {
-    PlayerConnected {
-        render_distance: u32,
-    },
-    PlayerPositionChanged {
-        origin: Point3<f64>,
-    },
-    PlayerOrientationChanged {
-        dir: Vector3<f32>,
-    },
+pub enum PlayerEvent {
+    JoinRequested { render_distance: u32 },
+    PositionChanged { origin: Point3<f64> },
+    OrientationChanged { dir: Vector3<f32> },
     BlockPlaced(Block),
     BlockDestroyed,
-    #[serde(skip)]
-    Connected(Box<ServerSender>),
-    #[serde(skip)]
-    ServerDisconnected,
 }
 
 #[derive(Deserialize)]

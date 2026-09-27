@@ -10,7 +10,7 @@ use crate::{
             utils::{Immediates, load_rgba, read_wgsl},
         },
     },
-    server::{ServerEvent, game::clock::Time},
+    server::{ControlEvent, game::clock::Time},
     shared::{color::Float3, utils},
 };
 use bytemuck::{Pod, Zeroable};
@@ -95,7 +95,7 @@ impl EventHandler for ObjectSet {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ServerEvent(ServerEvent::TimeUpdated(time)) = *event {
+        if let Event::ControlEvent(ControlEvent::TimeUpdated(time)) = *event {
             (self.sun_imm, self.moon_imm) = Self::imm(time);
         }
     }

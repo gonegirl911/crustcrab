@@ -4,11 +4,11 @@ pub mod frustum;
 use super::gui::Gui;
 use crate::{
     client::{
-        CLIENT_CONFIG, ClientEvent,
+        CLIENT_CONFIG, PlayerEvent,
         event_loop::{Event, EventHandler},
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
     },
-    server::{ServerEvent, game::world::chunk::Chunk},
+    server::{ControlEvent, game::world::chunk::Chunk},
     shared::color::Float3,
 };
 use bitflags::bitflags;
@@ -77,7 +77,7 @@ impl Player {
 
 impl EventHandler for Player {
     type Context<'a> = (
-        &'a Sender<ClientEvent>,
+        &'a Sender<PlayerEvent>,
         &'a Renderer,
         &'a Surface,
         &'a Gui,
@@ -87,17 +87,17 @@ impl EventHandler for Player {
     fn handle(
         &mut self,
         event: &Event,
-        (client_tx, renderer, surface, gui, dt): Self::Context<'_>,
+        (player_tx, renderer, surface, gui, dt): Self::Context<'_>,
     ) {
         self.controller.handle(event, ());
 
         match event {
             Event::Resumed => {
-                _ = client_tx.send(ClientEvent::PlayerConnected {
+                _ = player_tx.send(PlayerEvent::JoinRequested {
                     render_distance: CLIENT_CONFIG.player.render_distance,
                 });
             }
-            &Event::ServerEvent(ServerEvent::PlayerInitialized { origin, dir, .. }) => {
+            &Event::ControlEvent(ControlEvent::PlayerInitialized { origin, dir, .. }) => {
                 self.view = View::new(origin, dir);
                 self.controller.external_updates_applied = true;
             }
@@ -105,13 +105,13 @@ impl EventHandler for Player {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
 
                 if changes.contains(Changes::MOVED) {
-                    _ = client_tx.send(ClientEvent::PlayerPositionChanged {
+                    _ = player_tx.send(PlayerEvent::PositionChanged {
                         origin: self.view.origin,
                     });
                 }
 
                 if changes.contains(Changes::ROTATED) {
-                    _ = client_tx.send(ClientEvent::PlayerOrientationChanged {
+                    _ = player_tx.send(PlayerEvent::OrientationChanged {
                         dir: self.view.forward,
                     });
                 }
@@ -122,10 +122,10 @@ impl EventHandler for Player {
 
                 if changes.contains(Changes::BLOCK_PLACED) {
                     if let Some(block) = gui.inventory.selected_block() {
-                        _ = client_tx.send(ClientEvent::BlockPlaced(block));
+                        _ = player_tx.send(PlayerEvent::BlockPlaced(block));
                     }
                 } else if changes.contains(Changes::BLOCK_DESTROYED) {
-                    _ = client_tx.send(ClientEvent::BlockDestroyed);
+                    _ = player_tx.send(PlayerEvent::BlockDestroyed);
                 }
 
                 let external_updates_applied =

@@ -6,9 +6,9 @@ pub mod light;
 
 use super::player::{Player, WorldArea};
 use crate::{
-    client::{ClientEvent, game::world::BlockVertex},
+    client::{PlayerEvent, game::world::BlockVertex},
     server::{
-        GroupId, SERVER_CONFIG, ServerEvent, ServerSender,
+        ChunkEvent, ControlEvent, SERVER_CONFIG,
         event_loop::{Event, EventHandler},
     },
     shared::{
@@ -30,7 +30,7 @@ use chunk::{
     generator::ChunkGenerator,
     visibility::VisibilityGraph,
 };
-use crossbeam_channel::SendError;
+use crossbeam_channel::{SendError, Sender};
 use height::HeightMap;
 use light::WorldLight;
 use nalgebra::{Point2, Point3, Vector3, point};
@@ -78,15 +78,17 @@ impl World {
             .collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[rustfmt::skip]
     fn apply(
         &mut self,
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
-        server_tx: &ServerSender,
+        control_tx: &Sender<ControlEvent>,
+        chunk_tx: &Sender<ChunkEvent>,
         area: WorldArea,
-        ray: Ray,
+        aim: Ray,
     ) {
         let mut branch = Branch::default();
         if !branch.apply(&self.chunks, coords, normal, action) {
@@ -114,13 +116,17 @@ impl World {
             &inserts,
             &removals,
         );
-        let group_id = GroupId::new(inserts.len() + removals.len() + updates.len());
 
-        self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+        self.handle(
+            &WorldEvent::BlockHoverRequested { aim },
+            (control_tx, chunk_tx),
+        );
 
-        _ = self.send_updates(updates, group_id, server_tx);
-        _ = Self::send_unloads(removals, Some(group_id), server_tx);
-        _ = self.send_loads(inserts, group_id, server_tx);
+        _ = chunk_tx.send(ChunkEvent::BatchStarted);
+        _ = self.send_updates(updates, chunk_tx);
+        _ = Self::send_unloads(removals, chunk_tx);
+        _ = self.send_loads(inserts, chunk_tx);
+        _ = chunk_tx.send(ChunkEvent::BatchEnded);
 
         self.actions.extend(actions);
     }
@@ -153,55 +159,53 @@ impl World {
     fn send_loads<P: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: P,
-        group_id: GroupId,
-        server_tx: &ServerSender,
-    ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send_many(points.into_iter().map(|coords| ServerEvent::ChunkLoaded {
-            data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-            group_id: Some(group_id),
-        }))
+        chunk_tx: &Sender<ChunkEvent>,
+    ) -> Result<(), SendError<ChunkEvent>> {
+        points
+            .into_iter()
+            .map(|coords| {
+                ChunkEvent::Loaded(ChunkData::new(&self.chunks, &self.light, coords).into())
+            })
+            .try_for_each(|event| chunk_tx.send(event))
     }
 
     fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
         points: P,
-        server_tx: &ServerSender,
-    ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.par_send_many(
-            points
-                .into_par_iter()
-                .map(|coords| ServerEvent::ChunkLoaded {
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
-                }),
-        )
+        chunk_tx: &Sender<ChunkEvent>,
+    ) -> Result<(), SendError<ChunkEvent>> {
+        points
+            .into_par_iter()
+            .map(|coords| {
+                ChunkEvent::Loaded(ChunkData::new(&self.chunks, &self.light, coords).into())
+            })
+            .try_for_each(|event| chunk_tx.send(event))
     }
 
     fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
         &self,
         points: P,
-        group_id: GroupId,
-        server_tx: &ServerSender,
-    ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send_many(points.into_iter().map(|coords| ServerEvent::ChunkUpdated {
-            data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-            group_id: Some(group_id),
-        }))
+        chunk_tx: &Sender<ChunkEvent>,
+    ) -> Result<(), SendError<ChunkEvent>> {
+        points
+            .into_iter()
+            .map(|coords| {
+                ChunkEvent::Updated(ChunkData::new(&self.chunks, &self.light, coords).into())
+            })
+            .try_for_each(|event| chunk_tx.send(event))
     }
 
     fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
         &self,
         points: P,
-        server_tx: &ServerSender,
-    ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.par_send_many(
-            points
-                .into_par_iter()
-                .map(|coords| ServerEvent::ChunkUpdated {
-                    data: ChunkData::new(&self.chunks, &self.light, coords).into(),
-                    group_id: None,
-                }),
-        )
+        chunk_tx: &Sender<ChunkEvent>,
+    ) -> Result<(), SendError<ChunkEvent>> {
+        points
+            .into_par_iter()
+            .map(|coords| {
+                ChunkEvent::Updated(ChunkData::new(&self.chunks, &self.light, coords).into())
+            })
+            .try_for_each(|event| chunk_tx.send(event))
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -223,24 +227,22 @@ impl World {
 
     fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(
         points: P,
-        group_id: Option<GroupId>,
-        server_tx: &ServerSender,
-    ) -> Result<(), SendError<ServerEvent>> {
-        server_tx.send_many(
-            points
-                .into_iter()
-                .map(|coords| ServerEvent::ChunkUnloaded { coords, group_id }),
-        )
+        chunk_tx: &Sender<ChunkEvent>,
+    ) -> Result<(), SendError<ChunkEvent>> {
+        points
+            .into_iter()
+            .map(|coords| ChunkEvent::Unloaded { coords })
+            .try_for_each(|event| chunk_tx.send(event))
     }
 }
 
 impl EventHandler<WorldEvent> for World {
-    type Context<'a> = &'a ServerSender;
+    type Context<'a> = (&'a Sender<ControlEvent>, &'a Sender<ChunkEvent>);
 
     #[rustfmt::skip]
-    fn handle(&mut self, event: &WorldEvent, server_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &WorldEvent, (control_tx, chunk_tx): Self::Context<'_>) {
         match *event {
-            WorldEvent::PlayerConnected { area, ray } => {
+            WorldEvent::JoinRequested { area, aim } => {
                 let inserts = self.par_insert_many(area.par_server_points());
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
@@ -253,14 +255,17 @@ impl EventHandler<WorldEvent> for World {
                     .collect::<Vec<_>>();
 
                 loads.par_sort_unstable_by_key(|&coords| {
-                    utils::distance_squared(coords, utils::chunk_coords(ray.origin))
+                    utils::distance_squared(coords, utils::chunk_coords(aim.origin))
                 });
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+                self.handle(
+                    &WorldEvent::BlockHoverRequested { aim },
+                    (control_tx, chunk_tx),
+                );
 
-                _ = self.par_send_loads(loads, server_tx);
+                _ = self.par_send_loads(loads, chunk_tx);
             }
-            WorldEvent::WorldAreaChanged { prev, cur, ray } => {
+            WorldEvent::WorldAreaChanged { prev, cur, aim } => {
                 let inserts = self.par_insert_many(cur.par_exclusive_server_points(prev));
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
@@ -277,25 +282,28 @@ impl EventHandler<WorldEvent> for World {
                     .collect();
                 let updates = self.mesh_updates(inserts, light_updates, cur, &loads, &unloads);
 
-                self.handle(&WorldEvent::BlockHoverRequested { ray }, server_tx);
+                self.handle(
+                    &WorldEvent::BlockHoverRequested { aim },
+                    (control_tx, chunk_tx),
+                );
 
-                _ = Self::send_unloads(unloads, None, server_tx);
-                _ = self.par_send_loads(loads, server_tx);
-                _ = self.par_send_updates(updates, server_tx);
+                _ = Self::send_unloads(unloads, chunk_tx);
+                _ = self.par_send_loads(loads, chunk_tx);
+                _ = self.par_send_updates(updates, chunk_tx);
             }
-            WorldEvent::BlockHoverRequested { ray } => {
-                let hover = ray.cast(SERVER_CONFIG.player.reach).find(
+            WorldEvent::BlockHoverRequested { aim } => {
+                let hover = aim.cast(SERVER_CONFIG.player.reach).find(
                     |&BlockIntersection { coords, .. }| {
                         self.chunks
                             .block(coords)
                             .data()
                             .hitbox(coords)
-                            .intersects(ray)
+                            .intersects(aim)
                     },
                 );
 
                 if mem::replace(&mut self.hover, hover) != hover {
-                    _ = server_tx.send(ServerEvent::BlockHovered(hover.map(
+                    _ = control_tx.send(ControlEvent::BlockHovered(hover.map(
                         |BlockIntersection { coords, .. }| {
                             BlockHoverData::new(
                                 coords,
@@ -306,21 +314,30 @@ impl EventHandler<WorldEvent> for World {
                     )));
                 }
             }
-            WorldEvent::BlockPlaced { block, area, ray } => {
+            WorldEvent::BlockPlaced { block, area, aim } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hover {
                     self.apply(
                         coords + normal,
                         normal,
                         BlockAction::Place(block),
-                        server_tx,
+                        control_tx,
+                        chunk_tx,
                         area,
-                        ray,
+                        aim,
                     );
                 }
             }
-            WorldEvent::BlockDestroyed { area, ray } => {
+            WorldEvent::BlockDestroyed { area, aim } => {
                 if let Some(BlockIntersection { coords, normal }) = self.hover {
-                    self.apply(coords, normal, BlockAction::Destroy, server_tx, area, ray);
+                    self.apply(
+                        coords,
+                        normal,
+                        BlockAction::Destroy,
+                        control_tx,
+                        chunk_tx,
+                        area,
+                        aim,
+                    );
                 }
             }
         }
@@ -706,49 +723,48 @@ impl BlockHoverData {
 }
 
 pub enum WorldEvent {
-    PlayerConnected {
+    JoinRequested {
         area: WorldArea,
-        ray: Ray,
+        aim: Ray,
     },
     WorldAreaChanged {
         prev: WorldArea,
         cur: WorldArea,
-        ray: Ray,
+        aim: Ray,
     },
     BlockHoverRequested {
-        ray: Ray,
+        aim: Ray,
     },
     BlockPlaced {
         block: Block,
         area: WorldArea,
-        ray: Ray,
+        aim: Ray,
     },
     BlockDestroyed {
         area: WorldArea,
-        ray: Ray,
+        aim: Ray,
     },
 }
 
 impl WorldEvent {
-    pub fn new(event: &Event, &Player { prev, cur, ray }: &Player) -> Option<Self> {
+    pub fn new(event: &Event, &Player { prev, cur, aim }: &Player) -> Option<Self> {
         match *event {
-            Event::Client(ClientEvent::PlayerConnected { .. }) => {
-                Some(Self::PlayerConnected { area: cur, ray })
+            Event::Player(PlayerEvent::JoinRequested { .. }) => {
+                Some(Self::JoinRequested { area: cur, aim })
             }
-            Event::Client(ClientEvent::PlayerPositionChanged { .. }) if cur != prev => {
-                Some(Self::WorldAreaChanged { prev, cur, ray })
+            Event::Player(PlayerEvent::PositionChanged { .. }) if cur != prev => {
+                Some(Self::WorldAreaChanged { prev, cur, aim })
             }
-            Event::Client(
-                ClientEvent::PlayerPositionChanged { .. }
-                | ClientEvent::PlayerOrientationChanged { .. },
-            ) => Some(Self::BlockHoverRequested { ray }),
-            Event::Client(ClientEvent::BlockPlaced(block)) => Some(Self::BlockPlaced {
+            Event::Player(
+                PlayerEvent::PositionChanged { .. } | PlayerEvent::OrientationChanged { .. },
+            ) => Some(Self::BlockHoverRequested { aim }),
+            Event::Player(PlayerEvent::BlockPlaced(block)) => Some(Self::BlockPlaced {
                 block,
                 area: cur,
-                ray,
+                aim,
             }),
-            Event::Client(ClientEvent::BlockDestroyed) => {
-                Some(Self::BlockDestroyed { area: cur, ray })
+            Event::Player(PlayerEvent::BlockDestroyed) => {
+                Some(Self::BlockDestroyed { area: cur, aim })
             }
             _ => None,
         }

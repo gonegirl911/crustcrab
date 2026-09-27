@@ -10,7 +10,7 @@ use crate::{
             utils::{Immediates, Vertex, read_wgsl},
         },
     },
-    server::{ServerEvent, game::clock::Time},
+    server::{ControlEvent, game::clock::Time},
     shared::utils,
 };
 use bytemuck::{Pod, Zeroable};
@@ -74,7 +74,7 @@ impl EventHandler for StarDome {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ServerEvent(ServerEvent::TimeUpdated(time)) = *event {
+        if let Event::ControlEvent(ControlEvent::TimeUpdated(time)) = *event {
             self.imm = StarImmediates::new(time);
         }
     }

@@ -1,13 +1,14 @@
 use super::world::{World, block::Block};
 use crate::{
-    client::ClientEvent,
+    client::PlayerEvent,
     server::{
-        SERVER_CONFIG, ServerEvent, ServerSender,
+        ControlEvent, SERVER_CONFIG,
         event_loop::{Event, EventHandler},
         game::world::block::data::STR_TO_BLOCK,
     },
     shared::{cuboid::Cuboid, ray::Ray, utils},
 };
+use crossbeam_channel::Sender;
 use nalgebra::{Point2, Point3, Vector3, point, vector};
 use rayon::iter::ParallelIterator;
 use serde::{
@@ -20,18 +21,18 @@ use std::{ops::Deref, sync::Arc};
 pub struct Player {
     pub prev: WorldArea,
     pub cur: WorldArea,
-    pub ray: Ray,
+    pub aim: Ray,
 }
 
 impl EventHandler<Event> for Player {
-    type Context<'a> = &'a ServerSender;
+    type Context<'a> = &'a Sender<ControlEvent>;
 
-    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, control_tx: Self::Context<'_>) {
         self.prev = self.cur;
 
-        if let Event::Client(event) = event {
+        if let Event::Player(event) = event {
             match *event {
-                ClientEvent::PlayerConnected { render_distance } => {
+                PlayerEvent::JoinRequested { render_distance } => {
                     let PlayerConfig {
                         origin,
                         dir,
@@ -44,24 +45,24 @@ impl EventHandler<Event> for Player {
                         center: utils::chunk_coords(origin),
                         radius: render_distance as i32,
                     };
-                    self.ray = Ray {
+                    self.aim = Ray {
                         origin,
                         dir: dir.cast(),
                     };
 
-                    _ = server_tx.send(ServerEvent::PlayerInitialized {
+                    _ = control_tx.send(ControlEvent::PlayerInitialized {
                         origin,
                         dir,
                         speed,
                         inventory: inventory.clone(),
                     });
                 }
-                ClientEvent::PlayerOrientationChanged { dir } => {
-                    self.ray.dir = dir.cast();
-                }
-                ClientEvent::PlayerPositionChanged { origin } => {
+                PlayerEvent::PositionChanged { origin } => {
                     self.cur.center = utils::chunk_coords(origin);
-                    self.ray.origin = origin;
+                    self.aim.origin = origin;
+                }
+                PlayerEvent::OrientationChanged { dir } => {
+                    self.aim.dir = dir.cast();
                 }
                 _ => {}
             }

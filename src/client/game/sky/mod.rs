@@ -8,7 +8,7 @@ use crate::{
         event_loop::{Event, EventHandler},
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
     },
-    server::{ServerEvent, game::clock::Time},
+    server::{ControlEvent, game::clock::Time},
     shared::{
         color::{Float3, Rgb},
         utils,
@@ -109,7 +109,7 @@ impl EventHandler for Sky {
         self.objects.handle(event, ());
 
         match *event {
-            Event::ServerEvent(ServerEvent::TimeUpdated(time)) => {
+            Event::ControlEvent(ControlEvent::TimeUpdated(time)) => {
                 self.updated_time = Some(time);
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {

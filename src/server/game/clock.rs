@@ -1,11 +1,12 @@
 use crate::{
-    client::ClientEvent,
+    client::PlayerEvent,
     server::{
-        SERVER_CONFIG, ServerEvent, ServerSender,
+        ControlEvent, SERVER_CONFIG,
         event_loop::{Event, EventHandler},
     },
     shared::utils,
 };
+use crossbeam_channel::Sender;
 use nalgebra::{UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 use std::{f32::consts::TAU, ops::Range};
@@ -15,8 +16,8 @@ pub struct Clock {
 }
 
 impl Clock {
-    fn send_time(&self, server_tx: &ServerSender) {
-        _ = server_tx.send(ServerEvent::TimeUpdated(self.time()));
+    fn send_time(&self, control_tx: &Sender<ControlEvent>) {
+        _ = control_tx.send(ControlEvent::TimeUpdated(self.time()));
     }
 
     fn time(&self) -> Time {
@@ -33,16 +34,16 @@ impl Default for Clock {
 }
 
 impl EventHandler<Event> for Clock {
-    type Context<'a> = &'a ServerSender;
+    type Context<'a> = &'a Sender<ControlEvent>;
 
-    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, control_tx: Self::Context<'_>) {
         match event {
-            Event::Client(ClientEvent::PlayerConnected { .. }) => {
-                self.send_time(server_tx);
+            Event::Player(PlayerEvent::JoinRequested { .. }) => {
+                self.send_time(control_tx);
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
-                self.send_time(server_tx);
+                self.send_time(control_tx);
             }
             _ => {}
         }

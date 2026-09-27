@@ -1,4 +1,4 @@
-use crate::server::ServerEvent;
+use crate::server::{ChunkEvent, ControlEvent};
 use winit::event::{DeviceEvent, WindowEvent};
 
 pub trait EventHandler {
@@ -9,7 +9,8 @@ pub trait EventHandler {
 
 pub enum Event {
     Resumed,
-    ServerEvent(ServerEvent),
+    ControlEvent(ControlEvent),
+    ChunkEvent(ChunkEvent),
     WindowEvent(WindowEvent),
     DeviceEvent(DeviceEvent),
     AboutToWait,

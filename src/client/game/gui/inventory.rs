@@ -14,7 +14,7 @@ use crate::{
             utils::{Vertex, read_wgsl},
         },
     },
-    server::{ServerEvent, game::world::block::Block},
+    server::{ControlEvent, game::world::block::Block},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
@@ -121,7 +121,7 @@ impl EventHandler for Inventory {
 
     fn handle(&mut self, event: &Event, (renderer, surface): Self::Context<'_>) {
         match event {
-            Event::ServerEvent(ServerEvent::PlayerInitialized { inventory, .. }) => {
+            Event::ControlEvent(ControlEvent::PlayerInitialized { inventory, .. }) => {
                 self.contents = inventory.clone();
                 self.is_updated = true;
             }

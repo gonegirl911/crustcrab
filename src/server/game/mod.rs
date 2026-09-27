@@ -3,7 +3,7 @@ pub mod player;
 pub mod world;
 
 use super::{
-    ServerSender,
+    ChunkEvent, Connection, ControlEvent,
     event_loop::{Event, EventHandler},
 };
 use clock::Clock;
@@ -15,7 +15,7 @@ use world::{World, WorldEvent};
 pub struct Game {
     player: Player,
     clock: Clock,
-    world_tx: Sender<(WorldEvent, ServerSender)>,
+    world_tx: Sender<(WorldEvent, Sender<ControlEvent>, Sender<ChunkEvent>)>,
 }
 
 impl Default for Game {
@@ -26,8 +26,8 @@ impl Default for Game {
 
         thread::spawn(move || {
             let mut world = World::default();
-            for (event, server_tx) in world_rx {
-                world.handle(&event, &server_tx);
+            for (event, control_tx, chunk_tx) in world_rx {
+                world.handle(&event, (&control_tx, &chunk_tx));
             }
         });
 
@@ -40,14 +40,23 @@ impl Default for Game {
 }
 
 impl EventHandler<Event> for Game {
-    type Context<'a> = &'a ServerSender;
+    type Context<'a> = &'a Connection;
 
-    fn handle(&mut self, event: &Event, server_tx: Self::Context<'_>) {
-        self.player.handle(event, server_tx);
-        self.clock.handle(event, server_tx);
+    fn handle(
+        &mut self,
+        event: &Event,
+        Connection {
+            control_tx,
+            chunk_tx,
+        }: Self::Context<'_>,
+    ) {
+        self.player.handle(event, control_tx);
+        self.clock.handle(event, control_tx);
 
         if let Some(event) = WorldEvent::new(event, &self.player) {
-            self.world_tx.send((event, server_tx.clone())).unwrap();
+            self.world_tx
+                .send((event, control_tx.clone(), chunk_tx.clone()))
+                .unwrap();
         }
     }
 }
