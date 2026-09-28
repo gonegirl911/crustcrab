@@ -52,5 +52,5 @@ pub enum Event {
 
 #[derive(Deserialize)]
 pub struct EventLoopConfig {
-    ticks_per_second: u32,
+    pub ticks_per_second: u32,
 }

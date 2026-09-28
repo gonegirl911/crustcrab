@@ -623,7 +623,7 @@ impl BlockVertex {
         Self { data }
     }
 
-    fn coords(self) -> Point3<u8> {
+    fn coords(&self) -> Point3<u8> {
         point![
             self.data[0].bit_range(4, 0),
             self.data[0].bit_range(9, 5),
@@ -631,27 +631,27 @@ impl BlockVertex {
         ]
     }
 
-    fn side_shade(self) -> SideShade {
+    fn side_shade(&self) -> SideShade {
         unsafe { mem::transmute::<u8, _>(self.data[0].bit_range(24, 23)) }
     }
 
-    fn ao(self) -> u8 {
+    fn ao(&self) -> u8 {
         self.data[0].bit_range(26, 25)
     }
 
-    pub fn light(self) -> BlockLight {
+    pub fn light(&self) -> BlockLight {
         BlockLight(self.data[1])
     }
 
-    fn skylight(self) -> Rgb<u8> {
+    fn skylight(&self) -> Rgb<u8> {
         self.light().skylight()
     }
 
-    fn torchlight(self) -> Rgb<u8> {
+    fn torchlight(&self) -> Rgb<u8> {
         self.light().torchlight()
     }
 
-    pub fn light_factor(self, nightness: f32) -> Rgb<f32> {
+    pub fn light_factor(&self, nightness: f32) -> Rgb<f32> {
         let shading = &CLIENT_CONFIG.shading;
 
         let side_factors = shading.side_factors;
@@ -666,7 +666,7 @@ impl BlockVertex {
         self.world_light(nightness) * (1.0 - ao_factor) * side_factor
     }
 
-    pub fn world_light(self, nightness: f32) -> Rgb<f32> {
+    pub fn world_light(&self, nightness: f32) -> Rgb<f32> {
         let sky = &CLIENT_CONFIG.sky;
         let shading = &CLIENT_CONFIG.shading;
 

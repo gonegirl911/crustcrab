@@ -1,3 +1,4 @@
+pub mod clock;
 pub mod cloud;
 pub mod fog;
 pub mod gui;
@@ -18,6 +19,7 @@ use super::{
     window::RawWindow,
 };
 use crate::{client::renderer::utils::load_rgba, server::game::world::block::data::TEX_PATHS};
+use clock::Clock;
 use cloud::CloudLayer;
 use crossbeam_channel::Sender;
 use fog::Fog;
@@ -31,6 +33,7 @@ use winit::event::WindowEvent;
 use world::World;
 
 pub struct Game {
+    clock: Clock,
     sky: Sky,
     shading: Shading,
     world: World,
@@ -47,6 +50,7 @@ pub struct Game {
 
 impl Game {
     pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
+        let clock = Clock::default();
         let player = Player::new(renderer);
         let sky = Sky::new(renderer, surface, player.bind_group_layout());
         let shading = Shading::new(renderer);
@@ -93,6 +97,7 @@ impl Game {
             textures.bind_group_layout(),
         );
         Self {
+            clock,
             sky,
             shading,
             world,
@@ -108,18 +113,24 @@ impl Game {
         }
     }
 
-    #[rustfmt::skip]
     fn draw(
         &mut self,
         renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
+        let time = self.clock.time();
         let origin = self.player.view.origin;
         let anchor = self.player.view.anchor();
         let frustum = self.player.frustum();
 
-        self.sky.draw(self.processor.view(), encoder, self.player.bind_group());
+        self.sky.draw(
+            renderer,
+            self.processor.view(),
+            encoder,
+            self.player.bind_group(),
+            time,
+        );
 
         let blended_points = self.world.draw_opaque(
             self.fog.view(),
@@ -182,6 +193,7 @@ impl Game {
             self.depth.view(),
             self.processor.spare_bind_group(),
             origin,
+            time,
         );
 
         self.fog.draw(
@@ -232,9 +244,8 @@ impl EventHandler for Game {
             is_surface_texture_lost,
         ): Self::Context<'_>,
     ) {
-        self.sky.handle(event, renderer);
+        self.clock.handle(event, dt);
         self.world.handle(event, renderer);
-        self.clouds.handle(event, dt);
         self.fog.handle(event, (renderer, surface));
         self.hover.handle(event, ());
         self.gui.handle(event, (renderer, surface));

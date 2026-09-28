@@ -2,13 +2,12 @@ pub mod atmosphere;
 pub mod object;
 pub mod star;
 
+use super::clock::RenderTime;
 use crate::{
     client::{
         CLIENT_CONFIG,
-        event_loop::{Event, EventHandler},
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
     },
-    server::{ControlEvent, game::clock::Time},
     shared::{
         color::{Float3, Rgb},
         utils,
@@ -19,14 +18,12 @@ use bytemuck::{Pod, Zeroable};
 use object::{ObjectConfig, ObjectSet};
 use serde::Deserialize;
 use star::{StarConfig, StarDome};
-use winit::event::WindowEvent;
 
 pub struct Sky {
     atmosphere: Atmosphere,
     stars: StarDome,
     objects: ObjectSet,
     uniform: Uniform<SkyUniformData>,
-    updated_time: Option<Time>,
 }
 
 impl Sky {
@@ -57,7 +54,6 @@ impl Sky {
             stars,
             objects,
             uniform,
-            updated_time: Some(Default::default()),
         }
     }
 
@@ -71,10 +67,14 @@ impl Sky {
 
     pub fn draw(
         &self,
+        renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         player_bind_group: &wgpu::BindGroup,
+        time: RenderTime,
     ) {
+        self.uniform.set(renderer, &SkyUniformData::new(time));
+
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view,
@@ -92,33 +92,13 @@ impl Sky {
             player_bind_group,
             self.uniform.bind_group(),
         );
-        self.stars.draw(&mut render_pass, player_bind_group);
+        self.stars.draw(&mut render_pass, player_bind_group, time);
         self.objects.draw(
             &mut render_pass,
             player_bind_group,
             self.uniform.bind_group(),
+            time,
         );
-    }
-}
-
-impl EventHandler for Sky {
-    type Context<'a> = &'a Renderer;
-
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
-        self.stars.handle(event, ());
-        self.objects.handle(event, ());
-
-        match *event {
-            Event::ControlEvent(ControlEvent::TimeUpdated(time)) => {
-                self.updated_time = Some(time);
-            }
-            Event::WindowEvent(WindowEvent::RedrawRequested) => {
-                if let Some(time) = self.updated_time.take() {
-                    self.uniform.set(renderer, &SkyUniformData::new(time));
-                }
-            }
-            _ => {}
-        }
     }
 }
 
@@ -135,22 +115,19 @@ struct SkyUniformData {
 }
 
 impl SkyUniformData {
-    fn new(time: Time) -> Self {
+    fn new(time: RenderTime) -> Self {
         let config = &CLIENT_CONFIG.sky;
         let nightness = time.nightness();
+        let glow_opacity = 1.0 - (nightness * 2.0 - 1.0).powi(2);
         Self {
             sun_dir: time.sun_dir().into(),
             color: config.color(nightness).into(),
             horizon_color: config.horizon_color(nightness),
-            glow_opacity: Self::glow_opacity(nightness),
+            glow_opacity,
             glow_color: config.glow_color(nightness),
-            arc_angle: config.arc_angle(nightness),
+            arc_angle: config.arc_angle(nightness).to_radians(),
             sunlight_intensity: config.sunlight_intensity(nightness).into(),
         }
-    }
-
-    fn glow_opacity(nightness: f32) -> f32 {
-        1.0 - (nightness * 2.0 - 1.0).powi(2)
     }
 }
 

@@ -69,10 +69,10 @@ impl Crosshair {
 impl EventHandler for Crosshair {
     type Context<'a> = (&'a Renderer, &'a Surface);
 
+    #[rustfmt::skip]
     fn handle(&mut self, _: &Event, (renderer, surface): Self::Context<'_>) {
         if surface.is_resized {
-            self.uniform
-                .set(renderer, &CrosshairUniformData::new(surface));
+            self.uniform.set(renderer, &CrosshairUniformData::new(surface));
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     client::{
         CLIENT_CONFIG,
-        event_loop::{Event, EventHandler},
+        game::clock::RenderTime,
         renderer::{
             Renderer, Surface,
             effect::PostProcessor,
@@ -10,7 +10,6 @@ use crate::{
             utils::{Immediates, load_rgba, read_wgsl},
         },
     },
-    server::{ControlEvent, game::clock::Time},
     shared::{color::Float3, utils},
 };
 use bytemuck::{Pod, Zeroable};
@@ -20,8 +19,6 @@ use serde::Deserialize;
 pub struct ObjectSet {
     textures: ImageTextureArray,
     render_pipeline: RenderPipeline,
-    sun_imm: ObjectImmediates,
-    moon_imm: ObjectImmediates,
 }
 
 impl ObjectSet {
@@ -51,12 +48,9 @@ impl ObjectSet {
             .immediate_size(ObjectImmediates::SIZE)
             .format(PostProcessor::FORMAT)
             .build();
-        let (sun_imm, moon_imm) = Self::imm(Default::default());
         Self {
             textures,
             render_pipeline,
-            sun_imm,
-            moon_imm,
         }
     }
 
@@ -65,7 +59,14 @@ impl ObjectSet {
         render_pass: &mut wgpu::RenderPass,
         player_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
+        time: RenderTime,
     ) {
+        let sun_dir = time.sun_dir();
+        let up = -sun_dir.x.signum() * Vector3::y();
+        let nightness = time.nightness();
+        let sun_imm = ObjectImmediates::new(0, sun_dir, up, nightness);
+        let moon_imm = ObjectImmediates::new(1, -sun_dir, up, nightness);
+
         self.render_pipeline.bind(
             render_pass,
             [
@@ -74,30 +75,10 @@ impl ObjectSet {
                 self.textures.bind_group(),
             ],
         );
-        self.sun_imm.set(render_pass);
+        sun_imm.set(render_pass);
         render_pass.draw(0..6, 0..1);
-        self.moon_imm.set(render_pass);
+        moon_imm.set(render_pass);
         render_pass.draw(0..6, 0..1);
-    }
-
-    fn imm(time: Time) -> (ObjectImmediates, ObjectImmediates) {
-        let sun_dir = time.sun_dir();
-        let up = -sun_dir.x.signum() * Vector3::y();
-        let nightness = time.nightness();
-        (
-            ObjectImmediates::new(0, sun_dir, up, nightness),
-            ObjectImmediates::new(1, -sun_dir, up, nightness),
-        )
-    }
-}
-
-impl EventHandler for ObjectSet {
-    type Context<'a> = ();
-
-    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ControlEvent(ControlEvent::TimeUpdated(time)) = *event {
-            (self.sun_imm, self.moon_imm) = Self::imm(time);
-        }
     }
 }
 

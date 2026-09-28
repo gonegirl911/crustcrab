@@ -226,8 +226,8 @@ pub enum Side {
 
 impl Side {
     #[rustfmt::skip]
-    pub fn block_points(self) -> impl Iterator<Item = (Point3<u8>, Point3<u8>)> {
-        let axes = SIDE_AXES[self];
+    pub fn block_points(&self) -> impl Iterator<Item = (Point3<u8>, Point3<u8>)> + use<> {
+        let axes = SIDE_AXES[*self];
         let dim = Chunk::DIM as u8;
         let [normal, neighbor] = if self.is_positive() { [dim - 1, 0] } else { [0, dim - 1] };
         (0..dim).flat_map(move |u| {
@@ -240,7 +240,7 @@ impl Side {
         })
     }
 
-    pub fn axis(self) -> usize {
+    pub fn axis(&self) -> usize {
         match self {
             Self::Left | Self::Right => 0,
             Self::Top | Self::Bottom => 1,
@@ -248,11 +248,11 @@ impl Side {
         }
     }
 
-    pub fn is_positive(self) -> bool {
+    pub fn is_positive(&self) -> bool {
         matches!(self, Self::Back | Self::Right | Self::Top)
     }
 
-    pub fn opp(self) -> Self {
+    pub fn opp(&self) -> Self {
         match self {
             Side::Front => Side::Back,
             Side::Right => Side::Left,

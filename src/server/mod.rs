@@ -7,7 +7,7 @@ use crossbeam_channel::{Receiver, Sender};
 use event_loop::{EventLoop, EventLoopConfig};
 use game::{
     Game,
-    clock::{ClockConfig, Time},
+    clock::ClockConfig,
     player::PlayerConfig,
     world::{BlockHoverData, ChunkData, block::Block},
 };
@@ -62,7 +62,9 @@ pub enum ControlEvent {
         speed: f64,
         inventory: Arc<[Block]>,
     },
-    TimeUpdated(Time),
+    TimeUpdated {
+        ticks: u16,
+    },
     BlockHovered(Option<BlockHoverData>),
 }
 
@@ -76,11 +78,11 @@ pub enum ChunkEvent {
 }
 
 #[derive(Deserialize)]
-struct ServerConfig {
-    event_loop: EventLoopConfig,
+pub struct ServerConfig {
+    pub event_loop: EventLoopConfig,
     player: PlayerConfig,
-    clock: ClockConfig,
+    pub clock: ClockConfig,
 }
 
-static SERVER_CONFIG: LazyLock<ServerConfig> =
+pub static SERVER_CONFIG: LazyLock<ServerConfig> =
     LazyLock::new(|| toml::deserialize("assets/config/server.toml"));

@@ -189,7 +189,7 @@ impl<T: ?Sized, U> MemoryState<'_, T, U> {
 impl<'a, T> MemoryState<'a, T, ()> {
     pub const UNINIT: Self = Self::Uninit(());
 
-    fn value(self) -> Option<&'a T> {
+    fn value(&self) -> Option<&'a T> {
         if let Self::Immutable(value) = self {
             Some(value)
         } else {
@@ -199,8 +199,8 @@ impl<'a, T> MemoryState<'a, T, ()> {
 }
 
 impl<'a, T> MemoryState<'a, [T], usize> {
-    fn data(self) -> Result<&'a [T], usize> {
-        match self {
+    fn data(&self) -> Result<&'a [T], usize> {
+        match *self {
             Self::Immutable(data) => Ok(data),
             Self::Uninit(len) => Err(len),
         }

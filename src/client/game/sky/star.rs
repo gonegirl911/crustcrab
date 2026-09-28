@@ -1,7 +1,7 @@
 use crate::{
     client::{
         CLIENT_CONFIG,
-        event_loop::{Event, EventHandler},
+        game::clock::RenderTime,
         renderer::{
             Renderer,
             buffer::{MemoryState, VertexBuffer},
@@ -10,7 +10,6 @@ use crate::{
             utils::{Immediates, Vertex, read_wgsl},
         },
     },
-    server::{ControlEvent, game::clock::Time},
     shared::utils,
 };
 use bytemuck::{Pod, Zeroable};
@@ -26,7 +25,6 @@ use std::f32::consts::{FRAC_PI_2, PI};
 pub struct StarDome {
     instance_buffer: VertexBuffer<StarInstance>,
     render_pipeline: RenderPipeline,
-    imm: StarImmediates,
 }
 
 impl StarDome {
@@ -47,17 +45,22 @@ impl StarDome {
         Self {
             instance_buffer,
             render_pipeline,
-            imm: StarImmediates::new(Default::default()),
         }
     }
 
-    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, player_bind_group: &wgpu::BindGroup) {
-        if self.imm.opacity == 0.0 {
+    pub fn draw(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        player_bind_group: &wgpu::BindGroup,
+        time: RenderTime,
+    ) {
+        let imm = StarImmediates::new(time);
+        if imm.opacity == 0.0 {
             return;
         }
 
         self.render_pipeline.bind(render_pass, [player_bind_group]);
-        self.imm.set(render_pass);
+        imm.set(render_pass);
         render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
         render_pass.draw(0..6, 0..self.instance_buffer.len());
     }
@@ -67,16 +70,6 @@ impl StarDome {
         let generator = StarGenerator::default();
         let count = CLIENT_CONFIG.sky.star.count;
         (0..count).map(move |_| generator.generate(&mut rng))
-    }
-}
-
-impl EventHandler for StarDome {
-    type Context<'a> = ();
-
-    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ControlEvent(ControlEvent::TimeUpdated(time)) = *event {
-            self.imm = StarImmediates::new(time);
-        }
     }
 }
 
@@ -137,14 +130,16 @@ struct StarImmediates {
 }
 
 impl StarImmediates {
-    fn new(time: Time) -> Self {
+    fn new(time: RenderTime) -> Self {
+        let sky_rotation = time.sky_rotation();
         let size = CLIENT_CONFIG.sky.star.size;
         let brightness = CLIENT_CONFIG.sky.star.brightness;
         let nightness = time.nightness();
+        let opacity = utils::lerp(-brightness / 2.0, brightness, nightness).max(0.0);
         Self {
-            sky_rotation: time.sky_rotation().to_homogeneous(),
+            sky_rotation: sky_rotation.to_homogeneous(),
             size,
-            opacity: utils::lerp(-brightness / 2.0, brightness, nightness).max(0.0),
+            opacity,
         }
     }
 }

@@ -41,7 +41,7 @@ impl<T: Mul + Copy> Rgb<T> {
 }
 
 impl Rgb<f32> {
-    pub fn lum(self) -> f32 {
+    pub fn lum(&self) -> f32 {
         self.dot(Self::new(0.2126, 0.7152, 0.0722))
     }
 

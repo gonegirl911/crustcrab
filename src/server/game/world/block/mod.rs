@@ -22,7 +22,7 @@ impl Block {
     pub const AIR: Self = Self(0);
     pub const SAND: Self = Self(1);
 
-    pub fn data(self) -> &'static BlockData {
+    pub fn data(&self) -> &'static BlockData {
         unsafe { BLOCK_DATA.get_unchecked(self.0 as usize) }
     }
 
@@ -42,8 +42,8 @@ impl Block {
         };
     }
 
-    pub fn is_action_valid(self, action: BlockAction) -> bool {
-        match (self, action) {
+    pub fn is_action_valid(&self, action: BlockAction) -> bool {
+        match (*self, action) {
             (Self::AIR, BlockAction::Place(Self::AIR) | BlockAction::Destroy) => false,
             (Self::AIR, BlockAction::Place(_)) | (_, BlockAction::Destroy) => true,
             (_, BlockAction::Place(_)) => false,
@@ -99,11 +99,11 @@ impl BlockLight {
         value
     }
 
-    pub fn skylight(self) -> Rgb<u8> {
+    pub fn skylight(&self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(Self::SKYLIGHT_RANGE.start + i))
     }
 
-    pub fn torchlight(self) -> Rgb<u8> {
+    pub fn torchlight(&self) -> Rgb<u8> {
         Rgb::from_fn(|i| self.component(Self::TORCHLIGHT_RANGE.start + i))
     }
 

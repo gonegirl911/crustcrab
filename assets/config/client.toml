@@ -40,7 +40,7 @@ light_attenuation = 0.8
 [cloud]
 size = [12, 4]
 padding = 0.005
-speed = 1.0
+drift_per_tick = 0.05
 altitude = 192.0
 
 [cloud.day]

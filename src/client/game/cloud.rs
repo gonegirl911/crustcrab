@@ -1,8 +1,7 @@
-use super::world::BlockVertex;
+use super::{clock::RenderTime, world::BlockVertex};
 use crate::{
     client::{
         CLIENT_CONFIG,
-        event_loop::{Event, EventHandler},
         renderer::{
             Renderer, Surface,
             buffer::{MemoryState, VertexBuffer},
@@ -12,13 +11,7 @@ use crate::{
             utils::{Immediates, Vertex, load_rgba, read_wgsl},
         },
     },
-    server::{
-        ControlEvent,
-        game::{
-            clock::Time,
-            world::{block::Block, chunk::Chunk},
-        },
-    },
+    server::game::world::{block::Block, chunk::Chunk},
     shared::{
         color::{Float3, Rgb},
         utils,
@@ -27,8 +20,6 @@ use crate::{
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Point2, Point3, Vector2, point, vector};
 use serde::Deserialize;
-use std::time::Duration;
-use winit::event::WindowEvent;
 
 pub struct CloudLayer {
     vertex_buffer: VertexBuffer<BlockVertex>,
@@ -36,9 +27,7 @@ pub struct CloudLayer {
     texture: ImageTexture,
     render_pipeline: RenderPipeline,
     blender: Blender,
-    imm: CloudImmediates,
-    scroll: Vector2<f32>,
-    opacity: f32,
+    tex_dims: (u32, u32),
 }
 
 impl CloudLayer {
@@ -85,23 +74,20 @@ impl CloudLayer {
             .format(PostProcessor::FORMAT)
             .build();
         let blender = Blender::new(renderer, spare_bind_group_layout, PostProcessor::FORMAT);
-        let nightness = Time::default().nightness();
         Self {
             vertex_buffer,
             instance_buffer,
             texture,
             render_pipeline,
             blender,
-            imm: CloudImmediates::new(image.dimensions(), nightness),
-            scroll: Default::default(),
-            opacity: CLIENT_CONFIG.cloud.opacity(nightness),
+            tex_dims: image.dimensions(),
         }
     }
 
     #[expect(clippy::too_many_arguments)]
     #[rustfmt::skip]
     pub fn draw(
-        &mut self,
+        &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         spare_view: &wgpu::TextureView,
@@ -110,8 +96,13 @@ impl CloudLayer {
         depth_view: &wgpu::TextureView,
         spare_bind_group: &wgpu::BindGroup,
         origin: Point3<f64>,
+        time: RenderTime,
     ) {
-        self.imm.update_origin(origin, self.scroll);
+        let nightness = time.nightness();
+        let scroll_x = -CLIENT_CONFIG.cloud.drift_per_tick as f64 * time.ticks;
+        let imm = CloudImmediates::new(self.tex_dims, origin, scroll_x, nightness);
+        let opacity = CLIENT_CONFIG.cloud.opacity(nightness);
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -141,15 +132,10 @@ impl CloudLayer {
                     self.texture.bind_group(),
                 ],
             );
-            self.imm.set(&mut render_pass);
+            imm.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
-        self.blender.draw(view, encoder, spare_bind_group, self.opacity, true);
-    }
-
-    fn update_scroll(&mut self, dt: Duration) {
-        self.scroll.x -= CLIENT_CONFIG.cloud.speed * dt.as_secs_f32();
-        self.scroll.x %= self.imm.tex_dims.x * self.imm.size.x;
+        self.blender.draw(view, encoder, spare_bind_group, opacity, true);
     }
 
     fn vertices() -> impl Iterator<Item = BlockVertex> {
@@ -163,24 +149,6 @@ impl CloudLayer {
             .flat_map(move |dx| (-radius..=radius).map(move |dz| vector![dx, dz]))
             .filter(move |&offset| utils::magnitude_squared(offset) <= (radius as u128).pow(2))
             .map(CloudInstance::new)
-    }
-}
-
-impl EventHandler for CloudLayer {
-    type Context<'a> = Duration;
-
-    fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
-        match event {
-            Event::ControlEvent(ControlEvent::TimeUpdated(time)) => {
-                let nightness = time.nightness();
-                self.imm.update_color(nightness);
-                self.opacity = CLIENT_CONFIG.cloud.opacity(nightness);
-            }
-            Event::WindowEvent(WindowEvent::RedrawRequested) => {
-                self.update_scroll(dt);
-            }
-            _ => {}
-        }
     }
 }
 
@@ -216,33 +184,29 @@ struct CloudImmediates {
 }
 
 impl CloudImmediates {
-    fn new((tex_width, tex_height): (u32, u32), nightness: f32) -> Self {
+    fn new(
+        (tex_width, tex_height): (u32, u32),
+        origin: Point3<f64>,
+        scroll_x: f64,
+        nightness: f32,
+    ) -> Self {
+        let tex_dims = point![tex_width, tex_height];
+        let size = CLIENT_CONFIG.cloud.size;
+        let padding = CLIENT_CONFIG.cloud.padding;
+        let scale_factor = size.map(|c| 1.0 + padding * 2.0 / c as f32);
+        let period = size.x as f64 * tex_dims.x as f64;
+        let camera_xz = origin.xz().coords - vector![scroll_x, 0.0];
+        let phase = camera_xz.map(|c| c.rem_euclid(period));
+        let altitude = (CLIENT_CONFIG.cloud.altitude - origin.y) as f32;
         Self {
-            tex_dims: point![tex_width, tex_height].cast(),
-            size: CLIENT_CONFIG.cloud.size.cast(),
-            scale_factor: Self::scale_factor().into(),
+            tex_dims: tex_dims.cast(),
+            size: size.cast(),
+            scale_factor: scale_factor.xyx().into(),
             color: CLIENT_CONFIG.cloud.color(nightness).into(),
-            phase: Default::default(),
-            altitude: Default::default(),
+            phase: phase.cast(),
+            altitude,
             padding: Default::default(),
         }
-    }
-
-    fn update_color(&mut self, nightness: f32) {
-        self.color = CLIENT_CONFIG.cloud.color(nightness).into();
-    }
-
-    fn update_origin(&mut self, origin: Point3<f64>, scroll: Vector2<f32>) {
-        let period = self.size.x as f64 * self.tex_dims.x as f64;
-        let camera_xz = origin.xz().coords - scroll.cast();
-        self.phase = camera_xz.map(|c| c.rem_euclid(period)).cast();
-        self.altitude = (CLIENT_CONFIG.cloud.altitude - origin.y) as f32;
-    }
-
-    fn scale_factor() -> Point3<f32> {
-        let size = CLIENT_CONFIG.cloud.size.xyx();
-        let padding = CLIENT_CONFIG.cloud.padding;
-        size.map(|c| 1.0 + padding * 2.0 / c as f32)
     }
 }
 
@@ -252,7 +216,7 @@ impl Immediates for CloudImmediates {}
 pub struct CloudConfig {
     size: Point2<u64>,
     pub padding: f32,
-    speed: f32,
+    drift_per_tick: f32,
     altitude: f64,
     day: TimePhaseConfig,
     night: TimePhaseConfig,

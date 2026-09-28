@@ -45,7 +45,7 @@ var<uniform> sky: SkyUniform;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = normalize((player.inv_vp * vec4(in.screen_coords, 1.0, 1.0)).xyz);
     let horizon_factor = smooth_falloff(dir.y + HORIZON_OFFSET);
-    let theta = -sign(sky.sun_dir.x) * radians(sky.arc_angle);
+    let theta = -sign(sky.sun_dir.x) * sky.arc_angle;
     let rotated_y = dir.x * sin(theta) + dir.y * cos(theta);
     let arc_factor = smooth_falloff(rotated_y + ARC_OFFSET);
     let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);

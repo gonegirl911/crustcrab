@@ -266,18 +266,18 @@ impl EventHandler<WorldEvent> for World {
                 _ = self.par_send_loads(loads, chunk_tx);
             }
             WorldEvent::WorldAreaChanged { prev, cur, aim } => {
-                let inserts = self.par_insert_many(cur.par_exclusive_server_points(prev));
+                let inserts = self.par_insert_many(cur.par_exclusive_server_points(&prev));
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
                 self.light.extend_placeholders(new_surface_points);
                 let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts, true);
 
                 let loads = cur
-                    .exclusive_client_points(prev)
+                    .exclusive_client_points(&prev)
                     .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect();
                 let unloads = prev
-                    .exclusive_client_points(cur)
+                    .exclusive_client_points(&cur)
                     .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect();
                 let updates = self.mesh_updates(inserts, light_updates, cur, &loads, &unloads);
@@ -699,7 +699,7 @@ impl Eq for Quad {}
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct BlockHoverData {
     pub hitbox: Aabb,
-    pub brightness: Option<BlockLight>,
+    pub brightness: BlockLight,
 }
 
 impl BlockHoverData {
@@ -717,7 +717,7 @@ impl BlockHoverData {
                 let b = b.world_light(0.0).lum();
                 a.total_cmp(&b)
             })
-            .map(BlockVertex::light);
+            .map_or(light_area.kernel(), |v| v.light());
         Self { hitbox, brightness }
     }
 }

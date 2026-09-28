@@ -54,38 +54,36 @@ impl BlockHover {
         depth_view: &wgpu::TextureView,
         anchor: Point3<f64>,
     ) {
-        if let Some(BlockHoverData {
-            hitbox,
-            brightness: Some(brightness),
-        }) = self.data
-        {
-            self.highlight.draw(
-                &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: depth_view,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
+        let Some(BlockHoverData { hitbox, brightness }) = self.data else {
+            return;
+        };
+
+        self.highlight.draw(
+            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
                     }),
-                    ..Default::default()
+                    stencil_ops: None,
                 }),
-                player_bind_group,
-                sky_bind_group,
-                shading_bind_group,
-                &BlockHighlightImmediates::new(hitbox, brightness, anchor),
-            );
-        }
+                ..Default::default()
+            }),
+            player_bind_group,
+            sky_bind_group,
+            shading_bind_group,
+            &BlockHighlightImmediates::new(hitbox, brightness, anchor),
+        );
     }
 }
 
