@@ -107,16 +107,22 @@ impl SkyUniformData {
     fn new(time: RenderTime) -> Self {
         let config = &CLIENT_CONFIG.sky;
         let nightness = time.nightness();
-        let glow_opacity = 1.0 - (nightness * 2.0 - 1.0).powi(2);
         Self {
             sun_dir: time.sun_dir().into(),
             color: config.color(nightness).into(),
             horizon_color: config.horizon_color(nightness),
-            glow_opacity,
+            glow_opacity: Self::glow_opacity(nightness),
             glow_color: config.glow_color(nightness),
             arc_angle: config.arc_angle(nightness).to_radians(),
             sunlight_intensity: config.sunlight_intensity(nightness).into(),
         }
+    }
+
+    fn glow_opacity(nightness: f32) -> f32 {
+        const GLOW_CENTER: f32 = 0.5;
+        const GLOW_BANDWIDTH: f32 = 0.5;
+
+        1.0 - ((nightness - GLOW_CENTER) / GLOW_BANDWIDTH).powi(2)
     }
 }
 
@@ -142,8 +148,11 @@ impl SkyConfig {
     }
 
     fn arc_angle(&self, nightness: f32) -> f32 {
-        let t = 1.0 - (1.0 - (nightness * 3.0 - 1.0).max(0.0)).abs();
-        utils::lerp(self.day.arc_angle, self.night.arc_angle, t)
+        utils::lerp(
+            self.day.arc_angle,
+            self.night.arc_angle,
+            utils::ramp(1.0 / 3.0, 2.0 / 3.0, nightness) * utils::ramp(1.0, 2.0 / 3.0, nightness),
+        )
     }
 
     pub fn sunlight_intensity(&self, nightness: f32) -> Rgb<f32> {

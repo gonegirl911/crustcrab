@@ -135,7 +135,7 @@ impl StarImmediates {
         let size = CLIENT_CONFIG.sky.star.size;
         let brightness = CLIENT_CONFIG.sky.star.brightness;
         let nightness = time.nightness();
-        let opacity = utils::lerp(-brightness / 2.0, brightness, nightness).max(0.0);
+        let opacity = brightness * utils::ramp(1.0 / 3.0, 1.0, nightness);
         Self {
             sky_rotation: sky_rotation.to_homogeneous(),
             size,

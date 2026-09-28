@@ -12,8 +12,8 @@ use crate::{
 use app::{App, AppConfig};
 use crossbeam_channel::{Receiver, Sender};
 use game::{
-    cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig, shading::ShadingConfig,
-    sky::SkyConfig,
+    clock::ClockConfig, cloud::CloudConfig, gui::GuiConfig, player::PlayerConfig,
+    shading::ShadingConfig, sky::SkyConfig,
 };
 use nalgebra::{Point3, Vector3};
 use serde::{Deserialize, Serialize};
@@ -69,6 +69,7 @@ struct ClientConfig {
     cloud: CloudConfig,
     shading: ShadingConfig,
     gui: GuiConfig,
+    clock: ClockConfig,
     app: AppConfig,
 }
 

@@ -78,7 +78,7 @@ impl World {
             .collect()
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn apply(
         &mut self,
         coords: Point3<i64>,
@@ -178,6 +178,9 @@ impl World {
             .map(|coords| {
                 ChunkEvent::Loaded(ChunkData::new(&self.chunks, &self.light, coords).into())
             })
+            .collect_vec_list()
+            .into_iter()
+            .flatten()
             .try_for_each(|event| chunk_tx.send(event))
     }
 
@@ -204,6 +207,9 @@ impl World {
             .map(|coords| {
                 ChunkEvent::Updated(ChunkData::new(&self.chunks, &self.light, coords).into())
             })
+            .collect_vec_list()
+            .into_iter()
+            .flatten()
             .try_for_each(|event| chunk_tx.send(event))
     }
 

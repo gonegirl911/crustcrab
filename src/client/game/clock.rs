@@ -1,9 +1,13 @@
 use crate::{
-    client::event_loop::{Event, EventHandler},
+    client::{
+        CLIENT_CONFIG,
+        event_loop::{Event, EventHandler},
+    },
     server::{ControlEvent, SERVER_CONFIG},
     shared::utils,
 };
 use nalgebra::{UnitQuaternion, Vector3};
+use serde::Deserialize;
 use std::{f64::consts::TAU, ops::Range, time::Duration};
 use winit::event::WindowEvent;
 
@@ -41,9 +45,8 @@ impl Clock {
     }
 
     fn decay_error(&mut self, dt: Duration) {
-        const DECAY_TIME: f64 = 0.125;
-
-        self.error *= (-dt.as_secs_f64() / DECAY_TIME).exp();
+        let decay_time_s = CLIENT_CONFIG.clock.error_decay_time_ms as f64 / 1000.0;
+        self.error *= (-dt.as_secs_f64() / decay_time_s).exp();
     }
 }
 
@@ -113,4 +116,9 @@ impl RenderTime {
     fn progress(ticks: f32, Range { start, end }: Range<u16>) -> f32 {
         utils::inv_lerp(start as f32, (end - 1) as f32, ticks)
     }
+}
+
+#[derive(Deserialize)]
+pub struct ClockConfig {
+    error_decay_time_ms: u64,
 }

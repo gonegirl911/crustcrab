@@ -26,6 +26,10 @@ pub fn inv_lerp(a: f32, b: f32, value: f32) -> f32 {
     (value - a) / (b - a)
 }
 
+pub fn ramp(start: f32, end: f32, value: f32) -> f32 {
+    inv_lerp(start, end, value).clamp(0.0, 1.0)
+}
+
 // ------------------------------------------------------------------------------------------------
 
 pub fn magnitude_squared<const N: usize>(vector: SVector<i32, N>) -> u128 {

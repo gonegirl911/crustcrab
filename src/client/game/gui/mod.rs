@@ -90,9 +90,9 @@ impl Gui {
         );
     }
 
-    fn scaling(surface: &Surface, factor: f32) -> Vector2<f32> {
+    fn unit(surface: &Surface) -> Vector2<f32> {
         let config = &CLIENT_CONFIG.gui;
-        let size = (surface.height() * config.base_unit).max(config.min_size) * factor;
+        let size = (surface.height() * config.base_unit).max(config.min_size);
         vector![size / surface.width(), size / surface.height()]
     }
 

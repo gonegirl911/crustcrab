@@ -85,8 +85,8 @@ struct CrosshairUniformData {
 
 impl CrosshairUniformData {
     fn new(surface: &Surface) -> Self {
-        let scaling = Gui::scaling(surface, CLIENT_CONFIG.gui.crosshair.size);
-        let transform = Gui::transform(scaling, Vector2::repeat(0.5));
+        let size = Gui::unit(surface) * CLIENT_CONFIG.gui.crosshair.size;
+        let transform = Gui::transform(size, Vector2::repeat(0.5));
         Self { transform }
     }
 }

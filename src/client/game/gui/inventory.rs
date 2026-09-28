@@ -184,8 +184,10 @@ struct InventoryUniformData {
 impl InventoryUniformData {
     fn new(surface: &Surface, is_icon_flat: bool) -> Self {
         let icon_projection = Self::icon_projection(is_icon_flat);
-        let scaling = Gui::scaling(surface, CLIENT_CONFIG.gui.inventory.size);
-        let gui_transform = Gui::transform(scaling, scaling.map(|c| 1.0 - c * 1.44));
+        let unit = Gui::unit(surface);
+        let size = unit * CLIENT_CONFIG.gui.inventory.size;
+        let padding = unit * CLIENT_CONFIG.gui.inventory.padding;
+        let gui_transform = Gui::transform(size, vector![1.0, 1.0] - size - padding);
         Self {
             transform: gui_transform * icon_projection,
         }
@@ -193,19 +195,20 @@ impl InventoryUniformData {
 
     fn icon_projection(is_icon_flat: bool) -> Matrix4<f32> {
         if is_icon_flat {
-            Matrix4::identity()
-        } else {
-            let sqrt3 = 3.0f32.sqrt();
-            Matrix4::new_translation(&vector![0.5, 0.5, SQRT_2 - sqrt3 / 2.0])
-                * Matrix4::new_scaling(2.0 / (SQRT_2 + sqrt3))
-                * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
-                * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
-                * Matrix4::new_translation(&Vector3::repeat(-0.5))
+            return Matrix4::identity();
         }
+
+        let sqrt3 = 3.0f32.sqrt();
+        Matrix4::new_translation(&vector![0.5, 0.5, SQRT_2 - sqrt3 / 2.0])
+            * Matrix4::new_scaling(2.0 / (SQRT_2 + sqrt3))
+            * Matrix4::new_rotation(Vector3::x() * -FRAC_PI_6)
+            * Matrix4::new_rotation(Vector3::y() * FRAC_PI_4)
+            * Matrix4::new_translation(&Vector3::repeat(-0.5))
     }
 }
 
 #[derive(Deserialize)]
 pub struct InventoryConfig {
     size: f32,
+    padding: f32,
 }

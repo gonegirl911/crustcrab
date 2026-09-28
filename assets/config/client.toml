@@ -31,12 +31,6 @@ brightness = 15.0
 [sky.object.night]
 brightness = 1.0
 
-[shading]
-side_factors = { x = 0.6, top = 1.0, bottom = 0.5, z = 0.8 }
-ao_factor_min = 0.0
-ao_factor_max = 0.8
-light_attenuation = 0.8
-
 [cloud]
 size = [12, 4]
 padding = 0.005
@@ -51,6 +45,12 @@ opacity = 0.99
 color = [0.06, 0.06, 0.1]
 opacity = 0.85
 
+[shading]
+side_factors = { x = 0.6, top = 1.0, bottom = 0.5, z = 0.8 }
+ao_factor_min = 0.0
+ao_factor_max = 0.8
+light_attenuation = 0.8
+
 [gui]
 base_unit = 0.03125
 min_size = 16.0
@@ -60,6 +60,10 @@ size = 1.0
 
 [gui.inventory]
 size = 3.6
+padding = 1.5
+
+[clock]
+error_decay_time_ms = 125
 
 [app]
 drain_budget_ms = 4

@@ -91,7 +91,6 @@ impl ApplicationHandler for App {
                 self.is_focused = true;
             }
             WindowEvent::Focused(false) => {
-                event_loop.set_control_flow(ControlFlow::Wait);
                 self.is_focused = false;
             }
             WindowEvent::CloseRequested => {
@@ -117,15 +116,20 @@ impl ApplicationHandler for App {
             .handle(&Event::DeviceEvent(event), &self.player_tx);
     }
 
-    fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
         self.dispatch_server_events();
 
-        if self.is_focused {
-            self.instance
-                .as_mut()
-                .unwrap()
-                .handle(&Event::AboutToWait, &self.player_tx);
+        if !self.is_focused {
+            const WAKE_INTERVAL: Duration = Duration::from_secs(1);
+
+            event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + WAKE_INTERVAL));
+            return;
         }
+
+        self.instance
+            .as_mut()
+            .unwrap()
+            .handle(&Event::AboutToWait, &self.player_tx);
     }
 
     fn destroy_surfaces(&mut self, _: &dyn ActiveEventLoop) {
