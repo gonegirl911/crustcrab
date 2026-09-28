@@ -79,7 +79,6 @@ impl World {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[rustfmt::skip]
     fn apply(
         &mut self,
         coords: Point3<i64>,

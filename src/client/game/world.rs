@@ -232,7 +232,6 @@ impl World {
         }
     }
 
-    #[rustfmt::skip]
     fn cull_chunks(&self, frustum: &Frustum) -> impl Iterator<Item = Point3<i32>> {
         let origin = utils::chunk_coords(frustum.origin);
         let mut queue = VecDeque::from([origin]);
