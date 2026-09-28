@@ -26,10 +26,7 @@ struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) @interpolate(flat) tex_index: u32,
     @location(1) tex_coords: vec2<f32>,
-    @location(2) @interpolate(flat) side_shade: u32,
-    @location(3) ao: f32,
-    @location(4) skylight: vec3<f32>,
-    @location(5) torchlight: vec3<f32>,
+    @location(2) light_factor: vec3<f32>,
 }
 
 @group(0) @binding(0)
@@ -37,6 +34,12 @@ var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
 var<uniform> shading: ShadingUniform;
+
+@group(2) @binding(0)
+var t_light: texture_3d<f32>;
+
+@group(2) @binding(1)
+var s_light: sampler;
 
 var<immediate> imm: Immediates;
 
@@ -64,53 +67,18 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(vertex.data[1], 16u, 4u)),
         f32(extractBits(vertex.data[1], 20u, 4u)),
     );
-    return VertexOutput(
-        player.vp * vec4(-player.origin + imm.chunk_coords * CHUNK_DIM + coords, 1.0),
-        tex_idx,
-        tex_coords,
-        side_shade,
-        ao,
-        skylight,
-        torchlight,
-    );
-}
-
-@group(2) @binding(0)
-var t_blocks: binding_array<texture_2d<f32>>;
-
-@group(2) @binding(1)
-var s_block: sampler;
-
-@group(3) @binding(0)
-var t_light: texture_3d<f32>;
-
-@group(3) @binding(1)
-var s_light: sampler;
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
-    let light_factor = light_factor(in.side_shade, in.ao, in.skylight, in.torchlight);
-    return color * vec4(light_factor, 1.0);
-}
-
-@fragment
-fn fs_cutout(in: VertexOutput) -> @location(0) vec4<f32> {
-    let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
-    if color.a == 0.0 {
-        discard;
-    }
-    let light_factor = light_factor(in.side_shade, in.ao, in.skylight, in.torchlight);
-    return color * vec4(light_factor, 1.0);
-}
-
-fn light_factor(side_shade: u32, ao: f32, skylight: vec3<f32>, torchlight: vec3<f32>) -> vec3<f32> {
+    let side_factor = shading.side_factors[side_shade];
     let light = vec3(
         sample_light(ao, skylight.r, torchlight.r).r,
         sample_light(ao, skylight.g, torchlight.g).g,
         sample_light(ao, skylight.b, torchlight.b).b,
     );
-    return light * shading.side_factors[side_shade];
+    return VertexOutput(
+        player.vp * vec4(-player.origin + imm.chunk_coords * CHUNK_DIM + coords, 1.0),
+        tex_idx,
+        tex_coords,
+        light * side_factor,
+    );
 }
 
 fn sample_light(ao: f32, skylight: f32, torchlight: f32) -> vec3<f32> {
@@ -123,6 +91,27 @@ fn sample_light(ao: f32, skylight: f32, torchlight: f32) -> vec3<f32> {
         (torchlight + 0.5) / LIGHT_LEVELS,
     );
     return textureSampleLevel(t_light, s_light, light_coords, 0.0).xyz;
+}
+
+@group(3) @binding(0)
+var t_blocks: binding_array<texture_2d<f32>>;
+
+@group(3) @binding(1)
+var s_block: sampler;
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
+    return color * vec4(in.light_factor, 1.0);
+}
+
+@fragment
+fn fs_cutout(in: VertexOutput) -> @location(0) vec4<f32> {
+    let color = textureSample(t_blocks[in.tex_index], s_block, in.tex_coords);
+    if color.a == 0.0 {
+        discard;
+    }
+    return color * vec4(in.light_factor, 1.0);
 }
 
 const CHUNK_DIM = 16.0;

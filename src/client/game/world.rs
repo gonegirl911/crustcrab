@@ -58,14 +58,14 @@ impl World {
         renderer: &Renderer,
         player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
         shading_uniform_bind_group_layout: &wgpu::BindGroupLayout,
-        textures_bind_group_layout: &wgpu::BindGroupLayout,
         shading_texture_bind_group_layout: &wgpu::BindGroupLayout,
+        textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let bind_group_layouts = &[
             player_uniform_bind_group_layout,
             shading_uniform_bind_group_layout,
-            textures_bind_group_layout,
             shading_texture_bind_group_layout,
+            textures_bind_group_layout,
         ];
         let render_pipelines = enum_map! {
             RenderLayer::Opaque => {
@@ -99,8 +99,8 @@ impl World {
         encoder: &mut wgpu::CommandEncoder,
         player_uniform_bind_group: &wgpu::BindGroup,
         shading_uniform_bind_group: &wgpu::BindGroup,
-        textures_bind_group: &wgpu::BindGroup,
         shading_texture_bind_group: &wgpu::BindGroup,
+        textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         anchor: Point3<f64>,
         frustum: &Frustum,
@@ -111,8 +111,8 @@ impl World {
         let bind_groups = [
             player_uniform_bind_group,
             shading_uniform_bind_group,
-            textures_bind_group,
             shading_texture_bind_group,
+            textures_bind_group,
         ];
         let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
@@ -156,8 +156,8 @@ impl World {
         mut blended_points: Vec<Point3<i32>>,
         player_uniform_bind_group: &wgpu::BindGroup,
         shading_uniform_bind_group: &wgpu::BindGroup,
-        textures_bind_group: &wgpu::BindGroup,
         shading_texture_bind_group: &wgpu::BindGroup,
+        textures_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         origin: Point3<f64>,
         anchor: Point3<f64>,
@@ -173,8 +173,8 @@ impl World {
             [
                 player_uniform_bind_group,
                 shading_uniform_bind_group,
-                textures_bind_group,
                 shading_texture_bind_group,
+                textures_bind_group,
             ],
         );
 

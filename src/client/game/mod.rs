@@ -58,8 +58,8 @@ impl Game {
             renderer,
             &player.uniform.bind_group_layout,
             &shading.uniform.bind_group_layout,
-            &textures.bind_group_layout,
             &shading.texture.bind_group_layout,
+            &textures.bind_group_layout,
         );
         let processor = PostProcessor::new(renderer, surface);
         let clouds = CloudLayer::new(
@@ -138,8 +138,8 @@ impl Game {
             encoder,
             &self.player.uniform.bind_group,
             &self.shading.uniform.bind_group,
-            &self.textures.bind_group,
             &self.shading.texture.bind_group,
+            &self.textures.bind_group,
             self.depth.view(),
             anchor,
             &frustum,
@@ -169,8 +169,8 @@ impl Game {
             blended_points,
             &self.player.uniform.bind_group,
             &self.shading.uniform.bind_group,
-            &self.textures.bind_group,
             &self.shading.texture.bind_group,
+            &self.textures.bind_group,
             self.depth.view(),
             origin,
             anchor,

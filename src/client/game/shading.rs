@@ -15,13 +15,18 @@ use serde::Deserialize;
 use std::{array, sync::LazyLock};
 
 pub struct Shading {
-    pub mut(self) texture: DataTexture,
     pub mut(self) uniform: Uniform<ShadingUniformData>,
+    pub mut(self) texture: DataTexture,
 }
 
 impl Shading {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
+            uniform: Uniform::new(
+                renderer,
+                MemoryState::Immutable(&Default::default()),
+                wgpu::ShaderStages::VERTEX,
+            ),
             texture: DataTexture::builder()
                 .renderer(renderer)
                 .size(wgpu::Extent3d {
@@ -31,14 +36,9 @@ impl Shading {
                 })
                 .dimension(wgpu::TextureDimension::D3)
                 .format(wgpu::TextureFormat::Rgba16Unorm)
-                .visibility(wgpu::ShaderStages::VERTEX_FRAGMENT)
+                .visibility(wgpu::ShaderStages::VERTEX)
                 .filterable(true)
                 .build(),
-            uniform: Uniform::new(
-                renderer,
-                MemoryState::Immutable(&Default::default()),
-                wgpu::ShaderStages::VERTEX_FRAGMENT,
-            ),
         }
     }
 
@@ -51,8 +51,7 @@ impl Shading {
 pub struct LightTable([[[Rgba<u16>; Self::AO_LEVELS]; Self::LIGHT_LEVELS]; Self::LIGHT_LEVELS]);
 
 impl LightTable {
-    const AO_MAX: u8 = 3;
-    const AO_LEVELS: usize = Self::AO_MAX as usize + 1;
+    const AO_LEVELS: usize = 4;
     const LIGHT_LEVELS: usize = BlockLight::COMPONENT_MAX as usize + 1;
 
     fn new(nightness: f32) -> Self {
@@ -95,8 +94,9 @@ impl LightTable {
         let shading = &CLIENT_CONFIG.shading;
         let ao_factor_min = shading.ao_factor_min;
         let ao_factor_max = shading.ao_factor_max;
+        let ao_max = 3.0;
 
-        1.0 - utils::lerp(ao_factor_min, ao_factor_max, ao as f32 / 3.0)
+        1.0 - utils::lerp(ao_factor_min, ao_factor_max, ao as f32 / ao_max)
     }
 }
 
