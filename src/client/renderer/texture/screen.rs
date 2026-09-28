@@ -15,15 +15,15 @@ impl ScreenTexture {
     }
 
     pub fn view(&self) -> &wgpu::TextureView {
-        self.0.view(0)
+        &self.0.views[0]
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.0.bind_group_layout()
+        &self.0.bind_group_layout
     }
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.0.bind_group(0)
+        &self.0.bind_groups[0]
     }
 }
 
@@ -36,10 +36,10 @@ impl EventHandler for ScreenTexture {
 }
 
 pub struct ScreenTextureArray<const N: usize> {
-    views: [wgpu::TextureView; N],
+    pub mut(self) views: [wgpu::TextureView; N],
     sampler: wgpu::Sampler,
-    bind_group_layout: wgpu::BindGroupLayout,
-    bind_groups: [wgpu::BindGroup; N],
+    pub mut(self) bind_group_layout: wgpu::BindGroupLayout,
+    pub mut(self) bind_groups: [wgpu::BindGroup; N],
     format: wgpu::TextureFormat,
 }
 
@@ -80,18 +80,6 @@ impl<const N: usize> ScreenTextureArray<N> {
             bind_groups,
             format,
         }
-    }
-
-    pub fn view(&self, index: usize) -> &wgpu::TextureView {
-        &self.views[index]
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    pub fn bind_group(&self, index: usize) -> &wgpu::BindGroup {
-        &self.bind_groups[index]
     }
 
     fn create_views(

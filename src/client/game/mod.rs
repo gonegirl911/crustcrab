@@ -2,7 +2,7 @@ pub mod clock;
 pub mod cloud;
 pub mod fog;
 pub mod gui;
-pub mod hover;
+pub mod highlight;
 pub mod player;
 pub mod shading;
 pub mod sky;
@@ -24,7 +24,7 @@ use cloud::CloudLayer;
 use crossbeam_channel::Sender;
 use fog::Fog;
 use gui::Gui;
-use hover::BlockHover;
+use highlight::BlockHighlight;
 use player::Player;
 use shading::Shading;
 use sky::Sky;
@@ -38,7 +38,7 @@ pub struct Game {
     world: World,
     clouds: CloudLayer,
     fog: Fog,
-    hover: BlockHover,
+    highlight: BlockHighlight,
     aces: Aces,
     gui: Gui,
     player: Player,
@@ -51,37 +51,36 @@ impl Game {
     pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
         let clock = Clock::default();
         let player = Player::new(renderer);
-        let sky = Sky::new(renderer, surface, player.bind_group_layout());
+        let sky = Sky::new(renderer, surface, &player.uniform.bind_group_layout);
         let shading = Shading::new(renderer);
         let textures = BlockTextureArray::new(renderer, surface);
         let world = World::new(
             renderer,
-            player.bind_group_layout(),
-            sky.bind_group_layout(),
-            shading.bind_group_layout(),
-            textures.bind_group_layout(),
+            &player.uniform.bind_group_layout,
+            &shading.uniform.bind_group_layout,
+            &textures.bind_group_layout,
+            &shading.texture.bind_group_layout,
         );
         let processor = PostProcessor::new(renderer, surface);
         let clouds = CloudLayer::new(
             renderer,
             surface,
-            player.bind_group_layout(),
-            shading.bind_group_layout(),
+            &player.uniform.bind_group_layout,
+            &shading.uniform.bind_group_layout,
             processor.bind_group_layout(),
         );
         let depth = DepthBuffer::new(renderer, surface);
         let fog = Fog::new(
             renderer,
             surface,
-            player.bind_group_layout(),
-            sky.bind_group_layout(),
+            &player.uniform.bind_group_layout,
+            &sky.uniform.bind_group_layout,
             depth.bind_group_layout(),
         );
-        let hover = BlockHover::new(
+        let highlight = BlockHighlight::new(
             renderer,
-            player.bind_group_layout(),
-            sky.bind_group_layout(),
-            shading.bind_group_layout(),
+            &player.uniform.bind_group_layout,
+            &shading.texture.bind_group_layout,
         );
         let aces = Aces::new(
             renderer,
@@ -91,9 +90,9 @@ impl Game {
         let gui = Gui::new(
             renderer,
             surface,
-            shading.bind_group_layout(),
+            &shading.uniform.bind_group_layout,
             processor.bind_group_layout(),
-            textures.bind_group_layout(),
+            &textures.bind_group_layout,
         );
         Self {
             clock,
@@ -102,7 +101,7 @@ impl Game {
             world,
             clouds,
             fog,
-            hover,
+            highlight,
             aces,
             gui,
             player,
@@ -119,6 +118,7 @@ impl Game {
         encoder: &mut wgpu::CommandEncoder,
     ) {
         let time = self.clock.time();
+        let nightness = time.nightness();
         let origin = self.player.view.origin;
         let anchor = self.player.view.anchor();
         let frustum = self.player.frustum();
@@ -127,17 +127,19 @@ impl Game {
             renderer,
             self.processor.view(),
             encoder,
-            self.player.bind_group(),
+            &self.player.uniform.bind_group,
             time,
         );
 
+        self.shading.update(renderer, nightness);
+
         let blended_points = self.world.draw_opaque(
-            self.fog.view(),
+            self.fog.texture.view(),
             encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
-            self.shading.bind_group(),
-            self.textures.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.shading.uniform.bind_group,
+            &self.textures.bind_group,
+            &self.shading.texture.bind_group,
             self.depth.view(),
             anchor,
             &frustum,
@@ -146,30 +148,29 @@ impl Game {
         self.fog.draw(
             self.processor.view(),
             encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.sky.uniform.bind_group,
             self.depth.bind_group(),
         );
 
-        self.hover.draw(
+        self.highlight.draw(
             self.processor.view(),
             encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
-            self.shading.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.shading.texture.bind_group,
             self.depth.view(),
             anchor,
         );
 
         self.world.draw_blended(
             renderer,
-            self.fog.view(),
+            self.fog.texture.view(),
             encoder,
             blended_points,
-            self.player.bind_group(),
-            self.sky.bind_group(),
-            self.shading.bind_group(),
-            self.textures.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.shading.uniform.bind_group,
+            &self.textures.bind_group,
+            &self.shading.texture.bind_group,
             self.depth.view(),
             origin,
             anchor,
@@ -178,17 +179,17 @@ impl Game {
         self.fog.draw(
             self.processor.view(),
             encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.sky.uniform.bind_group,
             self.depth.bind_group(),
         );
 
         self.clouds.draw(
-            self.fog.view(),
+            self.fog.texture.view(),
             encoder,
             self.processor.spare_view(),
-            self.player.bind_group(),
-            self.shading.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.shading.uniform.bind_group,
             self.depth.view(),
             self.processor.spare_bind_group(),
             origin,
@@ -198,8 +199,8 @@ impl Game {
         self.fog.draw(
             self.processor.view(),
             encoder,
-            self.player.bind_group(),
-            self.sky.bind_group(),
+            &self.player.uniform.bind_group,
+            &self.sky.uniform.bind_group,
             self.depth.bind_group(),
         );
 
@@ -214,9 +215,9 @@ impl Game {
             self.gui.draw(
                 view,
                 encoder,
-                self.shading.bind_group(),
+                &self.shading.uniform.bind_group,
                 bind_group,
-                self.textures.bind_group(),
+                &self.textures.bind_group,
                 self.depth.view(),
             );
         });
@@ -237,7 +238,7 @@ impl EventHandler for Game {
         self.clock.handle(event, dt);
         self.world.handle(event, renderer);
         self.fog.handle(event, (renderer, surface));
-        self.hover.handle(event, ());
+        self.highlight.handle(event, ());
         self.gui.handle(event, (renderer, surface));
         self.player.handle(event, (player_tx, renderer, surface, &self.gui, dt));
         self.depth.handle(event, (renderer, surface));

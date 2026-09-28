@@ -19,96 +19,20 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, Vector3, vector};
+use std::sync::Arc;
 
-pub struct BlockHover {
-    highlight: BlockHighlight,
-    data: Option<BlockHoverData>,
-}
-
-impl BlockHover {
-    pub fn new(
-        renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
-        shading_bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> Self {
-        Self {
-            highlight: BlockHighlight::new(
-                renderer,
-                player_bind_group_layout,
-                sky_bind_group_layout,
-                shading_bind_group_layout,
-            ),
-            data: None,
-        }
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    pub fn draw(
-        &self,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
-        shading_bind_group: &wgpu::BindGroup,
-        depth_view: &wgpu::TextureView,
-        anchor: Point3<f64>,
-    ) {
-        let Some(BlockHoverData { hitbox, brightness }) = self.data else {
-            return;
-        };
-
-        self.highlight.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: depth_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                ..Default::default()
-            }),
-            player_bind_group,
-            sky_bind_group,
-            shading_bind_group,
-            &BlockHighlightImmediates::new(hitbox, brightness, anchor),
-        );
-    }
-}
-
-impl EventHandler for BlockHover {
-    type Context<'a> = ();
-
-    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ControlEvent(ControlEvent::BlockHovered(data)) = *event {
-            self.data = data;
-        }
-    }
-}
-
-struct BlockHighlight {
+pub struct BlockHighlight {
     vertex_buffer: VertexBuffer<BlockHighlightVertex>,
     index_buffer: IndexBuffer<u16>,
     render_pipeline: RenderPipeline,
+    data: Option<Arc<BlockHoverData>>,
 }
 
 impl BlockHighlight {
-    fn new(
+    pub fn new(
         renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
-        shading_bind_group_layout: &wgpu::BindGroupLayout,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_texture_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         Self {
             vertex_buffer: VertexBuffer::new(
@@ -120,9 +44,8 @@ impl BlockHighlight {
                 .renderer(renderer)
                 .shader_desc(read_wgsl("assets/shaders/highlight.wgsl"))
                 .bind_group_layouts(&[
-                    player_bind_group_layout,
-                    sky_bind_group_layout,
-                    shading_bind_group_layout,
+                    player_uniform_bind_group_layout,
+                    shading_texture_bind_group_layout,
                 ])
                 .immediate_size(BlockHighlightImmediates::SIZE)
                 .buffers(&[BlockHighlightVertex::desc()])
@@ -137,29 +60,67 @@ impl BlockHighlight {
                 .format(PostProcessor::FORMAT)
                 .blend(wgpu::BlendState::ALPHA_BLENDING)
                 .build(),
+            data: None,
         }
     }
 
     #[rustfmt::skip]
-    fn draw(
+    pub fn draw(
         &self,
-        render_pass: &mut wgpu::RenderPass,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
-        shading_bind_group: &wgpu::BindGroup,
-        imm: &BlockHighlightImmediates,
+        view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        shading_texture_bind_group: &wgpu::BindGroup,
+        depth_view: &wgpu::TextureView,
+        anchor: Point3<f64>,
     ) {
+        let Some(data) = &self.data else {
+            return;
+        };
+
+        let imm = BlockHighlightImmediates::new(data.hitbox(), data.brightness(), anchor);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
+        });
         self.render_pipeline.bind(
-            render_pass,
-            [player_bind_group, sky_bind_group, shading_bind_group],
+            &mut render_pass,
+            [player_uniform_bind_group, shading_texture_bind_group],
         );
-        imm.set(render_pass);
-        self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
+        imm.set(&mut render_pass);
+        self.vertex_buffer.draw_indexed(&mut render_pass, &self.index_buffer);
     }
 }
 
-#[repr(C)]
+impl EventHandler for BlockHighlight {
+    type Context<'a> = ();
+
+    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
+        if let Event::ControlEvent(ControlEvent::BlockHovered(data)) = event {
+            self.data = data.clone();
+        }
+    }
+}
+
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct BlockHighlightVertex {
     coords: Point3<f32>,
 }
@@ -176,8 +137,8 @@ impl Vertex for BlockHighlightVertex {
     const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3];
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct BlockHighlightImmediates {
     m: Matrix4<f32>,
     brightness: u32,

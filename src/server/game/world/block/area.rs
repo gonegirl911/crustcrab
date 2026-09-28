@@ -8,8 +8,10 @@ use crate::{
     shared::{cuboid::Cuboid, enum_map::EnumMap},
 };
 use nalgebra::{Point3, Vector3};
+use serde::{Deserialize, Serialize};
 use std::{array, ops::Index};
 
+#[derive(Serialize, Deserialize)]
 pub struct BlockContext<S> {
     source: S,
 }
@@ -144,6 +146,7 @@ pub trait BlockLightAreaSource {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct BlockAreaDataStore<T>([[[T; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
 impl<T> BlockAreaDataStore<T> {

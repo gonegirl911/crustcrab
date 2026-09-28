@@ -42,7 +42,7 @@ pub struct Inventory {
 impl Inventory {
     pub fn new(
         renderer: &Renderer,
-        shading_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_uniform_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let uniform = Uniform::new(renderer, MemoryState::UNINIT, wgpu::ShaderStages::VERTEX);
@@ -50,8 +50,8 @@ impl Inventory {
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/inventory.wgsl"))
             .bind_group_layouts(&[
-                uniform.bind_group_layout(),
-                shading_bind_group_layout,
+                &uniform.bind_group_layout,
+                shading_uniform_bind_group_layout,
                 textures_bind_group_layout,
             ])
             .buffers(&[BlockVertex::desc()])
@@ -84,15 +84,15 @@ impl Inventory {
     pub fn draw(
         &self,
         render_pass: &mut wgpu::RenderPass,
-        shading_bind_group: &wgpu::BindGroup,
+        shading_uniform_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
     ) {
         if let Some(buffer) = &self.vertex_buffer {
             self.render_pipeline.bind(
                 render_pass,
                 [
-                    self.uniform.bind_group(),
-                    shading_bind_group,
+                    &self.uniform.bind_group,
+                    shading_uniform_bind_group,
                     textures_bind_group,
                 ],
             );
@@ -175,8 +175,8 @@ impl EventHandler for Inventory {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct InventoryUniformData {
     transform: Matrix4<f32>,
 }

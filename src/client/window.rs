@@ -7,7 +7,7 @@ use winit::{
     window::{CursorGrabMode, WindowAttributes as RawWindowAttributes},
 };
 
-pub struct Window(Arc<RawWindow>);
+pub struct Window(pub mut(self) Arc<RawWindow>);
 
 impl Window {
     pub fn new(event_loop: &dyn ActiveEventLoop) -> Self {
@@ -17,14 +17,6 @@ impl Window {
                 .expect("window should be creatable")
                 .into(),
         )
-    }
-
-    pub fn as_raw(&self) -> &RawWindow {
-        &*self.0
-    }
-
-    pub fn to_owned_raw(&self) -> Arc<RawWindow> {
-        self.0.clone()
     }
 }
 

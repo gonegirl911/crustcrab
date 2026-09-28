@@ -39,8 +39,8 @@ impl Crosshair {
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/crosshair.wgsl"))
             .bind_group_layouts(&[
-                uniform.bind_group_layout(),
-                texture.bind_group_layout(),
+                &uniform.bind_group_layout,
+                &texture.bind_group_layout,
                 input_bind_group_layout,
             ])
             .format(PostProcessor::FORMAT)
@@ -57,8 +57,8 @@ impl Crosshair {
         self.render_pipeline.bind(
             render_pass,
             [
-                self.uniform.bind_group(),
-                self.texture.bind_group(),
+                &self.uniform.bind_group,
+                &self.texture.bind_group,
                 input_bind_group,
             ],
         );
@@ -77,8 +77,8 @@ impl EventHandler for Crosshair {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct CrosshairUniformData {
     transform: Matrix4<f32>,
 }

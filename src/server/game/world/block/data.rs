@@ -4,7 +4,7 @@ use super::{
     model::{Model, RawModel},
 };
 use crate::{
-    client::game::world::BlockVertex,
+    client::game::{shading::DAY_LIGHT_TABLE, world::BlockVertex},
     enum_map,
     server::game::world::chunk::Chunk,
     shared::{
@@ -56,7 +56,7 @@ impl BlockData {
                     )
                 }
             };
-            Self::triangulation(&vertices).map(|corner| vertices[corner])
+            Self::triangulation(&corner_lights, &corner_aos).map(|corner| vertices[corner])
         })
     }
 
@@ -125,12 +125,18 @@ impl BlockData {
         !self.is_glowing() && self.light_filter == Default::default()
     }
 
-    fn triangulation(vertices: &EnumMap<Corner, BlockVertex>) -> [Corner; 6] {
-        let lower_left = vertices[Corner::LowerLeft].light_factor(0.0).lum();
-        let upper_right = vertices[Corner::UpperRight].light_factor(0.0).lum();
-        let lower_right = vertices[Corner::LowerRight].light_factor(0.0).lum();
-        let upper_left = vertices[Corner::UpperLeft].light_factor(0.0).lum();
-        if lower_left + upper_right > lower_right + upper_left {
+    fn triangulation(
+        corner_lights: &EnumMap<Corner, BlockLight>,
+        corner_aos: &EnumMap<Corner, u8>,
+    ) -> [Corner; 6] {
+        let lum = |corner| {
+            DAY_LIGHT_TABLE
+                .value(corner_lights[corner], corner_aos[corner])
+                .lum()
+        };
+        if lum(Corner::LowerLeft) + lum(Corner::UpperRight)
+            > lum(Corner::LowerRight) + lum(Corner::UpperLeft)
+        {
             LL_UR_TRIANGULATION
         } else {
             LR_UL_TRIANGULATION
@@ -192,9 +198,9 @@ pub enum RenderLayer {
     Blended,
 }
 
-#[repr(u8)]
 #[derive(Clone, Copy, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[repr(u8)]
 pub enum SideShade {
     X = 0,
     Top = 1,

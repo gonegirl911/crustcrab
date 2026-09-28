@@ -10,7 +10,7 @@ use crate::client::{
 };
 
 pub struct Fog {
-    texture: ScreenTexture,
+    pub mut(self) texture: ScreenTexture,
     render_pipeline: RenderPipeline,
 }
 
@@ -18,8 +18,8 @@ impl Fog {
     pub fn new(
         renderer: &Renderer,
         surface: &Surface,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+        sky_uniform_bind_group_layout: &wgpu::BindGroupLayout,
         depth_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let texture = ScreenTexture::new(renderer, surface, PostProcessor::FORMAT);
@@ -27,8 +27,8 @@ impl Fog {
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/fog.wgsl"))
             .bind_group_layouts(&[
-                player_bind_group_layout,
-                sky_bind_group_layout,
+                player_uniform_bind_group_layout,
+                sky_uniform_bind_group_layout,
                 texture.bind_group_layout(),
                 depth_bind_group_layout,
             ])
@@ -41,24 +41,20 @@ impl Fog {
         }
     }
 
-    pub fn view(&self) -> &wgpu::TextureView {
-        self.texture.view()
-    }
-
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        sky_uniform_bind_group: &wgpu::BindGroup,
         depth_bind_group: &wgpu::BindGroup,
     ) {
         let mut render_pass = color_pass(view, encoder, wgpu::LoadOp::Load);
         self.render_pipeline.bind(
             &mut render_pass,
             [
-                player_bind_group,
-                sky_bind_group,
+                player_uniform_bind_group,
+                sky_uniform_bind_group,
                 self.texture.bind_group(),
                 depth_bind_group,
             ],

@@ -153,7 +153,7 @@ impl Instance {
     async fn new(event_loop: &dyn ActiveEventLoop) -> Self {
         let stopwatch = Stopwatch::start();
         let window = Window::new(event_loop);
-        let (renderer, surface) = Renderer::new(window.to_owned_raw()).await;
+        let (renderer, surface) = Renderer::new(window.0.clone()).await;
         let game = Game::new(&renderer, &surface);
         Self {
             stopwatch,
@@ -170,12 +170,12 @@ impl Instance {
         let mut encoder = self.renderer.device.create_command_encoder(&Default::default());
         self.game.draw(&self.renderer, &view, &mut encoder);
         self.renderer.queue.submit([encoder.finish()]);
-        self.window.as_raw().pre_present_notify();
+        self.window.0.pre_present_notify();
         self.renderer.queue.present(texture);
     }
 
     async fn recover(&mut self) {
-        let window = self.window.to_owned_raw();
+        let window = self.window.0.clone();
         if self.renderer.is_device_lost() {
             (self.renderer, self.surface) = Renderer::new(window).await;
             self.game = Game::new(&self.renderer, &self.surface);
@@ -193,7 +193,7 @@ impl EventHandler for Instance {
     fn handle(&mut self, event: &Event, player_tx: Self::Context<'_>) {
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
-        self.surface.handle(event, (self.window.as_raw(), &self.renderer));
+        self.surface.handle(event, (&*self.window.0, &self.renderer));
         self.game.handle(
             event,
             (player_tx, &self.renderer, &self.surface, self.stopwatch.dt),

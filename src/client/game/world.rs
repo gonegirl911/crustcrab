@@ -30,7 +30,7 @@ use crate::{
             },
         },
     },
-    shared::{color::Rgb, enum_map::EnumMap, indexmap::FxIndexMap, pool::JobPool, utils},
+    shared::{enum_map::EnumMap, indexmap::FxIndexMap, pool::JobPool, utils},
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -39,7 +39,6 @@ use rustc_hash::FxHashMap;
 use std::{
     cmp::Reverse,
     collections::{VecDeque, hash_map::Entry},
-    mem,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -57,16 +56,16 @@ pub struct World {
 impl World {
     pub fn new(
         renderer: &Renderer,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
-        shading_bind_group_layout: &wgpu::BindGroupLayout,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_uniform_bind_group_layout: &wgpu::BindGroupLayout,
         textures_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_texture_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let bind_group_layouts = &[
-            player_bind_group_layout,
-            sky_bind_group_layout,
-            shading_bind_group_layout,
+            player_uniform_bind_group_layout,
+            shading_uniform_bind_group_layout,
             textures_bind_group_layout,
+            shading_texture_bind_group_layout,
         ];
         let render_pipelines = enum_map! {
             RenderLayer::Opaque => {
@@ -98,10 +97,10 @@ impl World {
         &self,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
-        shading_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        shading_uniform_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
+        shading_texture_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         anchor: Point3<f64>,
         frustum: &Frustum,
@@ -110,10 +109,10 @@ impl World {
         let mut cutout_parts = vec![];
         let mut blended_points = vec![];
         let bind_groups = [
-            player_bind_group,
-            sky_bind_group,
-            shading_bind_group,
+            player_uniform_bind_group,
+            shading_uniform_bind_group,
             textures_bind_group,
+            shading_texture_bind_group,
         ];
         let mut render_pass = Self::render_pass(view, encoder, depth_view, true);
 
@@ -155,10 +154,10 @@ impl World {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         mut blended_points: Vec<Point3<i32>>,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
-        shading_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        shading_uniform_bind_group: &wgpu::BindGroup,
         textures_bind_group: &wgpu::BindGroup,
+        shading_texture_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         origin: Point3<f64>,
         anchor: Point3<f64>,
@@ -172,10 +171,10 @@ impl World {
         self.render_pipelines[RenderLayer::Blended].bind(
             &mut render_pass,
             [
-                player_bind_group,
-                sky_bind_group,
-                shading_bind_group,
+                player_uniform_bind_group,
+                shading_uniform_bind_group,
                 textures_bind_group,
+                shading_texture_bind_group,
             ],
         );
 
@@ -594,8 +593,8 @@ impl ChunkMesh {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 pub struct BlockVertex {
     data: [u32; 2],
 }
@@ -630,54 +629,8 @@ impl BlockVertex {
         ]
     }
 
-    fn side_shade(&self) -> SideShade {
-        unsafe { mem::transmute::<u8, _>(self.data[0].bit_range(24, 23)) }
-    }
-
-    fn ao(&self) -> u8 {
-        self.data[0].bit_range(26, 25)
-    }
-
     pub fn light(&self) -> BlockLight {
         BlockLight(self.data[1])
-    }
-
-    fn skylight(&self) -> Rgb<u8> {
-        self.light().skylight()
-    }
-
-    fn torchlight(&self) -> Rgb<u8> {
-        self.light().torchlight()
-    }
-
-    pub fn light_factor(&self, nightness: f32) -> Rgb<f32> {
-        let shading = &CLIENT_CONFIG.shading;
-
-        let side_factors = shading.side_factors;
-        let ao_factor_min = shading.ao_factor_min;
-        let ao_factor_max = shading.ao_factor_max;
-        let ao_max = 3.0;
-
-        let side_shade = self.side_shade();
-        let ao = self.ao() as f32;
-        let side_factor = side_factors[side_shade];
-        let ao_factor = utils::lerp(ao_factor_min, ao_factor_max, ao / ao_max);
-        self.world_light(nightness) * (1.0 - ao_factor) * side_factor
-    }
-
-    pub fn world_light(&self, nightness: f32) -> Rgb<f32> {
-        let sky = &CLIENT_CONFIG.sky;
-        let shading = &CLIENT_CONFIG.shading;
-
-        let sunlight_intensity = sky.sunlight_intensity(nightness);
-        let light_attenuation = shading.light_attenuation;
-        let light_max = BlockLight::COMPONENT_MAX;
-
-        let skylight = self.skylight();
-        let torchlight = self.torchlight();
-        let global_light = skylight.map(|c| light_attenuation.powi((light_max - c) as i32));
-        let local_light = torchlight.map(|c| light_attenuation.powi((light_max - c) as i32));
-        (global_light * sunlight_intensity + local_light).saturate()
     }
 }
 
@@ -685,8 +638,8 @@ impl Vertex for BlockVertex {
     const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Uint32x2];
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct BlockImmediates {
     chunk_coords: Point3<f32>,
 }

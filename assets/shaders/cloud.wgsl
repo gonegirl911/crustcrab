@@ -18,9 +18,6 @@ struct PlayerUniform {
 
 struct ShadingUniform {
     side_factors: vec4<f32>,
-    ao_factor_min: f32,
-    ao_factor_max: f32,
-    light_attenuation: f32,
 }
 
 struct Immediates {

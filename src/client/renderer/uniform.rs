@@ -6,8 +6,8 @@ use bytemuck::Pod;
 
 pub struct Uniform<T> {
     buffer: UniformBuffer<T>,
-    bind_group_layout: wgpu::BindGroupLayout,
-    bind_group: wgpu::BindGroup,
+    pub mut(self) bind_group_layout: wgpu::BindGroupLayout,
+    pub mut(self) bind_group: wgpu::BindGroup,
 }
 
 impl<T: Pod> Uniform<T> {
@@ -43,14 +43,6 @@ impl<T: Pod> Uniform<T> {
             bind_group_layout,
             bind_group,
         }
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
     }
 
     pub fn set(&self, renderer: &Renderer, value: &T) {

@@ -43,7 +43,8 @@ impl Renderer {
             .request_device(&wgpu::DeviceDescriptor {
                 required_features: wgpu::Features::IMMEDIATES
                     | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
-                    | wgpu::Features::TEXTURE_BINDING_ARRAY,
+                    | wgpu::Features::TEXTURE_BINDING_ARRAY
+                    | wgpu::Features::TEXTURE_FORMAT_16BIT_NORM,
                 required_limits: adapter.limits(),
                 ..Default::default()
             })

@@ -12,8 +12,8 @@ use serde::{
 };
 use std::ops::Range;
 
-#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Default, Serialize)]
+#[repr(transparent)]
 pub struct Block(u8);
 
 impl Block {

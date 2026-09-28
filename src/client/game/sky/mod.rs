@@ -23,14 +23,14 @@ pub struct Sky {
     atmosphere: Atmosphere,
     stars: StarDome,
     objects: ObjectSet,
-    uniform: Uniform<SkyUniformData>,
+    pub mut(self) uniform: Uniform<SkyUniformData>,
 }
 
 impl Sky {
     pub fn new(
         renderer: &Renderer,
         surface: &Surface,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let uniform = Uniform::new(
             renderer,
@@ -39,15 +39,15 @@ impl Sky {
         );
         let atmosphere = Atmosphere::new(
             renderer,
-            player_bind_group_layout,
-            uniform.bind_group_layout(),
+            player_uniform_bind_group_layout,
+            &uniform.bind_group_layout,
         );
-        let stars = StarDome::new(renderer, player_bind_group_layout);
+        let stars = StarDome::new(renderer, player_uniform_bind_group_layout);
         let objects = ObjectSet::new(
             renderer,
             surface,
-            player_bind_group_layout,
-            uniform.bind_group_layout(),
+            player_uniform_bind_group_layout,
+            &uniform.bind_group_layout,
         );
         Self {
             atmosphere,
@@ -57,20 +57,13 @@ impl Sky {
         }
     }
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.uniform.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.uniform.bind_group()
-    }
-
+    #[rustfmt::skip]
     pub fn draw(
         &self,
         renderer: &Renderer,
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        player_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
         time: RenderTime,
     ) {
         self.uniform.set(renderer, &SkyUniformData::new(time));
@@ -78,22 +71,22 @@ impl Sky {
         let mut render_pass = color_pass(view, encoder, wgpu::LoadOp::Clear(Default::default()));
         self.atmosphere.draw(
             &mut render_pass,
-            player_bind_group,
-            self.uniform.bind_group(),
+            player_uniform_bind_group,
+            &self.uniform.bind_group,
         );
-        self.stars.draw(&mut render_pass, player_bind_group, time);
+        self.stars.draw(&mut render_pass, player_uniform_bind_group, time);
         self.objects.draw(
             &mut render_pass,
-            player_bind_group,
-            self.uniform.bind_group(),
+            player_uniform_bind_group,
+            &self.uniform.bind_group,
             time,
         );
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct SkyUniformData {
+#[repr(C)]
+pub struct SkyUniformData {
     sun_dir: Float3,
     color: Float3,
     horizon_color: Rgb<f32>,

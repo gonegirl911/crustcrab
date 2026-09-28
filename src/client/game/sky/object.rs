@@ -25,8 +25,8 @@ impl ObjectSet {
     pub fn new(
         renderer: &Renderer,
         surface: &Surface,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        sky_bind_group_layout: &wgpu::BindGroupLayout,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+        sky_uniform_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let textures = ImageTextureArray::builder()
             .renderer(renderer)
@@ -41,9 +41,9 @@ impl ObjectSet {
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/object.wgsl"))
             .bind_group_layouts(&[
-                player_bind_group_layout,
-                sky_bind_group_layout,
-                textures.bind_group_layout(),
+                player_uniform_bind_group_layout,
+                sky_uniform_bind_group_layout,
+                &textures.bind_group_layout,
             ])
             .immediate_size(ObjectImmediates::SIZE)
             .format(PostProcessor::FORMAT)
@@ -57,8 +57,8 @@ impl ObjectSet {
     pub fn draw(
         &self,
         render_pass: &mut wgpu::RenderPass,
-        player_bind_group: &wgpu::BindGroup,
-        sky_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        sky_uniform_bind_group: &wgpu::BindGroup,
         time: RenderTime,
     ) {
         let sun_dir = time.sun_dir();
@@ -70,9 +70,9 @@ impl ObjectSet {
         self.render_pipeline.bind(
             render_pass,
             [
-                player_bind_group,
-                sky_bind_group,
-                self.textures.bind_group(),
+                player_uniform_bind_group,
+                sky_uniform_bind_group,
+                &self.textures.bind_group,
             ],
         );
         sun_imm.set(render_pass);
@@ -82,8 +82,8 @@ impl ObjectSet {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct ObjectImmediates {
     dir: Float3,
     up: Vector3<f32>,

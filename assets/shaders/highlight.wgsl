@@ -12,23 +12,6 @@ struct PlayerUniform {
     zfar: f32,
 }
 
-struct SkyUniform {
-    sun_dir: vec3<f32>,
-    color: vec3<f32>,
-    horizon_color: vec3<f32>,
-    glow_opacity: f32,
-    glow_color: vec3<f32>,
-    arc_angle: f32,
-    sunlight_intensity: vec3<f32>,
-}
-
-struct ShadingUniform {
-    side_factors: vec4<f32>,
-    ao_factor_min: f32,
-    ao_factor_max: f32,
-    light_attenuation: f32,
-}
-
 struct Immediates {
     m: mat4x4<f32>,
     brightness: u32,
@@ -43,10 +26,10 @@ struct VertexOutput {
 var<uniform> player: PlayerUniform;
 
 @group(1) @binding(0)
-var<uniform> sky: SkyUniform;
+var t_light: texture_3d<f32>;
 
-@group(2) @binding(0)
-var<uniform> shading: ShadingUniform;
+@group(1) @binding(1)
+var s_light: sampler;
 
 var<immediate> imm: Immediates;
 
@@ -62,13 +45,27 @@ fn vs_main(vertex: VertexInput) -> VertexOutput {
         f32(extractBits(imm.brightness, 16u, 4u)),
         f32(extractBits(imm.brightness, 20u, 4u)),
     );
-    let global_light = pow(vec3(shading.light_attenuation), (LIGHT_MAX - skylight));
-    let local_light = pow(vec3(shading.light_attenuation), (LIGHT_MAX - torchlight));
-    let opacity = OPACITY_MULTIPLIER * lum(saturate(global_light * sky.sunlight_intensity + local_light));
+    let light = vec3(
+        sample_light(0.0, skylight.r, torchlight.r).r,
+        sample_light(0.0, skylight.g, torchlight.g).g,
+        sample_light(0.0, skylight.b, torchlight.b).b,
+    );
     return VertexOutput(
         player.vp * (vec4(-player.origin, 0.0) + imm.m * vec4(vertex.coords, 1.0)),
-        max(opacity, OPACITY_MIN),
+        max(OPACITY_MULTIPLIER * lum(light), OPACITY_MIN),
     );
+}
+
+fn sample_light(ao: f32, skylight: f32, torchlight: f32) -> vec3<f32> {
+    const AO_LEVELS = 4.0;
+    const LIGHT_LEVELS = 16.0;
+
+    let light_coords = vec3(
+        (ao + 0.5) / AO_LEVELS,
+        (skylight + 0.5) / LIGHT_LEVELS,
+        (torchlight + 0.5) / LIGHT_LEVELS,
+    );
+    return textureSampleLevel(t_light, s_light, light_coords, 0.0).xyz;
 }
 
 fn lum(color: vec3<f32>) -> f32 {
@@ -80,6 +77,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(vec3(1.0), in.opacity);
 }
 
-const LIGHT_MAX = 15.0;
 const OPACITY_MULTIPLIER = 0.1;
 const OPACITY_MIN = 0.02;

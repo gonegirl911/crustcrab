@@ -28,7 +28,10 @@ pub struct StarDome {
 }
 
 impl StarDome {
-    pub fn new(renderer: &Renderer, player_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(
+        renderer: &Renderer,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let instance_buffer = VertexBuffer::new(
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
@@ -36,7 +39,7 @@ impl StarDome {
         let render_pipeline = RenderPipeline::builder()
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/star.wgsl"))
-            .bind_group_layouts(&[player_bind_group_layout])
+            .bind_group_layouts(&[player_uniform_bind_group_layout])
             .immediate_size(StarImmediates::SIZE)
             .buffers(&[StarInstance::desc()])
             .format(PostProcessor::FORMAT)
@@ -48,10 +51,11 @@ impl StarDome {
         }
     }
 
+    #[rustfmt::skip]
     pub fn draw(
         &self,
         render_pass: &mut wgpu::RenderPass,
-        player_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
         time: RenderTime,
     ) {
         let imm = StarImmediates::new(time);
@@ -59,7 +63,7 @@ impl StarDome {
             return;
         }
 
-        self.render_pipeline.bind(render_pass, [player_bind_group]);
+        self.render_pipeline.bind(render_pass, [player_uniform_bind_group]);
         imm.set(render_pass);
         render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));
         render_pass.draw(0..6, 0..self.instance_buffer.len());
@@ -99,8 +103,8 @@ impl Default for StarGenerator {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct StarInstance {
     coords: Point3<f32>,
     rotation: f32,
@@ -121,8 +125,8 @@ impl Vertex for StarInstance {
         &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32];
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct StarImmediates {
     sky_rotation: Matrix4<f32>,
     size: f32,

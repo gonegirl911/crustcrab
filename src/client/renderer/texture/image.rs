@@ -4,8 +4,8 @@ use image::RgbaImage;
 use std::num::NonZero;
 
 pub struct ImageTexture {
-    bind_group_layout: wgpu::BindGroupLayout,
-    bind_group: wgpu::BindGroup,
+    pub mut(self) bind_group_layout: wgpu::BindGroupLayout,
+    pub mut(self) bind_group: wgpu::BindGroup,
 }
 
 #[bon]
@@ -40,14 +40,6 @@ impl ImageTexture {
             bind_group_layout,
             bind_group,
         }
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
     }
 
     fn create_view(
@@ -187,8 +179,8 @@ impl ImageTexture {
 }
 
 pub struct ImageTextureArray {
-    bind_group_layout: wgpu::BindGroupLayout,
-    bind_group: wgpu::BindGroup,
+    pub mut(self) bind_group_layout: wgpu::BindGroupLayout,
+    pub mut(self) bind_group: wgpu::BindGroup,
 }
 
 #[bon]
@@ -227,14 +219,6 @@ impl ImageTextureArray {
         }
     }
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
-    }
-
     fn create_views<'a, R: IntoIterator<Item = &'a RgbaImage>>(
         renderer: &Renderer,
         surface: &Surface,
@@ -261,9 +245,9 @@ impl ImageTextureArray {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
                     },
                     count: NonZero::new(views.len() as u32),
                 },

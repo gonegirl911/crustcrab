@@ -34,8 +34,8 @@ impl CloudLayer {
     pub fn new(
         renderer: &Renderer,
         surface: &Surface,
-        player_bind_group_layout: &wgpu::BindGroupLayout,
-        shading_bind_group_layout: &wgpu::BindGroupLayout,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+        shading_uniform_bind_group_layout: &wgpu::BindGroupLayout,
         spare_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let vertex_buffer = VertexBuffer::new(
@@ -58,9 +58,9 @@ impl CloudLayer {
             .renderer(renderer)
             .shader_desc(read_wgsl("assets/shaders/cloud.wgsl"))
             .bind_group_layouts(&[
-                player_bind_group_layout,
-                shading_bind_group_layout,
-                texture.bind_group_layout(),
+                player_uniform_bind_group_layout,
+                shading_uniform_bind_group_layout,
+                &texture.bind_group_layout,
             ])
             .immediate_size(CloudImmediates::SIZE)
             .buffers(&[BlockVertex::desc(), CloudInstance::desc()])
@@ -91,8 +91,8 @@ impl CloudLayer {
         view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         spare_view: &wgpu::TextureView,
-        player_bind_group: &wgpu::BindGroup,
-        shading_bind_group: &wgpu::BindGroup,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        shading_uniform_bind_group: &wgpu::BindGroup,
         depth_view: &wgpu::TextureView,
         spare_bind_group: &wgpu::BindGroup,
         origin: Point3<f64>,
@@ -127,9 +127,9 @@ impl CloudLayer {
             self.render_pipeline.bind(
                 &mut render_pass,
                 [
-                    player_bind_group,
-                    shading_bind_group,
-                    self.texture.bind_group(),
+                    player_uniform_bind_group,
+                    shading_uniform_bind_group,
+                    &self.texture.bind_group,
                 ],
             );
             imm.set(&mut render_pass);
@@ -156,8 +156,8 @@ impl CloudLayer {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct CloudInstance {
     offset: Vector2<f32>,
 }
@@ -175,8 +175,8 @@ impl Vertex for CloudInstance {
     const ATTRIBS: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![1 => Float32x2];
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct CloudImmediates {
     tex_dims: Point2<f32>,
     size: Point2<f32>,
@@ -194,19 +194,19 @@ impl CloudImmediates {
         scroll_x: f64,
         nightness: f32,
     ) -> Self {
+        let config = &CLIENT_CONFIG.cloud;
         let tex_dims = point![tex_width, tex_height];
-        let size = CLIENT_CONFIG.cloud.size;
-        let padding = CLIENT_CONFIG.cloud.padding;
-        let scale_factor = size.map(|c| 1.0 + padding * 2.0 / c as f32);
+        let size = config.size;
+        let scale_factor = size.map(|c| 1.0 + config.padding * 2.0 / c as f32);
         let period = size.x as f64 * tex_dims.x as f64;
         let camera_xz = origin.xz().coords - vector![scroll_x, 0.0];
         let phase = camera_xz.map(|c| c.rem_euclid(period));
-        let altitude = (CLIENT_CONFIG.cloud.altitude - origin.y) as f32;
+        let altitude = (config.altitude - origin.y) as f32;
         Self {
             tex_dims: tex_dims.cast(),
             size: size.cast(),
             scale_factor: scale_factor.xyx().into(),
-            color: CLIENT_CONFIG.cloud.color(nightness).into(),
+            color: config.color(nightness).into(),
             phase: phase.cast(),
             altitude,
             padding: Default::default(),

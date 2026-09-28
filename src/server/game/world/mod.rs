@@ -6,7 +6,10 @@ pub mod light;
 
 use super::player::{Player, WorldArea};
 use crate::{
-    client::{PlayerEvent, game::world::BlockVertex},
+    client::{
+        PlayerEvent,
+        game::{shading::DAY_LIGHT_TABLE, world::BlockVertex},
+    },
     server::{
         ChunkEvent, ControlEvent, SERVER_CONFIG,
         event_loop::{Event, EventHandler},
@@ -21,7 +24,7 @@ use crate::{
 use action::{ActionStore, BlockAction};
 use block::{
     Block, BlockLight,
-    area::{BlockArea, BlockAreaSource, BlockContext, BlockLightAreaSource},
+    area::{BlockArea, BlockAreaSource, BlockContext, BlockLightArea, BlockLightAreaSource},
     data::{Corner, RenderLayer, SIDE_AXES, Side},
 };
 use chunk::{
@@ -310,11 +313,12 @@ impl EventHandler<WorldEvent> for World {
                 if mem::replace(&mut self.hover, hover) != hover {
                     _ = control_tx.send(ControlEvent::BlockHovered(hover.map(
                         |BlockIntersection { coords, .. }| {
-                            BlockHoverData::new(
+                            BlockHoverData {
                                 coords,
-                                &self.chunks.block_area(coords),
-                                &self.light.block_light_area(coords),
-                            )
+                                area: self.chunks.block_area(coords),
+                                light_area: self.light.block_light_area(coords),
+                            }
+                            .into()
                         },
                     )));
                 }
@@ -699,29 +703,33 @@ impl PartialEq for Quad {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BlockHoverData {
-    pub hitbox: Aabb,
-    pub brightness: BlockLight,
+    coords: Point3<i64>,
+    area: BlockArea,
+    light_area: BlockLightArea,
 }
 
 impl BlockHoverData {
-    fn new(
-        coords: Point3<i64>,
-        area: &BlockContext<impl BlockAreaSource>,
-        light_area: &BlockContext<impl BlockLightAreaSource>,
-    ) -> Self {
-        let data = area.kernel().data();
-        let hitbox = data.hitbox(coords);
-        let brightness = data
-            .mesh(utils::block_coords(coords), area, light_area)
+    pub fn hitbox(&self) -> Aabb {
+        self.area.kernel().data().hitbox(self.coords)
+    }
+
+    pub fn brightness(&self) -> BlockLight {
+        self.area
+            .kernel()
+            .data()
+            .mesh(
+                utils::block_coords(self.coords),
+                &self.area,
+                &self.light_area,
+            )
             .max_by(|a, b| {
-                let a = a.world_light(0.0).lum();
-                let b = b.world_light(0.0).lum();
+                let a = DAY_LIGHT_TABLE.value(a.light(), 0).lum();
+                let b = DAY_LIGHT_TABLE.value(b.light(), 0).lum();
                 a.total_cmp(&b)
             })
-            .map_or(light_area.kernel(), |v| v.light());
-        Self { hitbox, brightness }
+            .map_or(self.light_area.kernel(), |v| v.light())
     }
 }
 

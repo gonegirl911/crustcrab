@@ -25,7 +25,7 @@ pub struct Player {
     pub mut(self) view: View,
     projection: Projection,
     controller: Controller,
-    uniform: Uniform<PlayerUniformData>,
+    pub mut(self) uniform: Uniform<PlayerUniformData>,
 }
 
 impl Player {
@@ -45,14 +45,6 @@ impl Player {
             controller,
             uniform,
         }
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.uniform.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.uniform.bind_group()
     }
 
     pub fn frustum(&self) -> Frustum {
@@ -153,9 +145,9 @@ impl EventHandler for Player {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct PlayerUniformData {
+#[repr(C)]
+pub struct PlayerUniformData {
     vp: Matrix4<f32>,
     inv_vp: Matrix4<f32>,
     origin: Float3,

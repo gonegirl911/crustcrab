@@ -7,8 +7,8 @@ use std::{
     ops::{Add, Index, Mul},
 };
 
-#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Default, Zeroable, Pod, Deserialize)]
+#[repr(transparent)]
 pub struct Rgb<T>([T; 3]);
 
 impl<T> Rgb<T> {
@@ -31,6 +31,17 @@ impl<T> Rgb<T> {
         F: FnMut(T, U) -> V,
     {
         Rgb::from_fn(|i| f(self[i], other[i]))
+    }
+
+    pub fn with_alpha(self, a: T) -> Rgba<T> {
+        let [r, g, b] = self.0;
+        Rgba([r, g, b, a])
+    }
+}
+
+impl<T: Copy> Rgb<T> {
+    pub fn splat(value: T) -> Self {
+        Self([value; 3])
     }
 }
 
@@ -91,8 +102,26 @@ impl<T> IntoIterator for Rgb<T> {
     }
 }
 
-#[repr(C, align(16))]
+#[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(transparent)]
+pub struct Rgba<T>([T; 4]);
+
+impl<T> Rgba<T> {
+    pub fn map<U, F: FnMut(T) -> U>(self, f: F) -> Rgba<U> {
+        Rgba(self.0.map(f))
+    }
+}
+
+impl<T> Index<usize> for Rgba<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
 #[derive(Clone, Copy, Default, Zeroable, Pod)]
+#[repr(C, align(16))]
 pub struct Float3 {
     data: [f32; 3],
     padding: f32,

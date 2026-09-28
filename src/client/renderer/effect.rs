@@ -17,32 +17,28 @@ impl PostProcessor {
 
     pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
         let textures = ScreenTextureArray::new(renderer, surface, Self::FORMAT);
-        let blit = Blit::new(
-            renderer,
-            textures.bind_group_layout(),
-            surface.config.format,
-        );
+        let blit = Blit::new(renderer, &textures.bind_group_layout, surface.config.format);
         Self { textures, blit }
     }
 
     pub fn view(&self) -> &wgpu::TextureView {
-        self.textures.view(0)
+        &self.textures.views[0]
     }
 
     pub fn spare_view(&self) -> &wgpu::TextureView {
-        self.textures.view(1)
+        &self.textures.views[1]
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.textures.bind_group_layout()
+        &self.textures.bind_group_layout
     }
 
     fn bind_group(&self) -> &wgpu::BindGroup {
-        self.textures.bind_group(0)
+        &self.textures.bind_groups[0]
     }
 
     pub fn spare_bind_group(&self) -> &wgpu::BindGroup {
-        self.textures.bind_group(1)
+        &self.textures.bind_groups[1]
     }
 
     pub fn step<E>(&mut self, effect: E)
@@ -122,8 +118,8 @@ impl Blender {
     }
 }
 
-#[repr(C)]
 #[derive(Clone, Copy, Zeroable, Pod)]
+#[repr(C)]
 struct BlenderImmediates {
     opacity: f32,
 }

@@ -1,57 +1,115 @@
 use crate::{
     client::{
         CLIENT_CONFIG,
-        renderer::{Renderer, buffer::MemoryState, uniform::Uniform},
+        renderer::{Renderer, buffer::MemoryState, texture::data::DataTexture, uniform::Uniform},
     },
-    server::game::world::block::data::SideShade,
-    shared::enum_map::EnumMap,
+    server::game::world::block::{BlockLight, data::SideShade},
+    shared::{
+        color::{Rgb, Rgba},
+        enum_map::EnumMap,
+        quantize, utils,
+    },
 };
 use bytemuck::{Pod, Zeroable};
 use serde::Deserialize;
+use std::{array, sync::LazyLock};
 
 pub struct Shading {
-    uniform: Uniform<ShadingUniformData>,
+    pub mut(self) texture: DataTexture,
+    pub mut(self) uniform: Uniform<ShadingUniformData>,
 }
 
 impl Shading {
     pub fn new(renderer: &Renderer) -> Self {
         Self {
+            texture: DataTexture::builder()
+                .renderer(renderer)
+                .size(wgpu::Extent3d {
+                    width: LightTable::AO_LEVELS as u32,
+                    height: LightTable::LIGHT_LEVELS as u32,
+                    depth_or_array_layers: LightTable::LIGHT_LEVELS as u32,
+                })
+                .dimension(wgpu::TextureDimension::D3)
+                .format(wgpu::TextureFormat::Rgba16Unorm)
+                .visibility(wgpu::ShaderStages::VERTEX_FRAGMENT)
+                .filterable(true)
+                .build(),
             uniform: Uniform::new(
                 renderer,
                 MemoryState::Immutable(&Default::default()),
-                wgpu::ShaderStages::VERTEX,
+                wgpu::ShaderStages::VERTEX_FRAGMENT,
             ),
         }
     }
 
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.uniform.bind_group_layout()
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.uniform.bind_group()
+    pub fn update(&self, renderer: &Renderer, nightness: f32) {
+        let table = LightTable::new(nightness);
+        self.texture.write(renderer, table.as_slice());
     }
 }
 
-#[repr(C)]
+pub struct LightTable([[[Rgba<u16>; Self::AO_LEVELS]; Self::LIGHT_LEVELS]; Self::LIGHT_LEVELS]);
+
+impl LightTable {
+    const AO_MAX: u8 = 3;
+    const AO_LEVELS: usize = Self::AO_MAX as usize + 1;
+    const LIGHT_LEVELS: usize = BlockLight::COMPONENT_MAX as usize + 1;
+
+    fn new(nightness: f32) -> Self {
+        let sunlight_intensity = CLIENT_CONFIG.sky.sunlight_intensity(nightness);
+        Self(array::from_fn(|torchlight| {
+            array::from_fn(|skylight| {
+                array::from_fn(|ao| {
+                    let value =
+                        Self::world_light(skylight as u8, torchlight as u8, sunlight_intensity)
+                            * Self::ao_factor(ao as u8);
+                    value.with_alpha(1.0).map(quantize::to_unorm16)
+                })
+            })
+        }))
+    }
+
+    pub fn value(&self, light: BlockLight, ao: u8) -> Rgb<f32> {
+        let skylight = light.skylight();
+        let torchlight = light.torchlight();
+        Rgb::from_fn(|i| {
+            let quantized_value = self.0[torchlight[i] as usize][skylight[i] as usize][ao as usize];
+            quantize::from_unorm16(quantized_value[i])
+        })
+    }
+
+    fn as_slice(&self) -> &[Rgba<u16>] {
+        self.0.as_flattened().as_flattened()
+    }
+
+    fn world_light(skylight: u8, torchlight: u8, sunlight_intensity: Rgb<f32>) -> Rgb<f32> {
+        let light_attenuation = CLIENT_CONFIG.shading.light_attenuation;
+        let light_max = BlockLight::COMPONENT_MAX;
+
+        let global_light = light_attenuation.powi((light_max - skylight) as i32);
+        let local_light = light_attenuation.powi((light_max - torchlight) as i32);
+        (Rgb::splat(global_light) * sunlight_intensity + Rgb::splat(local_light)).saturate()
+    }
+
+    fn ao_factor(ao: u8) -> f32 {
+        let shading = &CLIENT_CONFIG.shading;
+        let ao_factor_min = shading.ao_factor_min;
+        let ao_factor_max = shading.ao_factor_max;
+
+        1.0 - utils::lerp(ao_factor_min, ao_factor_max, ao as f32 / 3.0)
+    }
+}
+
 #[derive(Clone, Copy, Zeroable, Pod)]
-struct ShadingUniformData {
+#[repr(C)]
+pub struct ShadingUniformData {
     side_factors: [f32; 4],
-    ao_factor_min: f32,
-    ao_factor_max: f32,
-    light_attenuation: f32,
-    padding: f32,
 }
 
 impl Default for ShadingUniformData {
     fn default() -> Self {
-        let config = &CLIENT_CONFIG.shading;
         Self {
-            side_factors: config.side_factors.inner().into_array(),
-            ao_factor_min: config.ao_factor_min,
-            ao_factor_max: config.ao_factor_max,
-            light_attenuation: config.light_attenuation,
-            padding: Default::default(),
+            side_factors: CLIENT_CONFIG.shading.side_factors.inner().into_array(),
         }
     }
 }
@@ -63,3 +121,5 @@ pub struct ShadingConfig {
     pub ao_factor_max: f32,
     pub light_attenuation: f32,
 }
+
+pub static DAY_LIGHT_TABLE: LazyLock<LightTable> = LazyLock::new(|| LightTable::new(0.0));
