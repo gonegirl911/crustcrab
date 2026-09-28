@@ -514,7 +514,7 @@ struct RevisionTracker {
     pending: u32,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Default)]
 struct Revision(u32);
 
 #[derive(Default)]

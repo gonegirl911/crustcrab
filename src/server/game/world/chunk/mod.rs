@@ -275,7 +275,7 @@ impl Default for ChunkBitSet {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub struct ChunkReach(u32);
 
 impl ChunkReach {

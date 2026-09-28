@@ -41,7 +41,7 @@ impl Extend<(Point3<i64>, BlockAction)> for ActionStore {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum BlockAction {
     Place(Block),
     Destroy,

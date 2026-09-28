@@ -183,7 +183,7 @@ impl<'a> RawBlockData<'a> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Enum, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Default, Enum, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RenderLayer {
     #[default]
@@ -193,7 +193,7 @@ pub enum RenderLayer {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Enum, Serialize, Deserialize)]
+#[derive(Clone, Copy, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SideShade {
     X = 0,
@@ -213,7 +213,7 @@ impl From<Option<Side>> for SideShade {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Enum, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
     Bottom, // DO NOT MOVE
@@ -264,7 +264,7 @@ impl Side {
     }
 }
 
-#[derive(Clone, Copy, Debug, Enum, Serialize, Deserialize)]
+#[derive(Clone, Copy, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Corner {
     LowerLeft,

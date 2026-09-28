@@ -7,7 +7,6 @@ use winit::{
     window::{CursorGrabMode, WindowAttributes as RawWindowAttributes},
 };
 
-#[derive(Clone)]
 pub struct Window(Arc<RawWindow>);
 
 impl Window {

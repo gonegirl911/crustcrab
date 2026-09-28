@@ -30,11 +30,11 @@ impl<I, O> JobPool<I, O> {
 }
 
 impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
-    pub fn new<F: Fn(I) -> O + Send + Sync + 'static>(f: F) -> Self {
+    pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(job: J) -> Self {
         let (out_tx, out_rx) = crossbeam_channel::unbounded();
         Self {
             inner: Arc::new(Inner {
-                f: Box::new(f),
+                job: Box::new(job),
                 out_tx,
                 pending: Default::default(),
             }),
@@ -64,7 +64,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
                     Self::dispatch(&inner, pending);
                 });
 
-                let output = (inner.f)(input);
+                let output = (inner.job)(input);
                 _ = inner.out_tx.send(output);
             });
         }
@@ -72,7 +72,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
 }
 
 struct Inner<I, O> {
-    f: Box<dyn Fn(I) -> O + Send + Sync>,
+    job: Box<dyn Fn(I) -> O + Send + Sync>,
     out_tx: Sender<O>,
     pending: Mutex<Pending<I>>,
 }

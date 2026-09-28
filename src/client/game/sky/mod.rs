@@ -6,7 +6,7 @@ use super::clock::RenderTime;
 use crate::{
     client::{
         CLIENT_CONFIG,
-        renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
+        renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform, utils::color_pass},
     },
     shared::{
         color::{Float3, Rgb},
@@ -75,18 +75,7 @@ impl Sky {
     ) {
         self.uniform.set(renderer, &SkyUniformData::new(time));
 
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(Default::default()),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            ..Default::default()
-        });
+        let mut render_pass = color_pass(view, encoder, wgpu::LoadOp::Clear(Default::default()));
         self.atmosphere.draw(
             &mut render_pass,
             player_bind_group,

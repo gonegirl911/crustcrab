@@ -43,7 +43,7 @@ impl From<RawModel<'_>> for Model {
     }
 }
 
-#[derive(Default, Deserialize)]
+#[derive(Deserialize)]
 #[serde(from = "RawModelData")]
 struct ModelData {
     diagonal: Vector3<f64>,

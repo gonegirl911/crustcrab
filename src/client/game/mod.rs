@@ -15,8 +15,8 @@ use super::{
         Renderer, Surface,
         effect::{Aces, PostProcessor},
         texture::{image::ImageTextureArray, screen::DepthBuffer},
+        utils::color_pass,
     },
-    window::RawWindow,
 };
 use crate::{client::renderer::utils::load_rgba, server::game::world::block::data::TEX_PATHS};
 use clock::Clock;
@@ -29,7 +29,6 @@ use player::Player;
 use shading::Shading;
 use sky::Sky;
 use std::{ops::Deref, time::Duration};
-use winit::event::WindowEvent;
 use world::World;
 
 pub struct Game {
@@ -113,7 +112,7 @@ impl Game {
         }
     }
 
-    fn draw(
+    pub fn draw(
         &mut self,
         renderer: &Renderer,
         view: &wgpu::TextureView,
@@ -204,9 +203,14 @@ impl Game {
             self.depth.bind_group(),
         );
 
-        self.processor.apply(encoder, &self.aces);
+        self.processor.step(|view, bind_group| {
+            self.aces.draw(
+                &mut color_pass(view, encoder, wgpu::LoadOp::Clear(Default::default())),
+                bind_group,
+            );
+        });
 
-        self.processor.apply_raw(|view, bind_group| {
+        self.processor.step(|view, bind_group| {
             self.gui.draw(
                 view,
                 encoder,
@@ -217,33 +221,19 @@ impl Game {
             );
         });
 
-        self.processor.draw(view, encoder);
+        self.processor.draw(&mut color_pass(
+            view,
+            encoder,
+            wgpu::LoadOp::Clear(Default::default()),
+        ));
     }
 }
 
 impl EventHandler for Game {
-    type Context<'a> = (
-        &'a Sender<PlayerEvent>,
-        &'a RawWindow,
-        &'a Renderer,
-        &'a Surface,
-        Duration,
-        &'a mut bool,
-    );
+    type Context<'a> = (&'a Sender<PlayerEvent>, &'a Renderer, &'a Surface, Duration);
 
     #[rustfmt::skip]
-    fn handle(
-        &mut self,
-        event: &Event,
-        (
-            player_tx,
-            window,
-            renderer @ Renderer { device, queue, .. },
-            surface,
-            dt,
-            is_surface_texture_lost,
-        ): Self::Context<'_>,
-    ) {
+    fn handle(&mut self, event: &Event, (player_tx, renderer, surface, dt): Self::Context<'_>) {
         self.clock.handle(event, dt);
         self.world.handle(event, renderer);
         self.fog.handle(event, (renderer, surface));
@@ -252,28 +242,6 @@ impl EventHandler for Game {
         self.player.handle(event, (player_tx, renderer, surface, &self.gui, dt));
         self.depth.handle(event, (renderer, surface));
         self.processor.handle(event, (renderer, surface));
-
-        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) {
-            match surface.get_current_texture() {
-                wgpu::CurrentSurfaceTexture::Success(texture) => {
-                    let view = texture.texture.create_view(&Default::default());
-                    let mut encoder = device.create_command_encoder(&Default::default());
-                    self.draw(renderer, &view, &mut encoder);
-                    queue.submit([encoder.finish()]);
-                    window.pre_present_notify();
-                    queue.present(texture);
-                }
-                wgpu::CurrentSurfaceTexture::Suboptimal(_)
-                | wgpu::CurrentSurfaceTexture::Outdated => {
-                    surface.configure(renderer);
-                }
-                wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {}
-                wgpu::CurrentSurfaceTexture::Lost => {
-                    *is_surface_texture_lost = true;
-                }
-                wgpu::CurrentSurfaceTexture::Validation => unreachable!(),
-            }
-        }
     }
 }
 

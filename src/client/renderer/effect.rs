@@ -45,27 +45,7 @@ impl PostProcessor {
         self.textures.bind_group(1)
     }
 
-    pub fn apply<E: Effect>(&mut self, encoder: &mut wgpu::CommandEncoder, effect: &E) {
-        self.apply_raw(|view, bind_group| {
-            effect.draw(
-                &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        depth_slice: None,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    ..Default::default()
-                }),
-                bind_group,
-            );
-        });
-    }
-
-    pub fn apply_raw<E>(&mut self, effect: E)
+    pub fn step<E>(&mut self, effect: E)
     where
         E: FnOnce(&wgpu::TextureView, &wgpu::BindGroup),
     {
@@ -73,22 +53,8 @@ impl PostProcessor {
         self.textures.swap();
     }
 
-    pub fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
-        self.blit.draw(
-            &mut encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                ..Default::default()
-            }),
-            self.bind_group(),
-        );
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass) {
+        self.blit.draw(render_pass, self.bind_group());
     }
 }
 
@@ -117,10 +83,8 @@ impl Blit {
                 .build(),
         )
     }
-}
 
-impl Effect for Blit {
-    fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
         self.0.bind(render_pass, [input_bind_group]);
         render_pass.draw(0..3, 0..1);
     }
@@ -148,30 +112,12 @@ impl Blender {
 
     pub fn draw(
         &self,
-        view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
+        render_pass: &mut wgpu::RenderPass,
         input_bind_group: &wgpu::BindGroup,
         opacity: f32,
-        should_clear: bool,
     ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: if should_clear {
-                        wgpu::LoadOp::Clear(Default::default())
-                    } else {
-                        wgpu::LoadOp::Load
-                    },
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            ..Default::default()
-        });
-        self.0.bind(&mut render_pass, [input_bind_group]);
-        BlenderImmediates::new(opacity).set(&mut render_pass);
+        self.0.bind(render_pass, [input_bind_group]);
+        BlenderImmediates::new(opacity).set(render_pass);
         render_pass.draw(0..3, 0..1);
     }
 }
@@ -207,15 +153,9 @@ impl Aces {
                 .build(),
         )
     }
-}
 
-impl Effect for Aces {
-    fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup) {
         self.0.bind(render_pass, [input_bind_group]);
         render_pass.draw(0..3, 0..1);
     }
-}
-
-pub trait Effect {
-    fn draw(&self, render_pass: &mut wgpu::RenderPass, input_bind_group: &wgpu::BindGroup);
 }

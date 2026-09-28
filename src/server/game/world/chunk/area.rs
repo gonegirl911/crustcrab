@@ -51,14 +51,6 @@ impl ChunkArea {
     }
 }
 
-impl Index<Vector3<i8>> for ChunkArea {
-    type Output = Block;
-
-    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        &self.0[delta]
-    }
-}
-
 #[derive(Default, Serialize, Deserialize)]
 pub struct ChunkLightArea(ChunkAreaDataStore<BlockLight>);
 
@@ -69,14 +61,6 @@ impl ChunkLightArea {
 
     pub fn copy_row(&mut self, delta: Vector3<i8>, src: &[BlockLight]) {
         self.0.copy_row(delta, src);
-    }
-}
-
-impl Index<Vector3<i8>> for ChunkLightArea {
-    type Output = BlockLight;
-
-    fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        &self.0[delta]
     }
 }
 

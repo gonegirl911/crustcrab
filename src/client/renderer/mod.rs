@@ -83,7 +83,7 @@ impl Renderer {
 
 pub struct Surface {
     surface: wgpu::Surface<'static>,
-    pub mut(self) config: wgpu::SurfaceConfiguration,
+    config: wgpu::SurfaceConfiguration,
     should_resize: bool,
     pub mut(self) is_resized: bool,
 }

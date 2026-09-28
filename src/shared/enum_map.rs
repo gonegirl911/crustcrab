@@ -40,11 +40,11 @@ impl<E: Enum, T> EnumMap<E, T> {
         EnumMap(GenericArray::uninit())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (E, &T)> {
+    fn iter(&self) -> impl Iterator<Item = (E, &T)> {
         E::variants().zip(&self.0)
     }
 
-    pub fn values(&self) -> slice::Iter<'_, T> {
+    fn values(&self) -> slice::Iter<'_, T> {
         self.0.iter()
     }
 
@@ -98,8 +98,6 @@ impl<E: Enum, T: PartialEq> PartialEq for EnumMap<E, T> {
     }
 }
 
-impl<E: Enum, T: Eq> Eq for EnumMap<E, T> {}
-
 impl<E: Enum, T: Default> Default for EnumMap<E, T> {
     fn default() -> Self {
         Self(Default::default())
@@ -143,15 +141,6 @@ impl<E: Enum, T> IntoIterator for EnumMap<E, T> {
 
     fn into_iter(self) -> Self::IntoIter {
         E::variants().zip(self.0)
-    }
-}
-
-impl<'a, E: Enum, T> IntoIterator for &'a EnumMap<E, T> {
-    type Item = (E, &'a T);
-    type IntoIter = impl Iterator<Item = Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
 

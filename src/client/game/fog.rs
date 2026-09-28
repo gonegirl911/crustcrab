@@ -1,8 +1,11 @@
 use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
-        Renderer, Surface, effect::PostProcessor, render_pipeline::RenderPipeline,
-        texture::screen::ScreenTexture, utils::read_wgsl,
+        Renderer, Surface,
+        effect::PostProcessor,
+        render_pipeline::RenderPipeline,
+        texture::screen::ScreenTexture,
+        utils::{color_pass, read_wgsl},
     },
 };
 
@@ -50,18 +53,7 @@ impl Fog {
         sky_bind_group: &wgpu::BindGroup,
         depth_bind_group: &wgpu::BindGroup,
     ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            ..Default::default()
-        });
+        let mut render_pass = color_pass(view, encoder, wgpu::LoadOp::Load);
         self.render_pipeline.bind(
             &mut render_pass,
             [

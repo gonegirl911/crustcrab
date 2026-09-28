@@ -207,17 +207,6 @@ impl<'a, T> MemoryState<'a, [T], usize> {
     }
 }
 
-impl<T: ?Sized, U: Clone> Clone for MemoryState<'_, T, U> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Immutable(data) => Self::Immutable(data),
-            Self::Uninit(fallback) => Self::Uninit(fallback.clone()),
-        }
-    }
-}
-
-impl<T: ?Sized, U: Copy> Copy for MemoryState<'_, T, U> {}
-
 pub trait Index: Pod {
     const FORMAT: wgpu::IndexFormat;
 }

@@ -70,7 +70,7 @@ impl EventHandler<Event> for Player {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub struct WorldArea {
     pub center: Point3<i32>,
     pub radius: i32,
@@ -138,12 +138,12 @@ impl WorldArea {
 
 #[derive(Deserialize)]
 pub struct PlayerConfig {
-    pub origin: Point3<f64>,
-    pub dir: Vector3<f32>,
-    pub speed: f64,
+    origin: Point3<f64>,
+    dir: Vector3<f32>,
+    speed: f64,
     pub reach: f64,
     #[serde(deserialize_with = "PlayerConfig::deserialize_inventory")]
-    pub inventory: Arc<[Block]>,
+    inventory: Arc<[Block]>,
 }
 
 impl PlayerConfig {

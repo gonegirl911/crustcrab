@@ -40,7 +40,7 @@ impl Ray {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct BlockIntersection {
     pub coords: Point3<i64>,
     pub normal: Vector3<i64>,

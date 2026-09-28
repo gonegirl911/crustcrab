@@ -8,7 +8,7 @@ use crate::{
             effect::{Blender, PostProcessor},
             render_pipeline::RenderPipeline,
             texture::{image::ImageTexture, screen::DepthBuffer},
-            utils::{Immediates, Vertex, load_rgba, read_wgsl},
+            utils::{Immediates, Vertex, color_pass, load_rgba, read_wgsl},
         },
     },
     server::game::world::{block::Block, chunk::Chunk},
@@ -135,7 +135,11 @@ impl CloudLayer {
             imm.set(&mut render_pass);
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
-        self.blender.draw(view, encoder, spare_bind_group, opacity, true);
+        self.blender.draw(
+            &mut color_pass(view, encoder, wgpu::LoadOp::Clear(Default::default())),
+            spare_bind_group,
+            opacity,
+        );
     }
 
     fn vertices() -> impl Iterator<Item = BlockVertex> {

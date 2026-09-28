@@ -694,8 +694,6 @@ impl PartialEq for Quad {
     }
 }
 
-impl Eq for Quad {}
-
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct BlockHoverData {
     pub hitbox: Aabb,

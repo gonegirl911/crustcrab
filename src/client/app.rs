@@ -159,6 +159,27 @@ impl Instance {
             game,
         }
     }
+
+    #[rustfmt::skip]
+    fn present(&mut self, texture: wgpu::SurfaceTexture) {
+        let view = texture.texture.create_view(&Default::default());
+        let mut encoder = self.renderer.device.create_command_encoder(&Default::default());
+        self.game.draw(&self.renderer, &view, &mut encoder);
+        self.renderer.queue.submit([encoder.finish()]);
+        self.window.as_raw().pre_present_notify();
+        self.renderer.queue.present(texture);
+    }
+
+    async fn recover(&mut self) {
+        let window = self.window.to_owned_raw();
+        if self.renderer.is_device_lost() {
+            (self.renderer, self.surface) = Renderer::new(window).await;
+            self.game = Game::new(&self.renderer, &self.surface);
+        } else {
+            self.surface.recreate(window, &self.renderer);
+            self.surface.configure(&self.renderer);
+        }
+    }
 }
 
 impl EventHandler for Instance {
@@ -166,31 +187,28 @@ impl EventHandler for Instance {
 
     #[rustfmt::skip]
     fn handle(&mut self, event: &Event, player_tx: Self::Context<'_>) {
-        let mut is_surface_texture_lost = false;
-
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
         self.surface.handle(event, (self.window.as_raw(), &self.renderer));
         self.game.handle(
             event,
-            (
-                player_tx,
-                self.window.as_raw(),
-                &self.renderer,
-                &self.surface,
-                self.stopwatch.dt,
-                &mut is_surface_texture_lost,
-            ),
+            (player_tx, &self.renderer, &self.surface, self.stopwatch.dt),
         );
 
-        if is_surface_texture_lost {
-            let window = self.window.to_owned_raw();
-            if self.renderer.is_device_lost() {
-                (self.renderer, self.surface) = pollster::block_on(Renderer::new(window));
-                self.game = Game::new(&self.renderer, &self.surface);
-            } else {
-                self.surface.recreate(window, &self.renderer);
-                self.surface.configure(&self.renderer);
+        if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) {
+            match self.surface.get_current_texture() {
+                wgpu::CurrentSurfaceTexture::Success(texture) => {
+                    self.present(texture);
+                }
+                wgpu::CurrentSurfaceTexture::Suboptimal(_)
+                | wgpu::CurrentSurfaceTexture::Outdated => {
+                    self.surface.configure(&self.renderer);
+                }
+                wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {}
+                wgpu::CurrentSurfaceTexture::Lost => {
+                    pollster::block_on(self.recover());
+                }
+                wgpu::CurrentSurfaceTexture::Validation => unreachable!(),
             }
         }
     }

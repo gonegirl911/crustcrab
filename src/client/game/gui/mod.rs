@@ -6,7 +6,7 @@ use crate::client::{
     event_loop::{Event, EventHandler},
     renderer::{
         Renderer, Surface,
-        effect::{Blit, Effect, PostProcessor},
+        effect::{Blit, PostProcessor},
     },
 };
 use crosshair::{Crosshair, CrosshairConfig};
