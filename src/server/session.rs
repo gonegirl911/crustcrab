@@ -1,6 +1,6 @@
 use super::{
-    connection::{ConnectionId, ConnectionRegistry},
-    event_loop::Event,
+    connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
+    event_loop::{Event, EventHandler},
 };
 use crate::client::PlayerEvent;
 use rustc_hash::FxHashMap;
@@ -44,6 +44,16 @@ impl SessionRegistry {
                     None
                 }
             }
+        }
+    }
+}
+
+impl EventHandler<ConnectionEvent> for SessionRegistry {
+    type Context<'a> = ();
+
+    fn handle(&mut self, event: &ConnectionEvent, (): Self::Context<'_>) {
+        if let ConnectionEvent::Closed(id) = event {
+            self.0.remove(id);
         }
     }
 }

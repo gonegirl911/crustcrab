@@ -42,9 +42,7 @@ impl EventLoop {
 
             for connection_event in self.connection_rx.try_iter() {
                 self.connections.handle(&connection_event, ());
-                if let ConnectionEvent::Closed(id) = connection_event {
-                    self.sessions.0.remove(&id);
-                }
+                self.sessions.handle(&connection_event, ());
                 handler.handle(&Event::Connection(connection_event), &self.connections);
             }
 
