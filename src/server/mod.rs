@@ -65,7 +65,7 @@ pub enum ControlEvent {
     TimeUpdated {
         ticks: u16,
     },
-    BlockHovered(Option<Arc<BlockHoverData>>),
+    BlockHovered(Option<Box<BlockHoverData>>),
 }
 
 #[derive(Serialize, Deserialize)]

@@ -17,6 +17,7 @@ use std::{array, sync::LazyLock};
 pub struct Shading {
     pub mut(self) uniform: Uniform<ShadingUniformData>,
     pub mut(self) texture: DataTexture,
+    uploaded_nightness: Option<f32>,
 }
 
 impl Shading {
@@ -37,14 +38,17 @@ impl Shading {
                 .dimension(wgpu::TextureDimension::D3)
                 .format(wgpu::TextureFormat::Rgba16Unorm)
                 .visibility(wgpu::ShaderStages::VERTEX)
-                .filterable(true)
+                .filterable(false)
                 .build(),
+            uploaded_nightness: None,
         }
     }
 
-    pub fn update(&self, renderer: &Renderer, nightness: f32) {
-        let table = LightTable::new(nightness);
-        self.texture.write(renderer, table.as_slice());
+    pub fn update(&mut self, renderer: &Renderer, nightness: f32) {
+        if self.uploaded_nightness.replace(nightness) != Some(nightness) {
+            let table = LightTable::new(nightness);
+            self.texture.write(renderer, table.as_slice());
+        }
     }
 }
 

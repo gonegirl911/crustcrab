@@ -19,13 +19,12 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, Vector3, vector};
-use std::sync::Arc;
 
 pub struct BlockHighlight {
     vertex_buffer: VertexBuffer<BlockHighlightVertex>,
     index_buffer: IndexBuffer<u16>,
     render_pipeline: RenderPipeline,
-    data: Option<Arc<BlockHoverData>>,
+    data: Option<BlockHighlightData>,
 }
 
 impl BlockHighlight {
@@ -74,11 +73,11 @@ impl BlockHighlight {
         depth_view: &wgpu::TextureView,
         anchor: Point3<f64>,
     ) {
-        let Some(data) = &self.data else {
+        let Some(BlockHighlightData { hitbox, brightness }) = self.data else {
             return;
         };
 
-        let imm = BlockHighlightImmediates::new(data.hitbox(), data.brightness(), anchor);
+        let imm = BlockHighlightImmediates::new(hitbox, brightness, anchor);
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -113,8 +112,22 @@ impl EventHandler for BlockHighlight {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        if let Event::ControlEvent(ControlEvent::BlockHovered(data)) = event {
-            self.data = data.clone();
+        if let Event::ControlEvent(ControlEvent::BlockHovered(data)) = &event {
+            self.data = data.as_deref().map(BlockHighlightData::new);
+        }
+    }
+}
+
+struct BlockHighlightData {
+    hitbox: Aabb,
+    brightness: BlockLight,
+}
+
+impl BlockHighlightData {
+    fn new(data: &BlockHoverData) -> Self {
+        Self {
+            hitbox: data.hitbox(),
+            brightness: data.brightness(),
         }
     }
 }
