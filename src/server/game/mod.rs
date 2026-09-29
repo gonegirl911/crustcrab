@@ -13,15 +13,15 @@ use std::thread;
 use world::{World, WorldEvent};
 
 pub struct Game {
-    player: Player,
     clock: Clock,
+    player: Player,
     world_tx: Sender<(WorldEvent, Sender<ControlEvent>, Sender<ChunkEvent>)>,
 }
 
 impl Default for Game {
     fn default() -> Self {
-        let player = Default::default();
         let clock = Default::default();
+        let player = Default::default();
         let (world_tx, world_rx) = crossbeam_channel::unbounded();
 
         thread::spawn(move || {
@@ -50,8 +50,8 @@ impl EventHandler<Event> for Game {
             chunk_tx,
         }: Self::Context<'_>,
     ) {
-        self.player.handle(event, control_tx);
         self.clock.handle(event, control_tx);
+        self.player.handle(event, control_tx);
 
         if let Some(event) = WorldEvent::new(event, &self.player) {
             self.world_tx

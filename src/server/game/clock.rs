@@ -6,17 +6,11 @@ use crate::{
     },
 };
 use crossbeam_channel::Sender;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
 pub struct Clock {
     ticks: u16,
-}
-
-impl Clock {
-    fn send_time(&self, control_tx: &Sender<ControlEvent>) {
-        _ = control_tx.send(ControlEvent::TimeUpdated { ticks: self.ticks });
-    }
 }
 
 impl Default for Clock {
@@ -33,11 +27,15 @@ impl EventHandler<Event> for Clock {
     fn handle(&mut self, event: &Event, control_tx: Self::Context<'_>) {
         match event {
             Event::Player(PlayerEvent::JoinRequested { .. }) => {
-                self.send_time(control_tx);
+                _ = control_tx.send(ControlEvent::TimeInitialized {
+                    ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
+                    cycle: SERVER_CONFIG.clock.cycle,
+                });
+                _ = control_tx.send(ControlEvent::TimeUpdated { ticks: self.ticks });
             }
             Event::Tick => {
-                self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.ticks_per_day;
-                self.send_time(control_tx);
+                self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.cycle.ticks_per_day;
+                _ = control_tx.send(ControlEvent::TimeUpdated { ticks: self.ticks });
             }
             _ => {}
         }
@@ -46,21 +44,29 @@ impl EventHandler<Event> for Clock {
 
 #[derive(Deserialize)]
 pub struct ClockConfig {
-    pub ticks_per_day: u16,
-    twilight_duration: u16,
+    #[serde(flatten)]
+    cycle: DayCycle,
     starting_phase: TimePhase,
 }
 
 impl ClockConfig {
-    pub fn starting_ticks(&self) -> u16 {
+    fn starting_ticks(&self) -> u16 {
         match self.starting_phase {
             TimePhase::Dawn => 0,
-            TimePhase::Day => self.day_start(),
-            TimePhase::Dusk => self.dusk_start(),
-            TimePhase::Night => self.night_start(),
+            TimePhase::Day => self.cycle.day_start(),
+            TimePhase::Dusk => self.cycle.dusk_start(),
+            TimePhase::Night => self.cycle.night_start(),
         }
     }
+}
 
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct DayCycle {
+    pub ticks_per_day: u16,
+    pub twilight_duration: u16,
+}
+
+impl DayCycle {
     pub fn dawn_range(&self) -> Range<u16> {
         0..self.day_start()
     }
@@ -87,6 +93,15 @@ impl ClockConfig {
 
     pub fn night_start(&self) -> u16 {
         self.dusk_start() + self.twilight_duration
+    }
+}
+
+impl Default for DayCycle {
+    fn default() -> Self {
+        Self {
+            ticks_per_day: u16::MAX,
+            twilight_duration: 0,
+        }
     }
 }
 

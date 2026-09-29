@@ -3,7 +3,7 @@ use crate::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
     },
-    server::{ControlEvent, SERVER_CONFIG},
+    server::{ControlEvent, game::clock::DayCycle},
     shared::utils,
 };
 use nalgebra::{UnitQuaternion, Vector3};
@@ -11,7 +11,10 @@ use serde::Deserialize;
 use std::{f64::consts::TAU, ops::Range, time::Duration};
 use winit::event::WindowEvent;
 
+#[derive(Default)]
 pub struct Clock {
+    ticks_per_second: f64,
+    cycle: DayCycle,
     anchor: f64,
     anchor_age: f64,
     prev_ticks: u16,
@@ -22,17 +25,17 @@ impl Clock {
     pub fn time(&self) -> RenderTime {
         RenderTime {
             ticks: self.extrapolated_ticks() + self.error,
+            cycle: self.cycle,
         }
     }
 
     fn extrapolated_ticks(&self) -> f64 {
-        let ticks_per_second = SERVER_CONFIG.event_loop.ticks_per_second as f64;
-        self.anchor + self.anchor_age * ticks_per_second
+        self.anchor + self.anchor_age * self.ticks_per_second
     }
 
     fn reanchor(&mut self, ticks: u16) {
         let extrapolated_ticks = self.extrapolated_ticks();
-        let ticks_per_day = SERVER_CONFIG.clock.ticks_per_day as f64;
+        let ticks_per_day = self.cycle.ticks_per_day as f64;
         self.anchor += (ticks as f64 - self.prev_ticks as f64).rem_euclid(ticks_per_day);
         self.anchor_age = 0.0;
         self.prev_ticks = ticks;
@@ -50,23 +53,18 @@ impl Clock {
     }
 }
 
-impl Default for Clock {
-    fn default() -> Self {
-        let starting_ticks = SERVER_CONFIG.clock.starting_ticks();
-        Self {
-            anchor: starting_ticks as f64,
-            anchor_age: 0.0,
-            prev_ticks: starting_ticks,
-            error: 0.0,
-        }
-    }
-}
-
 impl EventHandler for Clock {
     type Context<'a> = Duration;
 
     fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
         match *event {
+            Event::ControlEvent(ControlEvent::TimeInitialized {
+                ticks_per_second,
+                cycle,
+            }) => {
+                self.ticks_per_second = ticks_per_second as f64;
+                self.cycle = cycle;
+            }
             Event::ControlEvent(ControlEvent::TimeUpdated { ticks }) => {
                 self.reanchor(ticks);
             }
@@ -81,6 +79,7 @@ impl EventHandler for Clock {
 #[derive(Clone, Copy)]
 pub struct RenderTime {
     pub ticks: f64,
+    cycle: DayCycle,
 }
 
 impl RenderTime {
@@ -89,24 +88,22 @@ impl RenderTime {
     }
 
     pub fn sky_rotation(&self) -> UnitQuaternion<f32> {
-        let config = &SERVER_CONFIG.clock;
-        let anchor = config.sunrise() as f64 / config.ticks_per_day as f64;
-        let progress = self.ticks / (config.ticks_per_day - 1) as f64 - anchor;
+        let anchor = self.cycle.sunrise() as f64 / self.cycle.ticks_per_day as f64;
+        let progress = self.ticks / (self.cycle.ticks_per_day - 1) as f64 - anchor;
         let angle = TAU * progress.rem_euclid(1.0);
         UnitQuaternion::new(Vector3::z() * angle as f32)
     }
 
     pub fn nightness(&self) -> f32 {
-        let config = &SERVER_CONFIG.clock;
-        let ticks = self.ticks.rem_euclid(config.ticks_per_day as f64) as f32;
-        let dawn_range = config.dawn_range();
-        let day_range = config.day_range();
-        let dusk_range = config.dusk_range();
+        let ticks = self.ticks.rem_euclid(self.cycle.ticks_per_day as f64) as f32;
+        let dawn_range = self.cycle.dawn_range();
+        let day_range = self.cycle.day_range();
+        let dusk_range = self.cycle.dusk_range();
         if ticks < day_range.start as f32 {
             1.0 - Self::progress(ticks, dawn_range)
         } else if ticks < dusk_range.start as f32 {
             0.0
-        } else if ticks < config.night_start() as f32 {
+        } else if ticks < self.cycle.night_start() as f32 {
             Self::progress(ticks, dusk_range)
         } else {
             1.0
