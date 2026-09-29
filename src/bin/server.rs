@@ -27,34 +27,33 @@ fn main() {
     let (connection_tx, connection_rx) = crossbeam_channel::unbounded();
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
 
-    let mut server = Server::new(connection_rx, player_rx);
+    let Args {
+        event_addr,
+        chunk_addr,
+    } = Parser::parse();
+
+    let event_listener = match TcpListener::bind(&*event_addr) {
+        Ok(listener) => {
+            eprintln!("[{event_addr}] create TCP listener SUCCEEDED");
+            listener
+        }
+        Err(e) => {
+            eprintln!("[{event_addr}] create TCP listener FAILED: {e}");
+            return;
+        }
+    };
+    let chunk_listener = match TcpListener::bind(&*chunk_addr) {
+        Ok(listener) => {
+            eprintln!("[{chunk_addr}] create TCP listener SUCCEEDED");
+            listener
+        }
+        Err(e) => {
+            eprintln!("[{chunk_addr}] create TCP listener FAILED: {e}");
+            return;
+        }
+    };
 
     thread::spawn(move || {
-        let Args {
-            event_addr,
-            chunk_addr,
-        } = Parser::parse();
-        let event_listener = match TcpListener::bind(&*event_addr) {
-            Ok(listener) => {
-                eprintln!("[{event_addr}] create TCP listener SUCCEEDED");
-                listener
-            }
-            Err(e) => {
-                eprintln!("[{event_addr}] create TCP listener FAILED: {e}");
-                return;
-            }
-        };
-        let chunk_listener = match TcpListener::bind(&*chunk_addr) {
-            Ok(listener) => {
-                eprintln!("[{chunk_addr}] create TCP listener SUCCEEDED");
-                listener
-            }
-            Err(e) => {
-                eprintln!("[{chunk_addr}] create TCP listener FAILED: {e}");
-                return;
-            }
-        };
-
         for (event_stream, chunk_stream) in event_listener.incoming().zip(chunk_listener.incoming())
         {
             let event_stream = match event_stream {
@@ -161,5 +160,6 @@ fn main() {
         }
     });
 
+    let mut server = Server::new(connection_rx, player_rx);
     server.run();
 }
