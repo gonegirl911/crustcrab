@@ -80,14 +80,12 @@ impl EventHandler<Event> for Player {
                         dir: dir.cast(),
                     };
 
-                    connections
-                        .recipient(*id)
-                        .send(ControlEvent::PlayerInitialized {
-                            origin,
-                            dir,
-                            speed,
-                            inventory: inventory.clone(),
-                        });
+                    connections.one(*id).send(ControlEvent::PlayerInitialized {
+                        origin,
+                        dir,
+                        speed,
+                        inventory: inventory.clone(),
+                    });
                 }
                 PlayerEvent::PositionChanged { origin } => {
                     self.cur.center = utils::chunk_coords(origin);

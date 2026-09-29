@@ -119,7 +119,7 @@ impl World {
             .chain(&updates)
             .copied()
             .collect::<Vec<_>>();
-        let recipients = connections.recipients(self.viewers.client_containing(&batch));
+        let recipients = connections.many(self.viewers.client_containing(&batch));
 
         recipients.send(ChunkEvent::BatchStarted);
         self.send_updates(&recipients, updates);
@@ -258,7 +258,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
 
-                self.par_send_loads(&connections.recipient(id), loads);
+                self.par_send_loads(&connections.one(id), loads);
             }
             WorldEvent::WorldAreaChanged { id, prev, cur, aim } => {
                 let inserts = self.par_insert_many(cur.par_exclusive_server_points(&prev));
@@ -281,10 +281,10 @@ impl EventHandler<WorldEvent> for World {
 
                 self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
 
-                let recipients = connections.recipient(id);
-                Self::send_unloads(&recipients, unloads);
-                self.par_send_loads(&recipients, loads);
-                self.par_send_updates(&recipients, updates);
+                let recipient = connections.one(id);
+                Self::send_unloads(&recipient, unloads);
+                self.par_send_loads(&recipient, loads);
+                self.par_send_updates(&recipient, updates);
             }
             WorldEvent::BlockHoverRequested { id, aim } => {
                 let viewer = self.viewers.0.get_mut(&id).unwrap();
@@ -309,7 +309,7 @@ impl EventHandler<WorldEvent> for World {
                         .into()
                     });
                     connections
-                        .recipient(id)
+                        .one(id)
                         .send(ControlEvent::BlockHovered(data));
                 }
             }

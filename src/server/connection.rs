@@ -9,11 +9,11 @@ use uuid::Uuid;
 pub struct ConnectionRegistry(pub FxHashMap<ConnectionId, Connection>);
 
 impl ConnectionRegistry {
-    pub fn recipient<'a>(&'a self, id: ConnectionId) -> RecipientList<'a> {
+    pub fn one<'a>(&'a self, id: ConnectionId) -> RecipientList<'a> {
         RecipientList::One(&self.0[&id])
     }
 
-    pub fn recipients<'a, I>(&'a self, ids: I) -> RecipientList<'a>
+    pub fn many<'a, I>(&'a self, ids: I) -> RecipientList<'a>
     where
         I: IntoIterator<Item = ConnectionId>,
     {

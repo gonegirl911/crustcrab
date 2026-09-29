@@ -34,21 +34,21 @@ impl EventLoop {
     {
         let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
         loop {
-            let event = match ticker.recv_timeout(&self.player_rx) {
+            let player_event = match ticker.recv_timeout(&self.player_rx) {
                 Ok(event) => Some(event),
                 Err(RecvTimeoutError::Timeout) => None,
                 Err(RecvTimeoutError::Disconnected) => break,
             };
 
-            for event in self.connection_rx.try_iter() {
-                self.connections.handle(&event, ());
-                if let ConnectionEvent::Closed(id) = event {
+            for connection_event in self.connection_rx.try_iter() {
+                self.connections.handle(&connection_event, ());
+                if let ConnectionEvent::Closed(id) = connection_event {
                     self.sessions.0.remove(&id);
                 }
-                handler.handle(&Event::Connection(event), &self.connections);
+                handler.handle(&Event::Connection(connection_event), &self.connections);
             }
 
-            let event = match event {
+            let event = match player_event {
                 Some((id, event)) => self.sessions.admit(id, event, &self.connections),
                 None => Some(Event::Tick),
             };
@@ -56,9 +56,7 @@ impl EventLoop {
             if let Some(event) = event {
                 handler.handle(&event, &self.connections);
                 if let Event::Player(id, PlayerEvent::JoinRequested { .. }) = event {
-                    self.connections
-                        .recipient(id)
-                        .send(ControlEvent::JoinFinished);
+                    self.connections.one(id).send(ControlEvent::JoinFinished);
                 }
             }
         }

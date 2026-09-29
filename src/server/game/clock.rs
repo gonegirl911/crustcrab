@@ -27,14 +27,12 @@ impl EventHandler<Event> for Clock {
     fn handle(&mut self, event: &Event, connections: Self::Context<'_>) {
         match *event {
             Event::Player(id, PlayerEvent::JoinRequested { .. }) => {
+                connections.one(id).send(ControlEvent::TimeInitialized {
+                    ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
+                    cycle: SERVER_CONFIG.clock.cycle,
+                });
                 connections
-                    .recipient(id)
-                    .send(ControlEvent::TimeInitialized {
-                        ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
-                        cycle: SERVER_CONFIG.clock.cycle,
-                    });
-                connections
-                    .recipient(id)
+                    .one(id)
                     .send(ControlEvent::TimeUpdated { ticks: self.ticks });
             }
             Event::Tick => {
