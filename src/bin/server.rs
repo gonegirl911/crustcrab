@@ -83,9 +83,10 @@ fn main() {
                 eprintln!("[{chunk_addr}] disable Nagle algorithm FAILED: {e}");
             }
 
-            let id = ConnectionId::new();
             let (control_tx, control_rx) = crossbeam_channel::unbounded();
             let (chunk_tx, chunk_rx) = crossbeam_channel::unbounded();
+
+            let id = ConnectionId::new();
             connection_tx
                 .send(ConnectionEvent::Opened(
                     id,
