@@ -12,6 +12,7 @@ use crate::{
     },
     server::{
         ChunkEvent, ControlEvent, SERVER_CONFIG,
+        connection::{ConnectionEvent, ConnectionId, ConnectionRegistry, RecipientList},
         event_loop::{Event, EventHandler},
     },
     shared::{
@@ -33,7 +34,6 @@ use chunk::{
     generator::ChunkGenerator,
     visibility::VisibilityGraph,
 };
-use crossbeam_channel::{SendError, Sender};
 use height::HeightMap;
 use light::WorldLight;
 use nalgebra::{Point2, Point3, Vector3, point};
@@ -57,7 +57,7 @@ pub struct World {
     generator: ChunkGenerator,
     actions: ActionStore,
     light: WorldLight,
-    hover: Option<BlockIntersection>,
+    viewers: ViewerRegistry,
 }
 
 impl World {
@@ -81,15 +81,13 @@ impl World {
             .collect()
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn apply(
         &mut self,
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
-        control_tx: &Sender<ControlEvent>,
-        chunk_tx: &Sender<ChunkEvent>,
-        area: WorldArea,
+        id: ConnectionId,
+        connections: &ConnectionRegistry,
         aim: Ray,
     ) {
         let mut branch = Branch::default();
@@ -99,8 +97,8 @@ impl World {
 
         let Changelog {
             actions,
-            mut inserts,
-            mut removals,
+            inserts,
+            removals,
             updates: action_updates,
         } = branch.merge(&mut self.chunks);
 
@@ -108,27 +106,26 @@ impl World {
         self.light.extend_placeholders(new_surface_points);
         let light_updates = self.light.apply(&self.chunks, actions.iter().copied());
 
-        inserts.retain(|&coords| area.client_contains(coords));
-        removals.retain(|&coords| area.client_contains(coords));
-
         let updates = self.mesh_updates(
             inserts.iter().copied(),
             iter::chain(action_updates, light_updates),
-            area,
             &inserts,
             &removals,
         );
 
-        self.handle(
-            &WorldEvent::BlockHoverRequested { aim },
-            (control_tx, chunk_tx),
-        );
+        self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
 
-        _ = chunk_tx.send(ChunkEvent::BatchStarted);
-        _ = self.send_updates(updates, chunk_tx);
-        _ = Self::send_unloads(removals, chunk_tx);
-        _ = self.send_loads(inserts, chunk_tx);
-        _ = chunk_tx.send(ChunkEvent::BatchEnded);
+        let batch = iter::chain(&inserts, &removals)
+            .chain(&updates)
+            .copied()
+            .collect::<Vec<_>>();
+        let recipients = connections.recipients(self.viewers.client_containing(&batch));
+
+        recipients.send(ChunkEvent::BatchStarted);
+        self.send_updates(&recipients, updates);
+        Self::send_unloads(&recipients, removals);
+        self.send_loads(&recipients, inserts);
+        recipients.send(ChunkEvent::BatchEnded);
 
         self.actions.extend(actions);
     }
@@ -137,7 +134,6 @@ impl World {
         &self,
         inserts: impl IntoIterator<Item = Point3<i32>>,
         updates: impl IntoIterator<Item = (Point3<i32>, ChunkReach)>,
-        area: WorldArea,
         loads: &FxHashSet<Point3<i32>>,
         unloads: &FxHashSet<Point3<i32>>,
     ) -> FxHashSet<Point3<i32>> {
@@ -150,32 +146,29 @@ impl World {
                     .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta)),
             )
             .filter(|coords| {
-                area.client_contains(*coords)
-                    && self.chunks.0.contains_key(coords)
+                self.chunks.0.contains_key(coords)
                     && !loads.contains(coords)
                     && !unloads.contains(coords)
             })
             .collect()
     }
 
-    fn send_loads<P: IntoIterator<Item = Point3<i32>>>(
-        &self,
-        points: P,
-        chunk_tx: &Sender<ChunkEvent>,
-    ) -> Result<(), SendError<ChunkEvent>> {
+    fn send_loads<P>(&self, recipients: &RecipientList, points: P)
+    where
+        P: IntoIterator<Item = Point3<i32>>,
+    {
         points
             .into_iter()
             .map(|coords| {
                 ChunkEvent::Loaded(ChunkData::new(&self.chunks, &self.light, coords).into())
             })
-            .try_for_each(|event| chunk_tx.send(event))
+            .for_each(|event| recipients.send(event));
     }
 
-    fn par_send_loads<P: IntoParallelIterator<Item = Point3<i32>>>(
-        &self,
-        points: P,
-        chunk_tx: &Sender<ChunkEvent>,
-    ) -> Result<(), SendError<ChunkEvent>> {
+    fn par_send_loads<P>(&self, recipients: &RecipientList, points: P)
+    where
+        P: IntoParallelIterator<Item = Point3<i32>>,
+    {
         points
             .into_par_iter()
             .map(|coords| {
@@ -184,27 +177,25 @@ impl World {
             .collect_vec_list()
             .into_iter()
             .flatten()
-            .try_for_each(|event| chunk_tx.send(event))
+            .for_each(|event| recipients.send(event));
     }
 
-    fn send_updates<P: IntoIterator<Item = Point3<i32>>>(
-        &self,
-        points: P,
-        chunk_tx: &Sender<ChunkEvent>,
-    ) -> Result<(), SendError<ChunkEvent>> {
+    fn send_updates<P>(&self, recipients: &RecipientList, points: P)
+    where
+        P: IntoIterator<Item = Point3<i32>>,
+    {
         points
             .into_iter()
             .map(|coords| {
                 ChunkEvent::Updated(ChunkData::new(&self.chunks, &self.light, coords).into())
             })
-            .try_for_each(|event| chunk_tx.send(event))
+            .for_each(|event| recipients.send(event));
     }
 
-    fn par_send_updates<P: IntoParallelIterator<Item = Point3<i32>>>(
-        &self,
-        points: P,
-        chunk_tx: &Sender<ChunkEvent>,
-    ) -> Result<(), SendError<ChunkEvent>> {
+    fn par_send_updates<P>(&self, recipients: &RecipientList, points: P)
+    where
+        P: IntoParallelIterator<Item = Point3<i32>>,
+    {
         points
             .into_par_iter()
             .map(|coords| {
@@ -213,7 +204,7 @@ impl World {
             .collect_vec_list()
             .into_iter()
             .flatten()
-            .try_for_each(|event| chunk_tx.send(event))
+            .for_each(|event| recipients.send(event));
     }
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -233,24 +224,23 @@ impl World {
         }
     }
 
-    fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(
-        points: P,
-        chunk_tx: &Sender<ChunkEvent>,
-    ) -> Result<(), SendError<ChunkEvent>> {
+    fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(recipients: &RecipientList, points: P) {
         points
             .into_iter()
             .map(|coords| ChunkEvent::Unloaded { coords })
-            .try_for_each(|event| chunk_tx.send(event))
+            .for_each(|event| recipients.send(event));
     }
 }
 
 impl EventHandler<WorldEvent> for World {
-    type Context<'a> = (&'a Sender<ControlEvent>, &'a Sender<ChunkEvent>);
+    type Context<'a> = &'a ConnectionRegistry;
 
     #[rustfmt::skip]
-    fn handle(&mut self, event: &WorldEvent, (control_tx, chunk_tx): Self::Context<'_>) {
+    fn handle(&mut self, event: &WorldEvent, connections: Self::Context<'_>) {
+        self.viewers.handle(event, ());
+
         match *event {
-            WorldEvent::JoinRequested { area, aim } => {
+            WorldEvent::JoinRequested { id, area, aim } => {
                 let inserts = self.par_insert_many(area.par_server_points());
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
@@ -266,14 +256,11 @@ impl EventHandler<WorldEvent> for World {
                     utils::distance_squared(coords, utils::chunk_coords(aim.origin))
                 });
 
-                self.handle(
-                    &WorldEvent::BlockHoverRequested { aim },
-                    (control_tx, chunk_tx),
-                );
+                self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
 
-                _ = self.par_send_loads(loads, chunk_tx);
+                self.par_send_loads(&connections.recipient(id), loads);
             }
-            WorldEvent::WorldAreaChanged { prev, cur, aim } => {
+            WorldEvent::WorldAreaChanged { id, prev, cur, aim } => {
                 let inserts = self.par_insert_many(cur.par_exclusive_server_points(&prev));
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
@@ -288,18 +275,20 @@ impl EventHandler<WorldEvent> for World {
                     .exclusive_client_points(&cur)
                     .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect();
-                let updates = self.mesh_updates(inserts, light_updates, cur, &loads, &unloads);
+                let mut updates = self.mesh_updates(inserts, light_updates, &loads, &unloads);
 
-                self.handle(
-                    &WorldEvent::BlockHoverRequested { aim },
-                    (control_tx, chunk_tx),
-                );
+                updates.retain(|&coords| cur.client_contains(coords));
 
-                _ = Self::send_unloads(unloads, chunk_tx);
-                _ = self.par_send_loads(loads, chunk_tx);
-                _ = self.par_send_updates(updates, chunk_tx);
+                self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
+
+                let recipients = connections.recipient(id);
+                Self::send_unloads(&recipients, unloads);
+                self.par_send_loads(&recipients, loads);
+                self.par_send_updates(&recipients, updates);
             }
-            WorldEvent::BlockHoverRequested { aim } => {
+            WorldEvent::BlockHoverRequested { id, aim } => {
+                let viewer = self.viewers.0.get_mut(&id).unwrap();
+
                 let hover = aim.cast(SERVER_CONFIG.player.reach).find(
                     |&BlockIntersection { coords, .. }| {
                         self.chunks
@@ -310,45 +299,42 @@ impl EventHandler<WorldEvent> for World {
                     },
                 );
 
-                if mem::replace(&mut self.hover, hover) != hover {
-                    _ = control_tx.send(ControlEvent::BlockHovered(hover.map(
-                        |BlockIntersection { coords, .. }| {
-                            BlockHoverData {
-                                coords,
-                                area: self.chunks.block_area(coords),
-                                light_area: self.light.block_light_area(coords),
-                            }
-                            .into()
-                        },
-                    )));
+                if mem::replace(&mut viewer.hover, hover) != hover {
+                    let data = hover.map(|BlockIntersection { coords, .. }| {
+                        BlockHoverData {
+                            coords,
+                            area: self.chunks.block_area(coords),
+                            light_area: self.light.block_light_area(coords),
+                        }
+                        .into()
+                    });
+                    connections
+                        .recipient(id)
+                        .send(ControlEvent::BlockHovered(data));
                 }
             }
-            WorldEvent::BlockPlaced { block, area, aim } => {
-                if let Some(BlockIntersection { coords, normal }) = self.hover {
+            WorldEvent::BlockPlaced { id, block, aim } => {
+                let viewer = &self.viewers.0[&id];
+
+                if let Some(BlockIntersection { coords, normal }) = viewer.hover {
                     self.apply(
                         coords + normal,
                         normal,
                         BlockAction::Place(block),
-                        control_tx,
-                        chunk_tx,
-                        area,
+                        id,
+                        connections,
                         aim,
                     );
                 }
             }
-            WorldEvent::BlockDestroyed { area, aim } => {
-                if let Some(BlockIntersection { coords, normal }) = self.hover {
-                    self.apply(
-                        coords,
-                        normal,
-                        BlockAction::Destroy,
-                        control_tx,
-                        chunk_tx,
-                        area,
-                        aim,
-                    );
+            WorldEvent::BlockDestroyed { id, aim } => {
+                let viewer = &self.viewers.0[&id];
+
+                if let Some(BlockIntersection { coords, normal }) = viewer.hover {
+                    self.apply(coords, normal, BlockAction::Destroy, id, connections, aim);
                 }
             }
+            _ => {}
         }
     }
 }
@@ -398,6 +384,43 @@ impl Index<Point3<i32>> for ChunkStore {
     fn index(&self, coords: Point3<i32>) -> &Self::Output {
         &self.0[&coords]
     }
+}
+
+#[derive(Default)]
+struct ViewerRegistry(FxHashMap<ConnectionId, Viewer>);
+
+impl ViewerRegistry {
+    fn client_containing(&self, points: &[Point3<i32>]) -> impl Iterator<Item = ConnectionId> {
+        self.0
+            .iter()
+            .filter(|(_, player)| points.iter().any(|&c| player.area.client_contains(c)))
+            .map(|(&id, _)| id)
+    }
+}
+
+impl EventHandler<WorldEvent> for ViewerRegistry {
+    type Context<'a> = ();
+
+    fn handle(&mut self, event: &WorldEvent, (): Self::Context<'_>) {
+        match *event {
+            WorldEvent::JoinRequested { id, area, .. } => {
+                self.0.insert(id, Viewer { area, hover: None });
+            }
+            WorldEvent::WorldAreaChanged { id, cur, .. } => {
+                let viewer = self.0.get_mut(&id).unwrap();
+                viewer.area = cur;
+            }
+            WorldEvent::Connection(ConnectionEvent::Closed(id)) => {
+                self.0.remove(&id);
+            }
+            _ => {}
+        }
+    }
+}
+
+struct Viewer {
+    area: WorldArea,
+    hover: Option<BlockIntersection>,
 }
 
 #[derive(Default)]
@@ -734,48 +757,58 @@ impl BlockHoverData {
 }
 
 pub enum WorldEvent {
+    Connection(ConnectionEvent),
     JoinRequested {
+        id: ConnectionId,
         area: WorldArea,
         aim: Ray,
     },
     WorldAreaChanged {
+        id: ConnectionId,
         prev: WorldArea,
         cur: WorldArea,
         aim: Ray,
     },
     BlockHoverRequested {
+        id: ConnectionId,
         aim: Ray,
     },
     BlockPlaced {
+        id: ConnectionId,
         block: Block,
-        area: WorldArea,
         aim: Ray,
     },
     BlockDestroyed {
-        area: WorldArea,
+        id: ConnectionId,
         aim: Ray,
     },
 }
 
 impl WorldEvent {
-    pub fn new(event: &Event, &Player { prev, cur, aim }: &Player) -> Option<Self> {
+    pub fn new(event: &Event, player: Option<&Player>) -> Option<Self> {
+        if let Event::Connection(event) = event {
+            return Some(Self::Connection(event.clone()));
+        }
+
+        let &Player { prev, cur, aim } = player?;
         match *event {
-            Event::Player(PlayerEvent::JoinRequested { .. }) => {
-                Some(Self::JoinRequested { area: cur, aim })
+            Event::Player(id, PlayerEvent::JoinRequested { .. }) => {
+                Some(Self::JoinRequested { id, area: cur, aim })
             }
-            Event::Player(PlayerEvent::PositionChanged { .. }) if cur != prev => {
-                Some(Self::WorldAreaChanged { prev, cur, aim })
+            Event::Player(id, PlayerEvent::PositionChanged { .. }) if cur != prev => {
+                Some(Self::WorldAreaChanged { id, prev, cur, aim })
             }
-            Event::Player(
-                PlayerEvent::PositionChanged { .. } | PlayerEvent::OrientationChanged { .. },
-            ) => Some(Self::BlockHoverRequested { aim }),
-            Event::Player(PlayerEvent::BlockPlaced(block)) => Some(Self::BlockPlaced {
-                block,
-                area: cur,
-                aim,
-            }),
-            Event::Player(PlayerEvent::BlockDestroyed) => {
-                Some(Self::BlockDestroyed { area: cur, aim })
+            Event::Player(id, PlayerEvent::PositionChanged { .. }) => {
+                Some(Self::BlockHoverRequested { id, aim })
+            }
+            Event::Player(id, PlayerEvent::OrientationChanged { .. }) => {
+                Some(Self::BlockHoverRequested { id, aim })
+            }
+            Event::Player(id, PlayerEvent::BlockPlaced(block)) => {
+                Some(Self::BlockPlaced { id, block, aim })
+            }
+            Event::Player(id, PlayerEvent::BlockDestroyed) => {
+                Some(Self::BlockDestroyed { id, aim })
             }
             _ => None,
         }

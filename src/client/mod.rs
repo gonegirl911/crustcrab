@@ -56,6 +56,7 @@ impl Client {
 #[derive(Serialize, Deserialize)]
 pub enum PlayerEvent {
     JoinRequested { render_distance: u32 },
+    JoinAcknowledged,
     PositionChanged { origin: Point3<f64> },
     OrientationChanged { dir: Vector3<f32> },
     BlockPlaced(Block),

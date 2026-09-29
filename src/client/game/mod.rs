@@ -18,7 +18,10 @@ use super::{
         utils::color_pass,
     },
 };
-use crate::{client::renderer::utils::load_rgba, server::game::world::block::data::TEX_PATHS};
+use crate::{
+    client::renderer::utils::load_rgba,
+    server::{ControlEvent, game::world::block::data::TEX_PATHS},
+};
 use clock::Clock;
 use cloud::CloudLayer;
 use crossbeam_channel::Sender;
@@ -243,6 +246,10 @@ impl EventHandler for Game {
         self.player.handle(event, (player_tx, renderer, surface, &self.gui, dt));
         self.depth.handle(event, (renderer, surface));
         self.processor.handle(event, (renderer, surface));
+
+        if let Event::ControlEvent(ControlEvent::JoinFinished) = event {
+            _ = player_tx.send(PlayerEvent::JoinAcknowledged);
+        }
     }
 }
 

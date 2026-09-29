@@ -2,10 +2,10 @@ use crate::{
     client::PlayerEvent,
     server::{
         ControlEvent, SERVER_CONFIG,
+        connection::ConnectionRegistry,
         event_loop::{Event, EventHandler},
     },
 };
-use crossbeam_channel::Sender;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
@@ -22,20 +22,26 @@ impl Default for Clock {
 }
 
 impl EventHandler<Event> for Clock {
-    type Context<'a> = &'a Sender<ControlEvent>;
+    type Context<'a> = &'a ConnectionRegistry;
 
-    fn handle(&mut self, event: &Event, control_tx: Self::Context<'_>) {
-        match event {
-            Event::Player(PlayerEvent::JoinRequested { .. }) => {
-                _ = control_tx.send(ControlEvent::TimeInitialized {
-                    ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
-                    cycle: SERVER_CONFIG.clock.cycle,
-                });
-                _ = control_tx.send(ControlEvent::TimeUpdated { ticks: self.ticks });
+    fn handle(&mut self, event: &Event, connections: Self::Context<'_>) {
+        match *event {
+            Event::Player(id, PlayerEvent::JoinRequested { .. }) => {
+                connections
+                    .recipient(id)
+                    .send(ControlEvent::TimeInitialized {
+                        ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
+                        cycle: SERVER_CONFIG.clock.cycle,
+                    });
+                connections
+                    .recipient(id)
+                    .send(ControlEvent::TimeUpdated { ticks: self.ticks });
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.cycle.ticks_per_day;
-                _ = control_tx.send(ControlEvent::TimeUpdated { ticks: self.ticks });
+                connections
+                    .all()
+                    .send(ControlEvent::TimeUpdated { ticks: self.ticks });
             }
             _ => {}
         }

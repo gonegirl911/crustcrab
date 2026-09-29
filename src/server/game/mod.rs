@@ -3,60 +3,49 @@ pub mod player;
 pub mod world;
 
 use super::{
-    ChunkEvent, Connection, ControlEvent,
+    actor::Actor,
+    connection::ConnectionRegistry,
     event_loop::{Event, EventHandler},
 };
 use clock::Clock;
-use crossbeam_channel::Sender;
-use player::Player;
-use std::thread;
+use player::PlayerRegistry;
 use world::{World, WorldEvent};
 
 pub struct Game {
     clock: Clock,
-    player: Player,
-    world_tx: Sender<(WorldEvent, Sender<ControlEvent>, Sender<ChunkEvent>)>,
+    players: PlayerRegistry,
+    world: Actor<WorldEvent>,
 }
 
 impl Default for Game {
     fn default() -> Self {
-        let clock = Default::default();
-        let player = Default::default();
-        let (world_tx, world_rx) = crossbeam_channel::unbounded();
-
-        thread::spawn(move || {
-            let mut world = World::default();
-            for (event, control_tx, chunk_tx) in world_rx {
-                world.handle(&event, (&control_tx, &chunk_tx));
-            }
-        });
-
         Self {
-            player,
-            clock,
-            world_tx,
+            clock: Default::default(),
+            players: Default::default(),
+            world: Actor::spawn(World::default()),
         }
     }
 }
 
 impl EventHandler<Event> for Game {
-    type Context<'a> = &'a Connection;
+    type Context<'a> = &'a ConnectionRegistry;
 
-    fn handle(
-        &mut self,
-        event: &Event,
-        Connection {
-            control_tx,
-            chunk_tx,
-        }: Self::Context<'_>,
-    ) {
-        self.clock.handle(event, control_tx);
-        self.player.handle(event, control_tx);
+    fn handle(&mut self, event: &Event, connections: Self::Context<'_>) {
+        self.clock.handle(event, connections);
+        self.players.handle(event, connections);
 
-        if let Some(event) = WorldEvent::new(event, &self.player) {
-            self.world_tx
-                .send((event, control_tx.clone(), chunk_tx.clone()))
-                .unwrap();
+        if let Event::Connection(event) = event {
+            self.world.forward(event);
+        }
+
+        let player = if let Event::Player(id, _) = event {
+            self.players.0.get(id)
+        } else {
+            None
+        };
+
+        if let Some(event) = WorldEvent::new(event, player) {
+            self.world.send(event);
         }
     }
 }

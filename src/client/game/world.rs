@@ -48,8 +48,8 @@ pub struct World {
     meshes: FxHashMap<Point3<i32>, ChunkMesh>,
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
     revisions: FxHashMap<Point3<i32>, RevisionTracker>,
-    open_batch_id: Uuid,
-    pending_batches: FxHashMap<Uuid, ChunkBatch>,
+    open_batch_id: BatchId,
+    pending_batches: FxHashMap<BatchId, ChunkBatch>,
     workers: JobPool<ChunkInput, ChunkOutput>,
 }
 
@@ -86,7 +86,7 @@ impl World {
             meshes: Default::default(),
             render_pipelines,
             revisions: Default::default(),
-            open_batch_id: Uuid::nil(),
+            open_batch_id: BatchId::NIL,
             pending_batches: Default::default(),
             workers,
         }
@@ -205,7 +205,12 @@ impl World {
         }
     }
 
-    fn batch_or_apply_change(&mut self, renderer: &Renderer, change: ChunkChange, batch_id: Uuid) {
+    fn batch_or_apply_change(
+        &mut self,
+        renderer: &Renderer,
+        change: ChunkChange,
+        batch_id: BatchId,
+    ) {
         if let Some(batch) = self.pending_batches.get_mut(&batch_id) {
             batch.changes.push(change);
             if batch_id != self.open_batch_id {
@@ -216,7 +221,7 @@ impl World {
         }
     }
 
-    fn flush_batch_if_completed(&mut self, renderer: &Renderer, batch_id: Uuid) {
+    fn flush_batch_if_completed(&mut self, renderer: &Renderer, batch_id: BatchId) {
         let Entry::Occupied(mut entry) = self.pending_batches.entry(batch_id) else {
             return;
         };
@@ -463,12 +468,12 @@ impl EventHandler for World {
                 }
                 ChunkEvent::BatchStarted => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id);
-                    self.open_batch_id = Uuid::new_v4();
+                    self.open_batch_id = BatchId::new();
                     self.pending_batches.entry(self.open_batch_id).or_default();
                 }
                 ChunkEvent::BatchEnded => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id);
-                    self.open_batch_id = Uuid::nil();
+                    self.open_batch_id = BatchId::NIL;
                 }
             },
             Event::AboutToWait => {
@@ -521,6 +526,17 @@ struct ChunkBatch {
     expected: usize,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct BatchId(Uuid);
+
+impl BatchId {
+    const NIL: Self = Self(Uuid::nil());
+
+    fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
 struct ChunkChange {
     coords: Point3<i32>,
     data: ChunkChangeData,
@@ -538,7 +554,7 @@ enum ChunkChangeData {
 struct ChunkInput {
     data: Arc<ChunkData>,
     snapshot_revision: Revision,
-    batch_id: Uuid,
+    batch_id: BatchId,
 }
 
 struct ChunkOutput {
@@ -546,7 +562,7 @@ struct ChunkOutput {
     vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
     visibility_graph: VisibilityGraph,
     snapshot_revision: Revision,
-    batch_id: Uuid,
+    batch_id: BatchId,
 }
 
 struct ChunkMesh {

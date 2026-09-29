@@ -3,19 +3,49 @@ use crate::{
     client::PlayerEvent,
     server::{
         ControlEvent, SERVER_CONFIG,
+        connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
         event_loop::{Event, EventHandler},
         game::world::block::data::STR_TO_BLOCK,
     },
     shared::{cuboid::Cuboid, ray::Ray, utils},
 };
-use crossbeam_channel::Sender;
 use nalgebra::{Point2, Point3, Vector3, point, vector};
 use rayon::iter::ParallelIterator;
+use rustc_hash::FxHashMap;
 use serde::{
     Deserialize, Deserializer,
     de::{self, Unexpected},
 };
-use std::{ops::Deref, sync::Arc};
+use std::{collections::hash_map::Entry, ops::Deref, sync::Arc};
+
+#[derive(Default)]
+pub struct PlayerRegistry(pub FxHashMap<ConnectionId, Player>);
+
+impl EventHandler<Event> for PlayerRegistry {
+    type Context<'a> = &'a ConnectionRegistry;
+
+    fn handle(&mut self, event: &Event, connections: Self::Context<'_>) {
+        match *event {
+            Event::Player(id, PlayerEvent::JoinRequested { .. }) => {
+                let mut entry = self.0.entry(id).insert_entry(Default::default());
+                let player = entry.get_mut();
+                player.handle(event, connections);
+            }
+            Event::Player(id, _) => {
+                let player = self.0.get_mut(&id).unwrap();
+                player.handle(event, connections);
+            }
+            Event::Connection(ConnectionEvent::Closed(id)) => {
+                if let Entry::Occupied(mut entry) = self.0.entry(id) {
+                    let player = entry.get_mut();
+                    player.handle(event, connections);
+                    entry.remove();
+                }
+            }
+            _ => {}
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct Player {
@@ -25,12 +55,12 @@ pub struct Player {
 }
 
 impl EventHandler<Event> for Player {
-    type Context<'a> = &'a Sender<ControlEvent>;
+    type Context<'a> = &'a ConnectionRegistry;
 
-    fn handle(&mut self, event: &Event, control_tx: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, connections: Self::Context<'_>) {
         self.prev = self.cur;
 
-        if let Event::Player(event) = event {
+        if let Event::Player(id, event) = event {
             match *event {
                 PlayerEvent::JoinRequested { render_distance } => {
                     let PlayerConfig {
@@ -50,12 +80,14 @@ impl EventHandler<Event> for Player {
                         dir: dir.cast(),
                     };
 
-                    _ = control_tx.send(ControlEvent::PlayerInitialized {
-                        origin,
-                        dir,
-                        speed,
-                        inventory: inventory.clone(),
-                    });
+                    connections
+                        .recipient(*id)
+                        .send(ControlEvent::PlayerInitialized {
+                            origin,
+                            dir,
+                            speed,
+                            inventory: inventory.clone(),
+                        });
                 }
                 PlayerEvent::PositionChanged { origin } => {
                     self.cur.center = utils::chunk_coords(origin);

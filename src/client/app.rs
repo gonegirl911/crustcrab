@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, StartCause, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow},
+    event_loop::ActiveEventLoop,
     window::WindowId,
 };
 
@@ -22,7 +22,6 @@ pub struct App {
     control_rx: Receiver<ControlEvent>,
     chunk_rx: Receiver<ChunkEvent>,
     instance: Option<Instance>,
-    is_focused: bool,
 }
 
 impl App {
@@ -36,7 +35,6 @@ impl App {
             control_rx,
             chunk_rx,
             instance: None,
-            is_focused: false,
         }
     }
 
@@ -83,21 +81,7 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
-        let mut should_exit = false;
-
-        match event {
-            WindowEvent::Focused(true) => {
-                event_loop.set_control_flow(ControlFlow::Poll);
-                self.is_focused = true;
-            }
-            WindowEvent::Focused(false) => {
-                self.is_focused = false;
-            }
-            WindowEvent::CloseRequested => {
-                should_exit = true;
-            }
-            _ => {}
-        }
+        let should_exit = matches!(event, WindowEvent::CloseRequested);
 
         self.instance
             .as_mut()
@@ -116,15 +100,8 @@ impl ApplicationHandler for App {
             .handle(&Event::DeviceEvent(event), &self.player_tx);
     }
 
-    fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
+    fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
         self.dispatch_server_events();
-
-        if !self.is_focused {
-            const WAKE_INTERVAL: Duration = Duration::from_secs(1);
-
-            event_loop.set_control_flow(ControlFlow::WaitUntil(Instant::now() + WAKE_INTERVAL));
-            return;
-        }
 
         self.instance
             .as_mut()
