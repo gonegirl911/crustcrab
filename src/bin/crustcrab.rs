@@ -9,6 +9,7 @@ use crustcrab::{
 use std::thread;
 
 fn main() {
+    env_logger::init();
     pool::init(3);
 
     let (connection_tx, connection_rx) = crossbeam_channel::bounded(0);
@@ -17,16 +18,10 @@ fn main() {
     let (control_tx, control_rx) = crossbeam_channel::unbounded();
     let (chunk_tx, chunk_rx) = crossbeam_channel::unbounded();
 
-    let id = ConnectionId::new();
-    thread::spawn(move || {
-        for event in transport_rx {
-            _ = transport_tx.send((id, event));
-        }
-    });
-
     let mut server = Server::new(connection_rx, player_rx);
     thread::spawn(move || server.run());
 
+    let id = ConnectionId::new();
     connection_tx
         .send(ConnectionEvent::Opened(
             id,
@@ -36,6 +31,12 @@ fn main() {
             },
         ))
         .unwrap();
+
+    thread::spawn(move || {
+        for event in transport_rx {
+            _ = transport_tx.send((id, event));
+        }
+    });
 
     let client = Client::new(player_tx, control_rx, chunk_rx);
     client.run();

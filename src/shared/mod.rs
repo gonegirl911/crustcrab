@@ -1,9 +1,9 @@
 pub(crate) mod bound;
-pub mod codec;
 pub(crate) mod color;
 pub(crate) mod cuboid;
 pub(crate) mod enum_map;
 pub(crate) mod indexmap;
+pub(crate) mod net;
 pub mod pool;
 pub(crate) mod quantize;
 pub(crate) mod ray;

@@ -1,6 +1,7 @@
 pub(crate) mod app;
 pub(crate) mod event_loop;
 pub(crate) mod game;
+pub mod net;
 pub(crate) mod renderer;
 pub(crate) mod stopwatch;
 pub(crate) mod window;
@@ -33,8 +34,6 @@ impl Client {
         control_rx: Receiver<ControlEvent>,
         chunk_rx: Receiver<ChunkEvent>,
     ) -> Self {
-        env_logger::init();
-
         let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
         Self {

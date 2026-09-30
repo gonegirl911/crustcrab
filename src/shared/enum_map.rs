@@ -11,9 +11,9 @@ use serde::{
 use std::{
     fmt::{self, Display, Formatter},
     marker::PhantomData,
-    mem::{self, MaybeUninit},
+    mem::{self, ManuallyDrop, MaybeUninit},
     ops::{Add, Deref, Index, IndexMut},
-    slice,
+    ptr, slice,
 };
 
 pub use macros::Enum;
@@ -36,6 +36,10 @@ impl<E: Enum, T> EnumMap<E, T> {
         }))
     }
 
+    fn builder() -> EnumMapBuilder<E, T> {
+        EnumMapBuilder::default()
+    }
+
     fn uninit() -> EnumMap<E, MaybeUninit<T>> {
         EnumMap(GenericArray::uninit())
     }
@@ -48,7 +52,7 @@ impl<E: Enum, T> EnumMap<E, T> {
         self.0.iter()
     }
 
-    fn values_mut(&mut self) -> slice::IterMut<'_, T> {
+    pub fn values_mut(&mut self) -> slice::IterMut<'_, T> {
         self.0.iter_mut()
     }
 
@@ -106,18 +110,13 @@ impl<E: Enum, T: Default> Default for EnumMap<E, T> {
 
 impl<E: Enum, T> FromIterator<(E, T)> for EnumMap<E, T> {
     fn from_iter<I: IntoIterator<Item = (E, T)>>(iter: I) -> Self {
-        let mut uninit = Self::uninit();
-        let mut guard = Guard::new(&mut uninit);
-
+        let mut builder = EnumMap::builder();
         for (variant, value) in iter {
-            guard.set(variant, value);
+            builder.set(variant, value);
         }
-
-        if guard.finish().is_err() {
-            panic!("missing variants");
-        } else {
-            unsafe { uninit.assume_init() }
-        }
+        builder
+            .build()
+            .unwrap_or_else(|_| panic!("missing variants"))
     }
 }
 
@@ -164,11 +163,10 @@ where
             }
 
             fn visit_map<M: MapAccess<'de>>(self, mut access: M) -> Result<Self::Value, M::Error> {
-                let mut uninit = EnumMap::uninit();
-                let mut guard = Guard::new(&mut uninit);
+                let mut builder = EnumMap::builder();
 
                 while let Some((variant, value)) = access.next_entry()? {
-                    if !guard.init(variant, value) {
+                    if !builder.init(variant, value) {
                         return Err(de::Error::custom(format_args!(
                             "duplicate variant \"{}\"",
                             SerializeDisplay(variant),
@@ -176,14 +174,12 @@ where
                     }
                 }
 
-                if let Err(guard) = guard.finish() {
-                    Err(de::Error::custom(format_args!(
+                builder.build().map_err(|builder| {
+                    de::Error::custom(format_args!(
                         "missing variants [\"{}\"]",
-                        MissingVariants(&guard.is_init),
-                    )))
-                } else {
-                    Ok(unsafe { uninit.assume_init() })
-                }
+                        MissingVariants(&builder.is_init),
+                    ))
+                })
             }
         }
 
@@ -216,21 +212,13 @@ impl<E: Enum + Serialize> Display for MissingVariants<'_, E> {
     }
 }
 
-struct Guard<'a, E: Enum, T> {
-    uninit: &'a mut EnumMap<E, MaybeUninit<T>>,
+pub struct EnumMapBuilder<E: Enum, T> {
+    uninit: EnumMap<E, MaybeUninit<T>>,
     is_init: EnumMap<E, bool>,
     count: usize,
 }
 
-impl<'a, E: Enum, T> Guard<'a, E, T> {
-    fn new(uninit: &'a mut EnumMap<E, MaybeUninit<T>>) -> Self {
-        Self {
-            uninit,
-            is_init: Default::default(),
-            count: 0,
-        }
-    }
-
+impl<E: Enum, T> EnumMapBuilder<E, T> {
     fn init(&mut self, variant: E, value: T) -> bool {
         if self.is_init[variant] {
             false
@@ -240,23 +228,36 @@ impl<'a, E: Enum, T> Guard<'a, E, T> {
         }
     }
 
-    fn set(&mut self, variant: E, value: T) {
+    pub fn set(&mut self, variant: E, value: T) -> Option<T> {
+        let is_init = self.is_init[variant];
+        let prev = is_init.then(|| unsafe { self.uninit[variant].assume_init_read() });
         self.uninit[variant].write(value);
-        self.count += !self.is_init[variant] as usize;
+        self.count += !is_init as usize;
         self.is_init[variant] = true;
+        prev
     }
 
-    fn finish(self) -> Result<(), Self> {
+    pub fn build(self) -> Result<EnumMap<E, T>, Self> {
         if self.count == E::LEN {
-            mem::forget(self);
-            Ok(())
+            let this = ManuallyDrop::new(self);
+            Ok(unsafe { ptr::read(&this.uninit).assume_init() })
         } else {
             Err(self)
         }
     }
 }
 
-impl<E: Enum, T> Drop for Guard<'_, E, T> {
+impl<E: Enum, T> Default for EnumMapBuilder<E, T> {
+    fn default() -> Self {
+        Self {
+            uninit: EnumMap::uninit(),
+            is_init: Default::default(),
+            count: 0,
+        }
+    }
+}
+
+impl<E: Enum, T> Drop for EnumMapBuilder<E, T> {
     fn drop(&mut self) {
         if !mem::needs_drop::<T>() {
             return;

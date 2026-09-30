@@ -2,6 +2,7 @@ pub(crate) mod actor;
 pub mod connection;
 pub(crate) mod event_loop;
 pub(crate) mod game;
+pub mod net;
 pub(crate) mod session;
 pub(crate) mod ticker;
 
