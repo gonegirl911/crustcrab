@@ -18,8 +18,8 @@ This project also supports multiplayer. To host a server, run:
 RUST_LOG='crustcrab=info' \
     RUSTFLAGS='-C target-cpu=native' \
     cargo run --profile lto --bin server -- \
-    --event_addr 0.0.0.0:8008 \
-    --chunk_addr 0.0.0.0:8009
+    --event-addr 0.0.0.0:8008 \
+    --chunk-addr 0.0.0.0:8009
 ```
 
 To connect a client, run:
@@ -28,6 +28,6 @@ To connect a client, run:
 RUST_LOG='crustcrab=info' \
     RUSTFLAGS='-C target-cpu=native' \
     cargo run --profile lto --bin client -- \
-    --event_addr 127.0.0.1:8008 \
-    --chunk_addr 127.0.0.1:8009
+    --event-addr 127.0.0.1:8008 \
+    --chunk-addr 127.0.0.1:8009
 ```
