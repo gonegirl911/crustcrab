@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
 #[derive(Default)]
-pub struct SessionRegistry(pub FxHashMap<ConnectionId, Session>);
+pub struct SessionRegistry(FxHashMap<ConnectionId, Session>);
 
 impl SessionRegistry {
     pub fn admit(
