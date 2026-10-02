@@ -130,8 +130,8 @@ pub fn listen(
             });
 
             thread::spawn({
-                let player_tx = player_tx.clone();
                 let connection_tx = connection_tx.clone();
+                let player_tx = player_tx.clone();
                 move || {
                     let mut player_reader = BufReader::new(&*event_stream);
                     let mut buf = Vec::new();
