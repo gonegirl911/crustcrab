@@ -1,18 +1,21 @@
-use super::codec;
+use super::{ConnectionSettings, codec};
 use crate::shared::enum_map::{Enum, EnumMap, EnumMapBuilder};
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use log::{error, info, warn};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::{
-    iter,
+    io, iter,
     net::{SocketAddr, TcpListener, TcpStream},
     process, thread,
     time::{Duration, Instant},
 };
 use uuid::Uuid;
 
-pub fn serve<R>(addrs: EnumMap<R, SocketAddr>) -> Receiver<EnumMap<R, (TcpStream, SocketAddr)>>
+pub fn serve<R>(
+    addrs: EnumMap<R, SocketAddr>,
+    settings: ConnectionSettings,
+) -> Receiver<EnumMap<R, (TcpStream, SocketAddr)>>
 where
     R: Enum + Send + 'static,
 {
@@ -51,6 +54,9 @@ where
                     if let Err(e) = stream.set_nodelay(true) {
                         warn!("[{addr}] disable Nagle algorithm: {e}");
                     }
+                    if let Err(e) = stream.set_read_timeout(Some(ATTACH_TIMEOUT)) {
+                        warn!("[{addr}] set read timeout: {e}");
+                    }
 
                     thread::spawn({
                         let arrive_tx = arrive_tx.clone();
@@ -60,6 +66,14 @@ where
                                 Ok(Attach { token }) => {
                                     info!("[{addr}] attach {token}");
                                     _ = arrive_tx.send((token, role, stream, addr));
+                                }
+                                Err(codec::Error::Io(e))
+                                    if matches!(
+                                        e.kind(),
+                                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                                    ) =>
+                                {
+                                    info!("[{addr}] timed out waiting for attach request");
                                 }
                                 Err(codec::Error::ConnectionClosed) => {
                                     info!("[{addr}] reading closed");
@@ -108,7 +122,7 @@ where
 
             let mut confirmed = true;
             for (stream, addr) in completed.values_mut() {
-                if let Err(e) = codec::send(stream, &Attached, &mut buf) {
+                if let Err(e) = codec::send(stream, &Attached { settings }, &mut buf) {
                     error!("[{addr}] write attach confirmation: {e}");
                     confirmed = false;
                     break;
@@ -127,7 +141,7 @@ where
     attached_rx
 }
 
-pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> [TcpStream; N] {
+pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> ([TcpStream; N], ConnectionSettings) {
     let mut streams = Vec::with_capacity(N);
     let token = Uuid::new_v4();
     let mut buf = Vec::new();
@@ -153,15 +167,21 @@ pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> [TcpStream; N] {
         streams.push(stream);
     }
 
+    let mut connection_settings = None;
     for (stream, addr) in iter::zip(&mut streams, &addrs) {
-        if let Err(e) = codec::recv::<Attached, _>(stream, &mut buf) {
-            error!("[{addr}] read attach confirmation: {e}");
-            process::exit(1);
+        match codec::recv(stream, &mut buf) {
+            Ok(Attached { settings }) => {
+                connection_settings = Some(settings);
+            }
+            Err(e) => {
+                error!("[{addr}] read attach confirmation: {e}");
+                process::exit(1);
+            }
         }
     }
     info!("[{token}] attached");
 
-    streams.try_into().unwrap()
+    (streams.try_into().unwrap(), connection_settings.unwrap())
 }
 
 struct Rendezvous<R: Enum, S> {
@@ -213,7 +233,7 @@ impl<R: Enum, S> Default for Rendezvous<R, S> {
     fn default() -> Self {
         Self {
             waiting: Default::default(),
-            timeout: Duration::from_secs(30),
+            timeout: ATTACH_TIMEOUT,
         }
     }
 }
@@ -244,4 +264,8 @@ struct Attach {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Attached;
+struct Attached {
+    settings: ConnectionSettings,
+}
+
+const ATTACH_TIMEOUT: Duration = Duration::from_secs(30);

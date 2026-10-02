@@ -12,3 +12,7 @@ inventory = ["glowstone", "glass_magenta", "glass_cyan", "dead_bush"]
 ticks_per_day = 24000
 twilight_duration = 1500
 starting_phase = "dawn"
+
+[keepalive]
+interval_ms = 10000
+timeout_ms = 30000

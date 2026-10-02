@@ -60,6 +60,7 @@ pub enum PlayerEvent {
     OrientationChanged { dir: Vector3<f32> },
     BlockPlaced(Block),
     BlockDestroyed,
+    KeepAlive,
 }
 
 #[derive(Deserialize)]

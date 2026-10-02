@@ -17,7 +17,7 @@ pub fn connect(
     Receiver<ControlEvent>,
     Receiver<ChunkEvent>,
 ) {
-    let [event_stream, chunk_stream] = attach::connect([event_addr, chunk_addr]);
+    let ([event_stream, chunk_stream], settings) = attach::connect([event_addr, chunk_addr]);
 
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
     let (control_tx, control_rx) = crossbeam_channel::unbounded();
@@ -80,6 +80,16 @@ pub fn connect(
             }
         }
         info!("[{chunk_addr}] reading closed");
+    });
+
+    thread::spawn({
+        let player_tx = player_tx.clone();
+        move || loop {
+            thread::sleep(settings.keepalive_interval);
+            if player_tx.send(PlayerEvent::KeepAlive).is_err() {
+                break;
+            }
+        }
     });
 
     (player_tx, control_rx, chunk_rx)

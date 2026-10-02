@@ -17,6 +17,7 @@ use game::{
     world::{BlockHoverData, ChunkData, block::Block},
 };
 use nalgebra::{Point3, Vector3};
+use net::KeepAliveConfig;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
 
@@ -84,6 +85,7 @@ struct ServerConfig {
     event_loop: EventLoopConfig,
     player: PlayerConfig,
     clock: ClockConfig,
+    keepalive: KeepAliveConfig,
 }
 
 static SERVER_CONFIG: LazyLock<ServerConfig> =

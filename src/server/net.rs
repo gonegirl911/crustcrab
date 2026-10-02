@@ -1,18 +1,23 @@
-use super::connection::{Connection, ConnectionEvent, ConnectionId};
+use super::{
+    SERVER_CONFIG,
+    connection::{Connection, ConnectionEvent, ConnectionId},
+};
 use crate::{
     client::PlayerEvent,
     shared::{
         enum_map::EnumMap,
-        net::{attach, codec},
+        net::{ConnectionSettings, attach, codec},
     },
 };
 use crossbeam_channel::Receiver;
-use log::{error, info};
+use log::{error, info, warn};
 use macros::Enum;
+use serde::Deserialize;
 use std::{
-    io::{BufReader, BufWriter},
+    io::{self, BufReader, BufWriter},
     net::SocketAddr,
     thread,
+    time::Duration,
 };
 
 pub fn listen(
@@ -22,10 +27,22 @@ pub fn listen(
     Receiver<ConnectionEvent>,
     Receiver<(ConnectionId, PlayerEvent)>,
 ) {
-    let attached_rx = attach::serve(EnumMap::from_iter([
-        (Role::Event, event_addr),
-        (Role::Chunk, chunk_addr),
-    ]));
+    let keepalive = SERVER_CONFIG.keepalive;
+    if keepalive.interval_ms * 2 >= keepalive.timeout_ms {
+        warn!(
+            "keepalive interval ({}ms) not safely below timeout ({}ms); \
+            healthy idle clients may be evicted",
+            keepalive.interval_ms, keepalive.timeout_ms
+        );
+    }
+    let read_timeout = Duration::from_millis(keepalive.timeout_ms);
+
+    let attached_rx = attach::serve(
+        EnumMap::from_iter([(Role::Event, event_addr), (Role::Chunk, chunk_addr)]),
+        ConnectionSettings {
+            keepalive_interval: Duration::from_millis(keepalive.interval_ms),
+        },
+    );
 
     let (connection_tx, connection_rx) = crossbeam_channel::unbounded();
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
@@ -35,6 +52,10 @@ pub fn listen(
             let mut attached = attached.map(|_, (stream, addr)| Some((stream, addr)));
             let (event_stream, event_addr) = attached[Role::Event].take().unwrap();
             let (chunk_stream, chunk_addr) = attached[Role::Chunk].take().unwrap();
+
+            if let Err(e) = event_stream.set_read_timeout(Some(read_timeout)) {
+                warn!("[{event_addr}] set read timeout: {e}");
+            }
 
             let (control_tx, control_rx) = crossbeam_channel::unbounded();
             let (chunk_tx, chunk_rx) = crossbeam_channel::unbounded();
@@ -94,6 +115,15 @@ pub fn listen(
                     loop {
                         let event = match codec::recv(&mut player_reader, &mut buf) {
                             Ok(event) => event,
+                            Err(codec::Error::Io(e))
+                                if matches!(
+                                    e.kind(),
+                                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                                ) =>
+                            {
+                                info!("[{event_addr}] inactive connection evicted");
+                                break;
+                            }
                             Err(codec::Error::ConnectionClosed) => break,
                             Err(e) => {
                                 error!("[{event_addr}] read player event: {e}");
@@ -118,4 +148,10 @@ pub fn listen(
 enum Role {
     Event,
     Chunk,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+pub struct KeepAliveConfig {
+    pub interval_ms: u64,
+    pub timeout_ms: u64,
 }
