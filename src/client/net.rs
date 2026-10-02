@@ -4,9 +4,10 @@ use crate::shared::net::{attach, codec};
 use crossbeam_channel::{Receiver, Sender};
 use log::{error, info};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::{
     io::{BufReader, BufWriter},
-    process, thread,
+    thread,
 };
 
 pub fn connect(
@@ -18,21 +19,16 @@ pub fn connect(
     Receiver<ChunkEvent>,
 ) {
     let ([event_stream, chunk_stream], settings) = attach::connect([event_addr, chunk_addr]);
+    let event_stream = Arc::new(event_stream);
 
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
     let (control_tx, control_rx) = crossbeam_channel::unbounded();
     let (chunk_tx, chunk_rx) = crossbeam_channel::unbounded();
 
     thread::spawn({
-        let event_stream = match event_stream.try_clone() {
-            Ok(stream) => stream,
-            Err(e) => {
-                error!("[{event_addr}] clone event stream: {e}");
-                process::exit(1);
-            }
-        };
+        let event_stream = event_stream.clone();
         move || {
-            let mut control_reader = BufReader::new(event_stream);
+            let mut control_reader = BufReader::new(&*event_stream);
             let mut buf = Vec::new();
             loop {
                 let event = match codec::recv(&mut control_reader, &mut buf) {
@@ -52,7 +48,7 @@ pub fn connect(
     });
 
     thread::spawn(move || {
-        let mut player_writer = BufWriter::new(&event_stream);
+        let mut player_writer = BufWriter::new(&*event_stream);
         let mut buf = Vec::new();
         for event in player_rx {
             if let Err(e) = codec::send(&mut player_writer, &event, &mut buf) {

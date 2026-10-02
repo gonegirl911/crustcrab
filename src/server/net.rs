@@ -15,7 +15,8 @@ use macros::Enum;
 use serde::Deserialize;
 use std::{
     io::{self, BufReader, BufWriter},
-    net::SocketAddr,
+    net::{Shutdown, SocketAddr},
+    sync::Arc,
     thread,
     time::Duration,
 };
@@ -35,7 +36,7 @@ pub fn listen(
             keepalive.interval_ms, keepalive.timeout_ms
         );
     }
-    let read_timeout = Duration::from_millis(keepalive.timeout_ms);
+    let peer_timeout = Duration::from_millis(keepalive.timeout_ms);
 
     let attached_rx = attach::serve(
         EnumMap::from_iter([(Role::Event, event_addr), (Role::Chunk, chunk_addr)]),
@@ -52,9 +53,16 @@ pub fn listen(
             let mut attached = attached.map(|_, (stream, addr)| Some((stream, addr)));
             let (event_stream, event_addr) = attached[Role::Event].take().unwrap();
             let (chunk_stream, chunk_addr) = attached[Role::Chunk].take().unwrap();
+            let event_stream = Arc::new(event_stream);
 
-            if let Err(e) = event_stream.set_read_timeout(Some(read_timeout)) {
+            if let Err(e) = event_stream.set_read_timeout(Some(peer_timeout)) {
                 warn!("[{event_addr}] set read timeout: {e}");
+            }
+            if let Err(e) = event_stream.set_write_timeout(Some(peer_timeout)) {
+                warn!("[{event_addr}] set write timeout: {e}");
+            }
+            if let Err(e) = chunk_stream.set_write_timeout(Some(peer_timeout)) {
+                warn!("[{chunk_addr}] set write timeout: {e}");
             }
 
             let (control_tx, control_rx) = crossbeam_channel::unbounded();
@@ -72,19 +80,23 @@ pub fn listen(
                 .unwrap();
 
             thread::spawn({
-                let event_stream = match event_stream.try_clone() {
-                    Ok(stream) => stream,
-                    Err(e) => {
-                        error!("[{event_addr}] clone event stream: {e}");
-                        continue;
-                    }
-                };
+                let event_stream = event_stream.clone();
                 move || {
-                    let mut control_writer = BufWriter::new(event_stream);
+                    let mut control_writer = BufWriter::new(&*event_stream);
                     let mut buf = Vec::new();
                     for event in control_rx {
                         if let Err(e) = codec::send(&mut control_writer, &event, &mut buf) {
-                            error!("[{event_addr}] write control event: {e}");
+                            if let codec::Error::Io(e) = &e
+                                && matches!(
+                                    e.kind(),
+                                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                                )
+                            {
+                                info!("[{event_addr}] stalled connection evicted");
+                                _ = event_stream.shutdown(Shutdown::Both);
+                            } else {
+                                error!("[{event_addr}] write control event: {e}");
+                            }
                             break;
                         }
                     }
@@ -93,12 +105,23 @@ pub fn listen(
             });
 
             thread::spawn({
+                let event_stream = event_stream.clone();
                 move || {
                     let mut chunk_writer = BufWriter::new(chunk_stream);
                     let mut buf = Vec::new();
                     for event in chunk_rx {
                         if let Err(e) = codec::send(&mut chunk_writer, &event, &mut buf) {
-                            error!("[{chunk_addr}] write chunk event: {e}");
+                            if let codec::Error::Io(e) = &e
+                                && matches!(
+                                    e.kind(),
+                                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                                )
+                            {
+                                info!("[{chunk_addr}] stalled connection evicted");
+                                _ = event_stream.shutdown(Shutdown::Both);
+                            } else {
+                                error!("[{chunk_addr}] write control event: {e}");
+                            }
                             break;
                         }
                     }
@@ -110,7 +133,7 @@ pub fn listen(
                 let player_tx = player_tx.clone();
                 let connection_tx = connection_tx.clone();
                 move || {
-                    let mut player_reader = BufReader::new(event_stream);
+                    let mut player_reader = BufReader::new(&*event_stream);
                     let mut buf = Vec::new();
                     loop {
                         let event = match codec::recv(&mut player_reader, &mut buf) {
