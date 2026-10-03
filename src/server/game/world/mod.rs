@@ -48,6 +48,7 @@ use std::{
     collections::{VecDeque, hash_map::Entry},
     iter, mem,
     ops::{Index, Range},
+    sync::Arc,
 };
 
 #[derive(Default)]
@@ -160,7 +161,9 @@ impl World {
         points
             .into_iter()
             .map(|coords| {
-                ChunkEvent::Loaded(ChunkData::new(&self.chunks, &self.light, coords).into())
+                ChunkEvent::Loaded(
+                    Arc::new(ChunkData::new(&self.chunks, &self.light, coords)).into(),
+                )
             })
             .for_each(|event| recipients.send(event));
     }
@@ -172,7 +175,9 @@ impl World {
         points
             .into_par_iter()
             .map(|coords| {
-                ChunkEvent::Loaded(ChunkData::new(&self.chunks, &self.light, coords).into())
+                ChunkEvent::Loaded(
+                    Arc::new(ChunkData::new(&self.chunks, &self.light, coords)).into(),
+                )
             })
             .collect_vec_list()
             .into_iter()
@@ -187,7 +192,9 @@ impl World {
         points
             .into_iter()
             .map(|coords| {
-                ChunkEvent::Updated(ChunkData::new(&self.chunks, &self.light, coords).into())
+                ChunkEvent::Updated(
+                    Arc::new(ChunkData::new(&self.chunks, &self.light, coords)).into(),
+                )
             })
             .for_each(|event| recipients.send(event));
     }
@@ -199,7 +206,9 @@ impl World {
         points
             .into_par_iter()
             .map(|coords| {
-                ChunkEvent::Updated(ChunkData::new(&self.chunks, &self.light, coords).into())
+                ChunkEvent::Updated(
+                    Arc::new(ChunkData::new(&self.chunks, &self.light, coords)).into(),
+                )
             })
             .collect_vec_list()
             .into_iter()
@@ -209,25 +218,25 @@ impl World {
 
     fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
         if self.chunks.0.contains_key(&coords) {
-            None
+            return None;
+        }
+
+        let mut chunk = Box::new(self.generator.generate(coords));
+        for (coords, action) in self.actions.chunk_actions(coords) {
+            chunk.apply_unchecked(coords, action);
+        }
+        if !chunk.is_empty() {
+            chunk.recompute_visibility_graph();
+            Some(chunk)
         } else {
-            let mut chunk = Box::new(self.generator.generate(coords));
-            for (coords, action) in self.actions.chunk_actions(coords) {
-                chunk.apply_unchecked(coords, action);
-            }
-            if !chunk.is_empty() {
-                chunk.recompute_visibility_graph();
-                Some(chunk)
-            } else {
-                None
-            }
+            None
         }
     }
 
     fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(recipients: &RecipientList, points: P) {
         points
             .into_iter()
-            .map(|coords| ChunkEvent::Unloaded { coords })
+            .map(ChunkEvent::Unloaded)
             .for_each(|event| recipients.send(event));
     }
 }

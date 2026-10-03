@@ -6,7 +6,10 @@ pub mod net;
 pub(crate) mod session;
 pub(crate) mod ticker;
 
-use crate::{client::PlayerEvent, shared::toml};
+use crate::{
+    client::PlayerEvent,
+    shared::{net::compression::Compressed, toml},
+};
 use connection::{Connection, ConnectionEvent, ConnectionId, Outbound};
 use crossbeam_channel::{Receiver, SendError};
 use event_loop::{EventLoop, EventLoopConfig};
@@ -67,9 +70,9 @@ impl Outbound for ControlEvent {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ChunkEvent {
-    Loaded(Arc<ChunkData>),
-    Unloaded { coords: Point3<i32> },
-    Updated(Arc<ChunkData>),
+    Loaded(Compressed<Arc<ChunkData>>),
+    Unloaded(Point3<i32>),
+    Updated(Compressed<Arc<ChunkData>>),
     BatchStarted,
     BatchEnded,
 }

@@ -1,5 +1,6 @@
 pub mod attach;
 pub mod codec;
+pub mod compression;
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

@@ -17,7 +17,7 @@ pub enum Error {
 
 pub fn send<T: Serialize, W: Write>(dst: &mut W, t: &T, buf: &mut Vec<u8>) -> Result<(), Error> {
     buf.clear();
-    *buf = postcard::to_extend(t, mem::take(buf))?;
+    *buf = postcard::to_extend(t, mem::take(buf)).unwrap();
     let len = u32::try_from(buf.len()).unwrap();
     dst.write_all(&len.to_le_bytes())?;
     dst.write_all(buf)?;
@@ -38,7 +38,7 @@ pub fn recv<T: DeserializeOwned, R: Read>(src: &mut R, buf: &mut Vec<u8>) -> Res
     if read < len {
         return Err(io::Error::from(io::ErrorKind::UnexpectedEof).into());
     }
-    postcard::from_bytes(buf).map_err(Into::into)
+    Ok(postcard::from_bytes(buf)?)
 }
 
 fn probe<R: Read>(src: &mut R, byte: &mut u8) -> io::Result<usize> {

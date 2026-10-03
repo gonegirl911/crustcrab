@@ -30,7 +30,9 @@ use crate::{
             },
         },
     },
-    shared::{enum_map::EnumMap, indexmap::FxIndexMap, pool::JobPool, utils},
+    shared::{
+        enum_map::EnumMap, indexmap::FxIndexMap, net::compression::Compressed, pool::JobPool, utils,
+    },
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
@@ -429,7 +431,7 @@ impl EventHandler for World {
     fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
         match event {
             Event::ChunkEvent(event) => match event {
-                ChunkEvent::Loaded(data) => {
+                ChunkEvent::Loaded(Compressed { inner: data, .. }) => {
                     let snapshot_revision = self.bump_revision(data.coords);
                     let has_priority = self.join_open_batch();
                     self.workers.submit(
@@ -441,7 +443,7 @@ impl EventHandler for World {
                         has_priority,
                     );
                 }
-                &ChunkEvent::Unloaded { coords } => {
+                &ChunkEvent::Unloaded(coords) => {
                     let snapshot_revision = self.bump_revision(coords);
                     self.join_open_batch();
                     self.batch_or_apply_change(
@@ -454,7 +456,7 @@ impl EventHandler for World {
                         self.open_batch_id,
                     );
                 }
-                ChunkEvent::Updated(data) => {
+                ChunkEvent::Updated(Compressed { inner: data, .. }) => {
                     let snapshot_revision = self.bump_revision(data.coords);
                     let has_priority = self.join_open_batch();
                     self.workers.submit(

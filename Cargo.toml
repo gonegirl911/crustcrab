@@ -41,3 +41,4 @@ uuid = { version = "1.26.1", features = ["fast-rng", "serde", "v4"] }
 walkdir = "2.5.0"
 wgpu = "30.0.1"
 winit = "0.31.0-beta.3"
+zstd = { version = "0.14.0", default-features = false }
