@@ -26,4 +26,4 @@ impl<'de> Deserialize<'de> for ConnectionSettings {
     }
 }
 
-const MIN_KEEPALIVE_INTERVAL_MS: u64 = 100;
+pub const MIN_KEEPALIVE_INTERVAL_MS: u64 = 100;

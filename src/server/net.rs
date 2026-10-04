@@ -6,7 +6,7 @@ use crate::{
     client::PlayerEvent,
     shared::{
         enum_map::EnumMap,
-        net::{ConnectionSettings, attach, codec},
+        net::{ConnectionSettings, MIN_KEEPALIVE_INTERVAL_MS, attach, codec},
     },
 };
 use crossbeam_channel::Receiver;
@@ -29,6 +29,13 @@ pub fn listen(
     Receiver<(ConnectionId, PlayerEvent)>,
 ) {
     let keepalive = SERVER_CONFIG.keepalive;
+    if keepalive.interval_ms < MIN_KEEPALIVE_INTERVAL_MS {
+        warn!(
+            "keepalive interval ({}ms) below minimum threshold ({MIN_KEEPALIVE_INTERVAL_MS}ms); \
+            clients will refuse connection",
+            keepalive.interval_ms
+        );
+    }
     if keepalive.interval_ms * 2 >= keepalive.timeout_ms {
         warn!(
             "keepalive interval ({}ms) not safely below timeout ({}ms); \
