@@ -44,7 +44,7 @@ impl<T: Serialize> Serialize for Compressed<T> {
 
 impl<'de, T: DeserializeOwned> Deserialize<'de> for Compressed<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let wire = <&[u8]>::deserialize(deserializer)?;
+        let wire = Deserialize::deserialize(deserializer)?;
         let raw = DECOMPRESSOR
             .with_borrow_mut(|ctx| decompress(ctx, wire))
             .map_err(de::Error::custom)?;
