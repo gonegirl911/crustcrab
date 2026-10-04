@@ -62,10 +62,15 @@ fn compress(ctx: &mut Compressor, raw: &[u8]) -> Vec<u8> {
 fn decompress(ctx: &mut Decompressor, wire: &[u8]) -> io::Result<Vec<u8>> {
     let len = zstd_safe::get_frame_content_size(wire)
         .map_err(|e| io::Error::other(e.to_string()))?
-        .ok_or_else(|| io::Error::other("zstd frame lacks content size"))?
-        .try_into()
-        .map_err(|_| io::Error::other("zstd frame content size exceeds addressable memory"))?;
-    ctx.decompress(wire, len)
+        .ok_or_else(|| io::Error::other("zstd frame lacks content size"))?;
+
+    if len > MAX_CONTENT_LEN as u64 {
+        return Err(io::Error::other(format!(
+            "zstd content size {len} exceeds {MAX_CONTENT_LEN}"
+        )));
+    }
+
+    ctx.decompress(wire, len as usize)
 }
 
 thread_local! {
@@ -73,3 +78,5 @@ thread_local! {
     static DECOMPRESSOR: RefCell<Decompressor<'static>> = Decompressor::new().unwrap().into();
     static RAW_SCRATCH: RefCell<Vec<u8>> = const { RefCell::new(vec![]) };
 }
+
+const MAX_CONTENT_LEN: usize = 256 * 1024;

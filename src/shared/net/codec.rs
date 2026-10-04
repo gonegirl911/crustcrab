@@ -32,12 +32,23 @@ pub fn recv<T: DeserializeOwned, R: Read>(src: &mut R, buf: &mut Vec<u8>) -> Res
     }
     src.read_exact(&mut header[1..])?;
     let len = u32::from_le_bytes(header) as usize;
+
+    if len > MAX_FRAME_LEN {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("frame length {len} exceeds {MAX_FRAME_LEN}"),
+        )
+        .into());
+    }
+
     buf.clear();
     buf.reserve(len);
     let read = src.take(len as u64).read_to_end(buf)?;
+
     if read < len {
         return Err(io::Error::from(io::ErrorKind::UnexpectedEof).into());
     }
+
     Ok(postcard::from_bytes(buf)?)
 }
 
@@ -50,3 +61,5 @@ fn probe<R: Read>(src: &mut R, byte: &mut u8) -> io::Result<usize> {
         }
     }
 }
+
+const MAX_FRAME_LEN: usize = 1024 * 1024;
