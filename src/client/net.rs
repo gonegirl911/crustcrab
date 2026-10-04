@@ -5,6 +5,7 @@ use crossbeam_channel::{Receiver, Sender};
 use log::{error, info};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{
     io::{BufReader, BufWriter},
     thread,
@@ -20,6 +21,7 @@ pub fn connect(
 ) {
     let ([event_stream, chunk_stream], settings) = attach::connect([event_addr, chunk_addr]);
     let event_stream = Arc::new(event_stream);
+    let keepalive_interval = Duration::from_millis(settings.keepalive_interval_ms);
 
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
     let (control_tx, control_rx) = crossbeam_channel::unbounded();
@@ -81,7 +83,7 @@ pub fn connect(
     thread::spawn({
         let player_tx = player_tx.clone();
         move || loop {
-            thread::sleep(settings.keepalive_interval);
+            thread::sleep(keepalive_interval);
             if player_tx.send(PlayerEvent::KeepAlive).is_err() {
                 break;
             }

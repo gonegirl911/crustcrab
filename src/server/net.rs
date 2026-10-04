@@ -41,7 +41,7 @@ pub fn listen(
     let attached_rx = attach::serve(
         EnumMap::from_iter([(Role::Event, event_addr), (Role::Chunk, chunk_addr)]),
         ConnectionSettings {
-            keepalive_interval: Duration::from_millis(keepalive.interval_ms),
+            keepalive_interval_ms: keepalive.interval_ms,
         },
     );
 
