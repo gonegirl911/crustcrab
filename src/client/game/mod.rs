@@ -52,7 +52,7 @@ pub struct Game {
 
 impl Game {
     pub fn new(renderer: &Renderer, surface: &Surface) -> Self {
-        let clock = Clock::default();
+        let clock = Default::default();
         let player = Player::new(renderer);
         let sky = Sky::new(renderer, surface, &player.uniform.bind_group_layout);
         let shading = Shading::new(renderer);
