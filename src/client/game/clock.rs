@@ -49,7 +49,7 @@ impl Clock {
 
     fn decay_error(&mut self, dt: Duration) {
         let decay_time_s = CLIENT_CONFIG.clock.error_decay_time_ms as f64 / 1000.0;
-        self.error *= (-dt.as_secs_f64() / decay_time_s).exp();
+        self.error *= (-dt.as_secs_f64() / decay_time_s.max(f64::MIN_POSITIVE)).exp();
     }
 }
 

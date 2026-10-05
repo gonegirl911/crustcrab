@@ -298,15 +298,19 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::BlockHoverRequested { id, aim } => {
                 let viewer = self.viewers.0.get_mut(&id).unwrap();
 
-                let hover = aim.cast(SERVER_CONFIG.player.reach).find(
-                    |&BlockIntersection { coords, .. }| {
+                let hover = aim
+                    .cast(SERVER_CONFIG.player.reach)
+                    .take_while(|intersection| {
+                        self.chunks.0
+                            .contains_key(&utils::chunk_coords(intersection.coords))
+                    })
+                    .find(|&BlockIntersection { coords, .. }| {
                         self.chunks
                             .block(coords)
                             .data()
                             .hitbox(coords)
                             .intersects(aim)
-                    },
-                );
+                    });
 
                 if mem::replace(&mut viewer.hover, hover) != hover {
                     let data = hover.map(|BlockIntersection { coords, .. }| {
@@ -317,9 +321,7 @@ impl EventHandler<WorldEvent> for World {
                         }
                         .into()
                     });
-                    connections
-                        .one(id)
-                        .send(ControlEvent::BlockHovered(data));
+                    connections.one(id).send(ControlEvent::BlockHovered(data));
                 }
             }
             WorldEvent::BlockPlaced { id, block, aim } => {

@@ -61,7 +61,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let depth = player.zfar * linearize(textureSample(t_depth, s_depth, in.input_coords).x);
     let ray_distance = depth / cos_theta;
     let distance = cylinder_distance(dir, ray_distance);
-    let fog_start = f32(player.render_distance * CHUNK_DIM - FOG_PADDING);
+    let fog_start = max(f32(player.render_distance) * CHUNK_DIM - FOG_PADDING, 0.0);
     let bg_factor = smooth_falloff(distance - fog_start);
     let sun_alignment = max(dot(player.forward, sky.sun_dir), 0.0);
     let glow_factor = sun_alignment * sky.glow_opacity;
@@ -89,6 +89,6 @@ fn pow2(n: f32) -> f32 {
     return n * n;
 }
 
-const CHUNK_DIM = 16u;
-const FOG_PADDING = 3u * CHUNK_DIM;
+const CHUNK_DIM = 16.0;
+const FOG_PADDING = 3.0 * CHUNK_DIM;
 const FALLOFF_BANDWIDTH = 16.0;
