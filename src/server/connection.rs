@@ -80,7 +80,7 @@ impl Connection {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Deserialize)]
 pub struct ConnectionId(Uuid);
 
 impl ConnectionId {

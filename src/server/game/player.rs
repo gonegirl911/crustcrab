@@ -216,7 +216,10 @@ impl PlayerConfig {
         let inventory = Vec::deserialize(deserializer)?;
 
         if inventory.len() > 9 {
-            return Err(de::Error::custom("inventory has only 9 available slots"));
+            return Err(de::Error::invalid_value(
+                Unexpected::Seq,
+                &"an inventory with at most 9 entries",
+            ));
         }
 
         inventory

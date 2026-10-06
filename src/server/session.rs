@@ -1,5 +1,5 @@
 use super::{
-    connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
+    connection::{ConnectionEvent, ConnectionId},
     event_loop::{Event, EventHandler},
 };
 use crate::client::PlayerEvent;
@@ -10,16 +10,7 @@ use std::collections::hash_map::Entry;
 pub struct SessionRegistry(FxHashMap<ConnectionId, Session>);
 
 impl SessionRegistry {
-    pub fn admit(
-        &mut self,
-        id: ConnectionId,
-        event: PlayerEvent,
-        connections: &ConnectionRegistry,
-    ) -> Option<Event> {
-        if !connections.0.contains_key(&id) {
-            return None;
-        }
-
+    pub fn admit(&mut self, id: ConnectionId, event: PlayerEvent) -> Option<Event> {
         match self.0.entry(id) {
             Entry::Occupied(mut entry) => {
                 let session = entry.get_mut();

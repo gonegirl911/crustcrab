@@ -85,6 +85,7 @@ pub fn listen(
                     },
                 ))
                 .unwrap();
+            info!("[{event_addr}] opened connection {id:?}");
 
             thread::spawn({
                 let event_stream = event_stream.clone();

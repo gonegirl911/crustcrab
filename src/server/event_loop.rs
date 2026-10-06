@@ -1,7 +1,7 @@
 use super::{
     ControlEvent, SERVER_CONFIG,
     connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
-    session::SessionRegistry,
+    gate::Gate,
     ticker::Ticker,
 };
 use crate::client::PlayerEvent;
@@ -12,7 +12,7 @@ pub struct EventLoop {
     connections: ConnectionRegistry,
     connection_rx: Receiver<ConnectionEvent>,
     player_rx: Receiver<(ConnectionId, PlayerEvent)>,
-    sessions: SessionRegistry,
+    gate: Gate,
 }
 
 impl EventLoop {
@@ -24,7 +24,7 @@ impl EventLoop {
             connections: Default::default(),
             connection_rx,
             player_rx,
-            sessions: Default::default(),
+            gate: Default::default(),
         }
     }
 
@@ -42,12 +42,12 @@ impl EventLoop {
 
             for connection_event in self.connection_rx.try_iter() {
                 self.connections.handle(&connection_event, ());
-                self.sessions.handle(&connection_event, ());
+                self.gate.handle(&connection_event, ());
                 handler.handle(&Event::Connection(connection_event), &self.connections);
             }
 
             let event = match player_event {
-                Some((id, event)) => self.sessions.admit(id, event, &self.connections),
+                Some((id, event)) => self.gate.admit(id, event, &self.connections),
                 None => Some(Event::Tick),
             };
 
