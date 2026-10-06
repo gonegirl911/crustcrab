@@ -6,7 +6,10 @@ use crate::{
         event_loop::{Event, EventHandler},
     },
 };
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{self, Unexpected},
+};
 use std::ops::Range;
 
 pub struct Clock {
@@ -63,7 +66,7 @@ impl ClockConfig {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize)]
 pub struct DayCycle {
     pub ticks_per_day: u16,
     pub twilight_duration: u16,
@@ -105,6 +108,36 @@ impl Default for DayCycle {
             ticks_per_day: u16::MAX,
             twilight_duration: 0,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for DayCycle {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct RawDayCycle {
+            ticks_per_day: u16,
+            twilight_duration: u16,
+        }
+
+        let data = RawDayCycle::deserialize(deserializer)?;
+
+        if data.ticks_per_day < 2 {
+            return Err(de::Error::invalid_value(
+                Unexpected::Unsigned(data.ticks_per_day as u64),
+                &"a value above 1",
+            ));
+        }
+        if data.twilight_duration > data.ticks_per_day / 2 {
+            return Err(de::Error::invalid_value(
+                Unexpected::Unsigned(data.twilight_duration as u64),
+                &"a duration not exceeding half a day",
+            ));
+        }
+
+        Ok(Self {
+            ticks_per_day: data.ticks_per_day,
+            twilight_duration: data.twilight_duration,
+        })
     }
 }
 

@@ -213,10 +213,12 @@ impl PlayerConfig {
     where
         D: Deserializer<'de>,
     {
-        let inventory = Box::<[_]>::deserialize(deserializer)?;
+        let inventory = Vec::deserialize(deserializer)?;
+
         if inventory.len() > 9 {
             return Err(de::Error::custom("inventory has only 9 available slots"));
         }
+
         inventory
             .into_iter()
             .map(|str| {

@@ -2,7 +2,10 @@ pub mod attach;
 pub mod codec;
 pub mod compression;
 
-use serde::{Deserialize, Deserializer, Serialize, de};
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{self, Unexpected},
+};
 
 #[derive(Clone, Copy, Serialize)]
 pub struct ConnectionSettings {
@@ -11,13 +14,13 @@ pub struct ConnectionSettings {
 
 impl<'de> Deserialize<'de> for ConnectionSettings {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let keepalive_interval_ms = u64::deserialize(deserializer)?;
+        let keepalive_interval_ms = Deserialize::deserialize(deserializer)?;
 
         if keepalive_interval_ms < MIN_KEEPALIVE_INTERVAL_MS {
-            return Err(de::Error::custom(format!(
-                "keepalive interval ({keepalive_interval_ms}ms) \
-                below minimum threshold ({MIN_KEEPALIVE_INTERVAL_MS}ms)"
-            )));
+            return Err(de::Error::invalid_value(
+                Unexpected::Unsigned(keepalive_interval_ms),
+                &&*format!("a value below {MIN_KEEPALIVE_INTERVAL_MS}"),
+            ));
         }
 
         Ok(Self {
