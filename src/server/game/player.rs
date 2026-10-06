@@ -1,4 +1,8 @@
-use super::world::{World, block::Block};
+use super::world::{
+    World,
+    block::{Block, BlockLight, area::BlockArea},
+    chunk::Chunk,
+};
 use crate::{
     client::PlayerEvent,
     server::{
@@ -107,13 +111,20 @@ pub struct WorldArea {
 }
 
 impl WorldArea {
+    const SERVER_CONTEXT: i32 =
+        (BlockLight::COMPONENT_MAX as usize - 1 + BlockArea::PADDING).div_ceil(Chunk::DIM) as i32;
+
     pub fn par_server_points(&self) -> impl ParallelIterator<Item = Point3<i32>> {
-        self.par_cuboid_points()
+        self.server_cuboid()
+            .into_par_points()
+            .map(Point3::cast)
             .filter(move |&coords| self.server_contains(coords))
     }
 
     pub fn client_points(&self) -> impl Iterator<Item = Point3<i32>> {
-        self.cuboid_points()
+        self.client_cuboid()
+            .into_points()
+            .map(Point3::cast)
             .filter(move |&coords| self.client_contains(coords))
     }
 
@@ -131,38 +142,59 @@ impl WorldArea {
     }
 
     fn server_contains(&self, coords: Point3<i32>) -> bool {
-        self.contains_xz(coords.xz())
+        self.contains_xz(coords.xz(), Self::SERVER_CONTEXT) && self.server_contains_y(coords.y)
     }
 
     pub fn client_contains(&self, coords: Point3<i32>) -> bool {
-        self.contains_xz(coords.xz()) && self.client_contains_y(coords.y)
+        self.contains_xz(coords.xz(), 0) && self.client_contains_y(coords.y)
     }
 
-    fn cuboid_points(&self) -> impl Iterator<Item = Point3<i32>> {
-        self.cuboid().into_points().map(Point3::cast)
+    fn contains_xz(&self, xz: Point2<i32>, context: i32) -> bool {
+        let center_xz = self.center.xz();
+        let nearest = point![
+            center_xz.x.clamp(xz.x - context, xz.x + context),
+            center_xz.y.clamp(xz.y - context, xz.y + context),
+        ];
+        utils::distance_squared(nearest, center_xz) <= (self.radius as u128).pow(2)
     }
 
-    fn par_cuboid_points(&self) -> impl ParallelIterator<Item = Point3<i32>> {
-        self.cuboid().into_par_points().map(Point3::cast)
-    }
-
-    fn contains_xz(&self, xz: Point2<i32>) -> bool {
-        utils::distance_squared(xz, self.center.xz()) <= (self.radius as u128).pow(2)
+    fn server_contains_y(&self, y: i32) -> bool {
+        y >= self.y_start(Self::SERVER_CONTEXT)
     }
 
     fn client_contains_y(&self, y: i32) -> bool {
-        y.abs_diff(self.center.y) <= self.radius as u32
+        let y_start = self.y_start(0);
+        let y_end = self.client_y_end();
+        y >= y_start && y <= y_end
     }
 
-    fn cuboid(&self) -> Cuboid {
-        let radius = self.radius as i64;
-        let y_start = World::Y_RANGE.start as i64;
-        let y_end = World::Y_RANGE.end as i64;
+    fn server_cuboid(&self) -> Cuboid {
+        let y_end = World::Y_RANGE.end - 1;
+        self.cuboid(Self::SERVER_CONTEXT, y_end)
+    }
+
+    fn client_cuboid(&self) -> Cuboid {
+        let y_end = self.client_y_end();
+        self.cuboid(0, y_end)
+    }
+
+    fn cuboid(&self, context: i32, y_end: i32) -> Cuboid {
+        let radius = self.radius as i64 + context as i64;
+        let y_start = self.y_start(context).min(World::Y_RANGE.end - 1);
+        let y_end = y_end.max(World::Y_RANGE.start);
         Cuboid::from_corners(
-            point![-radius, y_start, -radius],
-            point![radius, y_end - 1, radius],
+            point![-radius, y_start as i64, -radius],
+            point![radius, y_end as i64, radius],
         )
         .translate(vector![self.center.x as i64, 0, self.center.z as i64])
+    }
+
+    fn y_start(&self, context: i32) -> i32 {
+        (self.center.y - self.radius - context).max(World::Y_RANGE.start)
+    }
+
+    fn client_y_end(&self) -> i32 {
+        (self.center.y + self.radius).min(World::Y_RANGE.end - 1)
     }
 }
 

@@ -300,10 +300,6 @@ impl EventHandler<WorldEvent> for World {
 
                 let hover = aim
                     .cast(SERVER_CONFIG.player.reach)
-                    .take_while(|intersection| {
-                        self.chunks.0
-                            .contains_key(&utils::chunk_coords(intersection.coords))
-                    })
                     .find(|&BlockIntersection { coords, .. }| {
                         self.chunks
                             .block(coords)
