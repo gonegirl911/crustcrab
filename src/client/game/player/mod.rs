@@ -97,13 +97,13 @@ impl EventHandler for Player {
                 let changes = self.controller.apply_updates(&mut self.view, dt);
 
                 if changes.contains(Changes::MOVED) {
-                    _ = player_tx.send(PlayerEvent::PositionChanged {
+                    _ = player_tx.send(PlayerEvent::Position {
                         origin: self.view.origin,
                     });
                 }
 
                 if changes.contains(Changes::ROTATED) {
-                    _ = player_tx.send(PlayerEvent::OrientationChanged {
+                    _ = player_tx.send(PlayerEvent::Orientation {
                         dir: self.view.forward,
                     });
                 }

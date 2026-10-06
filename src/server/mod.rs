@@ -4,7 +4,6 @@ pub(crate) mod event_loop;
 pub(crate) mod game;
 pub(crate) mod gate;
 pub mod net;
-pub(crate) mod session;
 pub(crate) mod ticker;
 
 use crate::{
@@ -20,6 +19,7 @@ use game::{
     player::PlayerConfig,
     world::{BlockHoverData, ChunkData, block::Block},
 };
+use gate::rate_limit::KickReason;
 use nalgebra::{Point3, Vector3};
 use net::KeepAliveConfig;
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,9 @@ pub enum ControlEvent {
         ticks: u16,
     },
     BlockHovered(Option<Arc<BlockHoverData>>),
+    Kicked {
+        reason: KickReason,
+    },
 }
 
 impl Outbound for ControlEvent {

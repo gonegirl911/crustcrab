@@ -4,6 +4,7 @@ pub(crate) mod cuboid;
 pub(crate) mod enum_map;
 pub(crate) mod indexmap;
 pub(crate) mod net;
+pub(crate) mod pacer;
 pub mod pool;
 pub(crate) mod quantize;
 pub(crate) mod ray;

@@ -1,8 +1,10 @@
-use super::{
-    connection::{ConnectionEvent, ConnectionId},
-    event_loop::{Event, EventHandler},
+use crate::{
+    client::PlayerEvent,
+    server::{
+        connection::{ConnectionEvent, ConnectionId},
+        event_loop::{Event, EventHandler},
+    },
 };
-use crate::client::PlayerEvent;
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 

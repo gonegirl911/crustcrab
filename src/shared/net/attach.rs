@@ -57,6 +57,9 @@ where
                     if let Err(e) = stream.set_read_timeout(Some(ATTACH_TIMEOUT)) {
                         warn!("[{addr}] set read timeout: {e}");
                     }
+                    if let Err(e) = stream.set_write_timeout(Some(ATTACH_TIMEOUT)) {
+                        warn!("[{addr}] set write timeout: {e}");
+                    }
 
                     thread::spawn({
                         let arrive_tx = arrive_tx.clone();
@@ -127,6 +130,13 @@ where
                     confirmed = false;
                     break;
                 }
+
+                if let Err(e) = stream.set_read_timeout(None) {
+                    warn!("[{addr}] clear read timeout: {e}");
+                }
+                if let Err(e) = stream.set_write_timeout(None) {
+                    warn!("[{addr}] clear write timeout: {e}");
+                }
             }
 
             if confirmed {
@@ -160,10 +170,18 @@ pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> ([TcpStream; N], Conne
         if let Err(e) = stream.set_nodelay(true) {
             warn!("[{addr}] disable Nagle algorithm: {e}");
         }
+        if let Err(e) = stream.set_read_timeout(Some(ATTACH_TIMEOUT)) {
+            warn!("[{addr}] set read timeout: {e}");
+        }
+        if let Err(e) = stream.set_write_timeout(Some(ATTACH_TIMEOUT)) {
+            warn!("[{addr}] set write timeout: {e}");
+        }
+
         if let Err(e) = codec::send(&mut stream, &Attach { token }, &mut buf) {
             error!("[{addr}] write attach request: {e}");
             process::exit(1);
         }
+
         streams.push(stream);
     }
 
@@ -172,6 +190,22 @@ pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> ([TcpStream; N], Conne
         match codec::recv(stream, &mut buf) {
             Ok(Attached { settings }) => {
                 connection_settings = Some(settings);
+
+                if let Err(e) = stream.set_read_timeout(None) {
+                    warn!("[{addr}] clear read timeout: {e}");
+                }
+                if let Err(e) = stream.set_write_timeout(None) {
+                    warn!("[{addr}] clear write timeout: {e}");
+                }
+            }
+            Err(codec::Error::Io(e))
+                if matches!(
+                    e.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                ) =>
+            {
+                error!("[{addr}] timed out waiting for attach confirmation");
+                process::exit(1);
             }
             Err(e) => {
                 error!("[{addr}] read attach confirmation: {e}");

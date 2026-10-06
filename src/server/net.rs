@@ -4,6 +4,7 @@ use super::{
 };
 use crate::{
     client::PlayerEvent,
+    server::ControlEvent,
     shared::{
         enum_map::EnumMap,
         net::{ConnectionSettings, MIN_KEEPALIVE_INTERVAL_MS, attach, codec},
@@ -107,6 +108,12 @@ pub fn listen(
                             }
                             break;
                         }
+
+                        if matches!(event, ControlEvent::Kicked { .. }) {
+                            info!("[{event_addr}] kicked connection closed");
+                            _ = event_stream.shutdown(Shutdown::Both);
+                            break;
+                        }
                     }
                     info!("[{event_addr}] writing closed");
                 }
@@ -128,7 +135,7 @@ pub fn listen(
                                 info!("[{chunk_addr}] stalled connection evicted");
                                 _ = event_stream.shutdown(Shutdown::Both);
                             } else {
-                                error!("[{chunk_addr}] write control event: {e}");
+                                error!("[{chunk_addr}] write chunk event: {e}");
                             }
                             break;
                         }

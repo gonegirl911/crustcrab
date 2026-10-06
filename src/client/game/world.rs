@@ -16,7 +16,7 @@ use crate::{
     server::{
         ChunkEvent,
         game::{
-            player::WorldArea,
+            player::ChunkScope,
             world::{
                 ChunkData,
                 block::{
@@ -242,7 +242,7 @@ impl World {
         let origin = utils::chunk_coords(frustum.origin);
         let mut queue = VecDeque::from([origin]);
         let mut visited = FxIndexMap::from_iter([(origin, SideSet::default())]);
-        let area = WorldArea {
+        let scope = ChunkScope {
             center: origin,
             radius: CLIENT_CONFIG.player.render_distance as i32,
         };
@@ -259,7 +259,7 @@ impl World {
 
                 let neighbor_coords = coords + delta.cast();
 
-                if !area.client_contains(neighbor_coords) {
+                if !scope.client_contains(neighbor_coords) {
                     continue;
                 }
 

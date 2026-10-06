@@ -4,7 +4,7 @@ pub mod chunk;
 pub mod height;
 pub mod light;
 
-use super::player::{Player, WorldArea};
+use super::player::{ChunkScope, Player};
 use crate::{
     client::{
         PlayerEvent,
@@ -249,14 +249,14 @@ impl EventHandler<WorldEvent> for World {
         self.viewers.handle(event, ());
 
         match *event {
-            WorldEvent::JoinRequested { id, area, aim } => {
-                let inserts = self.par_insert_many(area.par_server_points());
+            WorldEvent::JoinRequested { id, scope, aim } => {
+                let inserts = self.par_insert_many(scope.par_server_points());
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
                 self.light.extend_placeholders(new_surface_points);
                 self.light.par_insert_many(&self.chunks, &self.heights, &inserts, false);
 
-                let mut loads = area
+                let mut loads = scope
                     .client_points()
                     .filter(|&coords| self.chunks.0.contains_key(&coords))
                     .collect::<Vec<_>>();
@@ -269,7 +269,7 @@ impl EventHandler<WorldEvent> for World {
 
                 self.par_send_loads(&connections.one(id), loads);
             }
-            WorldEvent::WorldAreaChanged { id, prev, cur, aim } => {
+            WorldEvent::ChunkScopeChanged { id, prev, cur, aim } => {
                 let inserts = self.par_insert_many(cur.par_exclusive_server_points(&prev));
 
                 let new_surface_points = self.heights.load_many(inserts.iter().copied());
@@ -400,7 +400,7 @@ impl ViewerRegistry {
     fn client_containing(&self, points: &[Point3<i32>]) -> impl Iterator<Item = ConnectionId> {
         self.0
             .iter()
-            .filter(|(_, player)| points.iter().any(|&c| player.area.client_contains(c)))
+            .filter(|(_, player)| points.iter().any(|&c| player.scope.client_contains(c)))
             .map(|(&id, _)| id)
     }
 }
@@ -410,12 +410,12 @@ impl EventHandler<WorldEvent> for ViewerRegistry {
 
     fn handle(&mut self, event: &WorldEvent, (): Self::Context<'_>) {
         match *event {
-            WorldEvent::JoinRequested { id, area, .. } => {
-                self.0.insert(id, Viewer { area, hover: None });
+            WorldEvent::JoinRequested { id, scope, .. } => {
+                self.0.insert(id, Viewer { scope, hover: None });
             }
-            WorldEvent::WorldAreaChanged { id, cur, .. } => {
+            WorldEvent::ChunkScopeChanged { id, cur, .. } => {
                 let viewer = self.0.get_mut(&id).unwrap();
-                viewer.area = cur;
+                viewer.scope = cur;
             }
             WorldEvent::Connection(ConnectionEvent::Closed(id)) => {
                 self.0.remove(&id);
@@ -426,7 +426,7 @@ impl EventHandler<WorldEvent> for ViewerRegistry {
 }
 
 struct Viewer {
-    area: WorldArea,
+    scope: ChunkScope,
     hover: Option<BlockIntersection>,
 }
 
@@ -767,13 +767,13 @@ pub enum WorldEvent {
     Connection(ConnectionEvent),
     JoinRequested {
         id: ConnectionId,
-        area: WorldArea,
+        scope: ChunkScope,
         aim: Ray,
     },
-    WorldAreaChanged {
+    ChunkScopeChanged {
         id: ConnectionId,
-        prev: WorldArea,
-        cur: WorldArea,
+        prev: ChunkScope,
+        cur: ChunkScope,
         aim: Ray,
     },
     BlockHoverRequested {
@@ -799,16 +799,16 @@ impl WorldEvent {
 
         let &Player { prev, cur, aim } = player?;
         match *event {
-            Event::Player(id, PlayerEvent::JoinRequested { .. }) => {
-                Some(Self::JoinRequested { id, area: cur, aim })
+            Event::Player(id, PlayerEvent::JoinRequested { .. }) => Some(Self::JoinRequested {
+                id,
+                scope: cur,
+                aim,
+            }),
+            Event::Player(id, PlayerEvent::Position { .. }) if cur != prev => {
+                Some(Self::ChunkScopeChanged { id, prev, cur, aim })
             }
-            Event::Player(id, PlayerEvent::PositionChanged { .. }) if cur != prev => {
-                Some(Self::WorldAreaChanged { id, prev, cur, aim })
-            }
-            Event::Player(id, PlayerEvent::PositionChanged { .. }) => {
-                Some(Self::BlockHoverRequested { id, aim })
-            }
-            Event::Player(id, PlayerEvent::OrientationChanged { .. }) => {
+            Event::Player(id, PlayerEvent::Position { .. })
+            | Event::Player(id, PlayerEvent::Orientation { .. }) => {
                 Some(Self::BlockHoverRequested { id, aim })
             }
             Event::Player(id, PlayerEvent::BlockPlaced(block)) => {

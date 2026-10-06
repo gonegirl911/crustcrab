@@ -53,8 +53,8 @@ impl EventHandler<Event> for PlayerRegistry {
 
 #[derive(Default)]
 pub struct Player {
-    pub prev: WorldArea,
-    pub cur: WorldArea,
+    pub prev: ChunkScope,
+    pub cur: ChunkScope,
     pub aim: Ray,
 }
 
@@ -75,7 +75,7 @@ impl EventHandler<Event> for Player {
                         ..
                     } = SERVER_CONFIG.player;
 
-                    self.cur = WorldArea {
+                    self.cur = ChunkScope {
                         center: utils::chunk_coords(origin),
                         radius: render_distance as i32,
                     };
@@ -91,11 +91,11 @@ impl EventHandler<Event> for Player {
                         inventory: inventory.clone(),
                     });
                 }
-                PlayerEvent::PositionChanged { origin } => {
+                PlayerEvent::Position { origin } => {
                     self.cur.center = utils::chunk_coords(origin);
                     self.aim.origin = origin;
                 }
-                PlayerEvent::OrientationChanged { dir } => {
+                PlayerEvent::Orientation { dir } => {
                     self.aim.dir = dir.cast();
                 }
                 _ => {}
@@ -105,13 +105,13 @@ impl EventHandler<Event> for Player {
 }
 
 #[derive(Clone, Copy, PartialEq, Default)]
-pub struct WorldArea {
+pub struct ChunkScope {
     pub center: Point3<i32>,
     pub radius: i32,
 }
 
-impl WorldArea {
-    const SERVER_CONTEXT: i32 =
+impl ChunkScope {
+    pub const SERVER_CONTEXT: i32 =
         (BlockLight::COMPONENT_MAX as usize - 1 + BlockArea::PADDING).div_ceil(Chunk::DIM) as i32;
 
     pub fn par_server_points(&self) -> impl ParallelIterator<Item = Point3<i32>> {

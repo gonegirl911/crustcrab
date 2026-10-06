@@ -56,8 +56,8 @@ impl Client {
 pub enum PlayerEvent {
     JoinRequested { render_distance: u32 },
     JoinAcknowledged,
-    PositionChanged { origin: Point3<f64> },
-    OrientationChanged { dir: Vector3<f32> },
+    Position { origin: Point3<f64> },
+    Orientation { dir: Vector3<f32> },
     BlockPlaced(Block),
     BlockDestroyed,
     KeepAlive,

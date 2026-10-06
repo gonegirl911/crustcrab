@@ -2,7 +2,8 @@ use super::PlayerEvent;
 use crate::server::{ChunkEvent, ControlEvent};
 use crate::shared::net::{attach, codec};
 use crossbeam_channel::{Receiver, Sender};
-use log::{error, info};
+use log::{error, info, warn};
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,7 +22,15 @@ pub fn connect(
 ) {
     let ([event_stream, chunk_stream], settings) = attach::connect([event_addr, chunk_addr]);
     let event_stream = Arc::new(event_stream);
+    let chunk_stream = Arc::new(chunk_stream);
     let keepalive_interval = Duration::from_millis(settings.keepalive_interval_ms);
+
+    if let Err(e) = event_stream.set_read_timeout(Some(READ_TIMEOUT)) {
+        warn!("[{event_addr}] set read timeout: {e}");
+    }
+    if let Err(e) = event_stream.set_write_timeout(Some(WRITE_TIMEOUT)) {
+        warn!("[{event_addr}] set write timeout: {e}");
+    }
 
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
     let (control_tx, control_rx) = crossbeam_channel::unbounded();
@@ -36,11 +45,25 @@ pub fn connect(
                 let event = match codec::recv(&mut control_reader, &mut buf) {
                     Ok(event) => event,
                     Err(codec::Error::ConnectionClosed) => break,
+                    Err(codec::Error::Io(e))
+                        if matches!(
+                            e.kind(),
+                            io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                        ) =>
+                    {
+                        info!("[{event_addr}] server stopped responding");
+                        break;
+                    }
                     Err(e) => {
                         error!("[{event_addr}] read control event: {e}");
                         break;
                     }
                 };
+
+                if let ControlEvent::Kicked { reason } = &event {
+                    error!("[{event_addr}] kicked: {reason}");
+                }
+
                 if control_tx.send(event).is_err() {
                     break;
                 }
@@ -53,16 +76,28 @@ pub fn connect(
         let mut player_writer = BufWriter::new(&*event_stream);
         let mut buf = Vec::new();
         for event in player_rx {
-            if let Err(e) = codec::send(&mut player_writer, &event, &mut buf) {
-                error!("[{event_addr}] write player event: {e}");
-                break;
+            match codec::send(&mut player_writer, &event, &mut buf) {
+                Ok(()) => {}
+                Err(codec::Error::Io(e))
+                    if matches!(
+                        e.kind(),
+                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                    ) =>
+                {
+                    info!("[{event_addr}] server stopped responding");
+                    break;
+                }
+                Err(e) => {
+                    error!("[{event_addr}] write player event: {e}");
+                    break;
+                }
             }
         }
         info!("[{event_addr}] writing closed");
     });
 
     thread::spawn(move || {
-        let mut chunk_reader = BufReader::new(chunk_stream);
+        let mut chunk_reader = BufReader::new(&*chunk_stream);
         let mut buf = Vec::new();
         loop {
             let event = match codec::recv(&mut chunk_reader, &mut buf) {
@@ -92,3 +127,6 @@ pub fn connect(
 
     (player_tx, control_rx, chunk_rx)
 }
+
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+const WRITE_TIMEOUT: Duration = Duration::from_secs(30);
