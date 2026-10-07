@@ -1,22 +1,6 @@
-use super::PlayerFeatures;
-use crate::{
-    client::{
-        CLIENT_CONFIG,
-        event_loop::{Event, EventHandler},
-    },
-    server::ControlEvent,
-    shared::utils,
-};
-use bitflags::bitflags;
+use crate::shared::utils;
 use nalgebra::{Matrix4, Point3, Vector3, matrix, vector};
-use std::{
-    f32::consts::{FRAC_PI_2, TAU},
-    time::Duration,
-};
-use winit::{
-    event::{ButtonSource, DeviceEvent, ElementState, KeyEvent, MouseButton, WindowEvent},
-    keyboard::{KeyCode, PhysicalKey},
-};
+use std::f32::consts::{FRAC_PI_2, TAU};
 
 pub struct View {
     pub origin: Point3<f64>,
@@ -55,6 +39,16 @@ impl View {
 
     pub fn anchor(&self) -> Point3<f64> {
         utils::coords(utils::chunk_coords(self.origin), Point3::origin()).cast()
+    }
+
+    pub fn rotate(&mut self, dx: f32, dy: f32) {
+        const BOUND_Y: f32 = FRAC_PI_2 - f32::EPSILON;
+
+        self.yaw = (self.yaw - dx) % TAU;
+        self.pitch = (self.pitch - dy).clamp(-BOUND_Y, BOUND_Y);
+        self.forward = Self::forward(self.yaw, self.pitch);
+        self.right = Self::right(self.forward);
+        self.up = Self::up(self.forward, self.right);
     }
 
     fn forward(yaw: f32, pitch: f32) -> Vector3<f32> {
@@ -101,207 +95,5 @@ impl Projection {
             0.0, 0.0, r,  -r * self.znear;
             0.0, 0.0, 1.0, 0.0;
         ]
-    }
-}
-
-#[derive(Default)]
-pub struct Controller {
-    dx: f32,
-    dy: f32,
-    relevant_keys: Keys,
-    key_history: Keys,
-    relevant_buttons: MouseButtons,
-    button_history: MouseButtons,
-    speed: f64,
-    sensitivity: f32,
-    pub external_updates_applied: bool,
-}
-
-impl Controller {
-    pub fn new(speed: f64, sensitivity: f32) -> Self {
-        Self {
-            speed,
-            sensitivity,
-            ..Default::default()
-        }
-    }
-
-    #[rustfmt::skip]
-    pub fn apply_updates(&mut self, view: &mut View, dt: Duration) -> Changes {
-        let mut changes = Changes::empty();
-
-        if self.dx != 0.0 || self.dy != 0.0 {
-            self.apply_rotation(view);
-            self.dx = 0.0;
-            self.dy = 0.0;
-            changes.insert(Changes::ROTATED);
-        }
-
-        if !self.relevant_keys.is_empty() {
-            self.apply_movement(view, dt);
-            changes.insert(Changes::MOVED);
-        }
-
-        if self.relevant_buttons.contains(MouseButtons::RIGHT) {
-            changes.insert(Changes::BLOCK_PLACED);
-        } else if self.relevant_buttons.contains(MouseButtons::LEFT) {
-            changes.insert(Changes::BLOCK_DESTROYED);
-        }
-
-        if !CLIENT_CONFIG.player.features.contains(PlayerFeatures::DRAWING_MODE) {
-            let block_action_buttons = MouseButtons::LEFT | MouseButtons::RIGHT;
-            self.relevant_buttons.remove(block_action_buttons);
-            self.button_history.remove(block_action_buttons);
-        }
-
-        changes
-    }
-
-    fn apply_rotation(&self, view: &mut View) {
-        const BOUND_Y: f32 = FRAC_PI_2 - f32::EPSILON;
-
-        view.yaw = (view.yaw - self.dx * self.sensitivity) % TAU;
-        view.pitch = (view.pitch - self.dy * self.sensitivity).clamp(-BOUND_Y, BOUND_Y);
-        view.forward = View::forward(view.yaw, view.pitch);
-        view.right = View::right(view.forward);
-        view.up = View::up(view.forward, view.right);
-    }
-
-    fn apply_movement(&self, view: &mut View, dt: Duration) {
-        let mut dir = Vector3::zeros();
-        let right = view.right.cast();
-        let forward = right.cross(&Vector3::y());
-
-        if self.relevant_keys.contains(Keys::W) {
-            dir += forward;
-        } else if self.relevant_keys.contains(Keys::S) {
-            dir -= forward;
-        }
-
-        if self.relevant_keys.contains(Keys::A) {
-            dir -= right;
-        } else if self.relevant_keys.contains(Keys::D) {
-            dir += right;
-        }
-
-        if self.relevant_keys.contains(Keys::SPACE) {
-            dir.y += 1.0;
-        } else if self.relevant_keys.contains(Keys::LSHIFT) {
-            dir.y -= 1.0;
-        }
-
-        view.origin += dir.normalize() * self.speed * dt.as_secs_f64();
-    }
-}
-
-impl EventHandler for Controller {
-    type Context<'a> = ();
-
-    fn handle(&mut self, event: &Event, (): Self::Context<'_>) {
-        match event {
-            &Event::ControlEvent(ControlEvent::PlayerInitialized { speed, .. }) => {
-                self.speed = speed;
-            }
-            &Event::DeviceEvent(DeviceEvent::PointerMotion { delta: (dx, dy) }) => {
-                self.dx += dx as f32;
-                self.dy += dy as f32;
-            }
-            Event::WindowEvent(event) => match event {
-                WindowEvent::KeyboardInput {
-                    event:
-                        KeyEvent {
-                            physical_key: PhysicalKey::Code(keycode),
-                            state,
-                            ..
-                        },
-                    ..
-                } => {
-                    let (key, opp) = match keycode {
-                        KeyCode::KeyW => (Keys::W, Keys::S),
-                        KeyCode::KeyA => (Keys::A, Keys::D),
-                        KeyCode::KeyS => (Keys::S, Keys::W),
-                        KeyCode::KeyD => (Keys::D, Keys::A),
-                        KeyCode::Space => (Keys::SPACE, Keys::LSHIFT),
-                        KeyCode::ShiftLeft => (Keys::LSHIFT, Keys::SPACE),
-                        _ => return,
-                    };
-
-                    match state {
-                        ElementState::Pressed => {
-                            self.relevant_keys.insert(key);
-                            self.relevant_keys.remove(opp);
-                            self.key_history.insert(key);
-                        }
-                        ElementState::Released => {
-                            self.relevant_keys.remove(key);
-                            if self.key_history.contains(opp) {
-                                self.relevant_keys.insert(opp);
-                            }
-                            self.key_history.remove(key);
-                        }
-                    }
-                }
-                WindowEvent::PointerButton {
-                    button: ButtonSource::Mouse(button),
-                    state,
-                    ..
-                } => {
-                    let (button, opp) = match button {
-                        MouseButton::Left => (MouseButtons::LEFT, MouseButtons::RIGHT),
-                        MouseButton::Right => (MouseButtons::RIGHT, MouseButtons::LEFT),
-                        _ => return,
-                    };
-
-                    match state {
-                        ElementState::Pressed => {
-                            self.relevant_buttons.insert(button);
-                            self.relevant_buttons.remove(opp);
-                            self.button_history.insert(button);
-                        }
-                        ElementState::Released => {
-                            self.relevant_buttons.remove(button);
-                            if self.button_history.contains(opp) {
-                                self.relevant_buttons.insert(opp);
-                            }
-                            self.button_history.remove(button);
-                        }
-                    }
-                }
-                WindowEvent::Focused(false) => {
-                    self.relevant_keys = Default::default();
-                    self.key_history = Default::default();
-                    self.relevant_buttons = Default::default();
-                    self.button_history = Default::default();
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
-}
-
-bitflags! {
-    pub struct Changes: u8 {
-        const MOVED = 1 << 0;
-        const ROTATED = 1 << 1;
-        const BLOCK_PLACED = 1 << 2;
-        const BLOCK_DESTROYED = 1 << 3;
-        const VIEW = Self::MOVED.bits() | Self::ROTATED.bits();
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct Keys: u8 {
-        const W = 1 << 0;
-        const A = 1 << 1;
-        const S = 1 << 2;
-        const D = 1 << 3;
-        const SPACE = 1 << 4;
-        const LSHIFT = 1 << 5;
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct MouseButtons: u8 {
-        const LEFT = 1 << 0;
-        const RIGHT = 1 << 1;
     }
 }

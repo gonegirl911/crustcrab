@@ -9,9 +9,9 @@ use crossbeam_channel::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
 
 pub struct EventLoop {
-    connections: ConnectionRegistry,
     connection_rx: Receiver<ConnectionEvent>,
     player_rx: Receiver<(ConnectionId, PlayerEvent)>,
+    connections: ConnectionRegistry,
     gate: Gate,
 }
 
@@ -21,9 +21,9 @@ impl EventLoop {
         player_rx: Receiver<(ConnectionId, PlayerEvent)>,
     ) -> Self {
         Self {
-            connections: Default::default(),
             connection_rx,
             player_rx,
+            connections: Default::default(),
             gate: Default::default(),
         }
     }
@@ -48,7 +48,10 @@ impl EventLoop {
 
             let event = match player_event {
                 Some((id, event)) => self.gate.admit(id, event, &self.connections),
-                None => Some(Event::Tick),
+                None => {
+                    self.gate.keep_alive(&self.connections);
+                    Some(Event::Tick)
+                }
             };
 
             if let Some(event) = event {

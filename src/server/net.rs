@@ -1,19 +1,15 @@
-use super::{
-    SERVER_CONFIG,
-    connection::{Connection, ConnectionEvent, ConnectionId},
-};
+use super::connection::{Connection, ConnectionEvent, ConnectionId};
 use crate::{
     client::PlayerEvent,
     server::ControlEvent,
     shared::{
         enum_map::EnumMap,
-        net::{ConnectionSettings, MIN_KEEPALIVE_INTERVAL_MS, attach, codec},
+        net::{KEEP_ALIVE_TIMEOUT, attach, codec},
     },
 };
 use crossbeam_channel::Receiver;
 use log::{error, info, warn};
 use macros::Enum;
-use serde::Deserialize;
 use std::{
     io::{self, BufReader, BufWriter},
     net::{Shutdown, SocketAddr},
@@ -29,29 +25,10 @@ pub fn listen(
     Receiver<ConnectionEvent>,
     Receiver<(ConnectionId, PlayerEvent)>,
 ) {
-    let keepalive = SERVER_CONFIG.keepalive;
-    if keepalive.interval_ms < MIN_KEEPALIVE_INTERVAL_MS {
-        warn!(
-            "keepalive interval ({}ms) below minimum threshold ({MIN_KEEPALIVE_INTERVAL_MS}ms); \
-            clients will refuse connection",
-            keepalive.interval_ms
-        );
-    }
-    if keepalive.interval_ms * 2 >= keepalive.timeout_ms {
-        warn!(
-            "keepalive interval ({}ms) not safely below timeout ({}ms); \
-            healthy idle clients may be evicted",
-            keepalive.interval_ms, keepalive.timeout_ms
-        );
-    }
-    let peer_timeout = Duration::from_millis(keepalive.timeout_ms);
-
-    let attached_rx = attach::serve(
-        EnumMap::from_iter([(Role::Event, event_addr), (Role::Chunk, chunk_addr)]),
-        ConnectionSettings {
-            keepalive_interval_ms: keepalive.interval_ms,
-        },
-    );
+    let attached_rx = attach::serve(EnumMap::from_iter([
+        (Role::Event, event_addr),
+        (Role::Chunk, chunk_addr),
+    ]));
 
     let (connection_tx, connection_rx) = crossbeam_channel::unbounded();
     let (player_tx, player_rx) = crossbeam_channel::unbounded();
@@ -63,13 +40,13 @@ pub fn listen(
             let (chunk_stream, chunk_addr) = attached[Role::Chunk].take().unwrap();
             let event_stream = Arc::new(event_stream);
 
-            if let Err(e) = event_stream.set_read_timeout(Some(peer_timeout)) {
+            if let Err(e) = event_stream.set_read_timeout(Some(PEER_TIMEOUT)) {
                 warn!("[{event_addr}] set read timeout: {e}");
             }
-            if let Err(e) = event_stream.set_write_timeout(Some(peer_timeout)) {
+            if let Err(e) = event_stream.set_write_timeout(Some(PEER_TIMEOUT)) {
                 warn!("[{event_addr}] set write timeout: {e}");
             }
-            if let Err(e) = chunk_stream.set_write_timeout(Some(peer_timeout)) {
+            if let Err(e) = chunk_stream.set_write_timeout(Some(PEER_TIMEOUT)) {
                 warn!("[{chunk_addr}] set write timeout: {e}");
             }
 
@@ -86,7 +63,7 @@ pub fn listen(
                     },
                 ))
                 .unwrap();
-            info!("[{event_addr}] opened connection {id:?}");
+            info!("[{event_addr}] opened connection {id}");
 
             thread::spawn({
                 let event_stream = event_stream.clone();
@@ -188,8 +165,4 @@ enum Role {
     Chunk,
 }
 
-#[derive(Clone, Copy, Deserialize)]
-pub struct KeepAliveConfig {
-    pub interval_ms: u64,
-    pub timeout_ms: u64,
-}
+const PEER_TIMEOUT: Duration = KEEP_ALIVE_TIMEOUT;

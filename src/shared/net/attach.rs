@@ -1,4 +1,4 @@
-use super::{ConnectionSettings, codec};
+use super::codec;
 use crate::shared::enum_map::{Enum, EnumMap, EnumMapBuilder};
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use log::{error, info, warn};
@@ -12,10 +12,7 @@ use std::{
 };
 use uuid::Uuid;
 
-pub fn serve<R>(
-    addrs: EnumMap<R, SocketAddr>,
-    settings: ConnectionSettings,
-) -> Receiver<EnumMap<R, (TcpStream, SocketAddr)>>
+pub fn serve<R>(addrs: EnumMap<R, SocketAddr>) -> Receiver<EnumMap<R, (TcpStream, SocketAddr)>>
 where
     R: Enum + Send + 'static,
 {
@@ -125,7 +122,7 @@ where
 
             let mut confirmed = true;
             for (stream, addr) in completed.values_mut() {
-                if let Err(e) = codec::send(stream, &Attached { settings }, &mut buf) {
+                if let Err(e) = codec::send(stream, &Attached, &mut buf) {
                     error!("[{addr}] write attach confirmation: {e}");
                     confirmed = false;
                     break;
@@ -151,7 +148,7 @@ where
     attached_rx
 }
 
-pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> ([TcpStream; N], ConnectionSettings) {
+pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> [TcpStream; N] {
     let mut streams = Vec::with_capacity(N);
     let token = Uuid::new_v4();
     let mut buf = Vec::new();
@@ -185,12 +182,9 @@ pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> ([TcpStream; N], Conne
         streams.push(stream);
     }
 
-    let mut connection_settings = None;
     for (stream, addr) in iter::zip(&mut streams, &addrs) {
         match codec::recv(stream, &mut buf) {
-            Ok(Attached { settings }) => {
-                connection_settings = Some(settings);
-
+            Ok(Attached) => {
                 if let Err(e) = stream.set_read_timeout(None) {
                     warn!("[{addr}] clear read timeout: {e}");
                 }
@@ -215,7 +209,7 @@ pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> ([TcpStream; N], Conne
     }
     info!("[{token}] attached");
 
-    (streams.try_into().unwrap(), connection_settings.unwrap())
+    streams.try_into().unwrap()
 }
 
 struct Rendezvous<R: Enum, S> {
@@ -298,8 +292,6 @@ struct Attach {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Attached {
-    settings: ConnectionSettings,
-}
+struct Attached;
 
 const ATTACH_TIMEOUT: Duration = Duration::from_secs(30);

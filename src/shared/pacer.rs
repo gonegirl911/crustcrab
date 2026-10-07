@@ -1,21 +1,41 @@
 use std::time::{Duration, Instant};
 
-#[derive(Default)]
 pub struct Pacer {
+    gap: Duration,
     stamped_at: Option<Instant>,
 }
 
 impl Pacer {
-    pub fn is_due(&self, gap: Duration, now: Instant) -> bool {
-        self.stamped_at
-            .is_none_or(|stamped_at| now.duration_since(stamped_at) >= gap)
+    pub fn new(gap: Duration) -> Self {
+        Self {
+            gap,
+            stamped_at: None,
+        }
     }
 
-    pub fn stamp(&mut self, now: Instant) {
-        self.stamped_at = Some(now);
+    pub fn fire<T, F: FnOnce() -> T>(&mut self, now: Instant, f: F) -> Option<T> {
+        self.admit(now).then(f)
+    }
+
+    pub fn admit(&mut self, now: Instant) -> bool {
+        if self.is_due(now) {
+            self.stamp(now);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn clear(&mut self) {
         self.stamped_at = None;
+    }
+
+    fn is_due(&self, now: Instant) -> bool {
+        self.stamped_at
+            .is_none_or(|stamped_at| now.duration_since(stamped_at) >= self.gap)
+    }
+
+    fn stamp(&mut self, now: Instant) {
+        self.stamped_at = Some(now);
     }
 }

@@ -2,7 +2,10 @@ use super::{ChunkEvent, ControlEvent, event_loop::EventHandler};
 use crossbeam_channel::{SendError, Sender};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
-use std::iter;
+use std::{
+    fmt::{self, Display, Formatter},
+    iter,
+};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -80,13 +83,19 @@ impl Connection {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub struct ConnectionId(Uuid);
 
 impl ConnectionId {
     #[expect(clippy::new_without_default)]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+}
+
+impl Display for ConnectionId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 

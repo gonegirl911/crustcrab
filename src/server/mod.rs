@@ -19,9 +19,8 @@ use game::{
     player::PlayerConfig,
     world::{BlockHoverData, ChunkData, block::Block},
 };
-use gate::rate_limit::KickReason;
+use gate::KickReason;
 use nalgebra::{Point3, Vector3};
-use net::KeepAliveConfig;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, LazyLock};
 
@@ -61,6 +60,9 @@ pub enum ControlEvent {
         ticks: u16,
     },
     BlockHovered(Option<Arc<BlockHoverData>>),
+    KeepAlive {
+        tag: u64,
+    },
     Kicked {
         reason: KickReason,
     },
@@ -92,7 +94,6 @@ struct ServerConfig {
     event_loop: EventLoopConfig,
     player: PlayerConfig,
     clock: ClockConfig,
-    keepalive: KeepAliveConfig,
 }
 
 static SERVER_CONFIG: LazyLock<ServerConfig> =

@@ -9,15 +9,23 @@ pub fn sanitize(mut event: PlayerEvent) -> Option<PlayerEvent> {
             *render_distance = (*render_distance).clamp(1, MAX_RENDER_DISTANCE);
         }
         PlayerEvent::Position { origin } => {
-            if origin.iter().any(|c| c.abs() > WORLD_BORDER) {
+            if origin.iter().any(|c| !c.is_finite()) {
                 return None;
             }
+
+            origin.apply(|c| *c = c.clamp(-WORLD_BORDER, WORLD_BORDER));
         }
-        #[expect(clippy::collapsible_match)]
         PlayerEvent::Orientation { dir } => {
             if dir.iter().any(|c| !c.is_finite()) {
                 return None;
             }
+
+            #[expect(clippy::question_mark)]
+            let Some(normalized) = dir.cast::<f64>().try_normalize(f64::EPSILON) else {
+                return None;
+            };
+
+            *dir = normalized.cast();
         }
         _ => {}
     }

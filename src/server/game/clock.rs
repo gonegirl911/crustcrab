@@ -5,21 +5,27 @@ use crate::{
         connection::ConnectionRegistry,
         event_loop::{Event, EventHandler},
     },
+    shared::pacer::Pacer,
 };
 use serde::{
     Deserialize, Deserializer, Serialize,
     de::{self, Unexpected},
 };
-use std::ops::Range;
+use std::{
+    ops::Range,
+    time::{Duration, Instant},
+};
 
 pub struct Clock {
     ticks: u16,
+    pacer: Pacer,
 }
 
 impl Default for Clock {
     fn default() -> Self {
         Self {
             ticks: SERVER_CONFIG.clock.starting_ticks(),
+            pacer: Pacer::new(TIME_REPORT_GAP),
         }
     }
 }
@@ -35,13 +41,17 @@ impl EventHandler<Event> for Clock {
                     ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
                     cycle: SERVER_CONFIG.clock.cycle,
                 });
-                recipient.send(ControlEvent::TimeUpdated { ticks: self.ticks });
+                self.pacer.fire(Instant::now(), || {
+                    recipient.send(ControlEvent::TimeUpdated { ticks: self.ticks });
+                });
             }
             Event::Tick => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.cycle.ticks_per_day;
-                connections
-                    .all()
-                    .send(ControlEvent::TimeUpdated { ticks: self.ticks });
+                self.pacer.fire(Instant::now(), || {
+                    connections
+                        .all()
+                        .send(ControlEvent::TimeUpdated { ticks: self.ticks });
+                });
             }
             _ => {}
         }
@@ -149,3 +159,5 @@ enum TimePhase {
     Dusk,
     Night,
 }
+
+const TIME_REPORT_GAP: Duration = Duration::from_secs(1);

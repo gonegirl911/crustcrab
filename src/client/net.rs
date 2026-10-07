@@ -1,6 +1,6 @@
 use super::PlayerEvent;
 use crate::server::{ChunkEvent, ControlEvent};
-use crate::shared::net::{attach, codec};
+use crate::shared::net::{KEEP_ALIVE_TIMEOUT, attach, codec};
 use crossbeam_channel::{Receiver, Sender};
 use log::{error, info, warn};
 use std::io;
@@ -20,10 +20,9 @@ pub fn connect(
     Receiver<ControlEvent>,
     Receiver<ChunkEvent>,
 ) {
-    let ([event_stream, chunk_stream], settings) = attach::connect([event_addr, chunk_addr]);
+    let [event_stream, chunk_stream] = attach::connect([event_addr, chunk_addr]);
     let event_stream = Arc::new(event_stream);
     let chunk_stream = Arc::new(chunk_stream);
-    let keepalive_interval = Duration::from_millis(settings.keepalive_interval_ms);
 
     if let Err(e) = event_stream.set_read_timeout(Some(READ_TIMEOUT)) {
         warn!("[{event_addr}] set read timeout: {e}");
@@ -38,6 +37,7 @@ pub fn connect(
 
     thread::spawn({
         let event_stream = event_stream.clone();
+        let player_tx = player_tx.clone();
         move || {
             let mut control_reader = BufReader::new(&*event_stream);
             let mut buf = Vec::new();
@@ -60,8 +60,17 @@ pub fn connect(
                     }
                 };
 
-                if let ControlEvent::Kicked { reason } = &event {
-                    error!("[{event_addr}] kicked: {reason}");
+                match &event {
+                    &ControlEvent::KeepAlive { tag } => {
+                        if player_tx.send(PlayerEvent::KeepAlive { tag }).is_err() {
+                            break;
+                        }
+                        continue;
+                    }
+                    ControlEvent::Kicked { reason } => {
+                        error!("[{event_addr}] kicked: {reason}");
+                    }
+                    _ => {}
                 }
 
                 if control_tx.send(event).is_err() {
@@ -115,18 +124,8 @@ pub fn connect(
         info!("[{chunk_addr}] reading closed");
     });
 
-    thread::spawn({
-        let player_tx = player_tx.clone();
-        move || loop {
-            thread::sleep(keepalive_interval);
-            if player_tx.send(PlayerEvent::KeepAlive).is_err() {
-                break;
-            }
-        }
-    });
-
     (player_tx, control_rx, chunk_rx)
 }
 
-const READ_TIMEOUT: Duration = Duration::from_secs(30);
+const READ_TIMEOUT: Duration = KEEP_ALIVE_TIMEOUT;
 const WRITE_TIMEOUT: Duration = Duration::from_secs(30);

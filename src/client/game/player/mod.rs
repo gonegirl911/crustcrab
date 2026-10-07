@@ -1,4 +1,5 @@
 pub mod camera;
+pub mod controller;
 pub mod frustum;
 
 use super::gui::Gui;
@@ -9,16 +10,21 @@ use crate::{
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
     },
     server::{ControlEvent, game::world::chunk::Chunk},
-    shared::color::Float3,
+    shared::{color::Float3, pacer::Pacer},
 };
 use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
-use camera::{Changes, Controller, Projection, View};
+use camera::{Projection, View};
+use controller::{Changes, Controller};
 use crossbeam_channel::Sender;
 use frustum::Frustum;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
-use std::{f32::consts::SQRT_2, mem, time::Duration};
+use std::{
+    f32::consts::SQRT_2,
+    mem,
+    time::{Duration, Instant},
+};
 use winit::event::WindowEvent;
 
 pub struct Player {
@@ -26,6 +32,7 @@ pub struct Player {
     projection: Projection,
     controller: Controller,
     pub mut(self) uniform: Uniform<PlayerUniformData>,
+    view_report_pacer: Pacer,
 }
 
 impl Player {
@@ -33,7 +40,7 @@ impl Player {
         let config = &CLIENT_CONFIG.player;
         let view = View::new(Point3::origin(), Vector3::x());
         let projection = Projection::new(config.fovy, 0.0, 0.1, Self::zfar());
-        let controller = Controller::new(0.0, config.sensitivity);
+        let controller = Controller::new(config.sensitivity);
         let uniform = Uniform::new(
             renderer,
             MemoryState::UNINIT,
@@ -44,6 +51,7 @@ impl Player {
             projection,
             controller,
             uniform,
+            view_report_pacer: Pacer::new(VIEW_REPORT_GAP),
         }
     }
 
@@ -94,18 +102,21 @@ impl EventHandler for Player {
                 self.controller.external_updates_applied = true;
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
-                let changes = self.controller.apply_updates(&mut self.view, dt);
+                let now = Instant::now();
+                let changes = self.controller.apply_updates(&mut self.view, dt, now);
 
-                if changes.contains(Changes::MOVED) {
-                    _ = player_tx.send(PlayerEvent::Position {
-                        origin: self.view.origin,
-                    });
-                }
+                if changes.intersects(Changes::VIEW) && self.view_report_pacer.admit(now) {
+                    if changes.contains(Changes::MOVED) {
+                        _ = player_tx.send(PlayerEvent::Position {
+                            origin: self.view.origin,
+                        });
+                    }
 
-                if changes.contains(Changes::ROTATED) {
-                    _ = player_tx.send(PlayerEvent::Orientation {
-                        dir: self.view.forward,
-                    });
+                    if changes.contains(Changes::ROTATED) {
+                        _ = player_tx.send(PlayerEvent::Orientation {
+                            dir: self.view.forward,
+                        });
+                    }
                 }
 
                 if surface.is_resized {
@@ -195,3 +206,5 @@ bitflags! {
         const DRAWING_MODE = 1 << 0;
     }
 }
+
+const VIEW_REPORT_GAP: Duration = Duration::from_millis(16);

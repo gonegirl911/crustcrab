@@ -60,7 +60,7 @@ pub enum PlayerEvent {
     Orientation { dir: Vector3<f32> },
     BlockPlaced(Block),
     BlockDestroyed,
-    KeepAlive,
+    KeepAlive { tag: u64 },
 }
 
 #[derive(Deserialize)]
