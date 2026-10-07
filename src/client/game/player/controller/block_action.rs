@@ -26,13 +26,13 @@ impl BlockActionController {
             return None;
         };
 
-        if !CLIENT_CONFIG.player.features.contains(PlayerFeatures::DRAWING_MODE) {
-            self.relevant.clear();
-            self.history.clear();
-            Some(action)
-        } else {
-            self.pacer.admit(now).then_some(action)
+        if CLIENT_CONFIG.player.features.contains(PlayerFeatures::DRAWING_MODE) {
+            return self.pacer.admit(now).then_some(action);
         }
+
+        self.relevant.clear();
+        self.history.clear();
+        Some(action)
     }
 
     fn press(&mut self, button: MouseButtons, opp: MouseButtons) {
@@ -97,4 +97,4 @@ bitflags! {
     }
 }
 
-const BLOCK_ACTION_REPEAT_GAP: Duration = Duration::from_millis(33);
+const BLOCK_ACTION_REPEAT_GAP: Duration = Duration::from_millis(8);

@@ -48,21 +48,8 @@ pub fn connect(
             let mut control_reader = BufReader::new(&*event_stream);
             let mut buf = Vec::new();
             let disconnect_reason = loop {
-                match codec::recv(&mut control_reader, &mut buf) {
-                    Ok(ControlEvent::KeepAlive { tag }) => {
-                        if player_tx.send(PlayerEvent::KeepAlive { tag }).is_err() {
-                            break DisconnectReason::Closed;
-                        }
-                    }
-                    Ok(ControlEvent::Kicked { reason }) => {
-                        info!("[{event_addr}] kicked");
-                        break DisconnectReason::Kicked(reason);
-                    }
-                    Ok(event) => {
-                        if control_tx.send(event).is_err() {
-                            break DisconnectReason::Closed;
-                        }
-                    }
+                let event = match codec::recv(&mut control_reader, &mut buf) {
+                    Ok(event) => event,
                     Err(codec::Error::ConnectionClosed) => {
                         break DisconnectReason::Closed;
                     }
@@ -79,6 +66,13 @@ pub fn connect(
                         error!("[{event_addr}] read control event: {e}");
                         break DisconnectReason::Error(Box::new(e));
                     }
+                };
+
+                if let Err(reason) = relay(event, &player_tx, &control_tx) {
+                    if matches!(reason, DisconnectReason::Kicked(_)) {
+                        info!("[{event_addr}] kicked");
+                    }
+                    break reason;
                 }
             };
             info!("[{event_addr}] reading closed");
@@ -134,6 +128,29 @@ pub fn connect(
     });
 
     (player_tx, control_rx, chunk_rx, disconnect_rx)
+}
+
+pub fn relay(
+    event: ControlEvent,
+    player_tx: &Sender<PlayerEvent>,
+    control_tx: &Sender<ControlEvent>,
+) -> Result<(), DisconnectReason> {
+    match event {
+        ControlEvent::KeepAlive { tag } => {
+            if player_tx.send(PlayerEvent::KeepAlive { tag }).is_err() {
+                return Err(DisconnectReason::Closed);
+            }
+        }
+        ControlEvent::Kicked { reason } => {
+            return Err(DisconnectReason::Kicked(reason));
+        }
+        _ => {
+            if control_tx.send(event).is_err() {
+                return Err(DisconnectReason::Closed);
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Error)]
