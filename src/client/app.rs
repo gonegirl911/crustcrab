@@ -2,12 +2,14 @@ use super::{
     CLIENT_CONFIG, PlayerEvent,
     event_loop::{Event, EventHandler},
     game::Game,
+    net::DisconnectReason,
     renderer::{Renderer, Surface},
     stopwatch::Stopwatch,
     window::Window,
 };
 use crate::server::{ChunkEvent, ControlEvent};
 use crossbeam_channel::{Receiver, Sender};
+use log::info;
 use serde::Deserialize;
 use std::time::{Duration, Instant};
 use winit::{
@@ -21,6 +23,7 @@ pub struct App {
     player_tx: Sender<PlayerEvent>,
     control_rx: Receiver<ControlEvent>,
     chunk_rx: Receiver<ChunkEvent>,
+    disconnect_rx: Receiver<DisconnectReason>,
     instance: Option<Instance>,
 }
 
@@ -29,11 +32,13 @@ impl App {
         player_tx: Sender<PlayerEvent>,
         control_rx: Receiver<ControlEvent>,
         chunk_rx: Receiver<ChunkEvent>,
+        disconnect_rx: Receiver<DisconnectReason>,
     ) -> Self {
         Self {
             player_tx,
             control_rx,
             chunk_rx,
+            disconnect_rx,
             instance: None,
         }
     }
@@ -100,8 +105,16 @@ impl ApplicationHandler for App {
             .handle(&Event::DeviceEvent(event), &self.player_tx);
     }
 
-    fn about_to_wait(&mut self, _: &dyn ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
+        let disconnect_reason = self.disconnect_rx.try_recv().ok();
+
         self.dispatch_server_events();
+
+        if let Some(reason) = disconnect_reason {
+            info!("disconnected: {reason}, exiting");
+            event_loop.exit();
+            return;
+        }
 
         self.instance
             .as_mut()

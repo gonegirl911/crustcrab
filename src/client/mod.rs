@@ -17,6 +17,7 @@ use game::{
     shading::ShadingConfig, sky::SkyConfig,
 };
 use nalgebra::{Point3, Vector3};
+use net::DisconnectReason;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -26,6 +27,7 @@ pub struct Client {
     player_tx: Sender<PlayerEvent>,
     control_rx: Receiver<ControlEvent>,
     chunk_rx: Receiver<ChunkEvent>,
+    disconnect_rx: Receiver<DisconnectReason>,
 }
 
 impl Client {
@@ -33,6 +35,7 @@ impl Client {
         player_tx: Sender<PlayerEvent>,
         control_rx: Receiver<ControlEvent>,
         chunk_rx: Receiver<ChunkEvent>,
+        disconnect_rx: Receiver<DisconnectReason>,
     ) -> Self {
         let event_loop = EventLoop::new().expect("event loop should be buildable");
         event_loop.set_control_flow(ControlFlow::Poll);
@@ -41,11 +44,17 @@ impl Client {
             player_tx,
             control_rx,
             chunk_rx,
+            disconnect_rx,
         }
     }
 
     pub fn run(self) {
-        let app = App::new(self.player_tx, self.control_rx, self.chunk_rx);
+        let app = App::new(
+            self.player_tx,
+            self.control_rx,
+            self.chunk_rx,
+            self.disconnect_rx,
+        );
         self.event_loop
             .run_app(app)
             .expect("event loop should be runnable");

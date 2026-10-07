@@ -22,8 +22,8 @@ fn main() {
         chunk_addr,
     } = Parser::parse();
 
-    let (player_tx, control_rx, chunk_rx) = net::connect(event_addr, chunk_addr);
+    let (player_tx, control_rx, chunk_rx, disconnect_rx) = net::connect(event_addr, chunk_addr);
 
-    let client = Client::new(player_tx, control_rx, chunk_rx);
+    let client = Client::new(player_tx, control_rx, chunk_rx, disconnect_rx);
     client.run();
 }

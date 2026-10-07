@@ -128,8 +128,12 @@ pub fn listen(
                     let mut player_reader = BufReader::new(&*event_stream);
                     let mut buf = Vec::new();
                     loop {
-                        let event = match codec::recv(&mut player_reader, &mut buf) {
-                            Ok(event) => event,
+                        match codec::recv(&mut player_reader, &mut buf) {
+                            Ok(event) => {
+                                if player_tx.send((id, event)).is_err() {
+                                    break;
+                                }
+                            }
                             Err(codec::Error::Io(e))
                                 if matches!(
                                     e.kind(),
@@ -144,9 +148,6 @@ pub fn listen(
                                 error!("[{event_addr}] read player event: {e}");
                                 break;
                             }
-                        };
-                        if player_tx.send((id, event)).is_err() {
-                            break;
                         }
                     }
                     info!("[{event_addr}] reading closed");
