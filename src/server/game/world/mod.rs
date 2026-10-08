@@ -1,5 +1,6 @@
 pub mod action;
 pub mod branch;
+pub mod generator;
 pub mod height;
 pub mod light;
 pub mod mesh;
@@ -11,7 +12,7 @@ use super::{
         Block, BlockLight,
         area::{BlockArea, BlockAreaSource, BlockLightArea, BlockLightAreaSource},
     },
-    chunk::{Chunk, ChunkReach, area::ChunkArea, generator::ChunkGenerator},
+    chunk::{Chunk, ChunkReach, area::ChunkArea},
     coords,
     player::{ChunkScope, Player},
 };
@@ -30,6 +31,7 @@ use crate::{
 };
 use action::{ActionStore, BlockAction};
 use branch::{Branch, Changelog};
+use generator::ChunkGeneratorPool;
 use height::HeightMap;
 use light::WorldLight;
 use mesh::ChunkData;
@@ -50,7 +52,7 @@ use viewer::ViewerRegistry;
 pub struct World {
     chunks: ChunkStore,
     heights: HeightMap,
-    generator: ChunkGenerator,
+    generators: ChunkGeneratorPool,
     actions: ActionStore,
     light: WorldLight,
     viewers: ViewerRegistry,
@@ -61,67 +63,20 @@ pub struct World {
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    #[rustfmt::skip]
     fn initialize_scope(&mut self, id: ConnectionId, scope: ChunkScope) {
-        let inserts = self.par_insert_many(scope.par_server_points());
-
-        let new_surface_points = self.heights.load_many(inserts.iter().copied());
-        self.light.extend_placeholders(new_surface_points);
-        self.light.par_insert_many(&self.chunks, &self.heights, &inserts, false);
-
-        let loads = scope
-            .client_points()
-            .filter(|&coords| self.chunks.0.contains_key(&coords))
-            .collect::<Vec<_>>();
+        self.generators.request(
+            scope
+                .server_points()
+                .filter(|&coords| !self.chunks.0.contains_key(&coords)),
+            scope.center,
+        );
 
         let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-        scheduler.queue(loads, scope.center);
-    }
-
-    #[rustfmt::skip]
-    fn sync_scope(
-        &mut self,
-        id: ConnectionId,
-        from: ChunkScope,
-        to: ChunkScope,
-        connections: &ConnectionRegistry,
-    ) {
-        let inserts = self.par_insert_many(to.par_exclusive_server_points(&from));
-
-        let new_surface_points = self.heights.load_many(inserts.iter().copied());
-        self.light.extend_placeholders(new_surface_points);
-        let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts, true);
-
-        let loads = to
-            .exclusive_client_points(&from)
-            .filter(|&coords| self.chunks.0.contains_key(&coords))
-            .collect();
-        let unloads = from
-            .exclusive_client_points(&to)
-            .filter(|&coords| self.chunks.0.contains_key(&coords))
-            .collect();
-        let mut updates = self.mesh_updates(inserts, light_updates, &loads, &unloads);
-
-        updates.retain(|&coords| to.client_contains(coords));
-
-        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-        scheduler.queue(loads, to.center);
-
-        let recipient = connections.one(id);
-        Self::send_unloads(&recipient, unloads);
-        self.par_send_updates(&recipient, updates);
-    }
-
-    fn deliver_batch(&mut self, id: ConnectionId, connections: &ConnectionRegistry) {
-        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-        let Some(points) = scheduler.admit_batch() else {
-            return;
-        };
-
-        let recipient = connections.one(id);
-        recipient.send(ChunkEvent::BatchStarted(BatchKind::Delivery));
-        self.par_send_loads(&recipient, points);
-        recipient.send(ChunkEvent::BatchEnded);
+        scheduler.queue(
+            scope
+                .client_points()
+                .filter(|&coords| self.chunks.0.contains_key(&coords)),
+        );
     }
 
     fn apply(
@@ -163,22 +118,92 @@ impl World {
         self.actions.extend(actions);
     }
 
-    fn par_insert_many<P>(&mut self, points: P) -> Vec<Point3<i32>>
-    where
-        P: IntoParallelIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_par_iter()
-            .filter(|coords| !self.chunks.0.contains_key(coords))
-            .filter_map(|coords| Some((coords, self.generate(coords)?)))
-            .collect_vec_list()
-            .into_iter()
-            .flatten()
-            .map(|(coords, chunk)| {
+    #[rustfmt::skip]
+    fn advance_generators(&mut self, deadline: Instant) -> Vec<Point3<i32>> {
+        let demand = self.schedulers.demand();
+
+        self.generators.anticipate(demand, |coords| self.schedulers.server_contains(coords));
+
+        let mut inserts = vec![];
+        while inserts.len() < demand {
+            let Some((coords, chunk)) = self.generators.poll_until(deadline) else {
+                break;
+            };
+
+            if self.schedulers.server_contains(coords)
+                && let Some(chunk) = self.actions.apply(coords, chunk)
+            {
                 self.chunks.0.insert(coords, chunk);
-                coords
-            })
-            .collect()
+                inserts.push(coords);
+            }
+
+            if Instant::now() > deadline {
+                break;
+            }
+        }
+        inserts
+    }
+
+    #[rustfmt::skip]
+    fn integrate_inserts(&mut self, inserts: &[Point3<i32>]) {
+        let new_surface_points = self.heights.load_many(inserts.iter().copied());
+        self.light.extend_placeholders(new_surface_points);
+        let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, inserts);
+
+        let loads = inserts.iter().copied().collect::<FxHashSet<_>>();
+        let updates = self.mesh_updates(
+            inserts.iter().copied(),
+            light_updates,
+            &loads,
+            &Default::default(),
+        );
+
+        for scheduler in self.schedulers.0.values_mut() {
+            let scope = scheduler.admitted;
+            scheduler.queue(
+                iter::chain(&loads, &updates)
+                    .copied()
+                    .filter(|&coords| scope.client_contains(coords)),
+            );
+        }
+    }
+
+    fn sync_scope(
+        &mut self,
+        id: ConnectionId,
+        from: ChunkScope,
+        to: ChunkScope,
+        connections: &ConnectionRegistry,
+    ) {
+        self.generators.request(
+            to.exclusive_server_points(&from)
+                .filter(|&coords| !self.chunks.0.contains_key(&coords)),
+            to.center,
+        );
+
+        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+        scheduler.queue(
+            to.exclusive_client_points(&from)
+                .filter(|&coords| self.chunks.0.contains_key(&coords)),
+        );
+
+        Self::send_unloads(
+            &connections.one(id),
+            from.exclusive_client_points(&to)
+                .filter(|&coords| self.chunks.0.contains_key(&coords)),
+        );
+    }
+
+    fn deliver_batch(&mut self, id: ConnectionId, connections: &ConnectionRegistry) {
+        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+        let Some(points) = scheduler.admit_batch() else {
+            return;
+        };
+
+        let recipient = connections.one(id);
+        recipient.send(ChunkEvent::BatchStarted(BatchKind::Delivery));
+        self.par_send_loads(&recipient, points);
+        recipient.send(ChunkEvent::BatchEnded);
     }
 
     #[rustfmt::skip]
@@ -197,9 +222,8 @@ impl World {
         let recipients = connections.many(recipient_ids.iter().copied());
 
         recipients.send(ChunkEvent::BatchStarted(BatchKind::Broadcast));
-        self.send_updates(&recipients, updates);
         Self::send_unloads(&recipients, removals);
-        self.send_loads(&recipients, inserts);
+        self.send_loads(&recipients, iter::chain(updates, inserts));
         recipients.send(ChunkEvent::BatchEnded);
     }
 
@@ -255,54 +279,6 @@ impl World {
             .into_iter()
             .flatten()
             .for_each(|event| recipients.send(event));
-    }
-
-    fn send_updates<P>(&self, recipients: &RecipientList, points: P)
-    where
-        P: IntoIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_iter()
-            .map(|coords| {
-                ChunkEvent::Updated(
-                    Arc::new(ChunkData::new(&self.chunks, &self.light, coords)).into(),
-                )
-            })
-            .for_each(|event| recipients.send(event));
-    }
-
-    fn par_send_updates<P>(&self, recipients: &RecipientList, points: P)
-    where
-        P: IntoParallelIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_par_iter()
-            .map(|coords| {
-                ChunkEvent::Updated(
-                    Arc::new(ChunkData::new(&self.chunks, &self.light, coords)).into(),
-                )
-            })
-            .collect_vec_list()
-            .into_iter()
-            .flatten()
-            .for_each(|event| recipients.send(event));
-    }
-
-    fn generate(&self, coords: Point3<i32>) -> Option<Box<Chunk>> {
-        if self.chunks.0.contains_key(&coords) {
-            return None;
-        }
-
-        let mut chunk = Box::new(self.generator.generate(coords));
-        for (coords, action) in self.actions.chunk_actions(coords) {
-            chunk.apply_unchecked(coords, action);
-        }
-        if !chunk.is_empty() {
-            chunk.recompute_visibility_graph();
-            Some(chunk)
-        } else {
-            None
-        }
     }
 
     fn send_unloads<P: IntoIterator<Item = Point3<i32>>>(recipients: &RecipientList, points: P) {
@@ -375,6 +351,9 @@ impl EventHandler<WorldEvent> for World {
             WorldEvent::Tick => {
                 let now = Instant::now();
                 let deadline = now + TICK_BUDGET;
+
+                let inserts = self.advance_generators(deadline);
+                self.integrate_inserts(&inserts);
 
                 let ids = self.schedulers.0.keys().copied().collect::<Vec<_>>();
                 let ordered_ids = self.tick_rotation.order(&ids);

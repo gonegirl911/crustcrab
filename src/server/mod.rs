@@ -80,7 +80,6 @@ impl Outbound for ControlEvent {
 pub enum ChunkEvent {
     Loaded(Compressed<Arc<ChunkData>>),
     Unloaded(Point3<i32>),
-    Updated(Compressed<Arc<ChunkData>>),
     BatchStarted(BatchKind),
     BatchEnded,
 }

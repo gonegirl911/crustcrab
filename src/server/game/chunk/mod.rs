@@ -1,5 +1,4 @@
 pub mod area;
-pub mod generator;
 pub mod visibility;
 
 use super::{
@@ -31,7 +30,7 @@ pub struct Chunk {
 impl Chunk {
     pub const DIM: usize = 16;
 
-    fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
+    pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
         let mut non_air_count = 0;
         let mut glowing_count = 0;
         Self {
@@ -56,12 +55,13 @@ impl Chunk {
         is_valid
     }
 
-    pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: BlockAction) {
+    pub fn apply_unchecked(&mut self, coords: Point3<u8>, action: BlockAction) -> bool {
         let block = &mut self.blocks[coords];
         let prev = *block;
         block.apply_unchecked(action);
         let cur = *block;
         self.adjust_counts(prev, cur);
+        prev != cur
     }
 
     pub fn is_empty(&self) -> bool {

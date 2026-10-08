@@ -63,7 +63,6 @@ impl BlockHighlight {
         }
     }
 
-    #[rustfmt::skip]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -104,6 +103,7 @@ impl BlockHighlight {
             [player_uniform_bind_group, shading_texture_bind_group],
         );
         imm.set(&mut render_pass);
+        #[rustfmt::skip]
         self.vertex_buffer.draw_indexed(&mut render_pass, &self.index_buffer);
     }
 }

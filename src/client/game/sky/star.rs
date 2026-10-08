@@ -51,7 +51,6 @@ impl StarDome {
         }
     }
 
-    #[rustfmt::skip]
     pub fn draw(
         &self,
         render_pass: &mut wgpu::RenderPass,
@@ -63,6 +62,7 @@ impl StarDome {
             return;
         }
 
+        #[rustfmt::skip]
         self.render_pipeline.bind(render_pass, [player_uniform_bind_group]);
         imm.set(render_pass);
         render_pass.set_vertex_buffer(0, self.instance_buffer.slice(..));

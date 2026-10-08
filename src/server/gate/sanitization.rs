@@ -27,8 +27,8 @@ pub fn sanitize(mut event: PlayerEvent) -> Option<PlayerEvent> {
 
             *dir = normalized.cast();
         }
+        #[expect(clippy::collapsible_match)]
         PlayerEvent::ChunkBatchAcknowledged { chunks_per_second } => {
-            #[expect(clippy::collapsible_match)]
             if !chunks_per_second.is_finite() || *chunks_per_second < 0.0 {
                 return None;
             }

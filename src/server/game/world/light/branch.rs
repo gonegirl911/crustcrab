@@ -107,11 +107,7 @@ impl Branch {
         self
     }
 
-    pub fn merge(
-        self,
-        light: &mut WorldLight,
-        collect_updates: bool,
-    ) -> Vec<(Point3<i32>, ChunkReach)> {
+    pub fn merge(self, light: &mut WorldLight) -> Vec<(Point3<i32>, ChunkReach)> {
         let mut updates = vec![];
         for (chunk_coords, values) in self.values {
             match light.0.entry(chunk_coords) {
@@ -122,7 +118,7 @@ impl Branch {
                         continue;
                     }
 
-                    if collect_updates && let Some(reach) = light.diff_reach(&values) {
+                    if let Some(reach) = light.diff_reach(&values) {
                         updates.push((chunk_coords, reach));
                     }
 
@@ -137,8 +133,7 @@ impl Branch {
                         continue;
                     }
 
-                    if collect_updates && let Some(reach) = DEFAULT_CHUNK_LIGHT.diff_reach(&values)
-                    {
+                    if let Some(reach) = DEFAULT_CHUNK_LIGHT.diff_reach(&values) {
                         updates.push((chunk_coords, reach));
                     }
 

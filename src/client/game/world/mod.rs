@@ -485,18 +485,6 @@ impl EventHandler for World {
                         player_tx,
                     );
                 }
-                ChunkEvent::Updated(Compressed { inner: data, .. }) => {
-                    let snapshot_revision = self.bump_revision(data.coords);
-                    let has_priority = self.join_open_batch();
-                    self.workers.submit(
-                        ChunkInput {
-                            data: data.clone(),
-                            batch_id: self.open_batch_id,
-                            snapshot_revision,
-                        },
-                        has_priority,
-                    );
-                }
                 &ChunkEvent::BatchStarted(kind) => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
                     self.open_batch_id = BatchId::new(kind);

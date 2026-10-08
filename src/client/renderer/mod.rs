@@ -128,7 +128,6 @@ impl EventHandler for Surface {
                 WindowEvent::SurfaceResized(_) | WindowEvent::ScaleFactorChanged { .. } => {
                     self.should_resize = true;
                 }
-                #[expect(clippy::collapsible_match)]
                 WindowEvent::RedrawRequested => {
                     if mem::take(&mut self.should_resize) {
                         let PhysicalSize { width, height } = window.surface_size();

@@ -8,8 +8,8 @@ pub struct Ray {
 }
 
 impl Ray {
-    #[rustfmt::skip]
     pub fn cast(&self, reach: f64) -> impl Iterator<Item = BlockIntersection> + use<> {
+        #[rustfmt::skip]
         let precalcs = self.origin.coords.zip_map(&self.dir, |o, d| {
             match d.partial_cmp(&0.0).unwrap() {
                 cmp::Ordering::Less => (-1, o - o.floor(), 1.0 / -d),

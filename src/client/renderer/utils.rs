@@ -84,7 +84,6 @@ impl<C, V: Pod> BlendedMesh<C, V> {
         })
     }
 
-    #[rustfmt::skip]
     pub fn draw<D, F>(
         &mut self,
         renderer: &Renderer,
@@ -99,18 +98,23 @@ impl<C, V: Pod> BlendedMesh<C, V> {
             self.sort_indices(dist);
             self.index_buffer.write(renderer, &self.indices);
         }
+        #[rustfmt::skip]
         self.vertex_buffer.draw_indexed(render_pass, &self.index_buffer);
     }
 
-    #[rustfmt::skip]
     fn sort_indices<D, F>(&mut self, mut dist: F)
     where
         D: Ord,
         F: FnMut(&C) -> D,
     {
+        #[rustfmt::skip]
         self.face_indices.sort_unstable_by_key(|(c, _)| Reverse(dist(c)));
         self.indices.clear();
-        self.indices.extend(self.face_indices.iter().flat_map(|&(_, base)| base..base + 6));
+        self.indices.extend(
+            self.face_indices
+                .iter()
+                .flat_map(|&(_, base)| base..base + 6),
+        );
     }
 }
 

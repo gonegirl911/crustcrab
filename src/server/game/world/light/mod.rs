@@ -68,7 +68,6 @@ impl WorldLight {
         chunks: &ChunkStore,
         heights: &HeightMap,
         points: &[Point3<i32>],
-        collect_updates: bool,
     ) -> Vec<(Point3<i32>, ChunkReach)> {
         if points.is_empty() {
             return vec![];
@@ -130,7 +129,7 @@ impl WorldLight {
             )
             .map(|branch| branch.evaluate(chunks, self))
             .reduce(Default::default, Branch::sup)
-            .merge(self, collect_updates)
+            .merge(self)
     }
 
     pub fn apply<A>(&mut self, chunks: &ChunkStore, actions: A) -> Vec<(Point3<i32>, ChunkReach)>
@@ -148,7 +147,7 @@ impl WorldLight {
                 }
             }
         }
-        branch.merge(self, true)
+        branch.merge(self)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {

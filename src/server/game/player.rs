@@ -14,7 +14,6 @@ use crate::{
     shared::{cuboid::Cuboid, ray::Ray, utils},
 };
 use nalgebra::{Point2, Point3, Vector3, point, vector};
-use rayon::iter::ParallelIterator;
 use rustc_hash::FxHashMap;
 use serde::{
     Deserialize, Deserializer,
@@ -114,9 +113,9 @@ impl ChunkScope {
     pub const SERVER_CONTEXT: i32 =
         (BlockLight::COMPONENT_MAX as usize - 1 + BlockArea::PADDING).div_ceil(Chunk::DIM) as i32;
 
-    pub fn par_server_points(&self) -> impl ParallelIterator<Item = Point3<i32>> {
+    pub fn server_points(&self) -> impl Iterator<Item = Point3<i32>> {
         self.server_cuboid()
-            .into_par_points()
+            .into_points()
             .map(Point3::cast)
             .filter(move |&coords| self.server_contains(coords))
     }
@@ -128,11 +127,8 @@ impl ChunkScope {
             .filter(move |&coords| self.client_contains(coords))
     }
 
-    pub fn par_exclusive_server_points(
-        &self,
-        other: &Self,
-    ) -> impl ParallelIterator<Item = Point3<i32>> {
-        self.par_server_points()
+    pub fn exclusive_server_points(&self, other: &Self) -> impl Iterator<Item = Point3<i32>> {
+        self.server_points()
             .filter(move |&coords| !other.server_contains(coords))
     }
 
@@ -141,7 +137,7 @@ impl ChunkScope {
             .filter(move |&coords| !other.client_contains(coords))
     }
 
-    fn server_contains(&self, coords: Point3<i32>) -> bool {
+    pub fn server_contains(&self, coords: Point3<i32>) -> bool {
         self.contains_xz(coords.xz(), Self::SERVER_CONTEXT) && self.server_contains_y(coords.y)
     }
 

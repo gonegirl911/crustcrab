@@ -50,6 +50,7 @@ pub trait Cullable {
 }
 
 impl Cullable for BoundingSphere {
+    #[expect(clippy::needless_bool)]
     fn is_visible(&self, frustum: &Frustum) -> bool {
         let v = (self.center - frustum.origin).cast();
 

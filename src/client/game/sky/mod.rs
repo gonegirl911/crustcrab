@@ -57,7 +57,6 @@ impl Sky {
         }
     }
 
-    #[rustfmt::skip]
     pub fn draw(
         &self,
         renderer: &Renderer,
@@ -74,6 +73,7 @@ impl Sky {
             player_uniform_bind_group,
             &self.uniform.bind_group,
         );
+        #[rustfmt::skip]
         self.stars.draw(&mut render_pass, player_uniform_bind_group, time);
         self.objects.draw(
             &mut render_pass,

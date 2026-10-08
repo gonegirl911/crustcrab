@@ -1,5 +1,4 @@
 use nalgebra::{Point3, Vector3, point};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 pub struct Cuboid {
     origin: Point3<i64>,
@@ -40,12 +39,6 @@ impl Cuboid {
 
     pub fn into_points(self) -> impl Iterator<Item = Point3<i64>> {
         (0..self.volume()).map(move |i| self.decompose(i))
-    }
-
-    pub fn into_par_points(self) -> impl ParallelIterator<Item = Point3<i64>> {
-        (0..self.volume())
-            .into_par_iter()
-            .map(move |i| self.decompose(i))
     }
 
     fn decompose(&self, i: i64) -> Point3<i64> {

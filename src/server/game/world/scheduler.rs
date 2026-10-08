@@ -24,6 +24,16 @@ use std::{
 pub struct ChunkSchedulerRegistry(pub FxHashMap<ConnectionId, ChunkScheduler>);
 
 impl ChunkSchedulerRegistry {
+    pub fn demand(&self) -> usize {
+        MAX_CHUNKS_PER_TICK as usize * self.0.len()
+    }
+
+    pub fn server_contains(&self, coords: Point3<i32>) -> bool {
+        self.0
+            .values()
+            .any(|scheduler| scheduler.admitted.server_contains(coords))
+    }
+
     pub fn client_containing(&self, points: &[Point3<i32>]) -> impl Iterator<Item = ConnectionId> {
         self.0
             .iter()
@@ -64,7 +74,7 @@ impl EventHandler<WorldEvent> for ChunkSchedulerRegistry {
 }
 
 pub struct ChunkScheduler {
-    admitted: ChunkScope,
+    pub admitted: ChunkScope,
     desired: ChunkScope,
     scope_pacer: Pacer,
     pending: Vec<Point3<i32>>,
@@ -97,13 +107,14 @@ impl ChunkScheduler {
         }
     }
 
-    #[rustfmt::skip]
-    pub fn queue<P>(&mut self, points: P, center: Point3<i32>)
+    pub fn queue<P>(&mut self, points: P)
     where
         P: IntoIterator<Item = Point3<i32>>,
     {
         self.pending.extend(points);
-        self.pending.par_sort_unstable_by_key(|&coords| Reverse(utils::distance_squared(coords, center)));
+        self.pending.par_sort_unstable_by_key(|&coords| {
+            Reverse(utils::distance_squared(coords, self.admitted.center))
+        });
     }
 
     pub fn admit_batch(&mut self) -> Option<Vec<Point3<i32>>> {
@@ -123,12 +134,12 @@ impl ChunkScheduler {
         Some(self.pending.split_off(self.pending.len() - size))
     }
 
-    #[rustfmt::skip]
     pub fn acknowledge_batch(&mut self, chunks_per_second: f32) {
         let ticks_per_second = SERVER_CONFIG.event_loop.ticks_per_second;
         let chunks_per_tick = chunks_per_second / ticks_per_second as f32;
         self.unacknowledged_batches = self.unacknowledged_batches.saturating_sub(1);
         self.max_unacknowledged_batches = MAX_UNACKNOWLEDGED_BATCHES;
+        #[rustfmt::skip]
         self.budget.set_rate(chunks_per_tick.clamp(MIN_CHUNKS_PER_TICK, MAX_CHUNKS_PER_TICK));
     }
 

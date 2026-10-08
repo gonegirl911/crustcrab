@@ -1,10 +1,11 @@
-use crossbeam_channel::{self, Receiver, Sender, TryRecvError};
+use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::{
     collections::VecDeque,
     mem::DropGuard,
     num::NonZero,
     sync::{Arc, Mutex, MutexGuard},
     thread,
+    time::Instant,
 };
 
 pub fn init(reserved_threads: usize) {
@@ -26,6 +27,10 @@ pub struct JobPool<I, O> {
 impl<I, O> JobPool<I, O> {
     pub fn try_recv(&self) -> Result<O, TryRecvError> {
         self.out_rx.try_recv()
+    }
+
+    pub fn recv_deadline(&self, deadline: Instant) -> Result<O, RecvTimeoutError> {
+        self.out_rx.recv_deadline(deadline)
     }
 }
 

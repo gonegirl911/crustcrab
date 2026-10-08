@@ -1,5 +1,4 @@
 #![feature(
-    drop_guard,
     impl_restriction,
     impl_trait_in_assoc_type,
     int_roundings,
