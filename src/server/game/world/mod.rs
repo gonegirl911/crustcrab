@@ -50,7 +50,7 @@ use std::{
     iter, mem,
     ops::{Index, Range},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Default)]
@@ -385,6 +385,7 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::Tick => {
                 let now = Instant::now();
+                let deadline = now + TICK_BUDGET;
 
                 for id in self.schedulers.0.keys().copied().collect::<Vec<_>>() {
                     let scheduler = self.schedulers.0.get_mut(&id).unwrap();
@@ -394,6 +395,10 @@ impl EventHandler<WorldEvent> for World {
                     }
 
                     self.deliver_batch(id, connections);
+
+                    if Instant::now() > deadline {
+                        break;
+                    }
                 }
             }
             _ => {}
@@ -869,3 +874,5 @@ impl WorldEvent {
         }
     }
 }
+
+const TICK_BUDGET: Duration = Duration::from_millis(10);
