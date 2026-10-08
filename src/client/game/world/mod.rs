@@ -50,8 +50,8 @@ pub struct World {
     revisions: FxHashMap<Point3<i32>, RevisionTracker>,
     open_batch_id: BatchId,
     pending_batches: FxHashMap<BatchId, ChunkBatch>,
-    chunk_rate: Ema,
     workers: JobPool<ChunkInput, ChunkOutput>,
+    chunk_rate: Ema,
 }
 
 impl World {
