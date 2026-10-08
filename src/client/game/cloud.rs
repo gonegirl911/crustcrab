@@ -1,4 +1,4 @@
-use super::{clock::RenderTime, world::BlockVertex};
+use super::{clock::RenderTime, world::mesh::BlockVertex};
 use crate::{
     client::{
         CLIENT_CONFIG,

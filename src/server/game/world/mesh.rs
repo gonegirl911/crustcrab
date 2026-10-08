@@ -1,6 +1,6 @@
 use super::{ChunkStore, WorldLight};
 use crate::{
-    client::game::world::BlockVertex,
+    client::game::world::mesh::BlockVertex,
     server::game::{
         block::{
             Block, BlockLight,

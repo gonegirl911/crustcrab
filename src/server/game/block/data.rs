@@ -4,7 +4,7 @@ use super::{
     model::{Model, RawModel},
 };
 use crate::{
-    client::game::{shading::DAY_LIGHT_TABLE, world::BlockVertex},
+    client::game::{shading::DAY_LIGHT_TABLE, world::mesh::BlockVertex},
     enum_map,
     server::game::chunk::Chunk,
     shared::{
