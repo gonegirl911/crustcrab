@@ -55,7 +55,7 @@ pub struct World {
     light: WorldLight,
     viewers: ViewerRegistry,
     schedulers: ChunkSchedulerRegistry,
-    round_robin: RoundRobin<ConnectionId>,
+    tick_rotation: RoundRobin<ConnectionId>,
 }
 
 impl World {
@@ -382,7 +382,7 @@ impl EventHandler<WorldEvent> for World {
                 let deadline = now + TICK_BUDGET;
 
                 let ids = self.schedulers.0.keys().copied().collect::<Vec<_>>();
-                let ordered_ids = self.round_robin.order(&ids);
+                let ordered_ids = self.tick_rotation.order(&ids);
 
                 for &id in ordered_ids {
                     let scheduler = self.schedulers.0.get_mut(&id).unwrap();
@@ -391,7 +391,7 @@ impl EventHandler<WorldEvent> for World {
                     }
                     self.deliver_batch(id, connections);
 
-                    self.round_robin.advance(id);
+                    self.tick_rotation.advance(id);
 
                     if Instant::now() > deadline {
                         break;
