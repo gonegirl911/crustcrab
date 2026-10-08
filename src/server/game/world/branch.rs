@@ -12,13 +12,6 @@ pub struct Branch {
     actions: ActionStore,
 }
 
-pub struct Changelog {
-    pub actions: Vec<(Point3<i64>, BlockAction)>,
-    pub inserts: FxHashSet<Point3<i32>>,
-    pub removals: FxHashSet<Point3<i32>>,
-    pub updates: Vec<(Point3<i32>, ChunkReach)>,
-}
-
 impl Branch {
     pub fn apply(
         &mut self,
@@ -145,4 +138,11 @@ impl Branch {
         }
         block
     }
+}
+
+pub struct Changelog {
+    pub actions: Vec<(Point3<i64>, BlockAction)>,
+    pub inserts: FxHashSet<Point3<i32>>,
+    pub removals: FxHashSet<Point3<i32>>,
+    pub updates: Vec<(Point3<i32>, ChunkReach)>,
 }
