@@ -93,7 +93,7 @@ impl Default for RateLimiter {
             block_action: Pacer::new(BLOCK_ACTION_GAP),
             chunk_batch_acknowledged: Policer::new(
                 CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW,
-                ChunkScheduler::max_batch_acknowledgements(CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW),
+                ChunkScheduler::max_batch_acknowledgements(CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW) * 2,
             ),
             rate_violations: Default::default(),
         }
