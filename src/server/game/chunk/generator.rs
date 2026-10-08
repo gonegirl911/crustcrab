@@ -15,7 +15,7 @@ impl ChunkGenerator {
         }
 
         Chunk::from_fn(|block_coords| {
-            let coords = coords::coords(coords, block_coords).cast() / Chunk::DIM as f64;
+            let coords = coords::from_parts(coords, block_coords).cast() / Chunk::DIM as f64;
             if self.noise.get(coords.into()) > 0.0 {
                 Block::SAND
             } else {

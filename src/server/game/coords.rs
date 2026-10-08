@@ -1,11 +1,11 @@
 use super::chunk::Chunk;
 use nalgebra::{Point, Scalar};
 
-pub fn chunk_coords<W: WorldCoords>(coords: W) -> W::Point<i32> {
+pub fn chunk<W: WorldCoords>(coords: W) -> W::Point<i32> {
     coords.chunk_coords()
 }
 
-pub fn block_coords<W: WorldCoords>(coords: W) -> W::Point<u8> {
+pub fn block<W: WorldCoords>(coords: W) -> W::Point<u8> {
     coords.block_coords()
 }
 
@@ -41,9 +41,6 @@ impl<const D: usize> WorldCoords for Point<f64, D> {
     }
 }
 
-pub fn coords<const D: usize>(
-    chunk_coords: Point<i32, D>,
-    block_coords: Point<u8, D>,
-) -> Point<i64, D> {
-    chunk_coords.cast() * Chunk::DIM as i64 + block_coords.cast().coords
+pub fn from_parts<const D: usize>(chunk: Point<i32, D>, block: Point<u8, D>) -> Point<i64, D> {
+    chunk.cast() * Chunk::DIM as i64 + block.cast().coords
 }

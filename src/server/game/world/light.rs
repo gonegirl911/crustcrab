@@ -1,8 +1,4 @@
-use super::{
-    ChunkStore, World,
-    action::BlockAction,
-    height::HeightMap,
-};
+use super::{ChunkStore, World, action::BlockAction, height::HeightMap};
 use crate::{
     server::game::{
         block::{
@@ -40,7 +36,7 @@ impl WorldLight {
                     for y in ChunkArea::axis_range(dy) {
                         let z = ChunkArea::axis_range(dz);
                         value.copy_row(
-                            coords::coords(point![dx, dy, dz], point![x, y, z.start])
+                            coords::from_parts(point![dx, dy, dz], point![x, y, z.start])
                                 .coords
                                 .cast(),
                             light.row(point![x, y, z.start], z.len()),
@@ -119,7 +115,7 @@ impl WorldLight {
                         for (block_coords, neighbor_block_coords) in side.block_points() {
                             let node = Self::node(chunk, light, chunk_coords, block_coords);
                             let filter = node.block().data().light_filter;
-                            let coords = coords::coords(chunk_coords, block_coords);
+                            let coords = coords::from_parts(chunk_coords, block_coords);
                             let neighbor_value = neighbor[neighbor_block_coords];
                             component_range
                                 .clone()
@@ -161,8 +157,8 @@ impl WorldLight {
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
         self.0
-            .get(&coords::chunk_coords(coords))
-            .map_or_default(|light| light[coords::block_coords(coords)])
+            .get(&coords::chunk(coords))
+            .map_or_default(|light| light[coords::block(coords)])
     }
 
     fn absorption(coords: Point3<i64>, index: usize, travel: Side, neighbor_value: u8) -> u8 {
@@ -475,8 +471,8 @@ impl Branch {
     }
 
     fn block_light(&self, light: &WorldLight, coords: Point3<i64>) -> BlockLight {
-        if let Some(values) = self.values.get(&coords::chunk_coords(coords)) {
-            values[coords::block_coords(coords)]
+        if let Some(values) = self.values.get(&coords::chunk(coords)) {
+            values[coords::block(coords)]
         } else {
             light.block_light(coords)
         }
@@ -488,12 +484,12 @@ impl Branch {
         coords: Point3<i64>,
         value: u8,
     ) -> Node<'a> {
-        let chunk_coords = coords::chunk_coords(coords);
+        let chunk_coords = coords::chunk(coords);
         Node {
             chunk: chunks.get(chunk_coords),
             light: light.0.get(&chunk_coords),
             chunk_coords,
-            block_coords: coords::block_coords(coords),
+            block_coords: coords::block(coords),
             value,
         }
     }
@@ -595,7 +591,7 @@ impl<'a> Node<'a> {
     }
 
     fn coords(&self) -> Point3<i64> {
-        coords::coords(self.chunk_coords, self.block_coords)
+        coords::from_parts(self.chunk_coords, self.block_coords)
     }
 
     fn neighbor(
@@ -606,8 +602,8 @@ impl<'a> Node<'a> {
         index: usize,
     ) -> Self {
         let coords = self.coords() + SIDE_DELTAS[side].cast();
-        let chunk_coords = coords::chunk_coords(coords);
-        let block_coords = coords::block_coords(coords);
+        let chunk_coords = coords::chunk(coords);
+        let block_coords = coords::block(coords);
         let absorption = WorldLight::absorption(coords, index, side, self.value);
         let value = self.value.saturating_sub(absorption);
         if self.chunk_coords == chunk_coords {

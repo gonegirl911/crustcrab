@@ -17,8 +17,7 @@ use crate::{
             block::{
                 Block, BlockLight,
                 area::{
-                    BlockArea, BlockAreaSource, BlockContext, BlockLightArea,
-                    BlockLightAreaSource,
+                    BlockArea, BlockAreaSource, BlockContext, BlockLightArea, BlockLightAreaSource,
                 },
                 data::{Corner, RenderLayer, SIDE_AXES, Side},
             },
@@ -415,7 +414,7 @@ impl ChunkStore {
                     for y in ChunkArea::axis_range(dy) {
                         let z = ChunkArea::axis_range(dz);
                         value.copy_row(
-                            coords::coords(point![dx, dy, dz], point![x, y, z.start])
+                            coords::from_parts(point![dx, dy, dz], point![x, y, z.start])
                                 .coords
                                 .cast(),
                             chunk.row(point![x, y, z.start], z.len()),
@@ -436,8 +435,8 @@ impl ChunkStore {
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(coords::chunk_coords(coords))
-            .map_or_default(|chunk| chunk[coords::block_coords(coords)])
+        self.get(coords::chunk(coords))
+            .map_or_default(|chunk| chunk[coords::block(coords)])
     }
 }
 
@@ -514,7 +513,7 @@ impl Branch {
 
                     for (block_coords, action) in actions {
                         if chunk.apply(block_coords, action) {
-                            hits.push((coords::coords(chunk_coords, block_coords), action));
+                            hits.push((coords::from_parts(chunk_coords, block_coords), action));
                             reach.insert_block(block_coords);
                         }
                     }
@@ -545,7 +544,7 @@ impl Branch {
 
                     for (block_coords, action) in actions {
                         chunk.apply_unchecked(block_coords, action);
-                        hits.push((coords::coords(chunk_coords, block_coords), action));
+                        hits.push((coords::from_parts(chunk_coords, block_coords), action));
                         reach.insert_block(block_coords);
                     }
 
@@ -571,7 +570,7 @@ impl Branch {
         normal: Vector3<i64>,
         action: BlockAction,
     ) -> bool {
-        if !World::Y_RANGE.contains(&coords::chunk_coords(coords).y)
+        if !World::Y_RANGE.contains(&coords::chunk(coords).y)
             || !self.block(chunks, coords).is_action_valid(action)
         {
             return false;
@@ -791,11 +790,7 @@ impl BlockHoverData {
         self.area
             .kernel()
             .data()
-            .mesh(
-                coords::block_coords(self.coords),
-                &self.area,
-                &self.light_area,
-            )
+            .mesh(coords::block(self.coords), &self.area, &self.light_area)
             .max_by(|a, b| {
                 let a = DAY_LIGHT_TABLE.value(a.light(), 0).lum();
                 let b = DAY_LIGHT_TABLE.value(b.light(), 0).lum();

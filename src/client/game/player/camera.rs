@@ -38,7 +38,7 @@ impl View {
     }
 
     pub fn anchor(&self) -> Point3<f64> {
-        coords::coords(coords::chunk_coords(self.origin), Point3::origin()).cast()
+        coords::from_parts(coords::chunk(self.origin), Point3::origin()).cast()
     }
 
     pub fn rotate(&mut self, dx: f32, dy: f32) {

@@ -8,8 +8,8 @@ pub struct ActionStore(pub FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAct
 impl ActionStore {
     pub fn get(&self, coords: Point3<i64>) -> Option<BlockAction> {
         self.0
-            .get(&coords::chunk_coords(coords))?
-            .get(&coords::block_coords(coords))
+            .get(&coords::chunk(coords))?
+            .get(&coords::block(coords))
             .copied()
     }
 
@@ -26,9 +26,9 @@ impl ActionStore {
 
     pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
         self.0
-            .entry(coords::chunk_coords(coords))
+            .entry(coords::chunk(coords))
             .or_default()
-            .insert(coords::block_coords(coords), action);
+            .insert(coords::block(coords), action);
     }
 }
 

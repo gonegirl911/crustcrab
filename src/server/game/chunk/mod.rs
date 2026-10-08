@@ -109,7 +109,7 @@ impl Chunk {
 
     fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
-            coords::coords(coords, Point3::origin()).cast(),
+            coords::from_parts(coords, Point3::origin()).cast(),
             Vector3::repeat(Self::DIM as f64),
         )
     }

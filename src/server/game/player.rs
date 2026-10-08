@@ -76,7 +76,7 @@ impl EventHandler<Event> for Player {
                     } = SERVER_CONFIG.player;
 
                     self.cur = ChunkScope {
-                        center: coords::chunk_coords(origin),
+                        center: coords::chunk(origin),
                         radius: render_distance as i32,
                     };
                     self.aim = Ray {
@@ -92,7 +92,7 @@ impl EventHandler<Event> for Player {
                     });
                 }
                 PlayerEvent::Position { origin } => {
-                    self.cur.center = coords::chunk_coords(origin);
+                    self.cur.center = coords::chunk(origin);
                     self.aim.origin = origin;
                 }
                 PlayerEvent::Orientation { dir } => {
