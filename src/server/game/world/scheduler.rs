@@ -131,11 +131,12 @@ impl ChunkScheduler {
         self.max_unacknowledged_batches = MAX_UNACKNOWLEDGED_BATCHES;
         self.budget.set_rate(chunks_per_tick.clamp(MIN_CHUNKS_PER_TICK, MAX_CHUNKS_PER_TICK));
     }
-}
 
-pub fn max_batch_acknowledgements(span: Duration) -> usize {
-    let ticks_per_second = SERVER_CONFIG.event_loop.ticks_per_second;
-    (ticks_per_second as f32 * span.as_secs_f32()) as usize + MAX_UNACKNOWLEDGED_BATCHES as usize
+    pub fn max_batch_acknowledgements(span: Duration) -> usize {
+        let ticks_per_second = SERVER_CONFIG.event_loop.ticks_per_second;
+        (ticks_per_second as f32 * span.as_secs_f32()) as usize
+            + MAX_UNACKNOWLEDGED_BATCHES as usize
+    }
 }
 
 const CHUNK_SCOPE_CHANGE_GAP: Duration = Duration::from_millis(250);

@@ -4,7 +4,7 @@ use crate::{
     server::{
         connection::{ConnectionEvent, ConnectionId},
         event_loop::EventHandler,
-        game::world::scheduler,
+        game::world::scheduler::ChunkScheduler,
     },
     shared::flow::{pacer::Pacer, policer::Policer},
 };
@@ -93,7 +93,7 @@ impl Default for RateLimiter {
             block_action: Pacer::new(BLOCK_ACTION_GAP),
             chunk_batch_acknowledged: Policer::new(
                 CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW,
-                scheduler::max_batch_acknowledgements(CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW),
+                ChunkScheduler::max_batch_acknowledgements(CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW),
             ),
             rate_violations: Default::default(),
         }
