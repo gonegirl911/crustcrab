@@ -25,6 +25,7 @@ use crate::{
     shared::{
         bound::Aabb,
         ray::{BlockIntersection, Intersectable, Ray},
+        round_robin::RoundRobin,
     },
 };
 use action::{ActionStore, BlockAction};
@@ -54,6 +55,7 @@ pub struct World {
     light: WorldLight,
     viewers: ViewerRegistry,
     schedulers: ChunkSchedulerRegistry,
+    round_robin: RoundRobin<ConnectionId>,
 }
 
 impl World {
@@ -379,14 +381,17 @@ impl EventHandler<WorldEvent> for World {
                 let now = Instant::now();
                 let deadline = now + TICK_BUDGET;
 
-                for id in self.schedulers.0.keys().copied().collect::<Vec<_>>() {
-                    let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+                let ids = self.schedulers.0.keys().copied().collect::<Vec<_>>();
+                let ordered_ids = self.round_robin.order(&ids);
 
+                for &id in ordered_ids {
+                    let scheduler = self.schedulers.0.get_mut(&id).unwrap();
                     if let Some((from, to)) = scheduler.admit_scope_change(now) {
                         self.sync_scope(id, from, to, connections);
                     }
-
                     self.deliver_batch(id, connections);
+
+                    self.round_robin.advance(id);
 
                     if Instant::now() > deadline {
                         break;

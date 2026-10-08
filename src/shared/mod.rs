@@ -10,5 +10,6 @@ pub(crate) mod pacer;
 pub mod pool;
 pub(crate) mod quantize;
 pub(crate) mod ray;
+pub(crate) mod round_robin;
 pub(crate) mod toml;
 pub(crate) mod utils;
