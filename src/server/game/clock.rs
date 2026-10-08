@@ -5,7 +5,7 @@ use crate::{
         connection::ConnectionRegistry,
         event_loop::{Event, EventHandler},
     },
-    shared::pacer::Pacer,
+    shared::flow::pacer::Pacer,
 };
 use serde::{
     Deserialize, Deserializer, Serialize,

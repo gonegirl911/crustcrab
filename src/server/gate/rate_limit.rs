@@ -4,8 +4,9 @@ use crate::{
     server::{
         connection::{ConnectionEvent, ConnectionId},
         event_loop::EventHandler,
+        game::world::scheduler,
     },
-    shared::pacer::Pacer,
+    shared::flow::{pacer::Pacer, policer::Policer},
 };
 use log::info;
 use rustc_hash::FxHashMap;
@@ -43,7 +44,7 @@ pub struct RateLimiter {
     position: Pacer,
     orientation: Pacer,
     block_action: Pacer,
-    chunk_batch_acknowledged: Pacer,
+    chunk_batch_acknowledged: Policer,
     rate_violations: RateViolationsTracker,
 }
 
@@ -76,7 +77,7 @@ impl RateLimiter {
             PlayerEvent::BlockPlaced(_) | PlayerEvent::BlockDestroyed => {
                 self.block_action.admit(now)
             }
-            PlayerEvent::ChunkBatchAcknowledged { .. } => self.chunk_batch_acknowledged.admit(now),
+            PlayerEvent::ChunkBatchAcknowledged { .. } => self.chunk_batch_acknowledged.police(now),
             PlayerEvent::KeepAlive { .. } => unreachable!(),
         }
     }
@@ -90,7 +91,10 @@ impl Default for RateLimiter {
             position: Pacer::new(POSITION_GAP),
             orientation: Pacer::new(ORIENTATION_GAP),
             block_action: Pacer::new(BLOCK_ACTION_GAP),
-            chunk_batch_acknowledged: Pacer::new(CHUNK_BATCH_ACKNOWLEDGEMENT_GAP),
+            chunk_batch_acknowledged: Policer::new(
+                CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW,
+                scheduler::max_batch_acknowledgements(CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW),
+            ),
             rate_violations: Default::default(),
         }
     }
@@ -136,7 +140,7 @@ const JOIN_ACKNOWLEDGEMENT_GAP: Duration = Duration::from_secs(1);
 const POSITION_GAP: Duration = Duration::from_millis(2);
 const ORIENTATION_GAP: Duration = Duration::from_millis(2);
 const BLOCK_ACTION_GAP: Duration = Duration::from_millis(16);
-const CHUNK_BATCH_ACKNOWLEDGEMENT_GAP: Duration = Duration::from_millis(2);
+const CHUNK_BATCH_ACKNOWLEDGEMENT_WINDOW: Duration = Duration::from_secs(1);
 
 const RATE_VIOLATION_WINDOW: Duration = Duration::from_secs(60);
 const RATE_VIOLATIONS_THRESHOLD: usize = 360;

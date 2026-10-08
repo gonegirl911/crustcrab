@@ -11,7 +11,7 @@ use crate::{
         stopwatch::Stopwatch,
     },
     server::{ControlEvent, game::chunk::Chunk},
-    shared::{color::Float3, pacer::Pacer},
+    shared::{color::Float3, flow::pacer::Pacer},
 };
 use bytemuck::{Pod, Zeroable};
 use camera::{Projection, View};
