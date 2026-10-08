@@ -201,11 +201,6 @@ impl World {
         Self::send_unloads(&recipients, removals);
         self.send_loads(&recipients, inserts);
         recipients.send(ChunkEvent::BatchEnded);
-
-        for id in recipient_ids {
-            let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-            scheduler.unacknowledged_batches += 1;
-        }
     }
 
     fn mesh_updates(
