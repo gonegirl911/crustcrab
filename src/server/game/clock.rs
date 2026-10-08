@@ -11,10 +11,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
     de::{self, Unexpected},
 };
-use std::{
-    ops::Range,
-    time::{Duration, Instant},
-};
+use std::{ops::Range, time::Duration};
 
 pub struct Clock {
     ticks: u16,
@@ -43,9 +40,9 @@ impl EventHandler<Event> for Clock {
                     ticks: self.ticks,
                 });
             }
-            Event::Tick => {
+            Event::Tick(now) => {
                 self.ticks = (self.ticks + 1) % SERVER_CONFIG.clock.cycle.ticks_per_day;
-                self.pacer.fire(Instant::now(), || {
+                self.pacer.fire(now, || {
                     connections
                         .all()
                         .send(ControlEvent::TimeUpdated { ticks: self.ticks });

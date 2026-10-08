@@ -3,6 +3,7 @@ pub mod block;
 pub mod chunk;
 pub mod height;
 pub mod light;
+pub mod scheduler;
 
 use super::player::{ChunkScope, Player};
 use crate::{
@@ -37,11 +38,9 @@ use chunk::{
 use height::HeightMap;
 use light::WorldLight;
 use nalgebra::{Point2, Point3, Vector3, point};
-use rayon::{
-    iter::{IntoParallelIterator, ParallelIterator},
-    slice::ParallelSliceMut,
-};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
+use scheduler::ChunkSchedulerRegistry;
 use serde::{Deserialize, Serialize};
 use std::{
     array,
@@ -49,6 +48,7 @@ use std::{
     iter, mem,
     ops::{Index, Range},
     sync::Arc,
+    time::Instant,
 };
 
 #[derive(Default)]
@@ -59,27 +59,73 @@ pub struct World {
     actions: ActionStore,
     light: WorldLight,
     viewers: ViewerRegistry,
+    schedulers: ChunkSchedulerRegistry,
 }
 
 impl World {
     pub const Y_RANGE: Range<i32> = -4..20;
 
-    fn par_insert_many<P>(&mut self, points: P) -> Vec<Point3<i32>>
-    where
-        P: IntoParallelIterator<Item = Point3<i32>>,
-    {
-        points
-            .into_par_iter()
-            .filter(|coords| !self.chunks.0.contains_key(coords))
-            .filter_map(|coords| Some((coords, self.generate(coords)?)))
-            .collect_vec_list()
-            .into_iter()
-            .flatten()
-            .map(|(coords, chunk)| {
-                self.chunks.0.insert(coords, chunk);
-                coords
-            })
-            .collect()
+    #[rustfmt::skip]
+    fn initialize_scope(&mut self, id: ConnectionId, scope: ChunkScope) {
+        let inserts = self.par_insert_many(scope.par_server_points());
+
+        let new_surface_points = self.heights.load_many(inserts.iter().copied());
+        self.light.extend_placeholders(new_surface_points);
+        self.light.par_insert_many(&self.chunks, &self.heights, &inserts, false);
+
+        let loads = scope
+            .client_points()
+            .filter(|&coords| self.chunks.0.contains_key(&coords))
+            .collect::<Vec<_>>();
+
+        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+        scheduler.queue(loads, scope.center);
+    }
+
+    #[rustfmt::skip]
+    fn sync_scope(
+        &mut self,
+        id: ConnectionId,
+        from: ChunkScope,
+        to: ChunkScope,
+        connections: &ConnectionRegistry,
+    ) {
+        let inserts = self.par_insert_many(to.par_exclusive_server_points(&from));
+
+        let new_surface_points = self.heights.load_many(inserts.iter().copied());
+        self.light.extend_placeholders(new_surface_points);
+        let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts, true);
+
+        let loads = to
+            .exclusive_client_points(&from)
+            .filter(|&coords| self.chunks.0.contains_key(&coords))
+            .collect();
+        let unloads = from
+            .exclusive_client_points(&to)
+            .filter(|&coords| self.chunks.0.contains_key(&coords))
+            .collect();
+        let mut updates = self.mesh_updates(inserts, light_updates, &loads, &unloads);
+
+        updates.retain(|&coords| to.client_contains(coords));
+
+        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+        scheduler.queue(loads, to.center);
+
+        let recipient = connections.one(id);
+        Self::send_unloads(&recipient, unloads);
+        self.par_send_updates(&recipient, updates);
+    }
+
+    fn deliver_batch(&mut self, id: ConnectionId, connections: &ConnectionRegistry) {
+        let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+        let Some(points) = scheduler.admit_batch() else {
+            return;
+        };
+
+        let recipient = connections.one(id);
+        recipient.send(ChunkEvent::BatchStarted);
+        self.par_send_loads(&recipient, points);
+        recipient.send(ChunkEvent::BatchEnded);
     }
 
     fn apply(
@@ -116,11 +162,43 @@ impl World {
 
         self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
 
+        self.broadcast_batch(connections, updates, removals, inserts);
+
+        self.actions.extend(actions);
+    }
+
+    fn par_insert_many<P>(&mut self, points: P) -> Vec<Point3<i32>>
+    where
+        P: IntoParallelIterator<Item = Point3<i32>>,
+    {
+        points
+            .into_par_iter()
+            .filter(|coords| !self.chunks.0.contains_key(coords))
+            .filter_map(|coords| Some((coords, self.generate(coords)?)))
+            .collect_vec_list()
+            .into_iter()
+            .flatten()
+            .map(|(coords, chunk)| {
+                self.chunks.0.insert(coords, chunk);
+                coords
+            })
+            .collect()
+    }
+
+    #[rustfmt::skip]
+    fn broadcast_batch(
+        &mut self,
+        connections: &ConnectionRegistry,
+        updates: FxHashSet<Point3<i32>>,
+        removals: FxHashSet<Point3<i32>>,
+        inserts: FxHashSet<Point3<i32>>,
+    ) {
         let batch = iter::chain(&inserts, &removals)
             .chain(&updates)
             .copied()
             .collect::<Vec<_>>();
-        let recipients = connections.many(self.viewers.client_containing(&batch));
+        let recipient_ids = self.schedulers.client_containing(&batch).collect::<Vec<_>>();
+        let recipients = connections.many(recipient_ids.iter().copied());
 
         recipients.send(ChunkEvent::BatchStarted);
         self.send_updates(&recipients, updates);
@@ -128,7 +206,10 @@ impl World {
         self.send_loads(&recipients, inserts);
         recipients.send(ChunkEvent::BatchEnded);
 
-        self.actions.extend(actions);
+        for id in recipient_ids {
+            let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+            scheduler.unacknowledged_batches += 1;
+        }
     }
 
     fn mesh_updates(
@@ -244,69 +325,30 @@ impl World {
 impl EventHandler<WorldEvent> for World {
     type Context<'a> = &'a ConnectionRegistry;
 
-    #[rustfmt::skip]
     fn handle(&mut self, event: &WorldEvent, connections: Self::Context<'_>) {
         self.viewers.handle(event, ());
+        self.schedulers.handle(event, ());
 
         match *event {
             WorldEvent::JoinRequested { id, scope, aim } => {
-                let inserts = self.par_insert_many(scope.par_server_points());
-
-                let new_surface_points = self.heights.load_many(inserts.iter().copied());
-                self.light.extend_placeholders(new_surface_points);
-                self.light.par_insert_many(&self.chunks, &self.heights, &inserts, false);
-
-                let mut loads = scope
-                    .client_points()
-                    .filter(|&coords| self.chunks.0.contains_key(&coords))
-                    .collect::<Vec<_>>();
-
-                loads.par_sort_unstable_by_key(|&coords| {
-                    utils::distance_squared(coords, utils::chunk_coords(aim.origin))
-                });
-
+                self.initialize_scope(id, scope);
                 self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
-
-                self.par_send_loads(&connections.one(id), loads);
             }
-            WorldEvent::ChunkScopeChanged { id, prev, cur, aim } => {
-                let inserts = self.par_insert_many(cur.par_exclusive_server_points(&prev));
-
-                let new_surface_points = self.heights.load_many(inserts.iter().copied());
-                self.light.extend_placeholders(new_surface_points);
-                let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, &inserts, true);
-
-                let loads = cur
-                    .exclusive_client_points(&prev)
-                    .filter(|&coords| self.chunks.0.contains_key(&coords))
-                    .collect();
-                let unloads = prev
-                    .exclusive_client_points(&cur)
-                    .filter(|&coords| self.chunks.0.contains_key(&coords))
-                    .collect();
-                let mut updates = self.mesh_updates(inserts, light_updates, &loads, &unloads);
-
-                updates.retain(|&coords| cur.client_contains(coords));
-
+            WorldEvent::ChunkScopeChanged { id, aim, .. } => {
                 self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
-
-                let recipient = connections.one(id);
-                Self::send_unloads(&recipient, unloads);
-                self.par_send_loads(&recipient, loads);
-                self.par_send_updates(&recipient, updates);
             }
             WorldEvent::BlockHoverRequested { id, aim } => {
                 let viewer = self.viewers.0.get_mut(&id).unwrap();
 
-                let hover = aim
-                    .cast(SERVER_CONFIG.player.reach)
-                    .find(|&BlockIntersection { coords, .. }| {
+                let hover = aim.cast(SERVER_CONFIG.player.reach).find(
+                    |&BlockIntersection { coords, .. }| {
                         self.chunks
                             .block(coords)
                             .data()
                             .hitbox(coords)
                             .intersects(aim)
-                    });
+                    },
+                );
 
                 if mem::replace(&mut viewer.hover, hover) != hover {
                     let data = hover.map(|BlockIntersection { coords, .. }| {
@@ -322,7 +364,6 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::BlockPlaced { id, block, aim } => {
                 let viewer = &self.viewers.0[&id];
-
                 if let Some(BlockIntersection { coords, normal }) = viewer.hover {
                     self.apply(
                         coords + normal,
@@ -336,9 +377,21 @@ impl EventHandler<WorldEvent> for World {
             }
             WorldEvent::BlockDestroyed { id, aim } => {
                 let viewer = &self.viewers.0[&id];
-
                 if let Some(BlockIntersection { coords, normal }) = viewer.hover {
                     self.apply(coords, normal, BlockAction::Destroy, id, connections, aim);
+                }
+            }
+            WorldEvent::Tick => {
+                let now = Instant::now();
+
+                for id in self.schedulers.0.keys().copied().collect::<Vec<_>>() {
+                    let scheduler = self.schedulers.0.get_mut(&id).unwrap();
+
+                    if let Some((from, to)) = scheduler.admit_scope_change(now) {
+                        self.sync_scope(id, from, to, connections);
+                    }
+
+                    self.deliver_batch(id, connections);
                 }
             }
             _ => {}
@@ -396,26 +449,13 @@ impl Index<Point3<i32>> for ChunkStore {
 #[derive(Default)]
 struct ViewerRegistry(FxHashMap<ConnectionId, Viewer>);
 
-impl ViewerRegistry {
-    fn client_containing(&self, points: &[Point3<i32>]) -> impl Iterator<Item = ConnectionId> {
-        self.0
-            .iter()
-            .filter(|(_, player)| points.iter().any(|&c| player.scope.client_contains(c)))
-            .map(|(&id, _)| id)
-    }
-}
-
 impl EventHandler<WorldEvent> for ViewerRegistry {
     type Context<'a> = ();
 
     fn handle(&mut self, event: &WorldEvent, (): Self::Context<'_>) {
         match *event {
-            WorldEvent::JoinRequested { id, scope, .. } => {
-                self.0.insert(id, Viewer { scope, hover: None });
-            }
-            WorldEvent::ChunkScopeChanged { id, cur, .. } => {
-                let viewer = self.0.get_mut(&id).unwrap();
-                viewer.scope = cur;
+            WorldEvent::JoinRequested { id, .. } => {
+                self.0.insert(id, Viewer { hover: None });
             }
             WorldEvent::Connection(ConnectionEvent::Closed(id)) => {
                 self.0.remove(&id);
@@ -426,7 +466,6 @@ impl EventHandler<WorldEvent> for ViewerRegistry {
 }
 
 struct Viewer {
-    scope: ChunkScope,
     hover: Option<BlockIntersection>,
 }
 
@@ -772,8 +811,7 @@ pub enum WorldEvent {
     },
     ChunkScopeChanged {
         id: ConnectionId,
-        prev: ChunkScope,
-        cur: ChunkScope,
+        scope: ChunkScope,
         aim: Ray,
     },
     BlockHoverRequested {
@@ -789,33 +827,45 @@ pub enum WorldEvent {
         id: ConnectionId,
         aim: Ray,
     },
+    ChunkBatchAcknowledged {
+        id: ConnectionId,
+        chunks_per_second: f32,
+    },
+    Tick,
 }
 
 impl WorldEvent {
     pub fn new(event: &Event, player: Option<&Player>) -> Option<Self> {
-        if let Event::Connection(event) = event {
-            return Some(Self::Connection(event.clone()));
-        }
-
-        let &Player { prev, cur, aim } = player?;
-        match *event {
-            Event::Player(id, PlayerEvent::JoinRequested { .. }) => Some(Self::JoinRequested {
+        let (id, player_event, &Player { prev, cur, aim }) = match event {
+            Event::Connection(event) => {
+                return Some(Self::Connection(event.clone()));
+            }
+            Event::Player(id, event) => (*id, event, player?),
+            Event::Tick(_) => {
+                return Some(WorldEvent::Tick);
+            }
+        };
+        match *player_event {
+            PlayerEvent::JoinRequested { .. } => Some(Self::JoinRequested {
                 id,
                 scope: cur,
                 aim,
             }),
-            Event::Player(id, PlayerEvent::Position { .. }) if cur != prev => {
-                Some(Self::ChunkScopeChanged { id, prev, cur, aim })
-            }
-            Event::Player(id, PlayerEvent::Position { .. })
-            | Event::Player(id, PlayerEvent::Orientation { .. }) => {
+            PlayerEvent::Position { .. } if cur != prev => Some(Self::ChunkScopeChanged {
+                id,
+                scope: cur,
+                aim,
+            }),
+            PlayerEvent::Position { .. } | PlayerEvent::Orientation { .. } => {
                 Some(Self::BlockHoverRequested { id, aim })
             }
-            Event::Player(id, PlayerEvent::BlockPlaced(block)) => {
-                Some(Self::BlockPlaced { id, block, aim })
-            }
-            Event::Player(id, PlayerEvent::BlockDestroyed) => {
-                Some(Self::BlockDestroyed { id, aim })
+            PlayerEvent::BlockPlaced(block) => Some(Self::BlockPlaced { id, block, aim }),
+            PlayerEvent::BlockDestroyed => Some(Self::BlockDestroyed { id, aim }),
+            PlayerEvent::ChunkBatchAcknowledged { chunks_per_second } => {
+                Some(Self::ChunkBatchAcknowledged {
+                    id,
+                    chunks_per_second,
+                })
             }
             _ => None,
         }

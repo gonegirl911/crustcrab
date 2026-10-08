@@ -1,7 +1,7 @@
 use super::player::frustum::{Cullable, Frustum};
 use crate::{
     client::{
-        CLIENT_CONFIG,
+        CLIENT_CONFIG, PlayerEvent,
         event_loop::{Event, EventHandler},
         renderer::{
             Renderer,
@@ -31,11 +31,13 @@ use crate::{
         },
     },
     shared::{
-        enum_map::EnumMap, indexmap::FxIndexMap, net::compression::Compressed, pool::JobPool, utils,
+        ema::Ema, enum_map::EnumMap, indexmap::FxIndexMap, net::compression::Compressed,
+        pool::JobPool, utils,
     },
 };
 use bitfield::{BitRange, BitRangeMut};
 use bytemuck::{Pod, Zeroable};
+use crossbeam_channel::Sender;
 use nalgebra::{Point2, Point3, point};
 use rustc_hash::FxHashMap;
 use std::{
@@ -52,6 +54,7 @@ pub struct World {
     revisions: FxHashMap<Point3<i32>, RevisionTracker>,
     open_batch_id: BatchId,
     pending_batches: FxHashMap<BatchId, ChunkBatch>,
+    chunk_rate: Ema,
     workers: JobPool<ChunkInput, ChunkOutput>,
 }
 
@@ -90,6 +93,7 @@ impl World {
             revisions: Default::default(),
             open_batch_id: BatchId::NIL,
             pending_batches: Default::default(),
+            chunk_rate: Ema::new(CHUNK_RATE_SAMPLE_WEIGHT),
             workers,
         }
     }
@@ -199,12 +203,19 @@ impl World {
     }
 
     fn join_open_batch(&mut self) -> bool {
-        if let Some(batch) = self.pending_batches.get_mut(&self.open_batch_id) {
-            batch.expected += 1;
-            true
-        } else {
-            false
+        if self.open_batch_id == BatchId::NIL {
+            return false;
         }
+
+        self.pending_batches
+            .entry(self.open_batch_id)
+            .and_modify(|batch| batch.expected += 1)
+            .or_insert_with(|| ChunkBatch {
+                changes: Default::default(),
+                expected: 1,
+                started_at: Instant::now(),
+            });
+        true
     }
 
     fn batch_or_apply_change(
@@ -212,30 +223,47 @@ impl World {
         renderer: &Renderer,
         change: ChunkChange,
         batch_id: BatchId,
+        player_tx: &Sender<PlayerEvent>,
     ) {
         if let Some(batch) = self.pending_batches.get_mut(&batch_id) {
             batch.changes.push(change);
             if batch_id != self.open_batch_id {
-                self.flush_batch_if_completed(renderer, batch_id);
+                self.flush_batch_if_completed(renderer, batch_id, player_tx);
             }
         } else {
             self.apply_change(renderer, change);
         }
     }
 
-    fn flush_batch_if_completed(&mut self, renderer: &Renderer, batch_id: BatchId) {
-        let Entry::Occupied(mut entry) = self.pending_batches.entry(batch_id) else {
+    fn flush_batch_if_completed(
+        &mut self,
+        renderer: &Renderer,
+        batch_id: BatchId,
+        player_tx: &Sender<PlayerEvent>,
+    ) {
+        let Entry::Occupied(entry) = self.pending_batches.entry(batch_id) else {
             return;
         };
-        let batch = entry.get_mut();
+        let batch = entry.get();
 
         if batch.changes.len() < batch.expected {
             return;
         }
 
-        for change in entry.remove().changes {
+        let ChunkBatch {
+            changes,
+            expected,
+            started_at,
+        } = entry.remove();
+
+        for change in changes {
             self.apply_change(renderer, change);
         }
+
+        let elapsed = started_at.elapsed();
+        let sample = expected as f32 / elapsed.as_secs_f32();
+        let chunks_per_second = self.chunk_rate.smooth(sample);
+        _ = player_tx.send(PlayerEvent::ChunkBatchAcknowledged { chunks_per_second });
     }
 
     fn cull_chunks(&self, frustum: &Frustum) -> impl Iterator<Item = Point3<i32>> {
@@ -426,9 +454,9 @@ impl World {
 }
 
 impl EventHandler for World {
-    type Context<'a> = &'a Renderer;
+    type Context<'a> = (&'a Sender<PlayerEvent>, &'a Renderer);
 
-    fn handle(&mut self, event: &Event, renderer: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, (player_tx, renderer): Self::Context<'_>) {
         match event {
             Event::ChunkEvent(event) => match event {
                 ChunkEvent::Loaded(Compressed { inner: data, .. }) => {
@@ -454,6 +482,7 @@ impl EventHandler for World {
                             snapshot_revision,
                         },
                         self.open_batch_id,
+                        player_tx,
                     );
                 }
                 ChunkEvent::Updated(Compressed { inner: data, .. }) => {
@@ -469,12 +498,11 @@ impl EventHandler for World {
                     );
                 }
                 ChunkEvent::BatchStarted => {
-                    self.flush_batch_if_completed(renderer, self.open_batch_id);
+                    self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
                     self.open_batch_id = BatchId::new();
-                    self.pending_batches.entry(self.open_batch_id).or_default();
                 }
                 ChunkEvent::BatchEnded => {
-                    self.flush_batch_if_completed(renderer, self.open_batch_id);
+                    self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
                     self.open_batch_id = BatchId::NIL;
                 }
             },
@@ -501,6 +529,7 @@ impl EventHandler for World {
                             snapshot_revision,
                         },
                         batch_id,
+                        player_tx,
                     );
 
                     if Instant::now() > deadline {
@@ -522,10 +551,10 @@ struct RevisionTracker {
 #[derive(Clone, Copy, PartialEq, PartialOrd, Default)]
 struct Revision(u32);
 
-#[derive(Default)]
 struct ChunkBatch {
     changes: Vec<ChunkChange>,
     expected: usize,
+    started_at: Instant,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -673,3 +702,5 @@ impl BlockImmediates {
 }
 
 impl Immediates for BlockImmediates {}
+
+const CHUNK_RATE_SAMPLE_WEIGHT: f32 = 0.25;

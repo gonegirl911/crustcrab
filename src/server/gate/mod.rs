@@ -51,7 +51,6 @@ impl Gate {
         };
 
         let rate_limiter = self.rate_limiters.0.get_mut(&id).unwrap();
-
         match rate_limiter.judge(&event, Instant::now()) {
             Verdict::Admit => {}
             Verdict::Drop => {
@@ -65,8 +64,8 @@ impl Gate {
         self.sessions.admit(id, event)
     }
 
-    pub fn keep_alive(&mut self, connections: &ConnectionRegistry) {
-        for id in self.keep_alives.sweep(connections, Instant::now()) {
+    pub fn keep_alive(&mut self, connections: &ConnectionRegistry, now: Instant) {
+        for id in self.keep_alives.sweep(connections, now) {
             if !self.sessions.is_kicked(id) {
                 self.kick(connections, id, KickReason::TimedOut);
             }

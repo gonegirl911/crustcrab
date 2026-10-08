@@ -13,7 +13,6 @@ pub struct SessionRegistry(FxHashMap<ConnectionId, Session>);
 impl SessionRegistry {
     pub fn admit(&mut self, id: ConnectionId, event: PlayerEvent) -> Option<Event> {
         let session = self.0.get_mut(&id).unwrap();
-
         match (*session, &event) {
             (Session::Opened, PlayerEvent::JoinRequested { .. }) => {
                 *session = Session::Joining;

@@ -15,7 +15,6 @@ pub struct KeepAliveRegistry(FxHashMap<ConnectionId, KeepAlive>);
 impl KeepAliveRegistry {
     pub fn acknowledge(&mut self, id: ConnectionId, tag: u64) -> bool {
         let keep_alive = self.0.get_mut(&id).unwrap();
-
         if let KeepAlive::Pending {
             tag: expected,
             sent_at,

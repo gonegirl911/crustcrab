@@ -43,6 +43,7 @@ pub struct RateLimiter {
     position: Pacer,
     orientation: Pacer,
     block_action: Pacer,
+    chunk_batch_acknowledged: Pacer,
     rate_violations: RateViolationsTracker,
 }
 
@@ -75,6 +76,7 @@ impl RateLimiter {
             PlayerEvent::BlockPlaced(_) | PlayerEvent::BlockDestroyed => {
                 self.block_action.admit(now)
             }
+            PlayerEvent::ChunkBatchAcknowledged { .. } => self.chunk_batch_acknowledged.admit(now),
             PlayerEvent::KeepAlive { .. } => unreachable!(),
         }
     }
@@ -88,6 +90,7 @@ impl Default for RateLimiter {
             position: Pacer::new(POSITION_GAP),
             orientation: Pacer::new(ORIENTATION_GAP),
             block_action: Pacer::new(BLOCK_ACTION_GAP),
+            chunk_batch_acknowledged: Pacer::new(CHUNK_BATCH_ACKNOWLEDGEMENT_GAP),
             rate_violations: Default::default(),
         }
     }
@@ -133,6 +136,7 @@ const JOIN_ACKNOWLEDGEMENT_GAP: Duration = Duration::from_secs(1);
 const POSITION_GAP: Duration = Duration::from_millis(2);
 const ORIENTATION_GAP: Duration = Duration::from_millis(2);
 const BLOCK_ACTION_GAP: Duration = Duration::from_millis(4);
+const CHUNK_BATCH_ACKNOWLEDGEMENT_GAP: Duration = Duration::from_millis(2);
 
 const RATE_VIOLATION_WINDOW: Duration = Duration::from_secs(60);
 const RATE_VIOLATIONS_THRESHOLD: usize = 360;

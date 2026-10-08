@@ -2,6 +2,7 @@ use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
+        stopwatch::Stopwatch,
     },
     server::{ControlEvent, game::clock::DayCycle},
     shared::utils,
@@ -54,9 +55,9 @@ impl Clock {
 }
 
 impl EventHandler for Clock {
-    type Context<'a> = Duration;
+    type Context<'a> = &'a Stopwatch;
 
-    fn handle(&mut self, event: &Event, dt: Self::Context<'_>) {
+    fn handle(&mut self, event: &Event, &Stopwatch { dt, .. }: Self::Context<'_>) {
         match *event {
             Event::ControlEvent(ControlEvent::TimeInitialized {
                 ticks_per_second,

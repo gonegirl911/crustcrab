@@ -7,6 +7,7 @@ use super::{
 use crate::client::PlayerEvent;
 use crossbeam_channel::{Receiver, RecvTimeoutError};
 use serde::Deserialize;
+use std::time::Instant;
 
 pub struct EventLoop {
     connection_rx: Receiver<ConnectionEvent>,
@@ -49,8 +50,9 @@ impl EventLoop {
             let event = match player_event {
                 Some((id, event)) => self.gate.admit(id, event, &self.connections),
                 None => {
-                    self.gate.keep_alive(&self.connections);
-                    Some(Event::Tick)
+                    let now = Instant::now();
+                    self.gate.keep_alive(&self.connections, now);
+                    Some(Event::Tick(now))
                 }
             };
 
@@ -73,7 +75,7 @@ pub trait EventHandler<E> {
 pub enum Event {
     Connection(ConnectionEvent),
     Player(ConnectionId, PlayerEvent),
-    Tick,
+    Tick(Instant),
 }
 
 #[derive(Deserialize)]

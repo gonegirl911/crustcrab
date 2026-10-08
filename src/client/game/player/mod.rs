@@ -8,6 +8,7 @@ use crate::{
         CLIENT_CONFIG, PlayerEvent,
         event_loop::{Event, EventHandler},
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
+        stopwatch::Stopwatch,
     },
     server::{ControlEvent, game::world::chunk::Chunk},
     shared::{color::Float3, pacer::Pacer},
@@ -20,11 +21,7 @@ use crossbeam_channel::Sender;
 use frustum::Frustum;
 use nalgebra::{Matrix4, Point3, Vector3};
 use serde::Deserialize;
-use std::{
-    f32::consts::SQRT_2,
-    mem,
-    time::{Duration, Instant},
-};
+use std::{f32::consts::SQRT_2, mem, time::Duration};
 use winit::event::WindowEvent;
 
 pub struct Player {
@@ -78,16 +75,16 @@ impl Player {
 impl EventHandler for Player {
     type Context<'a> = (
         &'a Sender<PlayerEvent>,
+        &'a Stopwatch,
         &'a Renderer,
         &'a Surface,
         &'a Gui,
-        Duration,
     );
 
     fn handle(
         &mut self,
         event: &Event,
-        (player_tx, renderer, surface, gui, dt): Self::Context<'_>,
+        (player_tx, &Stopwatch { now, dt }, renderer, surface, gui): Self::Context<'_>,
     ) {
         self.controller.handle(event, ());
 
@@ -102,7 +99,6 @@ impl EventHandler for Player {
                 self.controller.external_updates_applied = true;
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
-                let now = Instant::now();
                 let changes = self.controller.apply_updates(&mut self.view, dt, now);
 
                 if changes.intersects(Changes::VIEW) && self.view_report_pacer.admit(now) {

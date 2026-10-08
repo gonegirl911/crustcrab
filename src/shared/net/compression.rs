@@ -14,7 +14,7 @@ use zstd::{
 
 #[derive(Clone)]
 pub struct Compressed<T> {
-    pub inner: T,
+    pub mut(self) inner: T,
     wire: Arc<OnceLock<Box<[u8]>>>,
 }
 

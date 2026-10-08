@@ -186,7 +186,7 @@ impl EventHandler for Instance {
         self.surface.handle(event, (&*self.window.0, &self.renderer));
         self.game.handle(
             event,
-            (player_tx, &self.renderer, &self.surface, self.stopwatch.dt),
+            (player_tx, &self.stopwatch, &self.renderer, &self.surface),
         );
 
         if matches!(event, Event::WindowEvent(WindowEvent::RedrawRequested)) {

@@ -17,6 +17,7 @@ use super::{
         texture::{image::ImageTextureArray, screen::DepthBuffer},
         utils::color_pass,
     },
+    stopwatch::Stopwatch,
 };
 use crate::{
     client::renderer::utils::load_rgba,
@@ -31,7 +32,7 @@ use highlight::BlockHighlight;
 use player::Player;
 use shading::Shading;
 use sky::Sky;
-use std::{ops::Deref, time::Duration};
+use std::ops::Deref;
 use world::World;
 
 pub struct Game {
@@ -234,16 +235,25 @@ impl Game {
 }
 
 impl EventHandler for Game {
-    type Context<'a> = (&'a Sender<PlayerEvent>, &'a Renderer, &'a Surface, Duration);
+    type Context<'a> = (
+        &'a Sender<PlayerEvent>,
+        &'a Stopwatch,
+        &'a Renderer,
+        &'a Surface,
+    );
 
     #[rustfmt::skip]
-    fn handle(&mut self, event: &Event, (player_tx, renderer, surface, dt): Self::Context<'_>) {
-        self.clock.handle(event, dt);
-        self.world.handle(event, renderer);
+    fn handle(
+        &mut self,
+        event: &Event,
+        (player_tx, stopwatch, renderer, surface): Self::Context<'_>,
+    ) {
+        self.clock.handle(event, stopwatch);
+        self.world.handle(event, (player_tx, renderer));
         self.fog.handle(event, (renderer, surface));
         self.highlight.handle(event, ());
         self.gui.handle(event, (renderer, surface));
-        self.player.handle(event, (player_tx, renderer, surface, &self.gui, dt));
+        self.player.handle(event, (player_tx, stopwatch, renderer, surface, &self.gui));
         self.depth.handle(event, (renderer, surface));
         self.processor.handle(event, (renderer, surface));
 
