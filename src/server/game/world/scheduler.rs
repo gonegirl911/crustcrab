@@ -42,16 +42,15 @@ impl EventHandler<WorldEvent> for ChunkSchedulerRegistry {
                 self.0.insert(id, ChunkScheduler::new(scope));
             }
             WorldEvent::ChunkScopeChanged { id, scope, .. } => {
-                self.0.get_mut(&id).unwrap().desired = scope;
+                let scheduler = self.0.get_mut(&id).unwrap();
+                scheduler.desired = scope;
             }
             WorldEvent::ChunkBatchAcknowledged {
                 id,
                 chunks_per_second,
             } => {
-                self.0
-                    .get_mut(&id)
-                    .unwrap()
-                    .acknowledge_batch(chunks_per_second);
+                let scheduler = self.0.get_mut(&id).unwrap();
+                scheduler.acknowledge_batch(chunks_per_second);
             }
             WorldEvent::Connection(ConnectionEvent::Closed(id)) => {
                 self.0.remove(&id);

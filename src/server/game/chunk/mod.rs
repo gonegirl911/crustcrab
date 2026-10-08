@@ -2,13 +2,14 @@ pub mod area;
 pub mod generator;
 pub mod visibility;
 
-use super::block::{Block, BlockLight};
-use crate::{
-    server::game::{block::area::BlockArea, coords, world::action::BlockAction},
-    shared::{
-        bound::{Aabb, BoundingSphere},
-        cuboid::Cuboid,
-    },
+use super::{
+    block::{Block, BlockLight, area::BlockArea},
+    coords,
+    world::action::BlockAction,
+};
+use crate::shared::{
+    bound::{Aabb, BoundingSphere},
+    cuboid::Cuboid,
 };
 use area::ChunkArea;
 use bitfield::Bit;

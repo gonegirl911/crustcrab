@@ -26,7 +26,7 @@ use crate::{
             },
             coords,
             player::ChunkScope,
-            world::ChunkData,
+            world::mesh::ChunkData,
         },
     },
     shared::{

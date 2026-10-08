@@ -1,6 +1,7 @@
 use super::{
-    block::{Block, BlockLight, area::BlockArea},
+    block::{Block, BlockLight, area::BlockArea, data::STR_TO_BLOCK},
     chunk::Chunk,
+    coords,
     world::World,
 };
 use crate::{
@@ -9,7 +10,6 @@ use crate::{
         ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
         event_loop::{Event, EventHandler},
-        game::{block::data::STR_TO_BLOCK, coords},
     },
     shared::{cuboid::Cuboid, ray::Ray, utils},
 };

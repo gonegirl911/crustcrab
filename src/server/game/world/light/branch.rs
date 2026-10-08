@@ -1,21 +1,17 @@
-use super::{ChunkStore, World, action::BlockAction, height::HeightMap};
+use super::WorldLight;
 use crate::{
     server::game::{
         block::{
             Block, BlockLight,
-            area::{BlockArea, BlockLightArea},
             data::{BlockData, SIDE_DELTAS, Side},
         },
-        chunk::{
-            Chunk, ChunkLight, ChunkReach,
-            area::{ChunkArea, ChunkLightArea},
-        },
+        chunk::{Chunk, ChunkLight, ChunkReach},
         coords,
+        world::ChunkStore,
     },
     shared::enum_map::Enum,
 };
-use nalgebra::{Point3, point};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use nalgebra::Point3;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cmp,
@@ -24,200 +20,19 @@ use std::{
 };
 
 #[derive(Default)]
-pub struct WorldLight(FxHashMap<Point3<i32>, Arc<ChunkLight>>);
-
-impl WorldLight {
-    pub fn chunk_light_area(&self, coords: Point3<i32>) -> ChunkLightArea {
-        let mut value = ChunkLightArea::default();
-        for delta in ChunkArea::chunk_deltas() {
-            if let Some(light) = self.0.get(&(coords + delta)) {
-                let [dx, dy, dz] = delta.into();
-                for x in ChunkArea::axis_range(dx) {
-                    for y in ChunkArea::axis_range(dy) {
-                        let z = ChunkArea::axis_range(dz);
-                        value.copy_row(
-                            coords::from_parts(point![dx, dy, dz], point![x, y, z.start])
-                                .coords
-                                .cast(),
-                            light.row(point![x, y, z.start], z.len()),
-                        );
-                    }
-                }
-            }
-        }
-        value
-    }
-
-    pub fn block_light_area(&self, coords: Point3<i64>) -> BlockLightArea {
-        BlockLightArea::from_fn(|delta| self.block_light(coords + delta.cast()))
-    }
-
-    pub fn extend_placeholders<P>(&mut self, new_surface_points: P)
-    where
-        P: IntoIterator<Item = Point3<i32>>,
-    {
-        for coords in new_surface_points {
-            for delta in ChunkArea::chunk_deltas() {
-                if delta.y > 0 {
-                    self.0
-                        .entry(coords + delta)
-                        .or_insert_with(|| PLACEHOLDER.clone());
-                }
-            }
-        }
-    }
-
-    pub fn par_insert_many(
-        &mut self,
-        chunks: &ChunkStore,
-        heights: &HeightMap,
-        points: &[Point3<i32>],
-        collect_updates: bool,
-    ) -> Vec<(Point3<i32>, ChunkReach)> {
-        if points.is_empty() {
-            return vec![];
-        }
-
-        for coords in points {
-            self.0.remove(coords);
-        }
-
-        let points_per_branch = points.len().div_ceil(rayon::current_num_threads());
-
-        points
-            .par_iter()
-            .fold_chunks(
-                points_per_branch,
-                LazyBranch::default,
-                |mut branch, &chunk_coords| {
-                    let chunk = &chunks[chunk_coords];
-                    let light = self.0.get(&chunk_coords);
-
-                    if chunk.is_glowing() {
-                        for (block_coords, block) in Chunk::points().zip(chunk.as_slice()) {
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
-                                branch.insert(i, node.with_value(c));
-                            }
-                        }
-                    }
-
-                    for (side, delta) in *SIDE_DELTAS {
-                        let Some(neighbor) = self.0.get(&(chunk_coords + delta.cast())) else {
-                            continue;
-                        };
-                        let component_range =
-                            if Self::inherits_skylight(heights, chunk_coords, side) {
-                                0..BlockLight::LEN
-                            } else {
-                                BlockLight::TORCHLIGHT_RANGE
-                            };
-                        for (block_coords, neighbor_block_coords) in side.block_points() {
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            let filter = node.block().data().light_filter;
-                            let coords = coords::from_parts(chunk_coords, block_coords);
-                            let neighbor_value = neighbor[neighbor_block_coords];
-                            component_range
-                                .clone()
-                                .filter(|i| filter[i % 3])
-                                .map(|i| (i, neighbor_value.component(i)))
-                                .for_each(|(i, c)| {
-                                    let absorption = Self::absorption(coords, i, side.opp(), c);
-                                    let value = c.saturating_sub(absorption);
-                                    branch.insert(i, node.with_value(value));
-                                });
-                        }
-                    }
-
-                    branch
-                },
-            )
-            .map(|branch| branch.evaluate(chunks, self))
-            .reduce(Default::default, Branch::sup)
-            .merge(self, collect_updates)
-    }
-
-    pub fn apply<A>(&mut self, chunks: &ChunkStore, actions: A) -> Vec<(Point3<i32>, ChunkReach)>
-    where
-        A: IntoIterator<Item = (Point3<i64>, BlockAction)>,
-    {
-        let mut branch = Branch::default();
-        for (coords, action) in actions {
-            match action {
-                BlockAction::Place(block) => {
-                    branch.place(chunks, self, coords, block.data());
-                }
-                BlockAction::Destroy => {
-                    branch.destroy(chunks, self, coords);
-                }
-            }
-        }
-        branch.merge(self, true)
-    }
-
-    fn block_light(&self, coords: Point3<i64>) -> BlockLight {
-        self.0
-            .get(&coords::chunk(coords))
-            .map_or_default(|light| light[coords::block(coords)])
-    }
-
-    fn absorption(coords: Point3<i64>, index: usize, travel: Side, neighbor_value: u8) -> u8 {
-        if !BlockLight::SKYLIGHT_RANGE.contains(&index) {
-            return 1;
-        }
-
-        if travel == Side::Top {
-            return neighbor_value;
-        }
-
-        if coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64 - BlockArea::PADDING as i64
-            && travel == Side::Bottom
-            && neighbor_value == BlockLight::COMPONENT_MAX
-        {
-            0
-        } else {
-            1
-        }
-    }
-
-    fn node<'a>(
-        chunk: &'a Chunk,
-        light: Option<&'a Arc<ChunkLight>>,
-        chunk_coords: Point3<i32>,
-        block_coords: Point3<u8>,
-    ) -> Node<'a> {
-        Node {
-            chunk: Some(chunk),
-            light,
-            chunk_coords,
-            block_coords,
-            value: 0,
-        }
-    }
-
-    fn inherits_skylight(heights: &HeightMap, coords: Point3<i32>, side: Side) -> bool {
-        match side {
-            Side::Top => coords.y == heights.0[&coords.xz()],
-            Side::Bottom => false,
-            _ => true,
-        }
-    }
-}
-
-#[derive(Default)]
-struct LazyBranch<'a> {
+pub struct LazyBranch<'a> {
     branch: Branch,
     nodes: [NodeQueue<'a>; BlockLight::LEN],
 }
 
 impl<'a> LazyBranch<'a> {
-    fn insert(&mut self, index: usize, node: Node<'a>) {
+    pub fn insert(&mut self, index: usize, node: Node<'a>) {
         if node.set_component(&mut self.branch, index) {
             self.nodes[index].push(node);
         }
     }
 
-    fn evaluate(mut self, chunks: &ChunkStore, light: &WorldLight) -> Branch {
+    pub fn evaluate(mut self, chunks: &ChunkStore, light: &WorldLight) -> Branch {
         for (i, nodes) in self.nodes.into_iter().enumerate() {
             self.branch.spread_nodes(chunks, light, i, nodes);
         }
@@ -227,12 +42,12 @@ impl<'a> LazyBranch<'a> {
 }
 
 #[derive(Default)]
-struct Branch {
+pub struct Branch {
     values: FxHashMap<Point3<i32>, Arc<ChunkLight>>,
 }
 
 impl Branch {
-    fn place(
+    pub fn place(
         &mut self,
         chunks: &ChunkStore,
         light: &WorldLight,
@@ -252,7 +67,7 @@ impl Branch {
         }
     }
 
-    fn destroy(&mut self, chunks: &ChunkStore, light: &WorldLight, coords: Point3<i64>) {
+    pub fn destroy(&mut self, chunks: &ChunkStore, light: &WorldLight, coords: Point3<i64>) {
         let value = self.flood(light, coords);
 
         for i in BlockLight::SKYLIGHT_RANGE {
@@ -264,7 +79,7 @@ impl Branch {
         }
     }
 
-    fn sup(mut self, other: Self) -> Self {
+    pub fn sup(mut self, other: Self) -> Self {
         for (chunk_coords, other) in other.values {
             match self.values.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
@@ -292,7 +107,7 @@ impl Branch {
         self
     }
 
-    fn merge(
+    pub fn merge(
         self,
         light: &mut WorldLight,
         collect_updates: bool,
@@ -443,7 +258,7 @@ impl Branch {
                 .is_none_or(|value| value.component(index) == node.value)
         });
 
-        self.spread_nodes(chunks, light, index, sources.into());
+        self.spread_nodes(chunks, light, index, sources.into())
     }
 
     fn spread_nodes<'a>(
@@ -545,22 +360,26 @@ impl<'a> NodeSet<'a> {
     }
 
     fn retain<F: FnMut(&Node) -> bool>(&mut self, f: F) {
-        self.queue.0.retain(f);
+        self.queue.0.retain(f)
     }
 }
 
 #[derive(Clone, Copy)]
-struct Node<'a> {
-    chunk: Option<&'a Chunk>,
-    light: Option<&'a Arc<ChunkLight>>,
-    chunk_coords: Point3<i32>,
-    block_coords: Point3<u8>,
-    value: u8,
+pub struct Node<'a> {
+    pub chunk: Option<&'a Chunk>,
+    pub light: Option<&'a Arc<ChunkLight>>,
+    pub chunk_coords: Point3<i32>,
+    pub block_coords: Point3<u8>,
+    pub value: u8,
 }
 
 impl<'a> Node<'a> {
-    fn with_value(&self, value: u8) -> Self {
+    pub fn with_value(&self, value: u8) -> Self {
         Self { value, ..*self }
+    }
+
+    pub fn block(&self) -> Block {
+        self.chunk.map_or_default(|chunk| chunk[self.block_coords])
     }
 
     fn set_component(&self, branch: &mut Branch, index: usize) -> bool {
@@ -584,10 +403,6 @@ impl<'a> Node<'a> {
         index: usize,
     ) -> impl Iterator<Item = Self> {
         Enum::variants().map(move |side| self.neighbor(chunks, light, side, index))
-    }
-
-    fn block(&self) -> Block {
-        self.chunk.map_or_default(|chunk| chunk[self.block_coords])
     }
 
     fn coords(&self) -> Point3<i64> {
@@ -651,5 +466,3 @@ impl<'a> BlockLightRefMut<'a> {
 }
 
 static DEFAULT_CHUNK_LIGHT: LazyLock<Arc<ChunkLight>> = LazyLock::new(Arc::default);
-
-static PLACEHOLDER: LazyLock<Arc<ChunkLight>> = LazyLock::new(|| ChunkLight::placeholder().into());

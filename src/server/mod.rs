@@ -18,7 +18,7 @@ use game::{
     block::Block,
     clock::{ClockConfig, DayCycle},
     player::PlayerConfig,
-    world::{BlockHoverData, ChunkData},
+    world::{BlockHoverData, mesh::ChunkData},
 };
 use gate::KickReason;
 use nalgebra::{Point3, Vector3};

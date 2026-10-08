@@ -1,57 +1,49 @@
 pub mod action;
+pub mod branch;
 pub mod height;
 pub mod light;
+pub mod mesh;
 pub mod scheduler;
+pub mod viewer;
 
-use super::player::{ChunkScope, Player};
-use crate::{
-    client::{
-        PlayerEvent,
-        game::{shading::DAY_LIGHT_TABLE, world::BlockVertex},
+use super::{
+    block::{
+        Block, BlockLight,
+        area::{BlockArea, BlockAreaSource, BlockLightArea, BlockLightAreaSource},
     },
+    chunk::{Chunk, ChunkReach, area::ChunkArea, generator::ChunkGenerator},
+    coords,
+    player::{ChunkScope, Player},
+};
+use crate::{
+    client::{PlayerEvent, game::shading::DAY_LIGHT_TABLE},
     server::{
         ChunkEvent, ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry, RecipientList},
         event_loop::{Event, EventHandler},
-        game::{
-            block::{
-                Block, BlockLight,
-                area::{
-                    BlockArea, BlockAreaSource, BlockContext, BlockLightArea, BlockLightAreaSource,
-                },
-                data::{Corner, RenderLayer, SIDE_AXES, Side},
-            },
-            chunk::{
-                Chunk, ChunkReach,
-                area::{ChunkArea, ChunkLightArea},
-                generator::ChunkGenerator,
-                visibility::VisibilityGraph,
-            },
-            coords,
-        },
     },
     shared::{
         bound::Aabb,
-        enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
     },
 };
 use action::{ActionStore, BlockAction};
+use branch::{Branch, Changelog};
 use height::HeightMap;
 use light::WorldLight;
-use nalgebra::{Point2, Point3, Vector3, point};
+use mesh::ChunkData;
+use nalgebra::{Point3, Vector3, point};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 use scheduler::ChunkSchedulerRegistry;
 use serde::{Deserialize, Serialize};
 use std::{
-    array,
-    collections::{VecDeque, hash_map::Entry},
     iter, mem,
     ops::{Index, Range},
     sync::Arc,
     time::{Duration, Instant},
 };
+use viewer::ViewerRegistry;
 
 #[derive(Default)]
 pub struct World {
@@ -450,332 +442,6 @@ impl Index<Point3<i32>> for ChunkStore {
 
     fn index(&self, coords: Point3<i32>) -> &Self::Output {
         &self.0[&coords]
-    }
-}
-
-#[derive(Default)]
-struct ViewerRegistry(FxHashMap<ConnectionId, Viewer>);
-
-impl EventHandler<WorldEvent> for ViewerRegistry {
-    type Context<'a> = ();
-
-    fn handle(&mut self, event: &WorldEvent, (): Self::Context<'_>) {
-        match *event {
-            WorldEvent::JoinRequested { id, .. } => {
-                self.0.insert(id, Viewer { hover: None });
-            }
-            WorldEvent::Connection(ConnectionEvent::Closed(id)) => {
-                self.0.remove(&id);
-            }
-            _ => {}
-        }
-    }
-}
-
-struct Viewer {
-    hover: Option<BlockIntersection>,
-}
-
-#[derive(Default)]
-struct Branch {
-    actions: ActionStore,
-}
-
-struct Changelog {
-    actions: Vec<(Point3<i64>, BlockAction)>,
-    inserts: FxHashSet<Point3<i32>>,
-    removals: FxHashSet<Point3<i32>>,
-    updates: Vec<(Point3<i32>, ChunkReach)>,
-}
-
-impl Branch {
-    fn apply(
-        &mut self,
-        chunks: &ChunkStore,
-        coords: Point3<i64>,
-        normal: Vector3<i64>,
-        action: BlockAction,
-    ) -> bool {
-        if !self.is_action_valid(chunks, coords, normal, action) {
-            false
-        } else {
-            self.execute_actions(chunks, VecDeque::from([(coords, action)]));
-            true
-        }
-    }
-
-    fn merge(self, chunks: &mut ChunkStore) -> Changelog {
-        let mut hits = vec![];
-        let mut inserts = FxHashSet::default();
-        let mut removals = FxHashSet::default();
-        let mut updates = vec![];
-
-        for (chunk_coords, actions) in self.actions.0 {
-            match chunks.0.entry(chunk_coords) {
-                Entry::Occupied(mut entry) => {
-                    let chunk = entry.get_mut();
-                    let mut reach = ChunkReach::default();
-
-                    for (block_coords, action) in actions {
-                        if chunk.apply(block_coords, action) {
-                            hits.push((coords::from_parts(chunk_coords, block_coords), action));
-                            reach.insert_block(block_coords);
-                        }
-                    }
-
-                    if chunk.is_empty() {
-                        entry.remove();
-                        removals.insert(chunk_coords);
-                    } else {
-                        chunk.recompute_visibility_graph();
-                    }
-
-                    if !reach.is_empty() {
-                        updates.push((chunk_coords, reach));
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    let mut actions = actions
-                        .into_iter()
-                        .filter(|&(_, action)| Block::AIR.is_action_valid(action))
-                        .peekable();
-
-                    if actions.peek().is_none() {
-                        continue;
-                    }
-
-                    let chunk = entry.insert(Default::default());
-                    let mut reach = ChunkReach::default();
-
-                    for (block_coords, action) in actions {
-                        chunk.apply_unchecked(block_coords, action);
-                        hits.push((coords::from_parts(chunk_coords, block_coords), action));
-                        reach.insert_block(block_coords);
-                    }
-
-                    chunk.recompute_visibility_graph();
-                    inserts.insert(chunk_coords);
-                    updates.push((chunk_coords, reach));
-                }
-            }
-        }
-
-        Changelog {
-            actions: hits,
-            inserts,
-            removals,
-            updates,
-        }
-    }
-
-    fn is_action_valid(
-        &self,
-        chunks: &ChunkStore,
-        coords: Point3<i64>,
-        normal: Vector3<i64>,
-        action: BlockAction,
-    ) -> bool {
-        if !World::Y_RANGE.contains(&coords::chunk(coords).y)
-            || !self.block(chunks, coords).is_action_valid(action)
-        {
-            return false;
-        }
-
-        if let BlockAction::Place(block) = action
-            && let Some(surface) = block.data().valid_surface
-            && (normal != Vector3::y() || self.block(chunks, coords - normal) != surface)
-        {
-            return false;
-        }
-
-        true
-    }
-
-    fn execute_actions(
-        &mut self,
-        chunks: &ChunkStore,
-        mut actions: VecDeque<(Point3<i64>, BlockAction)>,
-    ) {
-        while let Some((coords, action)) = actions.pop_front() {
-            if action == BlockAction::Destroy {
-                let coords = coords + Vector3::y();
-                if self.block(chunks, coords).data().valid_surface.is_some() {
-                    actions.push_front((coords, BlockAction::Destroy));
-                }
-            }
-            self.actions.insert(coords, action);
-        }
-    }
-
-    fn block(&self, chunks: &ChunkStore, coords: Point3<i64>) -> Block {
-        let mut block = chunks.block(coords);
-        if let Some(action) = self.actions.get(coords) {
-            block.apply_unchecked(action);
-        }
-        block
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ChunkData {
-    pub coords: Point3<i32>,
-    area: ChunkArea,
-    light_area: ChunkLightArea,
-    pub visibility_graph: VisibilityGraph,
-}
-
-impl ChunkData {
-    fn new(chunks: &ChunkStore, light: &WorldLight, coords: Point3<i32>) -> Self {
-        Self {
-            coords,
-            area: chunks.chunk_area(coords),
-            light_area: light.chunk_light_area(coords),
-            visibility_graph: chunks[coords].visibility_graph,
-        }
-    }
-
-    pub fn vertices(&self) -> EnumMap<RenderLayer, Vec<BlockVertex>> {
-        let mut vertices = EnumMap::<_, Vec<_>>::default();
-
-        for coords in Chunk::points() {
-            let area = self.area.block_area_view(coords);
-            let light_area = self.light_area.block_light_area_view(coords);
-            let data = area.kernel().data();
-            vertices[data.render_layer].extend(data.vertices(
-                None,
-                coords,
-                point![1, 1, 1],
-                point![1, 1],
-                area.corner_aos(None, data.is_externally_lit()),
-                light_area.corner_lights(None, &area),
-            ));
-        }
-
-        for side in Enum::variants() {
-            let axes = SIDE_AXES[side];
-
-            for normal in 0..Chunk::DIM as u8 {
-                let mut quads = array::from_fn(|v| {
-                    array::from_fn(|u| {
-                        let coords = axes.swizzle(point![normal, u as u8, v as u8]);
-                        Quad::new(
-                            side,
-                            &self.area.block_area_view(coords),
-                            &self.light_area.block_light_area_view(coords),
-                        )
-                    })
-                });
-                let plane = normal + side.is_positive() as u8;
-
-                for v in 0..Chunk::DIM {
-                    let mut u = 0;
-
-                    while u < Chunk::DIM {
-                        let Some(quad) = quads[v][u] else {
-                            u += 1;
-                            continue;
-                        };
-                        let width = Self::merge_width(&quads, v, u, &quad);
-                        let height = Self::merge_height(&quads, v, u, &quad, width);
-
-                        vertices[quad.block.data().render_layer].extend(quad.vertices(
-                            side,
-                            point![plane, u as u8, v as u8],
-                            point![width as u8, height as u8],
-                        ));
-
-                        for dv in 0..height {
-                            quads[v + dv][u..u + width].fill(None);
-                        }
-
-                        u += width;
-                    }
-                }
-            }
-        }
-
-        vertices
-    }
-
-    fn merge_width(
-        quads: &[[Option<Quad>; Chunk::DIM]; Chunk::DIM],
-        v: usize,
-        u: usize,
-        quad: &Quad,
-    ) -> usize {
-        let mut width = 1;
-        while u + width < Chunk::DIM && quads[v][u + width].as_ref() == Some(quad) {
-            width += 1;
-        }
-        width
-    }
-
-    fn merge_height(
-        quads: &[[Option<Quad>; Chunk::DIM]; Chunk::DIM],
-        v: usize,
-        u: usize,
-        quad: &Quad,
-        width: usize,
-    ) -> usize {
-        let mut height = 1;
-        'outer: while v + height < Chunk::DIM {
-            for du in 0..width {
-                if quads[v + height][u + du].as_ref() != Some(quad) {
-                    break 'outer;
-                }
-            }
-            height += 1;
-        }
-        height
-    }
-}
-
-#[derive(Clone, Copy)]
-struct Quad {
-    block: Block,
-    corner_aos: EnumMap<Corner, u8>,
-    corner_lights: EnumMap<Corner, BlockLight>,
-}
-
-impl Quad {
-    fn new(
-        side: Side,
-        area: &BlockContext<impl BlockAreaSource>,
-        light_area: &BlockContext<impl BlockLightAreaSource>,
-    ) -> Option<Self> {
-        let block = area.kernel();
-        let data = block.data();
-        let is_externally_lit = data.is_externally_lit();
-        area.is_side_visible(Some(side)).then(|| Self {
-            block,
-            corner_aos: area.corner_aos(Some(side), is_externally_lit),
-            corner_lights: light_area.corner_lights(Some(side), area),
-        })
-    }
-
-    fn vertices(
-        self,
-        side: Side,
-        coords: Point3<u8>,
-        dims: Point2<u8>,
-    ) -> impl Iterator<Item = BlockVertex> {
-        let axes = SIDE_AXES[side];
-        self.block.data().vertices(
-            Some(side),
-            axes.swizzle(coords),
-            axes.swizzle(point![0, dims.x, dims.y]),
-            dims,
-            self.corner_aos,
-            self.corner_lights,
-        )
-    }
-}
-
-impl PartialEq for Quad {
-    fn eq(&self, other: &Self) -> bool {
-        self.block == other.block
-            && self.corner_aos == other.corner_aos
-            && self.corner_lights == other.corner_lights
     }
 }
 
