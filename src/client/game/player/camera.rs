@@ -1,4 +1,4 @@
-use crate::shared::utils;
+use crate::server::game::coords;
 use nalgebra::{Matrix4, Point3, Vector3, matrix, vector};
 use std::f32::consts::{FRAC_PI_2, TAU};
 
@@ -38,7 +38,7 @@ impl View {
     }
 
     pub fn anchor(&self) -> Point3<f64> {
-        utils::coords(utils::chunk_coords(self.origin), Point3::origin()).cast()
+        coords::coords(coords::chunk_coords(self.origin), Point3::origin()).cast()
     }
 
     pub fn rotate(&mut self, dx: f32, dy: f32) {

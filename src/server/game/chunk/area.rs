@@ -1,6 +1,6 @@
 use super::Chunk;
 use crate::{
-    server::game::world::block::{
+    server::game::block::{
         Block, BlockLight,
         area::{BlockArea, BlockAreaView, BlockLightAreaView},
     },

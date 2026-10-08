@@ -11,7 +11,7 @@ use crate::{
             utils::{Immediates, Vertex, color_pass, load_rgba, read_wgsl},
         },
     },
-    server::game::world::{block::Block, chunk::Chunk},
+    server::game::{block::Block, chunk::Chunk},
     shared::{
         color::{Float3, Rgb},
         utils,

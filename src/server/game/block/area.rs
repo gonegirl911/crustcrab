@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     enum_map,
-    server::game::world::chunk::area::ChunkAreaDataStore,
+    server::game::chunk::area::ChunkAreaDataStore,
     shared::{cuboid::Cuboid, enum_map::EnumMap},
 };
 use nalgebra::{Point3, Vector3};

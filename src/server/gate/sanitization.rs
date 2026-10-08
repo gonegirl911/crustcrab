@@ -1,6 +1,6 @@
 use crate::{
     client::PlayerEvent,
-    server::game::{player::ChunkScope, world::chunk::Chunk},
+    server::game::{chunk::Chunk, player::ChunkScope},
 };
 
 pub fn sanitize(mut event: PlayerEvent) -> Option<PlayerEvent> {

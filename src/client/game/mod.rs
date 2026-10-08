@@ -21,7 +21,7 @@ use super::{
 };
 use crate::{
     client::renderer::utils::load_rgba,
-    server::{ControlEvent, game::world::block::data::TEX_PATHS},
+    server::{ControlEvent, game::block::data::TEX_PATHS},
 };
 use clock::Clock;
 use cloud::CloudLayer;

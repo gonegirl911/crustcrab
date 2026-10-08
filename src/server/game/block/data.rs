@@ -6,7 +6,7 @@ use super::{
 use crate::{
     client::game::{shading::DAY_LIGHT_TABLE, world::BlockVertex},
     enum_map,
-    server::game::world::chunk::Chunk,
+    server::game::chunk::Chunk,
     shared::{
         bound::Aabb,
         color::Rgb,

@@ -1,6 +1,4 @@
 pub mod action;
-pub mod block;
-pub mod chunk;
 pub mod height;
 pub mod light;
 pub mod scheduler;
@@ -15,26 +13,31 @@ use crate::{
         ChunkEvent, ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry, RecipientList},
         event_loop::{Event, EventHandler},
+        game::{
+            block::{
+                Block, BlockLight,
+                area::{
+                    BlockArea, BlockAreaSource, BlockContext, BlockLightArea,
+                    BlockLightAreaSource,
+                },
+                data::{Corner, RenderLayer, SIDE_AXES, Side},
+            },
+            chunk::{
+                Chunk, ChunkReach,
+                area::{ChunkArea, ChunkLightArea},
+                generator::ChunkGenerator,
+                visibility::VisibilityGraph,
+            },
+            coords,
+        },
     },
     shared::{
         bound::Aabb,
         enum_map::{Enum, EnumMap},
         ray::{BlockIntersection, Intersectable, Ray},
-        utils,
     },
 };
 use action::{ActionStore, BlockAction};
-use block::{
-    Block, BlockLight,
-    area::{BlockArea, BlockAreaSource, BlockContext, BlockLightArea, BlockLightAreaSource},
-    data::{Corner, RenderLayer, SIDE_AXES, Side},
-};
-use chunk::{
-    Chunk, ChunkReach,
-    area::{ChunkArea, ChunkLightArea},
-    generator::ChunkGenerator,
-    visibility::VisibilityGraph,
-};
 use height::HeightMap;
 use light::WorldLight;
 use nalgebra::{Point2, Point3, Vector3, point};
@@ -412,7 +415,7 @@ impl ChunkStore {
                     for y in ChunkArea::axis_range(dy) {
                         let z = ChunkArea::axis_range(dz);
                         value.copy_row(
-                            utils::coords(point![dx, dy, dz], point![x, y, z.start])
+                            coords::coords(point![dx, dy, dz], point![x, y, z.start])
                                 .coords
                                 .cast(),
                             chunk.row(point![x, y, z.start], z.len()),
@@ -433,8 +436,8 @@ impl ChunkStore {
     }
 
     fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(utils::chunk_coords(coords))
-            .map_or_default(|chunk| chunk[utils::block_coords(coords)])
+        self.get(coords::chunk_coords(coords))
+            .map_or_default(|chunk| chunk[coords::block_coords(coords)])
     }
 }
 
@@ -511,7 +514,7 @@ impl Branch {
 
                     for (block_coords, action) in actions {
                         if chunk.apply(block_coords, action) {
-                            hits.push((utils::coords(chunk_coords, block_coords), action));
+                            hits.push((coords::coords(chunk_coords, block_coords), action));
                             reach.insert_block(block_coords);
                         }
                     }
@@ -542,7 +545,7 @@ impl Branch {
 
                     for (block_coords, action) in actions {
                         chunk.apply_unchecked(block_coords, action);
-                        hits.push((utils::coords(chunk_coords, block_coords), action));
+                        hits.push((coords::coords(chunk_coords, block_coords), action));
                         reach.insert_block(block_coords);
                     }
 
@@ -568,7 +571,7 @@ impl Branch {
         normal: Vector3<i64>,
         action: BlockAction,
     ) -> bool {
-        if !World::Y_RANGE.contains(&utils::chunk_coords(coords).y)
+        if !World::Y_RANGE.contains(&coords::chunk_coords(coords).y)
             || !self.block(chunks, coords).is_action_valid(action)
         {
             return false;
@@ -789,7 +792,7 @@ impl BlockHoverData {
             .kernel()
             .data()
             .mesh(
-                utils::block_coords(self.coords),
+                coords::block_coords(self.coords),
                 &self.area,
                 &self.light_area,
             )

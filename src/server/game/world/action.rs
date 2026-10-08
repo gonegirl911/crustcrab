@@ -1,5 +1,4 @@
-use super::block::Block;
-use crate::shared::utils;
+use crate::server::game::{block::Block, coords};
 use nalgebra::Point3;
 use rustc_hash::FxHashMap;
 
@@ -9,8 +8,8 @@ pub struct ActionStore(pub FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAct
 impl ActionStore {
     pub fn get(&self, coords: Point3<i64>) -> Option<BlockAction> {
         self.0
-            .get(&utils::chunk_coords(coords))?
-            .get(&utils::block_coords(coords))
+            .get(&coords::chunk_coords(coords))?
+            .get(&coords::block_coords(coords))
             .copied()
     }
 
@@ -27,9 +26,9 @@ impl ActionStore {
 
     pub fn insert(&mut self, coords: Point3<i64>, action: BlockAction) {
         self.0
-            .entry(utils::chunk_coords(coords))
+            .entry(coords::chunk_coords(coords))
             .or_default()
-            .insert(utils::block_coords(coords), action);
+            .insert(coords::block_coords(coords), action);
     }
 }
 

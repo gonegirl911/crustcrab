@@ -1,6 +1,6 @@
 use super::{Chunk, ChunkBitSet};
 use crate::{
-    server::game::world::block::{
+    server::game::block::{
         area::BlockArea,
         data::{SIDE_DELTAS, Side},
     },

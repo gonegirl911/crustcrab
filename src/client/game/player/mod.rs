@@ -10,7 +10,7 @@ use crate::{
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
         stopwatch::Stopwatch,
     },
-    server::{ControlEvent, game::world::chunk::Chunk},
+    server::{ControlEvent, game::chunk::Chunk},
     shared::{color::Float3, pacer::Pacer},
 };
 use bitflags::bitflags;

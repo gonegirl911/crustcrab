@@ -3,7 +3,7 @@ use crate::{
         CLIENT_CONFIG,
         renderer::{Renderer, buffer::MemoryState, texture::data::DataTexture, uniform::Uniform},
     },
-    server::game::world::block::{BlockLight, data::SideShade},
+    server::game::block::{BlockLight, data::SideShade},
     shared::{
         color::{Rgb, Rgba},
         enum_map::EnumMap,

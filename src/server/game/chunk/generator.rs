@@ -1,8 +1,5 @@
 use super::Chunk;
-use crate::{
-    server::game::world::{World, block::Block},
-    shared::utils,
-};
+use crate::server::game::{block::Block, coords, world::World};
 use nalgebra::Point3;
 use noise::{NoiseFn, Simplex};
 
@@ -18,7 +15,7 @@ impl ChunkGenerator {
         }
 
         Chunk::from_fn(|block_coords| {
-            let coords = utils::coords(coords, block_coords).cast() / Chunk::DIM as f64;
+            let coords = coords::coords(coords, block_coords).cast() / Chunk::DIM as f64;
             if self.noise.get(coords.into()) > 0.0 {
                 Block::SAND
             } else {

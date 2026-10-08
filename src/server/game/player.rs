@@ -1,7 +1,7 @@
-use super::world::{
-    World,
+use super::{
     block::{Block, BlockLight, area::BlockArea},
     chunk::Chunk,
+    world::World,
 };
 use crate::{
     client::PlayerEvent,
@@ -9,7 +9,7 @@ use crate::{
         ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
         event_loop::{Event, EventHandler},
-        game::world::block::data::STR_TO_BLOCK,
+        game::{block::data::STR_TO_BLOCK, coords},
     },
     shared::{cuboid::Cuboid, ray::Ray, utils},
 };
@@ -76,7 +76,7 @@ impl EventHandler<Event> for Player {
                     } = SERVER_CONFIG.player;
 
                     self.cur = ChunkScope {
-                        center: utils::chunk_coords(origin),
+                        center: coords::chunk_coords(origin),
                         radius: render_distance as i32,
                     };
                     self.aim = Ray {
@@ -92,7 +92,7 @@ impl EventHandler<Event> for Player {
                     });
                 }
                 PlayerEvent::Position { origin } => {
-                    self.cur.center = utils::chunk_coords(origin);
+                    self.cur.center = coords::chunk_coords(origin);
                     self.aim.origin = origin;
                 }
                 PlayerEvent::Orientation { dir } => {

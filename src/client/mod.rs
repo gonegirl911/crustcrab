@@ -7,7 +7,7 @@ pub(crate) mod stopwatch;
 pub(crate) mod window;
 
 use crate::{
-    server::{ChunkEvent, ControlEvent, game::world::block::Block},
+    server::{ChunkEvent, ControlEvent, game::block::Block},
     shared::toml,
 };
 use app::{App, AppConfig};

@@ -1,4 +1,7 @@
+pub mod block;
+pub mod chunk;
 pub mod clock;
+pub mod coords;
 pub mod player;
 pub mod world;
 

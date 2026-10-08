@@ -16,18 +16,17 @@ use crate::{
     server::{
         ChunkEvent,
         game::{
-            player::ChunkScope,
-            world::{
-                ChunkData,
-                block::{
-                    BlockLight,
-                    data::{RenderLayer, SIDE_DELTAS, SideShade},
-                },
-                chunk::{
-                    Chunk,
-                    visibility::{SideSet, VisibilityGraph},
-                },
+            block::{
+                BlockLight,
+                data::{RenderLayer, SIDE_DELTAS, SideShade},
             },
+            chunk::{
+                Chunk,
+                visibility::{SideSet, VisibilityGraph},
+            },
+            coords,
+            player::ChunkScope,
+            world::ChunkData,
         },
     },
     shared::{
@@ -169,7 +168,7 @@ impl World {
         anchor: Point3<f64>,
     ) {
         blended_points.sort_unstable_by_key(|&coords| {
-            Reverse(utils::distance_squared(coords, utils::chunk_coords(origin)))
+            Reverse(utils::distance_squared(coords, coords::chunk_coords(origin)))
         });
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
@@ -267,7 +266,7 @@ impl World {
     }
 
     fn cull_chunks(&self, frustum: &Frustum) -> impl Iterator<Item = Point3<i32>> {
-        let origin = utils::chunk_coords(frustum.origin);
+        let origin = coords::chunk_coords(frustum.origin);
         let mut queue = VecDeque::from([origin]);
         let mut visited = FxIndexMap::from_iter([(origin, SideSet::default())]);
         let scope = ChunkScope {
@@ -693,7 +692,7 @@ struct BlockImmediates {
 
 impl BlockImmediates {
     fn new(chunk_coords: Point3<i32>, anchor: Point3<f64>) -> Self {
-        let anchor = utils::chunk_coords(anchor);
+        let anchor = coords::chunk_coords(anchor);
         let chunk_coords = chunk_coords - anchor.coords;
         Self {
             chunk_coords: chunk_coords.cast(),

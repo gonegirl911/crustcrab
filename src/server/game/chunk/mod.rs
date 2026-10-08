@@ -2,16 +2,12 @@ pub mod area;
 pub mod generator;
 pub mod visibility;
 
-use super::{
-    action::BlockAction,
-    block::{Block, BlockLight},
-};
+use super::block::{Block, BlockLight};
 use crate::{
-    server::game::world::block::area::BlockArea,
+    server::game::{block::area::BlockArea, coords, world::action::BlockAction},
     shared::{
         bound::{Aabb, BoundingSphere},
         cuboid::Cuboid,
-        utils,
     },
 };
 use area::ChunkArea;
@@ -113,7 +109,7 @@ impl Chunk {
 
     fn bounding_box(coords: Point3<i32>) -> Aabb {
         Aabb::new(
-            utils::coords(coords, Point3::origin()).cast(),
+            coords::coords(coords, Point3::origin()).cast(),
             Vector3::repeat(Self::DIM as f64),
         )
     }

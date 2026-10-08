@@ -14,7 +14,7 @@ use crate::{
             utils::{Vertex, read_wgsl},
         },
     },
-    server::{ControlEvent, game::world::block::Block},
+    server::{ControlEvent, game::block::Block},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Vector3, vector};
