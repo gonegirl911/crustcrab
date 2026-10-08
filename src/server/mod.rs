@@ -48,6 +48,7 @@ pub enum ControlEvent {
     TimeInitialized {
         ticks_per_second: u32,
         cycle: DayCycle,
+        ticks: u16,
     },
     PlayerInitialized {
         origin: Point3<f64>,

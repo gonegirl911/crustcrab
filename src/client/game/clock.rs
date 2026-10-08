@@ -61,9 +61,12 @@ impl EventHandler for Clock {
             Event::ControlEvent(ControlEvent::TimeInitialized {
                 ticks_per_second,
                 cycle,
+                ticks,
             }) => {
                 self.ticks_per_second = ticks_per_second as f64;
                 self.cycle = cycle;
+                self.anchor_age = 0.0;
+                self.reanchor(ticks);
             }
             Event::ControlEvent(ControlEvent::TimeUpdated { ticks }) => {
                 self.reanchor(ticks);

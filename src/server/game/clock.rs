@@ -40,9 +40,7 @@ impl EventHandler<Event> for Clock {
                 recipient.send(ControlEvent::TimeInitialized {
                     ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
                     cycle: SERVER_CONFIG.clock.cycle,
-                });
-                self.pacer.fire(Instant::now(), || {
-                    recipient.send(ControlEvent::TimeUpdated { ticks: self.ticks });
+                    ticks: self.ticks,
                 });
             }
             Event::Tick => {
@@ -116,7 +114,7 @@ impl Default for DayCycle {
     fn default() -> Self {
         Self {
             ticks_per_day: u16::MAX,
-            twilight_duration: 0,
+            twilight_duration: u16::MAX / 2,
         }
     }
 }
