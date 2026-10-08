@@ -8,7 +8,7 @@ use bitflags::bitflags;
 use block_action::BlockActionController;
 use movement::MovementController;
 use rotation::RotationController;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub struct Controller {
     rotation: RotationController,
@@ -27,7 +27,7 @@ impl Controller {
         }
     }
 
-    pub fn apply_updates(&mut self, view: &mut View, dt: Duration, now: Instant) -> Changes {
+    pub fn apply_updates(&mut self, view: &mut View, dt: Duration) -> Changes {
         let mut changes = Changes::empty();
 
         if self.rotation.apply(view) {
@@ -38,7 +38,7 @@ impl Controller {
             changes.insert(Changes::MOVED);
         }
 
-        if let Some(action) = self.block_action.fire(now) {
+        if let Some(action) = self.block_action.fire() {
             changes.insert(action);
         }
 

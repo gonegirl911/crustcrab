@@ -135,7 +135,7 @@ const JOIN_REQUEST_GAP: Duration = Duration::from_secs(1);
 const JOIN_ACKNOWLEDGEMENT_GAP: Duration = Duration::from_secs(1);
 const POSITION_GAP: Duration = Duration::from_millis(2);
 const ORIENTATION_GAP: Duration = Duration::from_millis(2);
-const BLOCK_ACTION_GAP: Duration = Duration::from_millis(4);
+const BLOCK_ACTION_GAP: Duration = Duration::from_millis(16);
 const CHUNK_BATCH_ACKNOWLEDGEMENT_GAP: Duration = Duration::from_millis(2);
 
 const RATE_VIOLATION_WINDOW: Duration = Duration::from_secs(60);

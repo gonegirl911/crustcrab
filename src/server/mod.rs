@@ -81,7 +81,7 @@ pub enum ChunkEvent {
     Loaded(Compressed<Arc<ChunkData>>),
     Unloaded(Point3<i32>),
     Updated(Compressed<Arc<ChunkData>>),
-    BatchStarted,
+    BatchStarted(BatchKind),
     BatchEnded,
 }
 
@@ -89,6 +89,12 @@ impl Outbound for ChunkEvent {
     fn send(self, Connection { chunk_tx, .. }: &Connection) -> Result<(), SendError<Self>> {
         chunk_tx.send(self)
     }
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub enum BatchKind {
+    Delivery,
+    Broadcast,
 }
 
 #[derive(Deserialize)]

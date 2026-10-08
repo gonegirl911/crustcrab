@@ -1,23 +1,16 @@
 use super::Changes;
-use crate::client::{
-    CLIENT_CONFIG,
-    event_loop::{Event, EventHandler},
-    game::player::PlayerFeatures,
-};
-use crate::shared::pacer::Pacer;
+use crate::client::event_loop::{Event, EventHandler};
 use bitflags::{Flags, bitflags};
-use std::time::{Duration, Instant};
 use winit::event::{ButtonSource, ElementState, MouseButton, WindowEvent};
 
+#[derive(Default)]
 pub struct BlockActionController {
     relevant: MouseButtons,
     history: MouseButtons,
-    pacer: Pacer,
 }
 
 impl BlockActionController {
-    #[rustfmt::skip]
-    pub fn fire(&mut self, now: Instant) -> Option<Changes> {
+    pub fn fire(&mut self) -> Option<Changes> {
         let action = if self.relevant.contains(MouseButtons::RIGHT) {
             Changes::BLOCK_PLACED
         } else if self.relevant.contains(MouseButtons::LEFT) {
@@ -25,11 +18,6 @@ impl BlockActionController {
         } else {
             return None;
         };
-
-        if CLIENT_CONFIG.player.features.contains(PlayerFeatures::DRAWING_MODE) {
-            return self.pacer.admit(now).then_some(action);
-        }
-
         self.relevant.clear();
         self.history.clear();
         Some(action)
@@ -47,17 +35,6 @@ impl BlockActionController {
             self.relevant.insert(opp);
         }
         self.history.remove(button);
-        self.pacer.clear();
-    }
-}
-
-impl Default for BlockActionController {
-    fn default() -> Self {
-        Self {
-            relevant: Default::default(),
-            history: Default::default(),
-            pacer: Pacer::new(BLOCK_ACTION_REPEAT_GAP),
-        }
     }
 }
 
@@ -96,5 +73,3 @@ bitflags! {
         const RIGHT = 1 << 1;
     }
 }
-
-const BLOCK_ACTION_REPEAT_GAP: Duration = Duration::from_millis(8);

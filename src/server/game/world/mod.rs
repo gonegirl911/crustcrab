@@ -18,7 +18,7 @@ use super::{
 use crate::{
     client::{PlayerEvent, game::shading::DAY_LIGHT_TABLE},
     server::{
-        ChunkEvent, ControlEvent, SERVER_CONFIG,
+        BatchKind, ChunkEvent, ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry, RecipientList},
         event_loop::{Event, EventHandler},
     },
@@ -119,7 +119,7 @@ impl World {
         };
 
         let recipient = connections.one(id);
-        recipient.send(ChunkEvent::BatchStarted);
+        recipient.send(ChunkEvent::BatchStarted(BatchKind::Delivery));
         self.par_send_loads(&recipient, points);
         recipient.send(ChunkEvent::BatchEnded);
     }
@@ -196,7 +196,7 @@ impl World {
         let recipient_ids = self.schedulers.client_containing(&batch).collect::<Vec<_>>();
         let recipients = connections.many(recipient_ids.iter().copied());
 
-        recipients.send(ChunkEvent::BatchStarted);
+        recipients.send(ChunkEvent::BatchStarted(BatchKind::Broadcast));
         self.send_updates(&recipients, updates);
         Self::send_unloads(&recipients, removals);
         self.send_loads(&recipients, inserts);

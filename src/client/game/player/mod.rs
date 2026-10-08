@@ -13,7 +13,6 @@ use crate::{
     server::{ControlEvent, game::chunk::Chunk},
     shared::{color::Float3, pacer::Pacer},
 };
-use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 use camera::{Projection, View};
 use controller::{Changes, Controller};
@@ -99,7 +98,7 @@ impl EventHandler for Player {
                 self.controller.external_updates_applied = true;
             }
             Event::WindowEvent(WindowEvent::RedrawRequested) => {
-                let changes = self.controller.apply_updates(&mut self.view, dt, now);
+                let changes = self.controller.apply_updates(&mut self.view, dt);
 
                 if changes.intersects(Changes::VIEW) && self.view_report_pacer.admit(now) {
                     if changes.contains(Changes::MOVED) {
@@ -192,15 +191,6 @@ pub struct PlayerConfig {
     fovy: f32,
     sensitivity: f32,
     pub render_distance: u32,
-    #[serde(default)]
-    features: PlayerFeatures,
-}
-
-bitflags! {
-    #[derive(Default, Deserialize)]
-    struct PlayerFeatures: u8 {
-        const DRAWING_MODE = 1 << 0;
-    }
 }
 
 const VIEW_REPORT_GAP: Duration = Duration::from_millis(16);

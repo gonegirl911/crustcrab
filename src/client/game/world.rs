@@ -14,7 +14,7 @@ use crate::{
     },
     enum_map,
     server::{
-        ChunkEvent,
+        BatchKind, ChunkEvent,
         game::{
             block::{
                 BlockLight,
@@ -90,7 +90,7 @@ impl World {
             meshes: Default::default(),
             render_pipelines,
             revisions: Default::default(),
-            open_batch_id: BatchId::NIL,
+            open_batch_id: BatchId::Nil,
             pending_batches: Default::default(),
             chunk_rate: Ema::new(CHUNK_RATE_SAMPLE_WEIGHT),
             workers,
@@ -202,7 +202,7 @@ impl World {
     }
 
     fn join_open_batch(&mut self) -> bool {
-        if self.open_batch_id == BatchId::NIL {
+        if self.open_batch_id == BatchId::Nil {
             return false;
         }
 
@@ -257,6 +257,10 @@ impl World {
 
         for change in changes {
             self.apply_change(renderer, change);
+        }
+
+        if !matches!(batch_id, BatchId::Delivery(_)) {
+            return;
         }
 
         let elapsed = started_at.elapsed();
@@ -496,13 +500,13 @@ impl EventHandler for World {
                         has_priority,
                     );
                 }
-                ChunkEvent::BatchStarted => {
+                &ChunkEvent::BatchStarted(kind) => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
-                    self.open_batch_id = BatchId::new();
+                    self.open_batch_id = BatchId::new(kind);
                 }
                 ChunkEvent::BatchEnded => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
-                    self.open_batch_id = BatchId::NIL;
+                    self.open_batch_id = BatchId::Nil;
                 }
             },
             Event::AboutToWait => {
@@ -557,13 +561,19 @@ struct ChunkBatch {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct BatchId(Uuid);
+enum BatchId {
+    Delivery(Uuid),
+    Broadcast(Uuid),
+    Nil,
+}
 
 impl BatchId {
-    const NIL: Self = Self(Uuid::nil());
-
-    fn new() -> Self {
-        Self(Uuid::new_v4())
+    fn new(kind: BatchKind) -> Self {
+        let id = Uuid::new_v4();
+        match kind {
+            BatchKind::Delivery => Self::Delivery(id),
+            BatchKind::Broadcast => Self::Broadcast(id),
+        }
     }
 }
 

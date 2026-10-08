@@ -26,10 +26,6 @@ impl Pacer {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.stamped_at = None;
-    }
-
     fn is_due(&self, now: Instant) -> bool {
         self.stamped_at
             .is_none_or(|stamped_at| now.duration_since(stamped_at) >= self.gap)
