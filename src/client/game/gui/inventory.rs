@@ -3,7 +3,7 @@ use crate::{
     client::{
         CLIENT_CONFIG,
         event_loop::{Event, EventHandler},
-        game::world::BlockVertex,
+        game::world::mesh::BlockVertex,
         renderer::{
             Renderer, Surface,
             buffer::{MemoryState, VertexBuffer},
