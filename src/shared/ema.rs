@@ -18,4 +18,8 @@ impl Ema {
         self.estimate = Some(estimate);
         estimate
     }
+
+    pub fn get(&self) -> Option<f32> {
+        self.estimate
+    }
 }

@@ -1,7 +1,7 @@
 use super::Chunk;
 use crate::{
     server::game::{block::Block, coords, world::World},
-    shared::{pool::JobPool, utils},
+    shared::{ema::Ema, pool::JobPool, utils},
 };
 use nalgebra::Point3;
 use noise::{NoiseFn, Simplex};
@@ -15,6 +15,7 @@ pub struct ChunkGeneratorPool {
     requested: FxHashSet<Point3<i32>>,
     deferred: VecDeque<Point3<i32>>,
     in_flight: usize,
+    yield_rate: Ema,
 }
 
 impl ChunkGeneratorPool {
@@ -36,7 +37,8 @@ impl ChunkGeneratorPool {
     where
         F: FnMut(Point3<i32>) -> bool,
     {
-        let in_flight_limit = (IN_FLIGHT_PER_DEMAND * demand as f32) as usize;
+        let poll_demand = demand as f32 / self.yield_rate.get().unwrap_or(1.0);
+        let in_flight_limit = (IN_FLIGHT_PER_POLL * poll_demand) as usize;
         while self.in_flight < in_flight_limit {
             let Some(coords) = self.deferred.pop_front() else {
                 return;
@@ -58,8 +60,9 @@ impl ChunkGeneratorPool {
         }
 
         let (coords, chunk) = self.pool.recv_deadline(deadline).ok()?;
-        self.in_flight -= 1;
         self.requested.remove(&coords);
+        self.in_flight -= 1;
+        self.yield_rate.smooth(chunk.is_some() as u8 as f32);
         Some((coords, chunk))
     }
 
@@ -81,6 +84,7 @@ impl Default for ChunkGeneratorPool {
             requested: Default::default(),
             deferred: Default::default(),
             in_flight: 0,
+            yield_rate: Ema::new(YIELD_SAMPLE_WEIGHT),
         }
     }
 }
@@ -107,4 +111,5 @@ impl ChunkGenerator {
     }
 }
 
-const IN_FLIGHT_PER_DEMAND: f32 = 2.0;
+const IN_FLIGHT_PER_POLL: f32 = 2.0;
+const YIELD_SAMPLE_WEIGHT: f32 = 0.1;
