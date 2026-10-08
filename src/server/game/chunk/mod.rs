@@ -240,37 +240,6 @@ impl<T> IndexMut<Point3<u8>> for ChunkDataStore<T> {
     }
 }
 
-pub struct ChunkBitSet(BitArr!(for Chunk::DIM.pow(3)));
-
-impl ChunkBitSet {
-    fn from_fn<F: FnMut(Point3<u8>) -> bool>(mut f: F) -> Self {
-        let mut data = Self::default();
-        for coords in Chunk::points() {
-            data.set(coords, f(coords));
-        }
-        data
-    }
-
-    fn set(&mut self, coords: Point3<u8>, value: bool) {
-        self.0.set(Self::index_unchecked(coords), value);
-    }
-
-    fn replace(&mut self, coords: Point3<u8>, value: bool) -> bool {
-        self.0.replace(Self::index_unchecked(coords), value)
-    }
-
-    fn index_unchecked(coords: Point3<u8>) -> usize {
-        let coords = coords.cast::<usize>();
-        coords.x * Chunk::DIM.pow(2) + coords.y * Chunk::DIM + coords.z
-    }
-}
-
-impl Default for ChunkBitSet {
-    fn default() -> Self {
-        Self(bitarr![0; Chunk::DIM.pow(3)])
-    }
-}
-
 #[derive(Clone, Copy, PartialEq, Default)]
 pub struct ChunkReach(u32);
 
@@ -309,5 +278,36 @@ impl IntoIterator for ChunkReach {
 
     fn into_iter(self) -> Self::IntoIter {
         ChunkArea::chunk_deltas().filter(move |&delta| self.0.bit(Self::index(delta)))
+    }
+}
+
+pub struct ChunkBitSet(BitArr!(for Chunk::DIM.pow(3)));
+
+impl ChunkBitSet {
+    fn from_fn<F: FnMut(Point3<u8>) -> bool>(mut f: F) -> Self {
+        let mut data = Self::default();
+        for coords in Chunk::points() {
+            data.set(coords, f(coords));
+        }
+        data
+    }
+
+    fn set(&mut self, coords: Point3<u8>, value: bool) {
+        self.0.set(Self::index_unchecked(coords), value);
+    }
+
+    fn replace(&mut self, coords: Point3<u8>, value: bool) -> bool {
+        self.0.replace(Self::index_unchecked(coords), value)
+    }
+
+    fn index_unchecked(coords: Point3<u8>) -> usize {
+        let coords = coords.cast::<usize>();
+        coords.x * Chunk::DIM.pow(2) + coords.y * Chunk::DIM + coords.z
+    }
+}
+
+impl Default for ChunkBitSet {
+    fn default() -> Self {
+        Self(bitarr![0; Chunk::DIM.pow(3)])
     }
 }
