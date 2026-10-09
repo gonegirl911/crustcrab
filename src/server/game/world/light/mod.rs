@@ -77,7 +77,9 @@ impl WorldLight {
             self.0.remove(coords);
         }
 
-        let points_per_branch = points.len().div_ceil(rayon::current_num_threads());
+        let points_per_branch = points
+            .len()
+            .div_ceil(rayon::current_num_threads() * BRANCHES_PER_THREAD);
 
         points
             .par_iter()
@@ -200,3 +202,5 @@ impl WorldLight {
 }
 
 static PLACEHOLDER: LazyLock<Arc<ChunkLight>> = LazyLock::new(|| ChunkLight::placeholder().into());
+
+const BRANCHES_PER_THREAD: usize = 4;

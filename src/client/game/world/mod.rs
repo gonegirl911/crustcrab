@@ -50,7 +50,7 @@ pub struct World {
     revisions: FxHashMap<Point3<i32>, RevisionTracker>,
     open_batch_id: BatchId,
     pending_batches: FxHashMap<BatchId, ChunkBatch>,
-    workers: JobPool<ChunkInput, ChunkOutput>,
+    pool: JobPool<ChunkInput, ChunkOutput>,
     chunk_rate: Ema,
 }
 
@@ -82,7 +82,7 @@ impl World {
                 Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
         };
-        let workers = JobPool::new(RESERVED_THREADS, Self::compute);
+        let pool = JobPool::new(THREAD_HEADROOM, Self::compute).demoted();
         Self {
             meshes: Default::default(),
             render_pipelines,
@@ -90,7 +90,7 @@ impl World {
             open_batch_id: BatchId::Nil,
             pending_batches: Default::default(),
             chunk_rate: Ema::new(CHUNK_RATE_SAMPLE_WEIGHT),
-            workers,
+            pool,
         }
     }
 
@@ -462,7 +462,7 @@ impl EventHandler for World {
                 ChunkEvent::Loaded(Compressed { inner: data, .. }) => {
                     let snapshot_revision = self.bump_revision(data.coords);
                     let has_priority = self.join_open_batch();
-                    self.workers.submit(
+                    self.pool.submit(
                         ChunkInput {
                             data: data.clone(),
                             snapshot_revision,
@@ -504,7 +504,7 @@ impl EventHandler for World {
                     visibility_graph,
                     batch_id,
                     snapshot_revision,
-                }) = self.workers.try_recv()
+                }) = self.pool.try_recv()
                 {
                     self.batch_or_apply_change(
                         renderer,
@@ -590,5 +590,5 @@ struct ChunkOutput {
     batch_id: BatchId,
 }
 
-const RESERVED_THREADS: usize = 1;
+const THREAD_HEADROOM: usize = 1;
 const CHUNK_RATE_SAMPLE_WEIGHT: f32 = 0.25;

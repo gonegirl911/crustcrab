@@ -1,4 +1,7 @@
+mod demotion;
+
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
+use demotion::demote;
 use std::{
     collections::VecDeque,
     mem::DropGuard,
@@ -8,9 +11,9 @@ use std::{
     time::Instant,
 };
 
-pub fn init(reserved_threads: usize) {
+pub fn init(headroom: usize) {
     rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads(reserved_threads))
+        .num_threads(thread_count(headroom))
         .build_global()
         .unwrap();
 }
@@ -31,9 +34,9 @@ impl<I, O> JobPool<I, O> {
 }
 
 impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
-    pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(reserved_threads: usize, job: J) -> Self {
+    pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(headroom: usize, job: J) -> Self {
         let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads(reserved_threads))
+            .num_threads(thread_count(headroom))
             .build()
             .unwrap()
             .into();
@@ -47,6 +50,11 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
             }),
             out_rx,
         }
+    }
+
+    pub fn demoted(self) -> Self {
+        self.inner.pool.spawn_broadcast(|_| demote());
+        self
     }
 
     pub fn submit(&self, input: I, has_priority: bool) {
@@ -118,9 +126,9 @@ impl<I> Default for Pending<I> {
     }
 }
 
-fn num_threads(reserved_threads: usize) -> usize {
+fn thread_count(headroom: usize) -> usize {
     thread::available_parallelism()
         .map_or(1, NonZero::get)
-        .saturating_sub(reserved_threads)
+        .saturating_sub(headroom)
         .max(1)
 }

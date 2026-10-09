@@ -86,10 +86,12 @@ impl ChunkGeneratorPool {
 impl Default for ChunkGeneratorPool {
     fn default() -> Self {
         let generator = Default::default();
+        let pool = JobPool::new(THREAD_HEADROOM, move |coords| {
+            (coords, Self::generate(&generator, coords))
+        })
+        .demoted();
         Self {
-            pool: JobPool::new(RESERVED_THREADS, move |coords| {
-                (coords, Self::generate(&generator, coords))
-            }),
+            pool,
             requested: Default::default(),
             deferred: Default::default(),
             in_flight: 0,
@@ -120,6 +122,6 @@ impl ChunkGenerator {
     }
 }
 
-const RESERVED_THREADS: usize = 4;
+const THREAD_HEADROOM: usize = 4;
 const IN_FLIGHT_PER_POLL: f32 = 2.0;
 const YIELD_SAMPLE_WEIGHT: f32 = 0.1;
