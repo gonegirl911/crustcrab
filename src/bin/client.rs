@@ -1,8 +1,5 @@
 use clap::Parser;
-use crustcrab::{
-    client::{Client, net},
-    shared::pool,
-};
+use crustcrab::client::{Client, net};
 use std::net::SocketAddr;
 
 #[derive(Parser)]
@@ -15,7 +12,6 @@ struct Args {
 
 fn main() {
     env_logger::init();
-    pool::init(1);
 
     let Args {
         event_addr,

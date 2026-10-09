@@ -242,6 +242,7 @@ impl EventHandler for Game {
         &'a Surface,
     );
 
+    #[rustfmt::skip]
     fn handle(
         &mut self,
         event: &Event,
@@ -252,7 +253,6 @@ impl EventHandler for Game {
         self.fog.handle(event, (renderer, surface));
         self.highlight.handle(event, ());
         self.gui.handle(event, (renderer, surface));
-        #[rustfmt::skip]
         self.player.handle(event, (player_tx, stopwatch, renderer, surface, &self.gui));
         self.depth.handle(event, (renderer, surface));
         self.processor.handle(event, (renderer, surface));

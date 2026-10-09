@@ -126,7 +126,7 @@ impl World {
 
         let mut inserts = vec![];
         while inserts.len() < demand {
-            let Some((coords, chunk)) = self.generators.poll_until(deadline) else {
+            let Some((coords, chunk)) = self.generators.poll_deadline(deadline) else {
                 break;
             };
 
@@ -196,7 +196,10 @@ impl World {
 
     fn deliver_batch(&mut self, id: ConnectionId, connections: &ConnectionRegistry) {
         let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-        let Some(points) = scheduler.admit_batch() else {
+        let is_settled = |coords| {
+            ChunkArea::chunk_deltas().all(|delta| !self.generators.is_generating(coords + delta))
+        };
+        let Some(points) = scheduler.admit_batch(is_settled) else {
             return;
         };
 
@@ -348,15 +351,13 @@ impl EventHandler<WorldEvent> for World {
                     self.apply(coords, normal, BlockAction::Destroy, id, connections, aim);
                 }
             }
-            WorldEvent::Tick => {
-                let now = Instant::now();
-                let deadline = now + TICK_BUDGET;
-
-                let inserts = self.advance_generators(deadline);
+            WorldEvent::Tick(now) => {
+                let inserts = self.advance_generators(Instant::now() + PHASE_BUDGET);
                 self.integrate_inserts(&inserts);
 
                 let ids = self.schedulers.0.keys().copied().collect::<Vec<_>>();
                 let ordered_ids = self.tick_rotation.order(&ids);
+                let deadline = Instant::now() + PHASE_BUDGET;
 
                 for &id in ordered_ids {
                     let scheduler = self.schedulers.0.get_mut(&id).unwrap();
@@ -479,7 +480,7 @@ pub enum WorldEvent {
         id: ConnectionId,
         chunks_per_second: f32,
     },
-    Tick,
+    Tick(Instant),
 }
 
 impl WorldEvent {
@@ -489,8 +490,8 @@ impl WorldEvent {
                 return Some(Self::Connection(event.clone()));
             }
             Event::Player(id, event) => (*id, event, player?),
-            Event::Tick(_) => {
-                return Some(WorldEvent::Tick);
+            &Event::Tick(now) => {
+                return Some(WorldEvent::Tick(now));
             }
         };
         match *player_event {
@@ -520,4 +521,4 @@ impl WorldEvent {
     }
 }
 
-const TICK_BUDGET: Duration = Duration::from_millis(10);
+const PHASE_BUDGET: Duration = Duration::from_millis(10);

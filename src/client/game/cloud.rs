@@ -85,6 +85,7 @@ impl CloudLayer {
     }
 
     #[expect(clippy::too_many_arguments)]
+    #[rustfmt::skip]
     pub fn draw(
         &self,
         view: &wgpu::TextureView,
@@ -132,7 +133,6 @@ impl CloudLayer {
                 ],
             );
             imm.set(&mut render_pass);
-            #[rustfmt::skip]
             self.vertex_buffer.draw_instanced(&mut render_pass, &self.instance_buffer);
         }
         self.blender.draw(

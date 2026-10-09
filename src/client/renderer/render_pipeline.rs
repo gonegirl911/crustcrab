@@ -8,7 +8,7 @@ pub struct RenderPipeline(wgpu::RenderPipeline);
 impl RenderPipeline {
     #[builder]
     pub fn new<'a>(
-        #[expect(unused)] renderer @ Renderer { device, .. }: &'a Renderer,
+        _renderer @ Renderer { device, .. }: &'a Renderer,
         shader_desc: wgpu::ShaderModuleDescriptor<'a>,
         #[builder(default)] bind_group_layouts: &'a [&'a wgpu::BindGroupLayout],
         #[builder(default)] immediate_size: u32,

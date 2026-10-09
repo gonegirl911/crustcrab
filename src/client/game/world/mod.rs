@@ -82,7 +82,7 @@ impl World {
                 Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
         };
-        let workers = JobPool::new(Self::compute);
+        let workers = JobPool::new(RESERVED_THREADS, Self::compute);
         Self {
             meshes: Default::default(),
             render_pipelines,
@@ -590,4 +590,5 @@ struct ChunkOutput {
     batch_id: BatchId,
 }
 
+const RESERVED_THREADS: usize = 1;
 const CHUNK_RATE_SAMPLE_WEIGHT: f32 = 0.25;

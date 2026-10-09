@@ -20,13 +20,13 @@ impl Atmosphere {
         )
     }
 
+    #[rustfmt::skip]
     pub fn draw(
         &self,
         render_pass: &mut wgpu::RenderPass,
         player_uniform_bind_group: &wgpu::BindGroup,
         sky_bind_group: &wgpu::BindGroup,
     ) {
-        #[rustfmt::skip]
         self.0.bind(render_pass, [player_uniform_bind_group, sky_bind_group]);
         render_pass.draw(0..3, 0..1);
     }

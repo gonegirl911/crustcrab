@@ -154,9 +154,9 @@ impl Instance {
         }
     }
 
+    #[rustfmt::skip]
     fn present(&mut self, texture: wgpu::SurfaceTexture) {
         let view = texture.texture.create_view(&Default::default());
-        #[rustfmt::skip]
         let mut encoder = self.renderer.device.create_command_encoder(&Default::default());
         self.game.draw(&self.renderer, &view, &mut encoder);
         self.renderer.queue.submit([encoder.finish()]);
@@ -179,10 +179,10 @@ impl Instance {
 impl EventHandler for Instance {
     type Context<'a> = &'a Sender<PlayerEvent>;
 
+    #[rustfmt::skip]
     fn handle(&mut self, event: &Event, player_tx: Self::Context<'_>) {
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
-        #[rustfmt::skip]
         self.surface.handle(event, (&*self.window.0, &self.renderer));
         self.game.handle(
             event,

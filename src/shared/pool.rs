@@ -9,12 +9,8 @@ use std::{
 };
 
 pub fn init(reserved_threads: usize) {
-    let num_threads = thread::available_parallelism()
-        .map_or(1, NonZero::get)
-        .saturating_sub(reserved_threads)
-        .max(1);
     rayon::ThreadPoolBuilder::new()
-        .num_threads(num_threads)
+        .num_threads(num_threads(reserved_threads))
         .build_global()
         .unwrap();
 }
@@ -35,10 +31,16 @@ impl<I, O> JobPool<I, O> {
 }
 
 impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
-    pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(job: J) -> Self {
+    pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(reserved_threads: usize, job: J) -> Self {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads(reserved_threads))
+            .build()
+            .unwrap()
+            .into();
         let (out_tx, out_rx) = crossbeam_channel::unbounded();
         Self {
             inner: Arc::new(Inner {
+                pool,
                 job: Box::new(job),
                 out_tx,
                 pending: Default::default(),
@@ -62,7 +64,8 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
             pending.in_flight += 1;
 
             let inner = inner.clone();
-            rayon::spawn(move || {
+            let pool = inner.pool.clone();
+            pool.spawn(move || {
                 let inner = DropGuard::new(inner, |inner| {
                     let mut pending = inner.pending.lock().unwrap();
                     pending.in_flight -= 1;
@@ -77,6 +80,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
 }
 
 struct Inner<I, O> {
+    pool: Arc<rayon::ThreadPool>,
     job: Box<dyn Fn(I) -> O + Send + Sync>,
     out_tx: Sender<O>,
     pending: Mutex<Pending<I>>,
@@ -112,4 +116,11 @@ impl<I> Default for Pending<I> {
             in_flight: 0,
         }
     }
+}
+
+fn num_threads(reserved_threads: usize) -> usize {
+    thread::available_parallelism()
+        .map_or(1, NonZero::get)
+        .saturating_sub(reserved_threads)
+        .max(1)
 }

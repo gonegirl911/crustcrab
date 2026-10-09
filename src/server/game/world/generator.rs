@@ -54,7 +54,10 @@ impl ChunkGeneratorPool {
         }
     }
 
-    pub fn poll_until(&mut self, deadline: Instant) -> Option<(Point3<i32>, Option<Box<Chunk>>)> {
+    pub fn poll_deadline(
+        &mut self,
+        deadline: Instant,
+    ) -> Option<(Point3<i32>, Option<Box<Chunk>>)> {
         if self.in_flight == 0 {
             return None;
         }
@@ -64,6 +67,10 @@ impl ChunkGeneratorPool {
         self.in_flight -= 1;
         self.yield_rate.smooth(chunk.is_some() as u8 as f32);
         Some((coords, chunk))
+    }
+
+    pub fn is_generating(&self, coords: Point3<i32>) -> bool {
+        self.requested.contains(&coords)
     }
 
     fn generate(generator: &ChunkGenerator, coords: Point3<i32>) -> Option<Box<Chunk>> {
@@ -80,7 +87,9 @@ impl Default for ChunkGeneratorPool {
     fn default() -> Self {
         let generator = Default::default();
         Self {
-            pool: JobPool::new(move |coords| (coords, Self::generate(&generator, coords))),
+            pool: JobPool::new(RESERVED_THREADS, move |coords| {
+                (coords, Self::generate(&generator, coords))
+            }),
             requested: Default::default(),
             deferred: Default::default(),
             in_flight: 0,
@@ -111,5 +120,6 @@ impl ChunkGenerator {
     }
 }
 
+const RESERVED_THREADS: usize = 4;
 const IN_FLIGHT_PER_POLL: f32 = 2.0;
 const YIELD_SAMPLE_WEIGHT: f32 = 0.1;

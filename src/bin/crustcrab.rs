@@ -13,7 +13,7 @@ use std::thread;
 
 fn main() {
     env_logger::init();
-    pool::init(3);
+    pool::init(2);
 
     let (connection_tx, connection_rx) = crossbeam_channel::bounded(0);
     let (player_tx, forward_rx) = crossbeam_channel::unbounded();
