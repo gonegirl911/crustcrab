@@ -72,7 +72,7 @@ impl<'de> Deserialize<'de> for Block {
 
 bitfield! {
     #[derive(Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
-    pub struct BlockLight(u32);
+    pub struct BlockLight(pub u32);
     pub u8, component, set_component: Self::COMPONENT_MAX.ilog2() as usize, 0, Self::LEN;
 }
 
