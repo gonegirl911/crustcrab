@@ -12,7 +12,7 @@ use crate::{
 };
 use connection::{Connection, ConnectionEvent, ConnectionId, Outbound};
 use crossbeam_channel::{Receiver, SendError};
-use event_loop::{EventLoop, EventLoopConfig};
+use event_loop::EventLoop;
 use game::{
     Game,
     block::Block,
@@ -80,7 +80,7 @@ impl Outbound for ControlEvent {
 pub enum ChunkEvent {
     Loaded(Compressed<Arc<ChunkData>>),
     Unloaded(Point3<i32>),
-    BatchStarted(BatchKind),
+    BatchStarted(BatchTrigger),
     BatchEnded,
 }
 
@@ -90,15 +90,14 @@ impl Outbound for ChunkEvent {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
-pub enum BatchKind {
-    Delivery,
-    Broadcast,
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BatchTrigger {
+    Scheduler { allowance: usize },
+    Action,
 }
 
 #[derive(Deserialize)]
 struct ServerConfig {
-    event_loop: EventLoopConfig,
     player: PlayerConfig,
     clock: ClockConfig,
 }

@@ -1,4 +1,4 @@
-use nalgebra::{Point3, Vector3, point};
+use nalgebra::{Point3, Vector3, vector};
 
 pub struct Cuboid {
     origin: Point3<i64>,
@@ -38,15 +38,21 @@ impl Cuboid {
     }
 
     pub fn into_points(self) -> impl Iterator<Item = Point3<i64>> {
-        (0..self.volume()).map(move |i| self.decompose(i))
+        (0..self.volume()).map(move |i| self.unflatten(i))
     }
 
-    fn decompose(&self, i: i64) -> Point3<i64> {
-        point![
-            self.origin.x + i / (self.diagonal.y * self.diagonal.z),
-            self.origin.y + i % (self.diagonal.y * self.diagonal.z) / self.diagonal.z,
-            self.origin.z + i % self.diagonal.z,
-        ]
+    pub fn flatten(&self, coords: Point3<i64>) -> i64 {
+        let delta = coords - self.origin;
+        delta.x * self.diagonal.y * self.diagonal.z + delta.y * self.diagonal.z + delta.z
+    }
+
+    pub fn unflatten(&self, i: i64) -> Point3<i64> {
+        let delta = vector![
+            i / (self.diagonal.y * self.diagonal.z),
+            i % (self.diagonal.y * self.diagonal.z) / self.diagonal.z,
+            i % self.diagonal.z,
+        ];
+        self.origin + delta
     }
 
     fn volume(&self) -> i64 {

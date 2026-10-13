@@ -117,10 +117,13 @@ impl BlockArea {
     const DIM: usize = 1 + Self::PADDING * 2;
 
     pub fn neighborhood_deltas() -> impl Iterator<Item = Vector3<i8>> {
-        Cuboid::unit()
-            .pad(1)
+        Self::neighborhood_cuboid()
             .into_points()
             .map(|coords| coords.coords.cast())
+    }
+
+    fn neighborhood_cuboid() -> Cuboid {
+        Cuboid::unit().pad(1)
     }
 }
 

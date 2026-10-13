@@ -2,10 +2,13 @@ use super::{
     ChunkStore, World,
     action::{ActionStore, BlockAction},
 };
-use crate::server::game::{block::Block, chunk::ChunkReach, coords};
+use crate::server::game::{block::Block, chunk::area::ChunkReach, coords};
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashSet;
-use std::collections::{VecDeque, hash_map::Entry};
+use std::{
+    collections::{VecDeque, hash_map::Entry},
+    sync::Arc,
+};
 
 #[derive(Default)]
 pub struct Branch {
@@ -31,13 +34,13 @@ impl Branch {
     pub fn merge(self, chunks: &mut ChunkStore) -> Changelog {
         let mut hits = vec![];
         let mut inserts = FxHashSet::default();
-        let mut removals = FxHashSet::default();
         let mut updates = vec![];
+        let mut removals = FxHashSet::default();
 
         for (chunk_coords, actions) in self.actions.0 {
             match chunks.0.entry(chunk_coords) {
                 Entry::Occupied(mut entry) => {
-                    let chunk = entry.get_mut();
+                    let chunk = Arc::make_mut(entry.get_mut());
                     let mut reach = ChunkReach::default();
 
                     for (block_coords, action) in actions {
@@ -68,7 +71,7 @@ impl Branch {
                         continue;
                     }
 
-                    let chunk = entry.insert(Default::default());
+                    let chunk = Arc::make_mut(entry.insert(Default::default()));
                     let mut reach = ChunkReach::default();
 
                     for (block_coords, action) in actions {
@@ -87,8 +90,8 @@ impl Branch {
         Changelog {
             actions: hits,
             inserts,
-            removals,
             updates,
+            removals,
         }
     }
 
@@ -105,11 +108,14 @@ impl Branch {
             return false;
         }
 
-        if let BlockAction::Place(block) = action
-            && let Some(surface) = block.data().valid_surface
-            && (normal != Vector3::y() || self.block(chunks, coords - normal) != surface)
-        {
-            return false;
+        if let BlockAction::Place(block) = action {
+            let support = self.block(chunks, coords - normal);
+
+            if let Some(surface) = block.data().valid_surface
+                && (normal != Vector3::y() || support != surface)
+            {
+                return false;
+            }
         }
 
         true
@@ -143,6 +149,6 @@ impl Branch {
 pub struct Changelog {
     pub actions: Vec<(Point3<i64>, BlockAction)>,
     pub inserts: FxHashSet<Point3<i32>>,
-    pub removals: FxHashSet<Point3<i32>>,
     pub updates: Vec<(Point3<i32>, ChunkReach)>,
+    pub removals: FxHashSet<Point3<i32>>,
 }

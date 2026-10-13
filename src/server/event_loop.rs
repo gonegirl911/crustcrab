@@ -1,12 +1,11 @@
 use super::{
-    ControlEvent, SERVER_CONFIG,
+    ControlEvent,
     connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
     gate::Gate,
     ticker::Ticker,
 };
 use crate::client::PlayerEvent;
 use crossbeam_channel::{Receiver, RecvTimeoutError};
-use serde::Deserialize;
 use std::time::Instant;
 
 pub struct EventLoop {
@@ -33,7 +32,7 @@ impl EventLoop {
     where
         H: for<'a> EventHandler<Event, Context<'a> = &'a ConnectionRegistry>,
     {
-        let mut ticker = Ticker::start(SERVER_CONFIG.event_loop.ticks_per_second);
+        let mut ticker = Ticker::start(TICKS_PER_SECOND);
         loop {
             let player_event = match ticker.recv_timeout(&self.player_rx) {
                 Ok(event) => Some(event),
@@ -78,7 +77,4 @@ pub enum Event {
     Tick(Instant),
 }
 
-#[derive(Deserialize)]
-pub struct EventLoopConfig {
-    pub ticks_per_second: u32,
-}
+pub const TICKS_PER_SECOND: u32 = 20;

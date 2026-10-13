@@ -1,38 +1,42 @@
-pub mod branch;
+pub mod region;
 
-use super::{ChunkStore, World, action::BlockAction, height::HeightMap};
-use crate::server::game::{
-    block::{
-        BlockLight,
-        area::{BlockArea, BlockLightArea},
-        data::{SIDE_DELTAS, Side},
+use super::ChunkStore;
+use crate::{
+    server::game::{
+        block::{BlockLight, area::BlockLightArea},
+        chunk::{
+            ChunkLight,
+            area::{ChunkArea, ChunkLightArea, ChunkReach},
+        },
+        coords,
     },
-    chunk::{
-        Chunk, ChunkLight, ChunkReach,
-        area::{ChunkArea, ChunkLightArea},
-    },
-    coords,
+    shared::pool::JobPool,
 };
-use branch::{Branch, LazyBranch, Node};
 use nalgebra::{Point3, point};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use rustc_hash::FxHashMap;
-use std::sync::{Arc, LazyLock};
+use region::{RegionInput, RegionOutput, SlotGrid};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::{
+    sync::{Arc, LazyLock},
+    time::Instant,
+};
 
-#[derive(Default)]
-pub struct WorldLight(FxHashMap<Point3<i32>, Arc<ChunkLight>>);
+pub struct WorldLight {
+    lights: FxHashMap<Point3<i32>, Arc<ChunkLight>>,
+    pool: JobPool<RegionInput, RegionOutput>,
+    pending: FxHashSet<Point3<i32>>,
+}
 
 impl WorldLight {
     pub fn chunk_light_area(&self, coords: Point3<i32>) -> ChunkLightArea {
         let mut value = ChunkLightArea::default();
         for delta in ChunkArea::chunk_deltas() {
-            if let Some(light) = self.0.get(&(coords + delta)) {
+            if let Some(light) = self.lights.get(&(coords + delta.cast())) {
                 let [dx, dy, dz] = delta.into();
                 for x in ChunkArea::axis_range(dx) {
                     for y in ChunkArea::axis_range(dy) {
                         let z = ChunkArea::axis_range(dz);
                         value.copy_row(
-                            coords::from_parts(point![dx, dy, dz], point![x, y, z.start])
+                            coords::from_parts(point![dx, dy, dz].cast(), point![x, y, z.start])
                                 .coords
                                 .cast(),
                             light.row(point![x, y, z.start], z.len()),
@@ -53,154 +57,102 @@ impl WorldLight {
         P: IntoIterator<Item = Point3<i32>>,
     {
         for coords in new_surface_points {
-            for delta in ChunkArea::chunk_deltas() {
+            for delta in region::chunk_deltas() {
                 if delta.y > 0 {
-                    self.0
-                        .entry(coords + delta)
+                    self.lights
+                        .entry(coords + delta.cast())
                         .or_insert_with(|| PLACEHOLDER.clone());
                 }
             }
         }
     }
 
-    pub fn par_insert_many(
+    pub fn request_regions<P: IntoIterator<Item = Point3<i32>>>(
         &mut self,
         chunks: &ChunkStore,
-        heights: &HeightMap,
-        points: &[Point3<i32>],
-    ) -> Vec<(Point3<i32>, ChunkReach)> {
-        if points.is_empty() {
-            return vec![];
-        }
-
+        points: P,
+        has_priority: bool,
+    ) {
         for coords in points {
-            self.0.remove(coords);
+            self.submit_region(chunks, coords, has_priority);
         }
-
-        let points_per_branch = points
-            .len()
-            .div_ceil(rayon::current_num_threads() * BRANCHES_PER_THREAD);
-
-        points
-            .par_iter()
-            .fold_chunks(
-                points_per_branch,
-                LazyBranch::default,
-                |mut branch, &chunk_coords| {
-                    let chunk = &chunks[chunk_coords];
-                    let light = self.0.get(&chunk_coords);
-
-                    if chunk.is_glowing() {
-                        for (block_coords, block) in Chunk::points().zip(chunk.as_slice()) {
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            for (i, c) in BlockLight::TORCHLIGHT_RANGE.zip(block.data().luminance) {
-                                branch.insert(i, node.with_value(c));
-                            }
-                        }
-                    }
-
-                    for (side, delta) in *SIDE_DELTAS {
-                        let Some(neighbor) = self.0.get(&(chunk_coords + delta.cast())) else {
-                            continue;
-                        };
-                        let component_range =
-                            if Self::inherits_skylight(heights, chunk_coords, side) {
-                                0..BlockLight::LEN
-                            } else {
-                                BlockLight::TORCHLIGHT_RANGE
-                            };
-                        for (block_coords, neighbor_block_coords) in side.block_points() {
-                            let node = Self::node(chunk, light, chunk_coords, block_coords);
-                            let filter = node.block().data().light_filter;
-                            let coords = coords::from_parts(chunk_coords, block_coords);
-                            let neighbor_value = neighbor[neighbor_block_coords];
-                            component_range
-                                .clone()
-                                .filter(|i| filter[i % 3])
-                                .map(|i| (i, neighbor_value.component(i)))
-                                .for_each(|(i, c)| {
-                                    let absorption = Self::absorption(coords, i, side.opp(), c);
-                                    let value = c.saturating_sub(absorption);
-                                    branch.insert(i, node.with_value(value));
-                                });
-                        }
-                    }
-
-                    branch
-                },
-            )
-            .map(|branch| branch.evaluate(chunks, self))
-            .reduce(Default::default, Branch::sup)
-            .merge(self)
     }
 
-    pub fn apply<A>(&mut self, chunks: &ChunkStore, actions: A) -> Vec<(Point3<i32>, ChunkReach)>
-    where
-        A: IntoIterator<Item = (Point3<i64>, BlockAction)>,
-    {
-        let mut branch = Branch::default();
-        for (coords, action) in actions {
-            match action {
-                BlockAction::Place(block) => {
-                    branch.place(chunks, self, coords, block.data());
-                }
-                BlockAction::Destroy => {
-                    branch.destroy(chunks, self, coords);
-                }
-            }
+    pub fn settle(
+        &mut self,
+        chunks: &ChunkStore,
+        deadline: Instant,
+    ) -> Vec<(Point3<i32>, ChunkReach)> {
+        let mut updates = vec![];
+        while !self.pending.is_empty()
+            && let Ok(output) = self.pool.recv_deadline(deadline)
+        {
+            self.pending.remove(&output.coords);
+            self.apply_output(output, chunks, &mut updates);
         }
-        branch.merge(self)
+        updates
+    }
+
+    pub fn is_pending(&self, coords: Point3<i32>) -> bool {
+        self.pending.contains(&coords)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
-        self.0
+        self.lights
             .get(&coords::chunk(coords))
             .map_or_default(|light| light[coords::block(coords)])
     }
 
-    fn absorption(coords: Point3<i64>, index: usize, travel: Side, neighbor_value: u8) -> u8 {
-        if !BlockLight::SKYLIGHT_RANGE.contains(&index) {
-            return 1;
+    fn submit_region(&mut self, chunks: &ChunkStore, coords: Point3<i32>, has_priority: bool) {
+        if !self.pending.insert(coords) {
+            return;
         }
 
-        if travel == Side::Top {
-            return neighbor_value;
-        }
-
-        if coords.y >= World::Y_RANGE.start as i64 * Chunk::DIM as i64 - BlockArea::PADDING as i64
-            && travel == Side::Bottom
-            && neighbor_value == BlockLight::COMPONENT_MAX
-        {
-            0
-        } else {
-            1
-        }
+        self.pool.submit(
+            RegionInput {
+                coords,
+                chunks: SlotGrid::from_fn(|delta| chunks.0.get(&(coords + delta)).cloned()),
+                lights: SlotGrid::from_fn(|delta| self.lights.get(&(coords + delta)).cloned()),
+                has_priority,
+            },
+            has_priority,
+        );
     }
 
-    fn node<'a>(
-        chunk: &'a Chunk,
-        light: Option<&'a Arc<ChunkLight>>,
-        chunk_coords: Point3<i32>,
-        block_coords: Point3<u8>,
-    ) -> Node<'a> {
-        Node {
-            chunk: Some(chunk),
-            light,
-            chunk_coords,
-            block_coords,
-            value: 0,
+    fn apply_output(
+        &mut self,
+        RegionOutput {
+            coords: output_coords,
+            input_chunks,
+            input_lights,
+            has_priority,
+        }: RegionOutput,
+        chunks: &ChunkStore,
+        updates: &mut Vec<(Point3<i32>, ChunkReach)>,
+    ) {
+        let is_stale = region::chunk_deltas().any(|delta| {
+            let coords = output_coords + delta.cast();
+            input_chunks[delta].as_ref().map(Arc::as_ptr) != chunks.0.get(&coords).map(Arc::as_ptr)
+                || input_lights[delta].as_ref().map(Arc::as_ptr)
+                    != self.lights.get(&coords).map(Arc::as_ptr)
+        });
+        if is_stale {
+            self.submit_region(chunks, output_coords, has_priority);
+            return;
         }
     }
+}
 
-    fn inherits_skylight(heights: &HeightMap, coords: Point3<i32>, side: Side) -> bool {
-        match side {
-            Side::Top => coords.y == heights.0[&coords.xz()],
-            Side::Bottom => false,
-            _ => true,
+impl Default for WorldLight {
+    fn default() -> Self {
+        Self {
+            lights: Default::default(),
+            pool: JobPool::new(THREAD_HEADROOM, region::compute),
+            pending: Default::default(),
         }
     }
 }
 
 static PLACEHOLDER: LazyLock<Arc<ChunkLight>> = LazyLock::new(|| ChunkLight::placeholder().into());
 
-const BRANCHES_PER_THREAD: usize = 4;
+const THREAD_HEADROOM: usize = 4;

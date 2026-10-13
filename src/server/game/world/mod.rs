@@ -12,14 +12,17 @@ use super::{
         Block, BlockLight,
         area::{BlockArea, BlockAreaSource, BlockLightArea, BlockLightAreaSource},
     },
-    chunk::{Chunk, ChunkReach, area::ChunkArea},
+    chunk::{
+        Chunk,
+        area::{ChunkArea, ChunkReach},
+    },
     coords,
     player::{ChunkScope, Player},
 };
 use crate::{
     client::{PlayerEvent, game::shading::DAY_LIGHT_TABLE},
     server::{
-        BatchKind, ChunkEvent, ControlEvent, SERVER_CONFIG,
+        BatchTrigger, ChunkEvent, ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry, RecipientList},
         event_loop::{Event, EventHandler},
     },
@@ -79,14 +82,13 @@ impl World {
         );
     }
 
+    #[rustfmt::skip]
     fn apply(
         &mut self,
         coords: Point3<i64>,
         normal: Vector3<i64>,
         action: BlockAction,
-        id: ConnectionId,
         connections: &ConnectionRegistry,
-        aim: Ray,
     ) {
         let mut branch = Branch::default();
         if !branch.apply(&self.chunks, coords, normal, action) {
@@ -96,24 +98,25 @@ impl World {
         let Changelog {
             actions,
             inserts,
-            removals,
             updates: action_updates,
+            removals,
         } = branch.merge(&mut self.chunks);
 
         let new_surface_points = self.heights.load_many(inserts.iter().copied());
         self.light.extend_placeholders(new_surface_points);
-        let light_updates = self.light.apply(&self.chunks, actions.iter().copied());
-
-        let updates = self.mesh_updates(
-            inserts.iter().copied(),
-            iter::chain(action_updates, light_updates),
-            &inserts,
-            &removals,
+        self.light.request_regions(
+            &self.chunks,
+            action_updates
+                .iter()
+                .map(|(coords, _)| coords)
+                .chain(&inserts)
+                .chain(&removals)
+                .copied(),
+            true,
         );
 
-        self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
-
-        self.broadcast_batch(connections, updates, removals, inserts);
+        let updates = self.mesh_updates(inserts.iter().copied(), action_updates, &inserts, &removals);
+        self.broadcast_action(connections, &inserts, &updates, &removals);
 
         self.actions.extend(actions);
     }
@@ -133,7 +136,7 @@ impl World {
             if self.schedulers.server_contains(coords)
                 && let Some(chunk) = self.actions.apply(coords, chunk)
             {
-                self.chunks.0.insert(coords, chunk);
+                self.chunks.0.insert(coords, chunk.into());
                 inserts.push(coords);
             }
 
@@ -148,20 +151,27 @@ impl World {
     fn integrate_inserts(&mut self, inserts: &[Point3<i32>]) {
         let new_surface_points = self.heights.load_many(inserts.iter().copied());
         self.light.extend_placeholders(new_surface_points);
-        let light_updates = self.light.par_insert_many(&self.chunks, &self.heights, inserts);
+        self.light.request_regions(&self.chunks, inserts.iter().copied(), false);
 
-        let loads = inserts.iter().copied().collect::<FxHashSet<_>>();
-        let updates = self.mesh_updates(
-            inserts.iter().copied(),
-            light_updates,
-            &loads,
-            &Default::default(),
-        );
+        let loads = inserts.iter().copied().collect();
+        let updates = self.mesh_updates(inserts.iter().copied(), [], &loads, &Default::default());
 
         for scheduler in self.schedulers.0.values_mut() {
             let scope = scheduler.admitted;
             scheduler.queue(
                 iter::chain(&loads, &updates)
+                    .copied()
+                    .filter(|&coords| scope.client_contains(coords)),
+            );
+        }
+    }
+
+    fn queue_relights(&mut self, relights: &FxHashSet<Point3<i32>>) {
+        for scheduler in self.schedulers.0.values_mut() {
+            let scope = scheduler.admitted;
+            scheduler.queue(
+                relights
+                    .iter()
                     .copied()
                     .filter(|&coords| scope.client_contains(coords)),
             );
@@ -194,39 +204,44 @@ impl World {
         );
     }
 
-    fn deliver_batch(&mut self, id: ConnectionId, connections: &ConnectionRegistry) {
+    fn deliver_scope(&mut self, id: ConnectionId, connections: &ConnectionRegistry) {
         let scheduler = self.schedulers.0.get_mut(&id).unwrap();
         let is_settled = |coords| {
-            ChunkArea::chunk_deltas().all(|delta| !self.generators.is_generating(coords + delta))
+            ChunkArea::chunk_deltas().all(|delta| {
+                let coords = coords + delta.cast();
+                !self.generators.is_pending(coords) && !self.light.is_pending(coords)
+            })
         };
-        let Some(points) = scheduler.admit_batch(is_settled) else {
+        let Some((points, allowance)) = scheduler.admit_batch(is_settled) else {
             return;
         };
 
         let recipient = connections.one(id);
-        recipient.send(ChunkEvent::BatchStarted(BatchKind::Delivery));
+        recipient.send(ChunkEvent::BatchStarted(BatchTrigger::Scheduler {
+            allowance,
+        }));
         self.par_send_loads(&recipient, points);
         recipient.send(ChunkEvent::BatchEnded);
     }
 
     #[rustfmt::skip]
-    fn broadcast_batch(
+    fn broadcast_action(
         &mut self,
         connections: &ConnectionRegistry,
-        updates: FxHashSet<Point3<i32>>,
-        removals: FxHashSet<Point3<i32>>,
-        inserts: FxHashSet<Point3<i32>>,
+        inserts: &FxHashSet<Point3<i32>>,
+        updates: &FxHashSet<Point3<i32>>,
+        removals: &FxHashSet<Point3<i32>>,
     ) {
-        let batch = iter::chain(&inserts, &removals)
-            .chain(&updates)
+        let batch = iter::chain(inserts, updates)
+            .chain(removals)
             .copied()
             .collect::<Vec<_>>();
         let recipient_ids = self.schedulers.client_containing(&batch).collect::<Vec<_>>();
         let recipients = connections.many(recipient_ids.iter().copied());
 
-        recipients.send(ChunkEvent::BatchStarted(BatchKind::Broadcast));
-        Self::send_unloads(&recipients, removals);
-        self.send_loads(&recipients, iter::chain(updates, inserts));
+        recipients.send(ChunkEvent::BatchStarted(BatchTrigger::Action));
+        Self::send_unloads(&recipients, removals.iter().copied());
+        self.send_loads(&recipients, iter::chain(inserts, updates).copied());
         recipients.send(ChunkEvent::BatchEnded);
     }
 
@@ -237,14 +252,12 @@ impl World {
         loads: &FxHashSet<Point3<i32>>,
         unloads: &FxHashSet<Point3<i32>>,
     ) -> FxHashSet<Point3<i32>> {
-        updates
+        inserts
             .into_iter()
-            .flat_map(|(coords, reach)| reach.into_iter().map(move |delta| coords + delta))
-            .chain(
-                inserts
-                    .into_iter()
-                    .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta)),
-            )
+            .flat_map(|coords| ChunkArea::chunk_deltas().map(move |delta| coords + delta.cast()))
+            .chain(updates.into_iter().flat_map(|(coords, reach)| {
+                reach.into_iter().map(move |delta| coords + delta.cast())
+            }))
             .filter(|coords| {
                 self.chunks.0.contains_key(coords)
                     && !loads.contains(coords)
@@ -339,32 +352,44 @@ impl EventHandler<WorldEvent> for World {
                         coords + normal,
                         normal,
                         BlockAction::Place(block),
-                        id,
                         connections,
-                        aim,
                     );
+                    self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
                 }
             }
             WorldEvent::BlockDestroyed { id, aim } => {
                 let viewer = &self.viewers.0[&id];
                 if let Some(BlockIntersection { coords, normal }) = viewer.hover {
-                    self.apply(coords, normal, BlockAction::Destroy, id, connections, aim);
+                    self.apply(coords, normal, BlockAction::Destroy, connections);
+                    self.handle(&WorldEvent::BlockHoverRequested { id, aim }, connections);
                 }
             }
+            #[rustfmt::skip]
             WorldEvent::Tick(now) => {
-                let inserts = self.advance_generators(Instant::now() + PHASE_BUDGET);
+                let deadline = Instant::now() + GENERATOR_BUDGET;
+                let inserts = self.advance_generators(deadline);
                 self.integrate_inserts(&inserts);
+
+                let deadline = Instant::now() + LIGHT_BUDGET;
+                let light_updates = self.light.settle(&self.chunks, deadline);
+                let relights = self.mesh_updates(
+                    [],
+                    light_updates,
+                    &Default::default(),
+                    &Default::default(),
+                );
+                self.queue_relights(&relights);
 
                 let ids = self.schedulers.0.keys().copied().collect::<Vec<_>>();
                 let ordered_ids = self.tick_rotation.order(&ids);
-                let deadline = Instant::now() + PHASE_BUDGET;
+                let deadline = Instant::now() + SCOPE_BUDGET;
 
                 for &id in ordered_ids {
                     let scheduler = self.schedulers.0.get_mut(&id).unwrap();
                     if let Some((from, to)) = scheduler.admit_scope_change(now) {
                         self.sync_scope(id, from, to, connections);
                     }
-                    self.deliver_batch(id, connections);
+                    self.deliver_scope(id, connections);
 
                     self.tick_rotation.advance(id);
 
@@ -379,19 +404,19 @@ impl EventHandler<WorldEvent> for World {
 }
 
 #[derive(Default)]
-pub struct ChunkStore(FxHashMap<Point3<i32>, Box<Chunk>>);
+pub struct ChunkStore(FxHashMap<Point3<i32>, Arc<Chunk>>);
 
 impl ChunkStore {
     fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
         let mut value = ChunkArea::default();
         for delta in ChunkArea::chunk_deltas() {
-            if let Some(chunk) = self.get(coords + delta) {
+            if let Some(chunk) = self.get(coords + delta.cast()) {
                 let [dx, dy, dz] = delta.into();
                 for x in ChunkArea::axis_range(dx) {
                     for y in ChunkArea::axis_range(dy) {
                         let z = ChunkArea::axis_range(dz);
                         value.copy_row(
-                            coords::from_parts(point![dx, dy, dz], point![x, y, z.start])
+                            coords::from_parts(point![dx, dy, dz].cast(), point![x, y, z.start])
                                 .coords
                                 .cast(),
                             chunk.row(point![x, y, z.start], z.len()),
@@ -478,7 +503,7 @@ pub enum WorldEvent {
     },
     ChunkBatchAcknowledged {
         id: ConnectionId,
-        chunks_per_second: f32,
+        chunks_per_second: Option<f32>,
     },
     Tick(Instant),
 }
@@ -521,4 +546,6 @@ impl WorldEvent {
     }
 }
 
-const PHASE_BUDGET: Duration = Duration::from_millis(10);
+const LIGHT_BUDGET: Duration = Duration::from_millis(7);
+const GENERATOR_BUDGET: Duration = Duration::from_millis(10);
+const SCOPE_BUDGET: Duration = Duration::from_millis(10);

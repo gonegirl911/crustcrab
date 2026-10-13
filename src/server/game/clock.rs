@@ -3,7 +3,7 @@ use crate::{
     server::{
         ControlEvent, SERVER_CONFIG,
         connection::ConnectionRegistry,
-        event_loop::{Event, EventHandler},
+        event_loop::{Event, EventHandler, TICKS_PER_SECOND},
     },
     shared::flow::pacer::Pacer,
 };
@@ -35,7 +35,7 @@ impl EventHandler<Event> for Clock {
             Event::Player(id, PlayerEvent::JoinRequested { .. }) => {
                 let recipient = connections.one(id);
                 recipient.send(ControlEvent::TimeInitialized {
-                    ticks_per_second: SERVER_CONFIG.event_loop.ticks_per_second,
+                    ticks_per_second: TICKS_PER_SECOND,
                     cycle: SERVER_CONFIG.clock.cycle,
                     ticks: self.ticks,
                 });

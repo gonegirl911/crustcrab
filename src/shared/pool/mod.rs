@@ -37,6 +37,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
     pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(headroom: usize, job: J) -> Self {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count(headroom))
+            .start_handler(|_| _ = demote())
             .build()
             .unwrap()
             .into();
@@ -52,11 +53,6 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
         }
     }
 
-    pub fn demoted(self) -> Self {
-        self.inner.pool.spawn_broadcast(|_| demote());
-        self
-    }
-
     pub fn submit(&self, input: I, has_priority: bool) {
         let mut pending = self.inner.pending.lock().unwrap();
         pending.push(input, has_priority);
@@ -64,7 +60,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
     }
 
     fn dispatch(inner: &Arc<Inner<I, O>>, mut pending: MutexGuard<Pending<I>>) {
-        let current_num_threads = rayon::current_num_threads();
+        let current_num_threads = inner.pool.current_num_threads();
 
         while pending.in_flight < current_num_threads
             && let Some(input) = pending.pop()

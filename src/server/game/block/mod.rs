@@ -77,10 +77,10 @@ bitfield! {
 }
 
 impl BlockLight {
-    pub const LEN: usize = 6;
+    const LEN: usize = 6;
     pub const COMPONENT_MAX: u8 = 15;
-    pub const SKYLIGHT_RANGE: Range<usize> = 0..3;
-    pub const TORCHLIGHT_RANGE: Range<usize> = 3..6;
+    const SKYLIGHT_RANGE: Range<usize> = 0..3;
+    const TORCHLIGHT_RANGE: Range<usize> = 3..6;
 
     // DO NOT MODIFY
     fn from_fn<F: FnMut(usize) -> u8>(mut f: F) -> Self {
@@ -109,10 +109,6 @@ impl BlockLight {
 
     pub fn sup(self, other: Self) -> Self {
         self.zip_map(other, Ord::max)
-    }
-
-    pub fn map<F: FnMut(usize, u8) -> u8>(self, mut f: F) -> Self {
-        Self::from_fn(|i| f(i, self.component(i)))
     }
 
     fn zip_map<F: FnMut(u8, u8) -> u8>(self, other: Self, mut f: F) -> Self {

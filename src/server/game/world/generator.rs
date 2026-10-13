@@ -6,13 +6,14 @@ use crate::{
 use nalgebra::Point3;
 use noise::{NoiseFn, Simplex};
 use rayon::slice::ParallelSliceMut;
+use rc_box::ArcBox;
 use rustc_hash::FxHashSet;
 use std::{collections::VecDeque, time::Instant};
 
 pub struct ChunkGeneratorPool {
     #[expect(clippy::type_complexity)]
-    pool: JobPool<Point3<i32>, (Point3<i32>, Option<Box<Chunk>>)>,
-    requested: FxHashSet<Point3<i32>>,
+    pool: JobPool<Point3<i32>, (Point3<i32>, Option<ArcBox<Chunk>>)>,
+    pending: FxHashSet<Point3<i32>>,
     deferred: VecDeque<Point3<i32>>,
     in_flight: usize,
     yield_rate: Ema,
@@ -27,7 +28,7 @@ impl ChunkGeneratorPool {
         self.deferred.extend(
             points
                 .into_iter()
-                .filter(|&coords| self.requested.insert(coords)),
+                .filter(|&coords| self.pending.insert(coords)),
         );
         self.deferred.make_contiguous()[start..]
             .par_sort_unstable_by_key(|&coords| utils::distance_squared(coords, center));
@@ -45,7 +46,7 @@ impl ChunkGeneratorPool {
             };
 
             if !is_wanted(coords) {
-                self.requested.remove(&coords);
+                self.pending.remove(&coords);
                 continue;
             }
 
@@ -57,24 +58,24 @@ impl ChunkGeneratorPool {
     pub fn poll_deadline(
         &mut self,
         deadline: Instant,
-    ) -> Option<(Point3<i32>, Option<Box<Chunk>>)> {
+    ) -> Option<(Point3<i32>, Option<ArcBox<Chunk>>)> {
         if self.in_flight == 0 {
             return None;
         }
 
         let (coords, chunk) = self.pool.recv_deadline(deadline).ok()?;
-        self.requested.remove(&coords);
+        self.pending.remove(&coords);
         self.in_flight -= 1;
         self.yield_rate.smooth(chunk.is_some() as u8 as f32);
         Some((coords, chunk))
     }
 
-    pub fn is_generating(&self, coords: Point3<i32>) -> bool {
-        self.requested.contains(&coords)
+    pub fn is_pending(&self, coords: Point3<i32>) -> bool {
+        self.pending.contains(&coords)
     }
 
-    fn generate(generator: &ChunkGenerator, coords: Point3<i32>) -> Option<Box<Chunk>> {
-        let mut chunk = Box::new(generator.generate(coords));
+    fn generate(generator: &ChunkGenerator, coords: Point3<i32>) -> Option<ArcBox<Chunk>> {
+        let mut chunk = ArcBox::new(generator.generate(coords));
         if chunk.is_empty() {
             return None;
         }
@@ -88,11 +89,10 @@ impl Default for ChunkGeneratorPool {
         let generator = Default::default();
         let pool = JobPool::new(THREAD_HEADROOM, move |coords| {
             (coords, Self::generate(&generator, coords))
-        })
-        .demoted();
+        });
         Self {
             pool,
-            requested: Default::default(),
+            pending: Default::default(),
             deferred: Default::default(),
             in_flight: 0,
             yield_rate: Ema::new(YIELD_SAMPLE_WEIGHT),

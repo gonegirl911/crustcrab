@@ -69,7 +69,7 @@ pub enum PlayerEvent {
     Orientation { dir: Vector3<f32> },
     BlockPlaced(Block),
     BlockDestroyed,
-    ChunkBatchAcknowledged { chunks_per_second: f32 },
+    ChunkBatchAcknowledged { chunks_per_second: Option<f32> },
     KeepAlive { tag: u64 },
 }
 

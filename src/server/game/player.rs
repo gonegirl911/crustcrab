@@ -1,8 +1,8 @@
 use super::{
-    block::{Block, BlockLight, area::BlockArea, data::STR_TO_BLOCK},
+    block::{Block, area::BlockArea, data::STR_TO_BLOCK},
     chunk::Chunk,
     coords,
-    world::World,
+    world::{World, light::region::LIGHT_REACH},
 };
 use crate::{
     client::PlayerEvent,
@@ -110,8 +110,12 @@ pub struct ChunkScope {
 }
 
 impl ChunkScope {
-    pub const SERVER_CONTEXT: i32 =
-        (BlockLight::COMPONENT_MAX as usize - 1 + BlockArea::PADDING).div_ceil(Chunk::DIM) as i32;
+    const CONTEXT: i64 = {
+        let read_context = BlockArea::PADDING as i64;
+        let write_context = LIGHT_REACH as i64;
+        read_context + write_context
+    };
+    pub const CHUNK_CONTEXT: i32 = Self::CONTEXT.div_ceil(Chunk::DIM as i64) as i32;
 
     pub fn server_points(&self) -> impl Iterator<Item = Point3<i32>> {
         self.server_cuboid()
@@ -138,7 +142,7 @@ impl ChunkScope {
     }
 
     pub fn server_contains(&self, coords: Point3<i32>) -> bool {
-        self.contains_xz(coords.xz(), Self::SERVER_CONTEXT) && self.server_contains_y(coords.y)
+        self.contains_xz(coords.xz(), Self::CHUNK_CONTEXT) && self.server_contains_y(coords.y)
     }
 
     pub fn client_contains(&self, coords: Point3<i32>) -> bool {
@@ -155,7 +159,7 @@ impl ChunkScope {
     }
 
     fn server_contains_y(&self, y: i32) -> bool {
-        y >= self.y_start(Self::SERVER_CONTEXT)
+        y >= self.y_start(Self::CHUNK_CONTEXT)
     }
 
     fn client_contains_y(&self, y: i32) -> bool {
@@ -166,7 +170,7 @@ impl ChunkScope {
 
     fn server_cuboid(&self) -> Cuboid {
         let y_end = World::Y_RANGE.end - 1;
-        self.cuboid(Self::SERVER_CONTEXT, y_end)
+        self.cuboid(Self::CHUNK_CONTEXT, y_end)
     }
 
     fn client_cuboid(&self) -> Cuboid {

@@ -688,6 +688,7 @@ dependencies = [
  "postcard",
  "rand 0.10.3",
  "rayon",
+ "rc-box",
  "rustc-hash 2.1.3",
  "serde",
  "thiserror 2.0.21",
@@ -695,6 +696,7 @@ dependencies = [
  "uuid",
  "walkdir",
  "wgpu",
+ "windows-sys 0.61.2",
  "winit",
  "zstd",
 ]
@@ -2456,6 +2458,12 @@ dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
 ]
+
+[[package]]
+name = "rc-box"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "897fecc9fac6febd4408f9e935e86df739b0023b625e610e0357535b9c8adad0"
 
 [[package]]
 name = "redox_event"

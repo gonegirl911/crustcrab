@@ -15,7 +15,7 @@ use crate::{
     },
     enum_map,
     server::{
-        BatchKind, ChunkEvent,
+        BatchTrigger, ChunkEvent,
         game::{
             block::data::{RenderLayer, SIDE_DELTAS},
             chunk::{
@@ -28,8 +28,7 @@ use crate::{
         },
     },
     shared::{
-        ema::Ema, enum_map::EnumMap, indexmap::FxIndexMap, net::compression::Compressed,
-        pool::JobPool, utils,
+        enum_map::EnumMap, indexmap::FxIndexMap, net::compression::Compressed, pool::JobPool, utils,
     },
 };
 use crossbeam_channel::Sender;
@@ -49,9 +48,8 @@ pub struct World {
     render_pipelines: EnumMap<RenderLayer, RenderPipeline>,
     revisions: FxHashMap<Point3<i32>, RevisionTracker>,
     open_batch_id: BatchId,
-    pending_batches: FxHashMap<BatchId, ChunkBatch>,
+    pending_batches: FxHashMap<BatchId, BatchTracker>,
     pool: JobPool<ChunkInput, ChunkOutput>,
-    chunk_rate: Ema,
 }
 
 impl World {
@@ -82,14 +80,13 @@ impl World {
                 Some(wgpu::BlendState::ALPHA_BLENDING),
             ),
         };
-        let pool = JobPool::new(THREAD_HEADROOM, Self::compute).demoted();
+        let pool = JobPool::new(THREAD_HEADROOM, Self::compute);
         Self {
             meshes: Default::default(),
             render_pipelines,
             revisions: Default::default(),
-            open_batch_id: BatchId::Nil,
+            open_batch_id: BatchId::NIL,
             pending_batches: Default::default(),
-            chunk_rate: Ema::new(CHUNK_RATE_SAMPLE_WEIGHT),
             pool,
         }
     }
@@ -198,36 +195,44 @@ impl World {
         revision.current
     }
 
-    fn join_open_batch(&mut self) -> bool {
-        if self.open_batch_id == BatchId::Nil {
-            return false;
+    fn join_open_batch(&mut self) -> Option<&BatchApplication> {
+        if self.open_batch_id == BatchId::NIL {
+            return None;
         }
 
-        self.pending_batches
-            .entry(self.open_batch_id)
-            .and_modify(|batch| batch.expected += 1)
-            .or_insert_with(|| ChunkBatch {
-                changes: Default::default(),
-                expected: 1,
-                started_at: Instant::now(),
-            });
-        true
+        let batch = self.pending_batches.get_mut(&self.open_batch_id).unwrap();
+        batch.expected += 1;
+        Some(&batch.application)
     }
 
-    fn batch_or_apply_change(
+    fn integrate_remesh(
         &mut self,
         renderer: &Renderer,
-        change: ChunkChange,
+        remesh: ChunkRemesh,
         batch_id: BatchId,
         player_tx: &Sender<PlayerEvent>,
     ) {
-        if let Some(batch) = self.pending_batches.get_mut(&batch_id) {
-            batch.changes.push(change);
-            if batch_id != self.open_batch_id {
-                self.flush_batch_if_completed(renderer, batch_id, player_tx);
+        let Some(batch) = self.pending_batches.get_mut(&batch_id) else {
+            self.apply_remesh(renderer, remesh);
+            return;
+        };
+
+        if let BatchFeedback::Report { meshed, .. } = &mut batch.feedback {
+            *meshed += remesh.data.is_some() as usize;
+        }
+
+        match &mut batch.application {
+            BatchApplication::Immediate { received } => {
+                *received += 1;
+                self.apply_remesh(renderer, remesh);
             }
-        } else {
-            self.apply_change(renderer, change);
+            BatchApplication::Atomic { remeshes } => {
+                remeshes.push(remesh);
+            }
+        }
+
+        if batch_id != self.open_batch_id {
+            self.flush_batch_if_completed(renderer, batch_id, player_tx);
         }
     }
 
@@ -242,28 +247,38 @@ impl World {
         };
         let batch = entry.get();
 
-        if batch.changes.len() < batch.expected {
+        let received = batch.application.received();
+        if received < batch.expected {
             return;
         }
 
-        let ChunkBatch {
-            changes,
-            expected,
-            started_at,
+        let BatchTracker {
+            application,
+            feedback,
+            ..
         } = entry.remove();
 
-        for change in changes {
-            self.apply_change(renderer, change);
+        if let BatchApplication::Atomic { remeshes } = application {
+            for remesh in remeshes {
+                self.apply_remesh(renderer, remesh);
+            }
         }
 
-        if !matches!(batch_id, BatchId::Delivery(_)) {
+        let BatchFeedback::Report {
+            opened_at,
+            allowance,
+            meshed,
+        } = feedback
+        else {
             return;
-        }
+        };
 
-        let elapsed = started_at.elapsed();
-        let sample = expected as f32 / elapsed.as_secs_f32();
-        let chunks_per_second = self.chunk_rate.smooth(sample);
-        _ = player_tx.send(PlayerEvent::ChunkBatchAcknowledged { chunks_per_second });
+        let is_measured = meshed > 0 && received >= allowance;
+        let elapsed = opened_at.elapsed();
+        let rate = meshed as f32 / elapsed.as_secs_f32();
+        _ = player_tx.send(PlayerEvent::ChunkBatchAcknowledged {
+            chunks_per_second: is_measured.then_some(rate),
+        });
     }
 
     fn cull_chunks(&self, frustum: &Frustum) -> impl Iterator<Item = Point3<i32>> {
@@ -324,14 +339,14 @@ impl World {
         visited.into_keys()
     }
 
-    fn apply_change(
+    fn apply_remesh(
         &mut self,
         renderer: &Renderer,
-        ChunkChange {
+        ChunkRemesh {
             coords,
             data,
             snapshot_revision,
-        }: ChunkChange,
+        }: ChunkRemesh,
     ) {
         let Entry::Occupied(mut revision_entry) = self.revisions.entry(coords) else {
             unreachable!();
@@ -348,33 +363,15 @@ impl World {
             return;
         }
 
-        match data {
-            ChunkChangeData::Remesh {
-                vertices,
-                visibility_graph,
-            } => {
-                self.apply_remesh(renderer, coords, vertices, visibility_graph);
-            }
-            ChunkChangeData::Unload => {
-                self.meshes.remove(&coords);
-            }
-        }
-    }
-
-    fn apply_remesh(
-        &mut self,
-        renderer: &Renderer,
-        coords: Point3<i32>,
-        vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
-        visibility_graph: VisibilityGraph,
-    ) {
-        match ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph) {
-            Some(mesh) => {
-                self.meshes.insert(coords, mesh);
-            }
-            None => {
-                self.meshes.remove(&coords);
-            }
+        if let Some(ChunkRemeshData {
+            vertices,
+            visibility_graph,
+        }) = data
+            && let Some(mesh) = ChunkMesh::new(renderer, vertices.each_deref(), visibility_graph)
+        {
+            self.meshes.insert(coords, mesh);
+        } else {
+            self.meshes.remove(&coords);
         }
     }
 
@@ -461,7 +458,8 @@ impl EventHandler for World {
             Event::ChunkEvent(event) => match event {
                 ChunkEvent::Loaded(Compressed { inner: data, .. }) => {
                     let snapshot_revision = self.bump_revision(data.coords);
-                    let has_priority = self.join_open_batch();
+                    let application = self.join_open_batch();
+                    let has_priority = matches!(application, Some(BatchApplication::Atomic { .. }));
                     self.pool.submit(
                         ChunkInput {
                             data: data.clone(),
@@ -474,24 +472,32 @@ impl EventHandler for World {
                 &ChunkEvent::Unloaded(coords) => {
                     let snapshot_revision = self.bump_revision(coords);
                     self.join_open_batch();
-                    self.batch_or_apply_change(
+                    self.integrate_remesh(
                         renderer,
-                        ChunkChange {
+                        ChunkRemesh {
                             coords,
-                            data: ChunkChangeData::Unload,
+                            data: None,
                             snapshot_revision,
                         },
                         self.open_batch_id,
                         player_tx,
                     );
                 }
-                &ChunkEvent::BatchStarted(kind) => {
+                &ChunkEvent::BatchStarted(trigger) => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
-                    self.open_batch_id = BatchId::new(kind);
+                    self.open_batch_id = BatchId::new(trigger);
+                    self.pending_batches.insert(
+                        self.open_batch_id,
+                        BatchTracker {
+                            application: BatchApplication::from(trigger),
+                            expected: 0,
+                            feedback: BatchFeedback::new(trigger, Instant::now()),
+                        },
+                    );
                 }
                 ChunkEvent::BatchEnded => {
                     self.flush_batch_if_completed(renderer, self.open_batch_id, player_tx);
-                    self.open_batch_id = BatchId::Nil;
+                    self.open_batch_id = BatchId::NIL;
                 }
             },
             Event::AboutToWait => {
@@ -506,14 +512,14 @@ impl EventHandler for World {
                     snapshot_revision,
                 }) = self.pool.try_recv()
                 {
-                    self.batch_or_apply_change(
+                    self.integrate_remesh(
                         renderer,
-                        ChunkChange {
+                        ChunkRemesh {
                             coords,
-                            data: ChunkChangeData::Remesh {
+                            data: Some(ChunkRemeshData {
                                 vertices,
                                 visibility_graph,
-                            },
+                            }),
                             snapshot_revision,
                         },
                         batch_id,
@@ -539,41 +545,88 @@ struct RevisionTracker {
 #[derive(Clone, Copy, PartialEq, PartialOrd, Default)]
 struct Revision(u32);
 
-struct ChunkBatch {
-    changes: Vec<ChunkChange>,
+struct BatchTracker {
+    application: BatchApplication,
     expected: usize,
-    started_at: Instant,
+    feedback: BatchFeedback,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-enum BatchId {
-    Delivery(Uuid),
-    Broadcast(Uuid),
-    Nil,
+enum BatchApplication {
+    Immediate { received: usize },
+    Atomic { remeshes: Vec<ChunkRemesh> },
 }
 
-impl BatchId {
-    fn new(kind: BatchKind) -> Self {
-        let id = Uuid::new_v4();
-        match kind {
-            BatchKind::Delivery => Self::Delivery(id),
-            BatchKind::Broadcast => Self::Broadcast(id),
+impl BatchApplication {
+    fn received(&self) -> usize {
+        match self {
+            &Self::Immediate { received } => received,
+            Self::Atomic { remeshes } => remeshes.len(),
         }
     }
 }
 
-struct ChunkChange {
+impl From<BatchTrigger> for BatchApplication {
+    fn from(trigger: BatchTrigger) -> Self {
+        match trigger {
+            BatchTrigger::Scheduler { .. } => Self::Immediate { received: 0 },
+            BatchTrigger::Action => Self::Atomic {
+                remeshes: Default::default(),
+            },
+        }
+    }
+}
+
+enum BatchFeedback {
+    Report {
+        opened_at: Instant,
+        allowance: usize,
+        meshed: usize,
+    },
+    Skip,
+}
+
+impl BatchFeedback {
+    fn new(trigger: BatchTrigger, now: Instant) -> Self {
+        match trigger {
+            BatchTrigger::Scheduler { allowance } => Self::Report {
+                opened_at: now,
+                allowance,
+                meshed: 0,
+            },
+            BatchTrigger::Action => Self::Skip,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct BatchId {
+    id: Uuid,
+    trigger: BatchTrigger,
+}
+
+impl BatchId {
+    const NIL: Self = Self {
+        id: Uuid::nil(),
+        trigger: BatchTrigger::Action,
+    };
+
+    fn new(trigger: BatchTrigger) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            trigger,
+        }
+    }
+}
+
+struct ChunkRemesh {
     coords: Point3<i32>,
-    data: ChunkChangeData,
+    data: Option<ChunkRemeshData>,
     snapshot_revision: Revision,
 }
 
-enum ChunkChangeData {
-    Remesh {
-        vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
-        visibility_graph: VisibilityGraph,
-    },
-    Unload,
+struct ChunkRemeshData {
+    vertices: EnumMap<RenderLayer, Vec<BlockVertex>>,
+    visibility_graph: VisibilityGraph,
 }
 
 struct ChunkInput {
@@ -591,4 +644,3 @@ struct ChunkOutput {
 }
 
 const THREAD_HEADROOM: usize = 1;
-const CHUNK_RATE_SAMPLE_WEIGHT: f32 = 0.25;

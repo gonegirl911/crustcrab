@@ -1,6 +1,3 @@
-[event_loop]
-ticks_per_second = 20
-
 [player]
 origin = [0.0, 65.62, 0.0]
 dir = [1.0, 0.0, 0.0]

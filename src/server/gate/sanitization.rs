@@ -29,7 +29,7 @@ pub fn sanitize(mut event: PlayerEvent) -> Option<PlayerEvent> {
         }
         #[expect(clippy::collapsible_match)]
         PlayerEvent::ChunkBatchAcknowledged { chunks_per_second } => {
-            if !chunks_per_second.is_finite() || *chunks_per_second < 0.0 {
+            if chunks_per_second.is_some_and(|rate| !rate.is_finite() || rate <= 0.0) {
                 return None;
             }
         }
@@ -41,7 +41,7 @@ pub fn sanitize(mut event: PlayerEvent) -> Option<PlayerEvent> {
 const MAX_RENDER_DISTANCE: u32 = 64;
 const WORLD_BORDER: f64 = {
     let max_render_distance = MAX_RENDER_DISTANCE as i32;
-    let server_context = ChunkScope::SERVER_CONTEXT;
+    let scope_context = ChunkScope::CHUNK_CONTEXT;
     let buffer = 1;
-    (i32::MAX - max_render_distance - server_context - buffer) as f64 * Chunk::DIM as f64
+    (i32::MAX - max_render_distance - scope_context - buffer) as f64 * Chunk::DIM as f64
 };

@@ -1,12 +1,12 @@
 use super::{ChunkData, WorldEvent};
 use crate::{
     server::{
-        SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId},
-        event_loop::EventHandler,
+        event_loop::{EventHandler, TICKS_PER_SECOND},
         game::player::ChunkScope,
     },
     shared::{
+        ema::Ema,
         flow::{budget::Budget, pacer::Pacer},
         indexmap::FxIndexSet,
         utils,
@@ -16,7 +16,6 @@ use nalgebra::Point3;
 use rustc_hash::FxHashMap;
 use std::{
     cmp::Reverse,
-    collections::VecDeque,
     mem,
     time::{Duration, Instant},
 };
@@ -79,13 +78,14 @@ pub struct ChunkScheduler {
     desired: ChunkScope,
     scope_pacer: Pacer,
     pending: FxIndexSet<Point3<i32>>,
-    pub unacknowledged_batches: VecDeque<SentBatch>,
+    unacknowledged_batches: usize,
     max_unacknowledged_batches: usize,
+    chunk_rate: Ema,
     budget: Budget,
 }
 
 impl ChunkScheduler {
-    pub fn new(scope: ChunkScope) -> Self {
+    fn new(scope: ChunkScope) -> Self {
         Self {
             admitted: scope,
             desired: scope,
@@ -93,6 +93,7 @@ impl ChunkScheduler {
             pending: Default::default(),
             unacknowledged_batches: Default::default(),
             max_unacknowledged_batches: 1,
+            chunk_rate: Ema::new(CHUNK_RATE_SAMPLE_WEIGHT),
             budget: Budget::new(START_CHUNKS_PER_TICK),
         }
     }
@@ -114,18 +115,19 @@ impl ChunkScheduler {
     {
         let prev_len = self.pending.len();
         self.pending.extend(points);
-        if prev_len != self.pending.len() {
-            self.pending.par_sort_unstable_by_key(|&coords| {
-                Reverse(utils::distance_squared(coords, self.admitted.center))
-            });
+        if prev_len == self.pending.len() {
+            return;
         }
+        self.pending.par_sort_unstable_by_key(|&coords| {
+            Reverse(utils::distance_squared(coords, self.admitted.center))
+        });
     }
 
     pub fn admit_batch(
         &mut self,
         mut is_settled: impl FnMut(Point3<i32>) -> bool,
-    ) -> Option<Vec<Point3<i32>>> {
-        if self.unacknowledged_batches.len() >= self.max_unacknowledged_batches {
+    ) -> Option<(Vec<Point3<i32>>, usize)> {
+        if self.unacknowledged_batches >= self.max_unacknowledged_batches {
             return None;
         }
 
@@ -141,49 +143,37 @@ impl ChunkScheduler {
             return None;
         }
 
-        self.unacknowledged_batches.push_back(SentBatch {
-            chunks: batch.len(),
-            allowance,
-        });
-        Some(batch)
+        self.unacknowledged_batches += 1;
+        Some((batch, allowance))
     }
 
     #[rustfmt::skip]
-    pub fn acknowledge_batch(&mut self, chunks_per_second: f32) {
-        let ticks_per_second = SERVER_CONFIG.event_loop.ticks_per_second;
-        let chunks_per_tick = chunks_per_second / ticks_per_second as f32;
-        if let Some(batch) = self.unacknowledged_batches.pop_front()
-            && batch.is_rate_limited()
-        {
-            self.budget.set_rate(chunks_per_tick.clamp(MIN_CHUNKS_PER_TICK, MAX_CHUNKS_PER_TICK));
-        }
+    fn acknowledge_batch(&mut self, chunks_per_second: Option<f32>) {
+        self.unacknowledged_batches = self.unacknowledged_batches.saturating_sub(1);
         self.max_unacknowledged_batches = MAX_UNACKNOWLEDGED_BATCHES;
+
+        let Some(sample) = chunks_per_second else {
+            return;
+        };
+
+        let estimate = self.chunk_rate.smooth(sample);
+        let chunks_per_tick = estimate / TICKS_PER_SECOND as f32;
+        self.budget.set_rate(chunks_per_tick.clamp(MIN_CHUNKS_PER_TICK, MAX_CHUNKS_PER_TICK));
     }
 
     pub fn max_batch_acknowledgements(span: Duration) -> usize {
-        let ticks_per_second = SERVER_CONFIG.event_loop.ticks_per_second;
-        (ticks_per_second as f32 * span.as_secs_f32()) as usize + MAX_UNACKNOWLEDGED_BATCHES
-    }
-}
-
-pub struct SentBatch {
-    chunks: usize,
-    allowance: usize,
-}
-
-impl SentBatch {
-    fn is_rate_limited(&self) -> bool {
-        self.chunks >= self.allowance
+        (TICKS_PER_SECOND as f32 * span.as_secs_f32()) as usize + MAX_UNACKNOWLEDGED_BATCHES
     }
 }
 
 const CHUNK_SCOPE_CHANGE_GAP: Duration = Duration::from_millis(250);
+const MAX_DEMAND_PER_TICK: usize = 100;
+const MAX_UNACKNOWLEDGED_BATCHES: usize = 10;
+const CHUNK_RATE_SAMPLE_WEIGHT: f32 = 0.25;
+const START_CHUNKS_PER_TICK: f32 = 50.0;
 const MIN_CHUNKS_PER_TICK: f32 = 1.0;
 const MAX_CHUNKS_PER_TICK: f32 = {
     let max_unacknowledged_bytes = 128 * 1024 * 1024;
     let chunk_data_size = size_of::<ChunkData>();
     max_unacknowledged_bytes as f32 / chunk_data_size as f32 / MAX_UNACKNOWLEDGED_BATCHES as f32
 };
-const MAX_DEMAND_PER_TICK: usize = 100;
-const START_CHUNKS_PER_TICK: f32 = 50.0;
-const MAX_UNACKNOWLEDGED_BATCHES: usize = 10;

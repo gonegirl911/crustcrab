@@ -1,12 +1,17 @@
 use crate::server::game::{block::Block, chunk::Chunk, coords};
 use nalgebra::Point3;
+use rc_box::ArcBox;
 use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 pub struct ActionStore(pub FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 
 impl ActionStore {
-    pub fn apply(&self, coords: Point3<i32>, chunk: Option<Box<Chunk>>) -> Option<Box<Chunk>> {
+    pub fn apply(
+        &self,
+        coords: Point3<i32>,
+        chunk: Option<ArcBox<Chunk>>,
+    ) -> Option<ArcBox<Chunk>> {
         let mut actions = self.chunk_actions(coords);
 
         let (mut chunk, mut is_modified) = match chunk {
@@ -15,7 +20,7 @@ impl ActionStore {
                 if let Some((coords, action)) =
                     actions.find(|&(_, action)| Block::AIR.is_action_valid(action))
                 {
-                    let mut chunk = Box::<Chunk>::default();
+                    let mut chunk = ArcBox::new(Chunk::default());
                     chunk.apply_unchecked(coords, action);
                     (chunk, true)
                 } else {
