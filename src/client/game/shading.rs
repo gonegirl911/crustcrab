@@ -7,7 +7,8 @@ use crate::{
     shared::{
         color::{Rgb, Rgba},
         enum_map::EnumMap,
-        quantize, utils,
+        quantize,
+        utils::lerp,
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -100,7 +101,7 @@ impl LightTable {
         let ao_factor_max = shading.ao_factor_max;
         let ao_max = 3.0;
 
-        1.0 - utils::lerp(ao_factor_min, ao_factor_max, ao as f32 / ao_max)
+        1.0 - lerp(ao_factor_min, ao_factor_max, ao as f32 / ao_max)
     }
 }
 

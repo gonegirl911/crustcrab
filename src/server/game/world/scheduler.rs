@@ -9,7 +9,7 @@ use crate::{
         ema::Ema,
         flow::{budget::Budget, pacer::Pacer},
         indexmap::FxIndexSet,
-        utils,
+        utils::distance_squared,
     },
 };
 use nalgebra::Point3;
@@ -109,7 +109,7 @@ impl ChunkScheduler {
         }
     }
 
-    pub fn queue<P>(&mut self, points: P)
+    pub fn enqueue<P>(&mut self, points: P)
     where
         P: IntoIterator<Item = Point3<i32>>,
     {
@@ -119,7 +119,7 @@ impl ChunkScheduler {
             return;
         }
         self.pending.par_sort_unstable_by_key(|&coords| {
-            Reverse(utils::distance_squared(coords, self.admitted.center))
+            Reverse(distance_squared(coords, self.admitted.center))
         });
     }
 

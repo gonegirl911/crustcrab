@@ -15,7 +15,7 @@ struct Args {
 
 fn main() {
     env_logger::init();
-    pool::init(1);
+    pool::global::init(1);
 
     let Args {
         event_addr,

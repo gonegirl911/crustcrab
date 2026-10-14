@@ -1,7 +1,7 @@
 use super::Chunk;
 use crate::{
     server::game::{block::Block, coords, world::World},
-    shared::{ema::Ema, pool::JobPool, utils},
+    shared::{ema::Ema, pool::JobPool, utils::distance_squared},
 };
 use nalgebra::Point3;
 use noise::{NoiseFn, Simplex};
@@ -31,7 +31,7 @@ impl ChunkGeneratorPool {
                 .filter(|&coords| self.pending.insert(coords)),
         );
         self.deferred.make_contiguous()[start..]
-            .par_sort_unstable_by_key(|&coords| utils::distance_squared(coords, center));
+            .par_sort_unstable_by_key(|&coords| distance_squared(coords, center));
     }
 
     pub fn anticipate<F>(&mut self, demand: usize, mut is_wanted: F)
@@ -50,7 +50,7 @@ impl ChunkGeneratorPool {
                 continue;
             }
 
-            self.pool.submit(coords, false);
+            self.pool.submit(coords, Default::default());
             self.in_flight += 1;
         }
     }

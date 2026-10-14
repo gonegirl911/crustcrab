@@ -2,7 +2,7 @@ use generic_array::{
     ArrayLength, GenericArray, GenericArrayIter,
     functional::FunctionalSequence,
     sequence::GenericSequence,
-    typenum::{Add1, Unsigned, bit::B1},
+    typenum::{Add1, U, Unsigned, bit::B1},
 };
 use serde::{
     Deserialize, Deserializer, Serialize,
@@ -292,6 +292,18 @@ pub unsafe trait Enum: Copy {
 }
 
 pub type Variants<E: Enum> = impl Iterator<Item = E>;
+
+unsafe impl Enum for bool {
+    type Length = U<2>;
+
+    unsafe fn from_index_unchecked(index: usize) -> Self {
+        index != 0
+    }
+
+    fn to_index(self) -> usize {
+        self as usize
+    }
+}
 
 unsafe impl<E: Enum> Enum for Option<E>
 where

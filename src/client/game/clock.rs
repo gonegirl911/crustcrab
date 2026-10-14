@@ -5,7 +5,7 @@ use crate::{
         stopwatch::Stopwatch,
     },
     server::{ControlEvent, game::clock::DayCycle},
-    shared::utils,
+    shared::utils::inv_lerp,
 };
 use nalgebra::{UnitQuaternion, Vector3};
 use serde::Deserialize;
@@ -115,7 +115,7 @@ impl RenderTime {
     }
 
     fn progress(ticks: f32, Range { start, end }: Range<u16>) -> f32 {
-        utils::inv_lerp(start as f32, (end - 1) as f32, ticks)
+        inv_lerp(start as f32, (end - 1) as f32, ticks)
     }
 }
 

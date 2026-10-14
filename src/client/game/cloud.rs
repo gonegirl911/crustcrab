@@ -14,7 +14,7 @@ use crate::{
     server::game::{block::Block, chunk::Chunk},
     shared::{
         color::{Float3, Rgb},
-        utils,
+        utils::{lerp, magnitude_squared},
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -151,7 +151,7 @@ impl CloudLayer {
         let radius = (render_distance / CLIENT_CONFIG.cloud.size.x) as i32;
         (-radius..=radius)
             .flat_map(move |dx| (-radius..=radius).map(move |dz| vector![dx, dz]))
-            .filter(move |&offset| utils::magnitude_squared(offset) <= (radius as u128).pow(2))
+            .filter(move |&offset| magnitude_squared(offset) <= (radius as u128).pow(2))
             .map(CloudInstance::new)
     }
 }
@@ -228,11 +228,11 @@ pub struct CloudConfig {
 
 impl CloudConfig {
     fn color(&self, nightness: f32) -> Rgb<f32> {
-        utils::lerp(self.day.color, self.night.color, nightness)
+        lerp(self.day.color, self.night.color, nightness)
     }
 
     fn opacity(&self, nightness: f32) -> f32 {
-        utils::lerp(self.day.opacity, self.night.opacity, nightness)
+        lerp(self.day.opacity, self.night.opacity, nightness)
     }
 }
 

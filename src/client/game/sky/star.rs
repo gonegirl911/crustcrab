@@ -10,7 +10,7 @@ use crate::{
             utils::{Immediates, Vertex, read_wgsl},
         },
     },
-    shared::utils,
+    shared::utils::ramp,
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::{Matrix4, Point3, point};
@@ -139,7 +139,7 @@ impl StarImmediates {
         let size = CLIENT_CONFIG.sky.star.size;
         let brightness = CLIENT_CONFIG.sky.star.brightness;
         let nightness = time.nightness();
-        let opacity = brightness * utils::ramp(1.0 / 3.0, 1.0, nightness);
+        let opacity = brightness * ramp(1.0 / 3.0, 1.0, nightness);
         Self {
             sky_rotation: sky_rotation.to_homogeneous(),
             size,

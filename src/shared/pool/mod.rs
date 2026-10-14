@@ -1,40 +1,25 @@
 mod demotion;
+pub mod global;
+mod scheduler;
+mod utils;
 
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use demotion::demote;
+use scheduler::{Admitted, Completed, EnqueueOptions, Scheduler};
 use std::{
-    collections::VecDeque,
-    mem::DropGuard,
-    num::NonZero,
+    hash::Hash,
     sync::{Arc, Mutex, MutexGuard},
-    thread,
     time::Instant,
 };
+use utils::thread_count;
 
-pub fn init(headroom: usize) {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count(headroom))
-        .build_global()
-        .unwrap();
+pub struct JobPool<I, O, K = ()> {
+    inner: Arc<Inner<I, O, K>>,
+    out_rx: Receiver<Completed<O, K>>,
 }
 
-pub struct JobPool<I, O> {
-    inner: Arc<Inner<I, O>>,
-    out_rx: Receiver<O>,
-}
-
-impl<I, O> JobPool<I, O> {
-    pub fn try_recv(&self) -> Result<O, TryRecvError> {
-        self.out_rx.try_recv()
-    }
-
-    pub fn recv_deadline(&self, deadline: Instant) -> Result<O, RecvTimeoutError> {
-        self.out_rx.recv_deadline(deadline)
-    }
-}
-
-impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
-    pub fn new<J: Fn(I) -> O + Send + Sync + 'static>(headroom: usize, job: J) -> Self {
+impl<I, O, K> JobPool<I, O, K> {
+    pub fn new<H: Fn(I) -> O + Send + Sync + 'static>(headroom: usize, handler: H) -> Self {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count(headroom))
             .start_handler(|_| _ = demote())
@@ -44,86 +29,104 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
         Self {
             inner: Arc::new(Inner {
                 pool,
-                job: Box::new(job),
+                handler: Box::new(handler),
                 out_tx,
-                pending: Default::default(),
+                scheduler: Default::default(),
             }),
             out_rx,
         }
     }
+}
 
-    pub fn submit(&self, input: I, has_priority: bool) {
-        let mut pending = self.inner.pending.lock().unwrap();
-        pending.push(input, has_priority);
-        Self::dispatch(&self.inner, pending);
+impl<I, O, K: Hash + Eq> JobPool<I, O, K> {
+    pub fn try_recv(&self) -> Result<O, TryRecvError> {
+        self.out_rx.try_recv().map(|job| self.finish(job))
     }
 
-    fn dispatch(inner: &Arc<Inner<I, O>>, mut pending: MutexGuard<Pending<I>>) {
+    pub fn recv_deadline(&self, deadline: Instant) -> Result<O, RecvTimeoutError> {
+        self.out_rx
+            .recv_deadline(deadline)
+            .map(|job| self.finish(job))
+    }
+
+    fn finish(&self, Completed { output, key }: Completed<O, K>) -> O {
+        if let Some(key) = key {
+            let mut scheduler = self.inner.scheduler.lock().unwrap();
+            let _removed = scheduler.finish(&key);
+            drop(scheduler)
+        }
+        output
+    }
+}
+
+impl<I, O, K> JobPool<I, O, K>
+where
+    I: Send + 'static,
+    O: Send + 'static,
+    K: Hash + Eq + Clone + Send + 'static,
+{
+    pub fn submit(&self, input: I, options: SubmitOptions<K>) {
+        let SubmitOptions { key, has_priority } = options;
+
+        let mut scheduler = self.inner.scheduler.lock().unwrap();
+        let discarded = scheduler.enqueue(
+            input,
+            EnqueueOptions {
+                key,
+                priority: has_priority,
+            },
+        );
+        Self::dispatch(&self.inner, scheduler);
+        drop(discarded);
+    }
+}
+
+impl<I, O, K> JobPool<I, O, K>
+where
+    I: Send + 'static,
+    O: Send + 'static,
+    K: Hash + Eq + Send + 'static,
+{
+    fn dispatch(inner: &Arc<Inner<I, O, K>>, mut scheduler: MutexGuard<Scheduler<I, K, bool>>) {
         let current_num_threads = inner.pool.current_num_threads();
+        let mut jobs = vec![];
+        while let Some(job) = scheduler.admit(current_num_threads) {
+            jobs.push(job);
+        }
+        drop(scheduler);
 
-        while pending.in_flight < current_num_threads
-            && let Some(input) = pending.pop()
-        {
-            pending.in_flight += 1;
-
+        for Admitted { input, key } in jobs {
             let pool = &inner.pool;
             let inner = inner.clone();
             pool.spawn(move || {
-                let inner = DropGuard::new(inner, |inner| {
-                    let mut pending = inner.pending.lock().unwrap();
-                    pending.in_flight -= 1;
-                    Self::dispatch(&inner, pending);
-                });
+                let output = (inner.handler)(input);
+                _ = inner.out_tx.send(Completed { output, key });
 
-                let output = (inner.job)(input);
-                _ = inner.out_tx.send(output);
+                let mut scheduler = inner.scheduler.lock().unwrap();
+                scheduler.complete();
+                Self::dispatch(&inner, scheduler);
             });
         }
     }
 }
 
-struct Inner<I, O> {
+struct Inner<I, O, K> {
     pool: rayon::ThreadPool,
-    job: Box<dyn Fn(I) -> O + Send + Sync>,
-    out_tx: Sender<O>,
-    pending: Mutex<Pending<I>>,
+    handler: Box<dyn Fn(I) -> O + Send + Sync>,
+    out_tx: Sender<Completed<O, K>>,
+    scheduler: Mutex<Scheduler<I, K, bool>>,
 }
 
-struct Pending<I> {
-    priority_inputs: VecDeque<I>,
-    inputs: VecDeque<I>,
-    in_flight: usize,
+pub struct SubmitOptions<K> {
+    pub key: Option<K>,
+    pub has_priority: bool,
 }
 
-impl<I> Pending<I> {
-    fn push(&mut self, input: I, has_priority: bool) {
-        if has_priority {
-            self.priority_inputs.push_back(input);
-        } else {
-            self.inputs.push_back(input);
-        }
-    }
-
-    fn pop(&mut self) -> Option<I> {
-        self.priority_inputs
-            .pop_front()
-            .or_else(|| self.inputs.pop_front())
-    }
-}
-
-impl<I> Default for Pending<I> {
+impl<K> Default for SubmitOptions<K> {
     fn default() -> Self {
         Self {
-            priority_inputs: Default::default(),
-            inputs: Default::default(),
-            in_flight: 0,
+            key: None,
+            has_priority: false,
         }
     }
-}
-
-fn thread_count(headroom: usize) -> usize {
-    thread::available_parallelism()
-        .map_or(1, NonZero::get)
-        .saturating_sub(headroom)
-        .max(1)
 }

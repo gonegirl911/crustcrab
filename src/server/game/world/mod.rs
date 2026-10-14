@@ -75,7 +75,7 @@ impl World {
         );
 
         let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-        scheduler.queue(
+        scheduler.enqueue(
             scope
                 .client_points()
                 .filter(|&coords| self.chunks.0.contains_key(&coords)),
@@ -158,7 +158,7 @@ impl World {
 
         for scheduler in self.schedulers.0.values_mut() {
             let scope = scheduler.admitted;
-            scheduler.queue(
+            scheduler.enqueue(
                 iter::chain(&loads, &updates)
                     .copied()
                     .filter(|&coords| scope.client_contains(coords)),
@@ -166,10 +166,10 @@ impl World {
         }
     }
 
-    fn queue_relights(&mut self, relights: &FxHashSet<Point3<i32>>) {
+    fn enqueue_relights(&mut self, relights: &FxHashSet<Point3<i32>>) {
         for scheduler in self.schedulers.0.values_mut() {
             let scope = scheduler.admitted;
-            scheduler.queue(
+            scheduler.enqueue(
                 relights
                     .iter()
                     .copied()
@@ -192,7 +192,7 @@ impl World {
         );
 
         let scheduler = self.schedulers.0.get_mut(&id).unwrap();
-        scheduler.queue(
+        scheduler.enqueue(
             to.exclusive_client_points(&from)
                 .filter(|&coords| self.chunks.0.contains_key(&coords)),
         );
@@ -378,7 +378,7 @@ impl EventHandler<WorldEvent> for World {
                     &Default::default(),
                     &Default::default(),
                 );
-                self.queue_relights(&relights);
+                self.enqueue_relights(&relights);
 
                 let ids = self.schedulers.0.keys().copied().collect::<Vec<_>>();
                 let ordered_ids = self.tick_rotation.order(&ids);

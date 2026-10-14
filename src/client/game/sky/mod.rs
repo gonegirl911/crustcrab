@@ -10,7 +10,7 @@ use crate::{
     },
     shared::{
         color::{Float3, Rgb},
-        utils,
+        utils::{lerp, ramp},
     },
 };
 use atmosphere::Atmosphere;
@@ -129,27 +129,27 @@ pub struct SkyConfig {
 
 impl SkyConfig {
     fn color(&self, nightness: f32) -> Rgb<f32> {
-        utils::lerp(self.day.color, self.night.color, nightness)
+        lerp(self.day.color, self.night.color, nightness)
     }
 
     fn horizon_color(&self, nightness: f32) -> Rgb<f32> {
-        utils::lerp(self.day.horizon_color, self.night.horizon_color, nightness)
+        lerp(self.day.horizon_color, self.night.horizon_color, nightness)
     }
 
     fn glow_color(&self, nightness: f32) -> Rgb<f32> {
-        utils::lerp(self.day.glow_color, self.night.glow_color, nightness)
+        lerp(self.day.glow_color, self.night.glow_color, nightness)
     }
 
     fn arc_angle(&self, nightness: f32) -> f32 {
-        utils::lerp(
+        lerp(
             self.day.arc_angle,
             self.night.arc_angle,
-            utils::ramp(1.0 / 3.0, 2.0 / 3.0, nightness) * utils::ramp(1.0, 2.0 / 3.0, nightness),
+            ramp(1.0 / 3.0, 2.0 / 3.0, nightness) * ramp(1.0, 2.0 / 3.0, nightness),
         )
     }
 
     pub fn sunlight_intensity(&self, nightness: f32) -> Rgb<f32> {
-        utils::lerp(
+        lerp(
             self.day.sunlight_intensity,
             self.night.sunlight_intensity,
             nightness,

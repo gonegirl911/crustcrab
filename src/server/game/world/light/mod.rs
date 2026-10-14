@@ -10,11 +10,11 @@ use crate::{
         },
         coords,
     },
-    shared::pool::JobPool,
+    shared::pool::{self, JobPool},
 };
 use nalgebra::{Point3, point};
 use region::{RegionInput, RegionOutput, SlotGrid};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::{
     sync::{Arc, LazyLock},
     time::Instant,
@@ -22,8 +22,8 @@ use std::{
 
 pub struct WorldLight {
     lights: FxHashMap<Point3<i32>, Arc<ChunkLight>>,
-    pool: JobPool<RegionInput, RegionOutput>,
-    pending: FxHashSet<Point3<i32>>,
+    pool: JobPool<RegionInput, RegionOutput, Point3<i32>>,
+    pending: FxHashMap<Point3<i32>, PendingRecord>,
 }
 
 impl WorldLight {
@@ -85,16 +85,17 @@ impl WorldLight {
     ) -> Vec<(Point3<i32>, ChunkReach)> {
         let mut updates = vec![];
         while !self.pending.is_empty()
-            && let Ok(output) = self.pool.recv_deadline(deadline)
+            && let Ok(mut output) = self.pool.recv_deadline(deadline)
         {
-            self.pending.remove(&output.coords);
+            let pending = self.pending.remove(&output.coords).unwrap();
+            output.has_priority |= pending.has_priority;
             self.apply_output(output, chunks, &mut updates);
         }
         updates
     }
 
     pub fn is_pending(&self, coords: Point3<i32>) -> bool {
-        self.pending.contains(&coords)
+        self.pending.contains_key(&coords)
     }
 
     fn block_light(&self, coords: Point3<i64>) -> BlockLight {
@@ -104,10 +105,8 @@ impl WorldLight {
     }
 
     fn submit_region(&mut self, chunks: &ChunkStore, coords: Point3<i32>, has_priority: bool) {
-        if !self.pending.insert(coords) {
-            return;
-        }
-
+        let pending = self.pending.entry(coords).or_default();
+        pending.has_priority |= has_priority;
         self.pool.submit(
             RegionInput {
                 coords,
@@ -115,7 +114,10 @@ impl WorldLight {
                 lights: SlotGrid::from_fn(|delta| self.lights.get(&(coords + delta)).cloned()),
                 has_priority,
             },
-            has_priority,
+            pool::SubmitOptions {
+                key: Some(coords),
+                has_priority: pending.has_priority,
+            },
         );
     }
 
@@ -151,6 +153,11 @@ impl Default for WorldLight {
             pending: Default::default(),
         }
     }
+}
+
+#[derive(Default)]
+struct PendingRecord {
+    has_priority: bool,
 }
 
 static PLACEHOLDER: LazyLock<Arc<ChunkLight>> = LazyLock::new(|| ChunkLight::placeholder().into());

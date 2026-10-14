@@ -10,7 +10,7 @@ use crate::{
             utils::{Immediates, load_rgba, read_wgsl},
         },
     },
-    shared::{color::Float3, utils},
+    shared::{color::Float3, utils::lerp},
 };
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;
@@ -117,7 +117,7 @@ pub struct ObjectConfig {
 
 impl ObjectConfig {
     fn brightness(&self, nightness: f32) -> f32 {
-        utils::lerp(self.day.brightness, self.night.brightness, nightness)
+        lerp(self.day.brightness, self.night.brightness, nightness)
     }
 }
 

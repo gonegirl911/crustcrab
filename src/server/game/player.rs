@@ -11,7 +11,7 @@ use crate::{
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry},
         event_loop::{Event, EventHandler},
     },
-    shared::{cuboid::Cuboid, ray::Ray, utils},
+    shared::{cuboid::Cuboid, ray::Ray, utils::distance_squared},
 };
 use nalgebra::{Point2, Point3, Vector3, point, vector};
 use rustc_hash::FxHashMap;
@@ -155,7 +155,7 @@ impl ChunkScope {
             center_xz.x.clamp(xz.x - context, xz.x + context),
             center_xz.y.clamp(xz.y - context, xz.y + context),
         ];
-        utils::distance_squared(nearest, center_xz) <= (self.radius as u128).pow(2)
+        distance_squared(nearest, center_xz) <= (self.radius as u128).pow(2)
     }
 
     fn server_contains_y(&self, y: i32) -> bool {

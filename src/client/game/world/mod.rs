@@ -28,7 +28,11 @@ use crate::{
         },
     },
     shared::{
-        enum_map::EnumMap, indexmap::FxIndexMap, net::compression::Compressed, pool::JobPool, utils,
+        enum_map::EnumMap,
+        indexmap::FxIndexMap,
+        net::compression::Compressed,
+        pool::{self, JobPool},
+        utils::distance_squared,
     },
 };
 use crossbeam_channel::Sender;
@@ -162,7 +166,7 @@ impl World {
         anchor: Point3<f64>,
     ) {
         blended_points.sort_unstable_by_key(|&coords| {
-            Reverse(utils::distance_squared(coords, coords::chunk(origin)))
+            Reverse(distance_squared(coords, coords::chunk(origin)))
         });
 
         let mut render_pass = Self::render_pass(view, encoder, depth_view, false);
@@ -466,7 +470,10 @@ impl EventHandler for World {
                             snapshot_revision,
                             batch_id: self.open_batch_id,
                         },
-                        has_priority,
+                        pool::SubmitOptions {
+                            has_priority,
+                            ..Default::default()
+                        },
                     );
                 }
                 &ChunkEvent::Unloaded(coords) => {
