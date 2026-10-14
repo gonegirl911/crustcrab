@@ -87,8 +87,8 @@ impl WorldLight {
         while !self.pending.is_empty()
             && let Ok(mut output) = self.pool.recv_deadline(deadline)
         {
-            let pending = self.pending.remove(&output.coords).unwrap();
-            output.has_priority |= pending.has_priority;
+            let record = self.pending.remove(&output.coords).unwrap();
+            output.has_priority |= record.has_priority;
             self.apply_output(output, chunks, &mut updates);
         }
         updates
@@ -105,8 +105,8 @@ impl WorldLight {
     }
 
     fn submit_region(&mut self, chunks: &ChunkStore, coords: Point3<i32>, has_priority: bool) {
-        let pending = self.pending.entry(coords).or_default();
-        pending.has_priority |= has_priority;
+        let record = self.pending.entry(coords).or_default();
+        record.has_priority |= has_priority;
         self.pool.submit(
             RegionInput {
                 coords,
@@ -116,7 +116,7 @@ impl WorldLight {
             },
             pool::SubmitOptions {
                 key: Some(coords),
-                has_priority: pending.has_priority,
+                has_priority: record.has_priority,
             },
         );
     }
