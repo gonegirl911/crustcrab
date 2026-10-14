@@ -1,51 +1,49 @@
 pub mod action;
+pub mod block;
 pub mod branch;
+pub mod chunk;
+pub mod coords;
 pub mod generator;
 pub mod height;
+pub mod hover;
 pub mod light;
 pub mod mesh;
 pub mod scheduler;
 pub mod viewer;
 
-use super::{
-    block::{
-        Block, BlockLight,
-        area::{BlockArea, BlockAreaSource, BlockLightArea, BlockLightAreaSource},
-    },
-    chunk::{
-        Chunk,
-        area::{ChunkArea, ChunkReach},
-    },
-    coords,
-    player::{ChunkScope, Player},
-};
+use super::player::{ChunkScope, Player};
 use crate::{
-    client::{PlayerEvent, game::shading::DAY_LIGHT_TABLE},
+    client::PlayerEvent,
     server::{
         BatchTrigger, ChunkEvent, ControlEvent, SERVER_CONFIG,
         connection::{ConnectionEvent, ConnectionId, ConnectionRegistry, RecipientList},
         event_loop::{Event, EventHandler},
     },
     shared::{
-        bound::Aabb,
         ray::{BlockIntersection, Intersectable, Ray},
         round_robin::RoundRobin,
     },
 };
-use action::{ActionStore, BlockAction};
+use action::{BlockAction, BlockActionStore};
+use block::Block;
 use branch::{Branch, Changelog};
+use chunk::{
+    Chunk,
+    area::{ChunkArea, ChunkReach},
+    store::ChunkStore,
+};
 use generator::ChunkGeneratorPool;
 use height::HeightMap;
+use hover::BlockHoverData;
 use light::WorldLight;
 use mesh::ChunkData;
-use nalgebra::{Point3, Vector3, point};
+use nalgebra::{Point3, Vector3};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use scheduler::ChunkSchedulerRegistry;
-use serde::{Deserialize, Serialize};
 use std::{
     iter, mem,
-    ops::{Index, Range},
+    ops::Range,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -56,7 +54,7 @@ pub struct World {
     chunks: ChunkStore,
     heights: HeightMap,
     generators: ChunkGeneratorPool,
-    actions: ActionStore,
+    actions: BlockActionStore,
     light: WorldLight,
     viewers: ViewerRegistry,
     schedulers: ChunkSchedulerRegistry,
@@ -335,12 +333,7 @@ impl EventHandler<WorldEvent> for World {
 
                 if mem::replace(&mut viewer.hover, hover) != hover {
                     let data = hover.map(|BlockIntersection { coords, .. }| {
-                        BlockHoverData {
-                            coords,
-                            area: self.chunks.block_area(coords),
-                            light_area: self.light.block_light_area(coords),
-                        }
-                        .into()
+                        BlockHoverData::new(&self.chunks, &self.light, coords).into()
                     });
                     connections.one(id).send(ControlEvent::BlockHovered(data));
                 }
@@ -400,79 +393,6 @@ impl EventHandler<WorldEvent> for World {
             }
             _ => {}
         }
-    }
-}
-
-#[derive(Default)]
-pub struct ChunkStore(FxHashMap<Point3<i32>, Arc<Chunk>>);
-
-impl ChunkStore {
-    fn chunk_area(&self, coords: Point3<i32>) -> ChunkArea {
-        let mut value = ChunkArea::default();
-        for delta in ChunkArea::chunk_deltas() {
-            if let Some(chunk) = self.get(coords + delta.cast()) {
-                let [dx, dy, dz] = delta.into();
-                for x in ChunkArea::axis_range(dx) {
-                    for y in ChunkArea::axis_range(dy) {
-                        let z = ChunkArea::axis_range(dz);
-                        value.copy_row(
-                            coords::from_parts(point![dx, dy, dz].cast(), point![x, y, z.start])
-                                .coords
-                                .cast(),
-                            chunk.row(point![x, y, z.start], z.len()),
-                        );
-                    }
-                }
-            }
-        }
-        value
-    }
-
-    fn block_area(&self, coords: Point3<i64>) -> BlockArea {
-        BlockArea::from_fn(|delta| self.block(coords + delta.cast()))
-    }
-
-    fn get(&self, coords: Point3<i32>) -> Option<&Chunk> {
-        self.0.get(&coords).map(|v| &**v)
-    }
-
-    fn block(&self, coords: Point3<i64>) -> Block {
-        self.get(coords::chunk(coords))
-            .map_or_default(|chunk| chunk[coords::block(coords)])
-    }
-}
-
-impl Index<Point3<i32>> for ChunkStore {
-    type Output = Chunk;
-
-    fn index(&self, coords: Point3<i32>) -> &Self::Output {
-        &self.0[&coords]
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct BlockHoverData {
-    coords: Point3<i64>,
-    area: BlockArea,
-    light_area: BlockLightArea,
-}
-
-impl BlockHoverData {
-    pub fn hitbox(&self) -> Aabb {
-        self.area.kernel().data().hitbox(self.coords)
-    }
-
-    pub fn brightness(&self) -> BlockLight {
-        self.area
-            .kernel()
-            .data()
-            .mesh(coords::block(self.coords), &self.area, &self.light_area)
-            .max_by(|a, b| {
-                let a = DAY_LIGHT_TABLE.value(a.light(), 0).lum();
-                let b = DAY_LIGHT_TABLE.value(b.light(), 0).lum();
-                a.total_cmp(&b)
-            })
-            .map_or(self.light_area.kernel(), |v| v.light())
     }
 }
 

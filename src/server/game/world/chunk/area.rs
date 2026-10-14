@@ -1,6 +1,6 @@
 use super::Chunk;
 use crate::{
-    server::game::block::{
+    server::game::world::block::{
         Block, BlockLight,
         area::{BlockArea, BlockAreaView, BlockLightAreaView},
     },
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Index, Range};
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct ChunkArea(ChunkAreaDataStore<Block>);
+pub struct ChunkArea(ChunkAreaGrid<Block>);
 
 impl ChunkArea {
     const PADDING: usize = BlockArea::PADDING;
@@ -50,7 +50,7 @@ impl ChunkArea {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct ChunkLightArea(ChunkAreaDataStore<BlockLight>);
+pub struct ChunkLightArea(ChunkAreaGrid<BlockLight>);
 
 impl ChunkLightArea {
     pub fn block_light_area_view(&self, coords: Point3<u8>) -> BlockLightAreaView<'_> {
@@ -63,9 +63,9 @@ impl ChunkLightArea {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-pub struct ChunkAreaDataStore<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
+pub struct ChunkAreaGrid<T>([[[T; ChunkArea::DIM]; ChunkArea::DIM]; ChunkArea::DIM]);
 
-impl<T> ChunkAreaDataStore<T> {
+impl<T> ChunkAreaGrid<T> {
     fn index_unchecked(delta: Vector3<i8>) -> [usize; 3] {
         delta
             .map(|c| (c + ChunkArea::PADDING as i8) as usize)
@@ -73,14 +73,14 @@ impl<T> ChunkAreaDataStore<T> {
     }
 }
 
-impl<T: Copy> ChunkAreaDataStore<T> {
+impl<T: Copy> ChunkAreaGrid<T> {
     fn copy_row(&mut self, delta: Vector3<i8>, src: &[T]) {
         let [x, y, z] = Self::index_unchecked(delta);
         self.0[x][y][z..][..src.len()].copy_from_slice(src);
     }
 }
 
-impl<T> Index<Vector3<i8>> for ChunkAreaDataStore<T> {
+impl<T> Index<Vector3<i8>> for ChunkAreaGrid<T> {
     type Output = T;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {

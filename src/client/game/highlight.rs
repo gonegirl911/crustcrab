@@ -13,7 +13,7 @@ use crate::{
     },
     server::{
         ControlEvent,
-        game::{block::BlockLight, world::BlockHoverData},
+        game::world::{block::BlockLight, hover::BlockHoverData},
     },
     shared::bound::Aabb,
 };

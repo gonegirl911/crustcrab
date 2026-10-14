@@ -1,8 +1,5 @@
-use super::Chunk;
-use crate::{
-    server::game::{block::Block, coords, world::World},
-    shared::{ema::Ema, pool::JobPool, utils::distance_squared},
-};
+use super::{Chunk, World, block::Block, coords};
+use crate::shared::{ema::Ema, pool::JobPool, utils::distance_squared};
 use nalgebra::Point3;
 use noise::{NoiseFn, Simplex};
 use rayon::slice::ParallelSliceMut;

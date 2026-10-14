@@ -15,10 +15,9 @@ use crossbeam_channel::{Receiver, SendError};
 use event_loop::EventLoop;
 use game::{
     Game,
-    block::Block,
     clock::{ClockConfig, DayCycle},
     player::PlayerConfig,
-    world::{BlockHoverData, mesh::ChunkData},
+    world::{block::Block, hover::BlockHoverData, mesh::ChunkData},
 };
 use gate::KickReason;
 use nalgebra::{Point3, Vector3};

@@ -4,7 +4,7 @@ use crate::{
         buffer::{MemoryState, VertexBuffer},
         utils::{BlendedMesh, Immediates, Vertex},
     },
-    server::game::{
+    server::game::world::{
         block::{
             BlockLight,
             data::{RenderLayer, SideShade},

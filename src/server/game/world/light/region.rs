@@ -1,5 +1,5 @@
 use crate::{
-    server::game::{
+    server::game::world::{
         block::{Block, BlockLight},
         chunk::{Chunk, ChunkLight},
     },
@@ -9,13 +9,13 @@ use nalgebra::{Point3, Vector3};
 use std::{array, cell::Cell, mem::DropGuard, ops::Index, sync::Arc};
 
 pub fn compute(
-    RegionInput {
+    Input {
         coords,
         chunks: input_chunks,
         lights: input_lights,
         has_priority,
-    }: RegionInput,
-) -> RegionOutput {
+    }: Input,
+) -> Output {
     let blocks = DropGuard::new(BLOCK_FLAT_GRID_SCRATCH.take().unwrap(), |scratch| {
         BLOCK_FLAT_GRID_SCRATCH.set(Some(scratch));
     });
@@ -23,7 +23,7 @@ pub fn compute(
         BLOCK_LIGHT_FLAT_GRID_SCRATCH.set(Some(scratch));
     });
 
-    RegionOutput {
+    Output {
         coords,
         input_chunks,
         input_lights,
@@ -31,14 +31,14 @@ pub fn compute(
     }
 }
 
-pub struct RegionInput {
+pub struct Input {
     pub coords: Point3<i32>,
     pub chunks: SlotGrid<Chunk>,
     pub lights: SlotGrid<ChunkLight>,
     pub has_priority: bool,
 }
 
-pub struct RegionOutput {
+pub struct Output {
     pub coords: Point3<i32>,
     pub input_chunks: SlotGrid<Chunk>,
     pub input_lights: SlotGrid<ChunkLight>,
@@ -56,17 +56,17 @@ impl<T> SlotGrid<T> {
         &self[Default::default()]
     }
 
-    fn flatten_into<U>(&self, grid: &mut FlatGrid<U>)
+    fn flatten_into<U>(&self, grid: &mut FlatGrid<U>, fallback: U)
     where
         T: AsRef<[U]>,
-        U: Clone + Default,
+        U: Clone,
     {
         for (i, slot) in self.0.iter().enumerate() {
             let section = &mut grid.0[i * Chunk::VOLUME..][..Chunk::VOLUME];
             if let Some(value) = slot {
                 section.clone_from_slice((**value).as_ref());
             } else {
-                section.fill(Default::default());
+                section.fill(fallback.clone());
             }
         }
     }

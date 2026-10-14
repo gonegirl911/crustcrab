@@ -1,8 +1,9 @@
-use super::{
+use super::world::{
+    World,
     block::{Block, area::BlockArea, data::STR_TO_BLOCK},
     chunk::Chunk,
     coords,
-    world::{World, light::region::LIGHT_REACH},
+    light::region::LIGHT_REACH,
 };
 use crate::{
     client::PlayerEvent,

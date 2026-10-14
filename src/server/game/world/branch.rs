@@ -1,8 +1,8 @@
 use super::{
     ChunkStore, World,
-    action::{ActionStore, BlockAction},
+    action::{BlockAction, BlockActionStore},
 };
-use crate::server::game::{block::Block, chunk::area::ChunkReach, coords};
+use crate::server::game::world::{block::Block, chunk::area::ChunkReach, coords};
 use nalgebra::{Point3, Vector3};
 use rustc_hash::FxHashSet;
 use std::{
@@ -12,7 +12,7 @@ use std::{
 
 #[derive(Default)]
 pub struct Branch {
-    actions: ActionStore,
+    actions: BlockActionStore,
 }
 
 impl Branch {

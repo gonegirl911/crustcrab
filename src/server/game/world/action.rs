@@ -1,12 +1,12 @@
-use crate::server::game::{block::Block, chunk::Chunk, coords};
+use crate::server::game::world::{block::Block, chunk::Chunk, coords};
 use nalgebra::Point3;
 use rc_box::ArcBox;
 use rustc_hash::FxHashMap;
 
 #[derive(Default)]
-pub struct ActionStore(pub FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
+pub struct BlockActionStore(pub FxHashMap<Point3<i32>, FxHashMap<Point3<u8>, BlockAction>>);
 
-impl ActionStore {
+impl BlockActionStore {
     pub fn apply(
         &self,
         coords: Point3<i32>,
@@ -70,7 +70,7 @@ impl ActionStore {
     }
 }
 
-impl Extend<(Point3<i64>, BlockAction)> for ActionStore {
+impl Extend<(Point3<i64>, BlockAction)> for BlockActionStore {
     fn extend<I: IntoIterator<Item = (Point3<i64>, BlockAction)>>(&mut self, iter: I) {
         for (coords, action) in iter {
             self.insert(coords, action);

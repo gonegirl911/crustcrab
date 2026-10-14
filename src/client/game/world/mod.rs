@@ -17,14 +17,16 @@ use crate::{
     server::{
         BatchTrigger, ChunkEvent,
         game::{
-            block::data::{RenderLayer, SIDE_DELTAS},
-            chunk::{
-                Chunk,
-                visibility::{SideSet, VisibilityGraph},
-            },
-            coords,
             player::ChunkScope,
-            world::mesh::ChunkData,
+            world::{
+                block::data::{RenderLayer, SIDE_DELTAS},
+                chunk::{
+                    Chunk,
+                    visibility::{SideSet, VisibilityGraph},
+                },
+                coords,
+                mesh::ChunkData,
+            },
         },
     },
     shared::{

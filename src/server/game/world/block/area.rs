@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     enum_map,
-    server::game::chunk::area::ChunkAreaDataStore,
+    server::game::world::chunk::area::ChunkAreaGrid,
     shared::{cuboid::Cuboid, enum_map::EnumMap},
 };
 use nalgebra::{Point3, Vector3};
@@ -82,18 +82,18 @@ impl<S: BlockLightAreaSource> BlockContext<S> {
     }
 }
 
-impl<T> BlockContext<BlockAreaDataStore<T>> {
+impl<T> BlockContext<BlockAreaGrid<T>> {
     pub fn from_fn<F: FnMut(Vector3<i8>) -> T>(f: F) -> Self {
         Self {
-            source: BlockAreaDataStore::from_fn(f),
+            source: BlockAreaGrid::from_fn(f),
         }
     }
 }
 
-impl<'a, T> BlockContext<BlockAreaDataRef<'a, T>> {
-    pub fn new(data: &'a ChunkAreaDataStore<T>, coords: Point3<u8>) -> Self {
+impl<'a, T> BlockContext<ChunkAreaGridView<'a, T>> {
+    pub fn new(grid: &'a ChunkAreaGrid<T>, coords: Point3<u8>) -> Self {
         Self {
-            source: BlockAreaDataRef { data, coords },
+            source: ChunkAreaGridView { grid, coords },
         }
     }
 }
@@ -110,7 +110,7 @@ impl<S: BlockLightAreaSource> BlockLightAreaSource for BlockContext<S> {
     }
 }
 
-pub type BlockArea = BlockContext<BlockAreaDataStore<Block>>;
+pub type BlockArea = BlockContext<BlockAreaGrid<Block>>;
 
 impl BlockArea {
     pub const PADDING: usize = 1;
@@ -127,11 +127,11 @@ impl BlockArea {
     }
 }
 
-pub type BlockAreaView<'a> = BlockContext<BlockAreaDataRef<'a, Block>>;
+pub type BlockAreaView<'a> = BlockContext<ChunkAreaGridView<'a, Block>>;
 
-pub type BlockLightArea = BlockContext<BlockAreaDataStore<BlockLight>>;
+pub type BlockLightArea = BlockContext<BlockAreaGrid<BlockLight>>;
 
-pub type BlockLightAreaView<'a> = BlockContext<BlockAreaDataRef<'a, BlockLight>>;
+pub type BlockLightAreaView<'a> = BlockContext<ChunkAreaGridView<'a, BlockLight>>;
 
 pub trait BlockAreaSource {
     fn block(&self, delta: Vector3<i8>) -> Block;
@@ -150,9 +150,9 @@ pub trait BlockLightAreaSource {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct BlockAreaDataStore<T>([[[T; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
+pub struct BlockAreaGrid<T>([[[T; BlockArea::DIM]; BlockArea::DIM]; BlockArea::DIM]);
 
-impl<T> BlockAreaDataStore<T> {
+impl<T> BlockAreaGrid<T> {
     fn from_fn<F: FnMut(Vector3<i8>) -> T>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(Self::delta_unchecked([x, y, z]))))
@@ -170,7 +170,7 @@ impl<T> BlockAreaDataStore<T> {
     }
 }
 
-impl<T> Index<Vector3<i8>> for BlockAreaDataStore<T> {
+impl<T> Index<Vector3<i8>> for BlockAreaGrid<T> {
     type Output = T;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
@@ -179,38 +179,38 @@ impl<T> Index<Vector3<i8>> for BlockAreaDataStore<T> {
     }
 }
 
-impl BlockAreaSource for BlockAreaDataStore<Block> {
+impl BlockAreaSource for BlockAreaGrid<Block> {
     fn block(&self, delta: Vector3<i8>) -> Block {
         self[delta]
     }
 }
 
-impl BlockLightAreaSource for BlockAreaDataStore<BlockLight> {
+impl BlockLightAreaSource for BlockAreaGrid<BlockLight> {
     fn block_light(&self, delta: Vector3<i8>) -> BlockLight {
         self[delta]
     }
 }
 
-pub struct BlockAreaDataRef<'a, T> {
-    data: &'a ChunkAreaDataStore<T>,
+pub struct ChunkAreaGridView<'a, T> {
+    grid: &'a ChunkAreaGrid<T>,
     coords: Point3<u8>,
 }
 
-impl<T> Index<Vector3<i8>> for BlockAreaDataRef<'_, T> {
+impl<T> Index<Vector3<i8>> for ChunkAreaGridView<'_, T> {
     type Output = T;
 
     fn index(&self, delta: Vector3<i8>) -> &Self::Output {
-        &self.data[self.coords.coords.cast() + delta]
+        &self.grid[self.coords.coords.cast() + delta]
     }
 }
 
-impl BlockAreaSource for BlockAreaDataRef<'_, Block> {
+impl BlockAreaSource for ChunkAreaGridView<'_, Block> {
     fn block(&self, delta: Vector3<i8>) -> Block {
         self[delta]
     }
 }
 
-impl BlockLightAreaSource for BlockAreaDataRef<'_, BlockLight> {
+impl BlockLightAreaSource for ChunkAreaGridView<'_, BlockLight> {
     fn block_light(&self, delta: Vector3<i8>) -> BlockLight {
         self[delta]
     }

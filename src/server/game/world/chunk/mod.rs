@@ -1,10 +1,11 @@
 pub mod area;
+pub mod store;
 pub mod visibility;
 
 use super::{
+    action::BlockAction,
     block::{Block, BlockLight},
     coords,
-    world::action::BlockAction,
 };
 use crate::shared::{
     bound::{Aabb, BoundingSphere},
@@ -20,7 +21,7 @@ use visibility::VisibilityGraph;
 
 #[derive(Clone)]
 pub struct Chunk {
-    blocks: ChunkDataStore<Block>,
+    blocks: ChunkGrid<Block>,
     non_air_count: u16,
     pub mut(self) visibility_graph: VisibilityGraph,
 }
@@ -32,7 +33,7 @@ impl Chunk {
     pub fn from_fn<F: FnMut(Point3<u8>) -> Block>(mut f: F) -> Self {
         let mut non_air_count = 0;
         Self {
-            blocks: ChunkDataStore::from_fn(|coords| {
+            blocks: ChunkGrid::from_fn(|coords| {
                 let block = f(coords);
                 non_air_count += (block != Block::AIR) as u16;
                 block
@@ -131,11 +132,11 @@ impl Index<Point3<u8>> for Chunk {
     }
 }
 
-pub struct ChunkLight(ChunkDataStore<BlockLight>);
+pub struct ChunkLight(ChunkGrid<BlockLight>);
 
 impl ChunkLight {
     pub fn placeholder() -> Self {
-        Self(ChunkDataStore::from_fn(|_| BlockLight::placeholder()))
+        Self(ChunkGrid::from_fn(|_| BlockLight::placeholder()))
     }
 
     pub fn row(&self, coords: Point3<u8>, len: usize) -> &[BlockLight] {
@@ -152,9 +153,9 @@ impl Index<Point3<u8>> for ChunkLight {
 }
 
 #[derive(Clone, Default)]
-struct ChunkDataStore<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
+struct ChunkGrid<T>([[[T; Chunk::DIM]; Chunk::DIM]; Chunk::DIM]);
 
-impl<T> ChunkDataStore<T> {
+impl<T> ChunkGrid<T> {
     fn from_fn<F: FnMut(Point3<u8>) -> T>(mut f: F) -> Self {
         Self(array::from_fn(|x| {
             array::from_fn(|y| array::from_fn(|z| f(point![x, y, z].cast())))
@@ -170,7 +171,7 @@ impl<T> ChunkDataStore<T> {
     }
 }
 
-impl<T> Index<Point3<u8>> for ChunkDataStore<T> {
+impl<T> Index<Point3<u8>> for ChunkGrid<T> {
     type Output = T;
 
     fn index(&self, coords: Point3<u8>) -> &Self::Output {
@@ -178,7 +179,7 @@ impl<T> Index<Point3<u8>> for ChunkDataStore<T> {
     }
 }
 
-impl<T> IndexMut<Point3<u8>> for ChunkDataStore<T> {
+impl<T> IndexMut<Point3<u8>> for ChunkGrid<T> {
     fn index_mut(&mut self, coords: Point3<u8>) -> &mut Self::Output {
         &mut self.0[coords.x as usize][coords.y as usize][coords.z as usize]
     }

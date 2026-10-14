@@ -10,7 +10,7 @@ use crate::{
         renderer::{Renderer, Surface, buffer::MemoryState, uniform::Uniform},
         stopwatch::Stopwatch,
     },
-    server::{ControlEvent, game::chunk::Chunk},
+    server::{ControlEvent, game::world::chunk::Chunk},
     shared::{color::Float3, flow::pacer::Pacer},
 };
 use bytemuck::{Pod, Zeroable};

@@ -2,7 +2,7 @@ pub mod region;
 
 use super::ChunkStore;
 use crate::{
-    server::game::{
+    server::game::world::{
         block::{BlockLight, area::BlockLightArea},
         chunk::{
             ChunkLight,
@@ -13,7 +13,6 @@ use crate::{
     shared::pool::{self, JobPool},
 };
 use nalgebra::{Point3, point};
-use region::{RegionInput, RegionOutput, SlotGrid};
 use rustc_hash::FxHashMap;
 use std::{
     sync::{Arc, LazyLock},
@@ -22,7 +21,7 @@ use std::{
 
 pub struct WorldLight {
     lights: FxHashMap<Point3<i32>, Arc<ChunkLight>>,
-    pool: JobPool<RegionInput, RegionOutput, Point3<i32>>,
+    pool: JobPool<region::Input, region::Output, Point3<i32>>,
     pending: FxHashMap<Point3<i32>, PendingRecord>,
 }
 
@@ -108,10 +107,12 @@ impl WorldLight {
         let record = self.pending.entry(coords).or_default();
         record.has_priority |= has_priority;
         self.pool.submit(
-            RegionInput {
+            region::Input {
                 coords,
-                chunks: SlotGrid::from_fn(|delta| chunks.0.get(&(coords + delta)).cloned()),
-                lights: SlotGrid::from_fn(|delta| self.lights.get(&(coords + delta)).cloned()),
+                chunks: region::SlotGrid::from_fn(|delta| chunks.0.get(&(coords + delta)).cloned()),
+                lights: region::SlotGrid::from_fn(|delta| {
+                    self.lights.get(&(coords + delta)).cloned()
+                }),
                 has_priority,
             },
             pool::SubmitOptions {
@@ -123,12 +124,12 @@ impl WorldLight {
 
     fn apply_output(
         &mut self,
-        RegionOutput {
+        region::Output {
             coords: output_coords,
             input_chunks,
             input_lights,
             has_priority,
-        }: RegionOutput,
+        }: region::Output,
         chunks: &ChunkStore,
         updates: &mut Vec<(Point3<i32>, ChunkReach)>,
     ) {

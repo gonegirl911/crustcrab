@@ -2,7 +2,7 @@ pub mod area;
 pub mod data;
 pub mod model;
 
-use super::world::action::BlockAction;
+use super::action::BlockAction;
 use crate::shared::color::Rgb;
 use bitfield::bitfield;
 use data::{BLOCK_DATA, BlockData};

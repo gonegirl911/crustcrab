@@ -1,18 +1,18 @@
-use super::{ChunkStore, WorldLight};
+use super::{
+    ChunkStore, WorldLight,
+    block::{
+        Block, BlockLight,
+        area::{BlockAreaSource, BlockContext, BlockLightAreaSource},
+        data::{Corner, RenderLayer, SIDE_AXES, Side},
+    },
+    chunk::{
+        Chunk,
+        area::{ChunkArea, ChunkLightArea},
+        visibility::VisibilityGraph,
+    },
+};
 use crate::{
     client::game::world::mesh::BlockVertex,
-    server::game::{
-        block::{
-            Block, BlockLight,
-            area::{BlockAreaSource, BlockContext, BlockLightAreaSource},
-            data::{Corner, RenderLayer, SIDE_AXES, Side},
-        },
-        chunk::{
-            Chunk,
-            area::{ChunkArea, ChunkLightArea},
-            visibility::VisibilityGraph,
-        },
-    },
     shared::enum_map::{Enum, EnumMap},
 };
 use nalgebra::{Point2, Point3, point};
