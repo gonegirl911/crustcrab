@@ -127,7 +127,7 @@ impl World {
 
         self.generators.anticipate(demand, |coords| self.schedulers.server_contains(coords));
 
-        let mut inserts = vec![];
+        let mut inserts = Vec::with_capacity(demand);
         while inserts.len() < demand {
             let Some((coords, chunk)) = self.generators.poll_deadline(deadline) else {
                 break;

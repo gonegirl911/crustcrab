@@ -221,12 +221,12 @@ impl From<Option<Side>> for SideShade {
 #[derive(Clone, Copy, PartialEq, Enum, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
-    Bottom, // DO NOT MOVE
     Front,
     Right,
     Back,
     Left,
     Top,
+    Bottom,
 }
 
 impl Side {
