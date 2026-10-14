@@ -1,5 +1,6 @@
 mod demotion;
 pub mod global;
+mod queue;
 mod scheduler;
 mod utils;
 
@@ -66,14 +67,14 @@ where
     K: Hash + Eq + Clone + Send + 'static,
 {
     pub fn submit(&self, input: I, options: SubmitOptions<K>) {
-        let SubmitOptions { key, has_priority } = options;
+        let SubmitOptions { has_priority, key } = options;
 
         let mut scheduler = self.inner.scheduler.lock().unwrap();
         let discarded = scheduler.enqueue(
             input,
             EnqueueOptions {
-                key,
                 priority: has_priority,
+                key,
             },
         );
         Self::dispatch(&self.inner, scheduler);
@@ -87,9 +88,10 @@ where
     O: Send + 'static,
     K: Hash + Eq + Send + 'static,
 {
-    fn dispatch(inner: &Arc<Inner<I, O, K>>, mut scheduler: MutexGuard<Scheduler<I, K, bool>>) {
+    fn dispatch(inner: &Arc<Inner<I, O, K>>, mut scheduler: MutexGuard<Scheduler<I, bool, K>>) {
         let current_num_threads = inner.pool.current_num_threads();
-        let mut jobs = vec![];
+        let count = scheduler.admissible_count(current_num_threads);
+        let mut jobs = Vec::with_capacity(count);
         while let Some(job) = scheduler.admit(current_num_threads) {
             jobs.push(job);
         }
@@ -114,19 +116,19 @@ struct Inner<I, O, K> {
     pool: rayon::ThreadPool,
     handler: Box<dyn Fn(I) -> O + Send + Sync>,
     out_tx: Sender<Completed<O, K>>,
-    scheduler: Mutex<Scheduler<I, K, bool>>,
+    scheduler: Mutex<Scheduler<I, bool, K>>,
 }
 
 pub struct SubmitOptions<K> {
-    pub key: Option<K>,
     pub has_priority: bool,
+    pub key: Option<K>,
 }
 
 impl<K> Default for SubmitOptions<K> {
     fn default() -> Self {
         Self {
-            key: None,
             has_priority: false,
+            key: None,
         }
     }
 }

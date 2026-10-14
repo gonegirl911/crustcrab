@@ -115,8 +115,8 @@ impl WorldLight {
                 has_priority,
             },
             pool::SubmitOptions {
-                key: Some(coords),
                 has_priority: record.has_priority,
+                key: Some(coords),
             },
         );
     }
