@@ -89,7 +89,7 @@ impl<T> Index<Vector3<i8>> for ChunkAreaDataStore<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct ChunkReach(u32);
 
 impl ChunkReach {
@@ -98,7 +98,7 @@ impl ChunkReach {
     }
 
     pub fn is_empty(self) -> bool {
-        self == Default::default()
+        self.0 == 0
     }
 
     fn block_reach(coords: Point3<u8>) -> u32 {
