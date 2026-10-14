@@ -23,7 +23,9 @@ impl<I, O, K> JobPool<I, O, K> {
     pub fn new<H: Fn(I) -> O + Send + Sync + 'static>(headroom: usize, handler: H) -> Self {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count(headroom))
-            .start_handler(|_| _ = demote())
+            .start_handler(|_| {
+                _ = demote();
+            })
             .build()
             .unwrap();
         let (out_tx, out_rx) = crossbeam_channel::unbounded();
