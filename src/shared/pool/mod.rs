@@ -39,8 +39,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
             .num_threads(thread_count(headroom))
             .start_handler(|_| _ = demote())
             .build()
-            .unwrap()
-            .into();
+            .unwrap();
         let (out_tx, out_rx) = crossbeam_channel::unbounded();
         Self {
             inner: Arc::new(Inner {
@@ -67,8 +66,8 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
         {
             pending.in_flight += 1;
 
+            let pool = &inner.pool;
             let inner = inner.clone();
-            let pool = inner.pool.clone();
             pool.spawn(move || {
                 let inner = DropGuard::new(inner, |inner| {
                     let mut pending = inner.pending.lock().unwrap();
@@ -84,7 +83,7 @@ impl<I: Send + 'static, O: Send + 'static> JobPool<I, O> {
 }
 
 struct Inner<I, O> {
-    pool: Arc<rayon::ThreadPool>,
+    pool: rayon::ThreadPool,
     job: Box<dyn Fn(I) -> O + Send + Sync>,
     out_tx: Sender<O>,
     pending: Mutex<Pending<I>>,
