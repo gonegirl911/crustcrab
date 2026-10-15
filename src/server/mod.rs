@@ -1,4 +1,3 @@
-pub(crate) mod actor;
 pub mod connection;
 pub(crate) mod event_loop;
 pub(crate) mod game;

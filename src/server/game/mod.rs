@@ -1,14 +1,15 @@
 pub mod clock;
 pub mod player;
+pub mod utils;
 pub mod world;
 
 use super::{
-    actor::Actor,
     connection::ConnectionRegistry,
     event_loop::{Event, EventHandler},
 };
 use clock::Clock;
 use player::PlayerRegistry;
+use utils::Actor;
 use world::{World, WorldEvent};
 
 pub struct Game {
