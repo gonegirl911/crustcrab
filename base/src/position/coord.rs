@@ -10,8 +10,8 @@ impl Coord {
         Self(self.0.rem_euclid(vector![rhs]))
     }
 
-    pub fn displacement_from(self, anchor: i64) -> f32 {
-        self.0.displacement_from(point![anchor])[0]
+    pub fn displacement_from<C: Into<Self>>(self, anchor: C) -> f32 {
+        self.0.displacement_from(anchor.into().0)[0]
     }
 }
 

@@ -18,7 +18,8 @@ impl<const D: usize> Aabb<D> {
         Self { min, max }
     }
 
-    pub fn relative_to(self, anchor: Point<i64, D>) -> LocalAabb<D> {
+    pub fn relative_to<P: Into<Position<D>>>(self, anchor: P) -> LocalAabb<D> {
+        let anchor = anchor.into();
         LocalAabb {
             min: self.min.displacement_from(anchor).into(),
             max: self.max.displacement_from(anchor).into(),
