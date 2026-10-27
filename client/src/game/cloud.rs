@@ -108,7 +108,6 @@ impl Layer {
         }
     }
 
-    #[expect(clippy::too_many_arguments)]
     pub(super) fn draw(
         &self,
         view: &wgpu::TextureView,

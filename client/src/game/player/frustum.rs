@@ -15,7 +15,6 @@ pub(in crate::game) struct Frustum {
 }
 
 impl Frustum {
-    #[expect(clippy::too_many_arguments)]
     pub(super) fn new(
         origin: Position3,
         forward: Vector3<f32>,
@@ -50,7 +49,6 @@ trait Cullable {
 }
 
 impl Cullable for bounding::Sphere {
-    #[expect(clippy::needless_bool)]
     fn is_visible(&self, frustum: &Frustum) -> bool {
         let v = self.center.displacement_from(frustum.origin);
 

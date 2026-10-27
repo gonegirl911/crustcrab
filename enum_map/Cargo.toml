@@ -2,6 +2,9 @@
 name = "enum_map"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 enum_derive = { workspace = true }
 generic-array = { workspace = true }

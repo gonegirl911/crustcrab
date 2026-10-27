@@ -2,6 +2,9 @@
 name = "domain"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 base = { workspace = true }
 bitfield = { workspace = true }

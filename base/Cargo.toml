@@ -2,6 +2,9 @@
 name = "base"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 bytemuck = { workspace = true, features = ["derive"] }
 crossbeam-channel = { workspace = true }

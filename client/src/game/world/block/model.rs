@@ -11,7 +11,6 @@ use walkdir::{DirEntry, WalkDir};
 
 pub(super) struct Definition {
     has_flat_icon: bool,
-    #[expect(clippy::type_complexity)]
     corner_deltas: EnumMap<Option<Side>, Box<[EnumMap<Corner, Vector3<u8>>]>>,
 }
 
@@ -40,7 +39,6 @@ impl From<Config> for Definition {
 #[derive(Clone, Deserialize)]
 struct Config {
     has_flat_icon: bool,
-    #[expect(clippy::type_complexity)]
     side_corner_deltas: EnumMap<Side, Box<[EnumMap<Corner, Vector3<u8>>]>>,
     internal_corner_deltas: Box<[EnumMap<Corner, Vector3<u8>>]>,
 }
