@@ -1,0 +1,38 @@
+use crate::renderer::{
+    Renderer,
+    post_process::PostProcessor,
+    render_pipeline::{RenderPipeline, read_wgsl},
+};
+
+pub(super) struct Atmosphere(RenderPipeline);
+
+impl Atmosphere {
+    pub(super) fn new(
+        renderer: &Renderer,
+        player_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+        sky_bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        Self(
+            RenderPipeline::builder()
+                .renderer(renderer)
+                .shader_desc(read_wgsl("client/assets/shaders/atmosphere.wgsl"))
+                .bind_group_layouts(&[
+                    Some(player_uniform_bind_group_layout),
+                    Some(sky_bind_group_layout),
+                ])
+                .format(PostProcessor::FORMAT)
+                .build(),
+        )
+    }
+
+    #[rustfmt::skip]
+    pub(super) fn draw(
+        &self,
+        render_pass: &mut wgpu::RenderPass,
+        player_uniform_bind_group: &wgpu::BindGroup,
+        sky_bind_group: &wgpu::BindGroup,
+    ) {
+        self.0.bind(render_pass, [player_uniform_bind_group, sky_bind_group]);
+        render_pass.draw(0..3, 0..1);
+    }
+}

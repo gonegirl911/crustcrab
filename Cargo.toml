@@ -1,10 +1,54 @@
 [workspace]
-members = ["macros"]
+members = [
+    "base",
+    "client",
+    "domain",
+    "enum_map",
+    "enum_map/enum_derive",
+    "server",
+]
 
-[package]
-name = "crustcrab"
-edition = "2024"
-default-run = "crustcrab"
+[workspace.dependencies]
+base = { path = "base" }
+bitfield = "0.20.0"
+bitflags = "2.13.2"
+bitvec = { version = "1.1.1", default-features = false }
+bon = "3.10.3"
+bytemuck = "1.25.2"
+clap = "4.6.7"
+client = { path = "client" }
+compact_str = "0.10.0"
+crossbeam-channel = "0.5.17"
+domain = { path = "domain" }
+enum_derive = { path = "enum_map/enum_derive" }
+enum_map = { path = "enum_map" }
+env_logger = "0.11.11"
+generic-array = "1.4.5"
+hashlink = "0.12.2"
+image = { version = "0.25.10", default-features = false }
+indexmap = "2.14.2"
+libc = "0.2.191"
+log = "0.4.34"
+nalgebra = "0.35.0"
+pollster = "1.0.1"
+postcard = { version = "1.1.3", default-features = false }
+proc-macro-crate = "3.5.0"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+rand = { version = "0.10.3", default-features = false }
+rayon = "1.12.0"
+rustc-hash = "2.1.3"
+serde = "1.0.229"
+server = { path = "server" }
+syn = "3.0.9"
+thiserror = "2.0.21"
+toml = { version = "1.1.8", default-features = false }
+uuid = "1.29.0"
+walkdir = "2.5.0"
+wgpu = "30.0.1"
+windows-sys = "0.61.2"
+winit = "0.31.0-beta.3"
+zstd = { version = "0.14.3", default-features = false }
 
 [profile.lto]
 inherits = "release"
@@ -13,40 +57,13 @@ lto = "fat"
 panic = "abort"
 strip = "symbols"
 
+[package]
+name = "crustcrab"
+edition = "2024"
+
 [dependencies]
-bitfield = "0.20.0"
-bitflags = { version = "2.13.2", features = ["serde"] }
-bitvec = { version = "1.1.1", default-features = false, features = ["serde"] }
-bon = "3.10.1"
-bytemuck = { version = "1.25.2", features = ["derive"] }
-clap = { version = "4.6.7", features = ["derive"] }
-crossbeam-channel = "0.5.17"
-env_logger = "0.11.11"
-generic-array = "1.4.5"
-hashlink = "0.12.2"
-image = "0.25.10"
-indexmap = { version = "2.14.2", features = ["rayon"] }
-log = "0.4.34"
-macros = { path = "macros" }
-nalgebra = { version = "0.35.0", features = ["bytemuck", "serde-serialize"] }
-noise = "0.9.0"
-pollster = "1.0.1"
-postcard = { version = "1.1.3", default-features = false }
-rand = { version = "0.10.3", default-features = false }
-rayon = "1.12.0"
-rc-box = { version = "1.3.0", default-features = false }
-rustc-hash = "2.1.3"
-serde = { version = "1.0.229", features = ["derive", "rc"] }
-thiserror = "2.0.21"
-toml = "1.1.6"
-uuid = { version = "1.26.1", features = ["fast-rng", "serde", "v4"] }
-walkdir = "2.5.0"
-wgpu = "30.0.1"
-winit = "0.31.0-beta.3"
-zstd = { version = "0.14.0", default-features = false }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2.190"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_System_Threading"] }
+base = { workspace = true }
+client = { workspace = true }
+crossbeam-channel = { workspace = true }
+env_logger = { workspace = true }
+server = { workspace = true }

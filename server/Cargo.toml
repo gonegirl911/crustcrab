@@ -1,0 +1,13 @@
+[package]
+name = "server"
+edition = "2024"
+
+[dependencies]
+base = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+crossbeam-channel = { workspace = true }
+domain = { workspace = true }
+enum_map = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+uuid = { workspace = true }

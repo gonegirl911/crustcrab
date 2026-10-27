@@ -1,0 +1,65 @@
+[player]
+fovy = 90.0
+sensitivity = 0.0025
+render_distance = 16
+
+[sky.day]
+color = [0.22, 0.5, 1.0]
+horizon_color = [0.37, 0.62, 1.0]
+glow_color = [1.0, 0.45, 0.0]
+arc_angle = 14.0
+sunlight_intensity = [1.0, 1.0, 1.0]
+
+[sky.night]
+color = [0.0, 0.0, 0.0]
+horizon_color = [0.02, 0.02, 0.03]
+glow_color = [1.0, 0.0, 0.0]
+arc_angle = 10.0
+sunlight_intensity = [0.1, 0.1, 0.25]
+
+[sky.star]
+size = 0.005
+brightness = 0.15
+count = 1500
+
+[sky.object]
+size = 0.1
+
+[sky.object.day]
+brightness = 15.0
+
+[sky.object.night]
+brightness = 1.0
+
+[cloud]
+size = [12, 4]
+drift_per_tick = 0.05
+altitude = 192
+
+[cloud.day]
+color = [1.0, 1.0, 1.0]
+opacity = 0.99
+
+[cloud.night]
+color = [0.06, 0.06, 0.1]
+opacity = 0.85
+
+[shading]
+side_factors = { x = 0.6, top = 1.0, bottom = 0.5, z = 0.8 }
+ao_factor_min = 0.0
+ao_factor_max = 0.8
+light_attenuation = 0.8
+
+[gui]
+base_unit = 0.03125
+min_size = 16.0
+
+[gui.crosshair]
+size = 1.0
+
+[gui.inventory]
+size = 3.6
+padding = 1.5
+
+[clock]
+error_decay_time_s = 0.125

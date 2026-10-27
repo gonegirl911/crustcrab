@@ -1,0 +1,19 @@
+[package]
+name = "domain"
+edition = "2024"
+
+[dependencies]
+base = { workspace = true }
+bitfield = { workspace = true }
+bitvec = { workspace = true }
+compact_str = { workspace = true, features = ["serde"] }
+crossbeam-channel = { workspace = true }
+enum_map = { workspace = true }
+log = { workspace = true }
+nalgebra = { workspace = true }
+postcard = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true, features = ["rc"] }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v4"] }
+zstd = { workspace = true }

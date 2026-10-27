@@ -1,0 +1,21 @@
+[package]
+name = "base"
+edition = "2024"
+
+[dependencies]
+bytemuck = { workspace = true, features = ["derive"] }
+crossbeam-channel = { workspace = true }
+enum_map = { workspace = true }
+hashlink = { workspace = true }
+indexmap = { workspace = true }
+nalgebra = { workspace = true, features = ["serde-serialize"] }
+rayon = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+toml = { workspace = true, features = ["parse", "serde"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true }

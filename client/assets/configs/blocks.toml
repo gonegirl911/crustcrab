@@ -1,0 +1,21 @@
+[air]
+model = "air"
+
+[sand]
+texture = "sand.png"
+
+[glowstone]
+texture = "glowstone.png"
+
+[glass_magenta]
+texture = "glass_magenta.png"
+render_layer = "blended"
+
+[glass_cyan]
+texture = "glass_cyan.png"
+render_layer = "blended"
+
+[dead_bush]
+model = "flower"
+texture = "dead_bush.png"
+render_layer = "cutout"

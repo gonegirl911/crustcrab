@@ -1,0 +1,27 @@
+[package]
+name = "client"
+edition = "2024"
+
+[dependencies]
+base = { workspace = true }
+bitfield = { workspace = true }
+bitflags = { workspace = true }
+bon = { workspace = true }
+bytemuck = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+compact_str = { workspace = true }
+crossbeam-channel = { workspace = true }
+domain = { workspace = true }
+env_logger = { workspace = true }
+enum_map = { workspace = true }
+image = { workspace = true, features = ["png"] }
+log = { workspace = true }
+nalgebra = { workspace = true, features = ["bytemuck"] }
+pollster = { workspace = true }
+rand = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+walkdir = { workspace = true }
+wgpu = { workspace = true }
+winit = { workspace = true }

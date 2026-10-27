@@ -1,0 +1,8 @@
+[package]
+name = "enum_map"
+edition = "2024"
+
+[dependencies]
+enum_derive = { workspace = true }
+generic-array = { workspace = true }
+serde = { workspace = true }
