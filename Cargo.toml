@@ -8,15 +8,15 @@ members = [
     "server",
 ]
 
-[workspace.lints.clippy]
-needless_bool = "allow"
-
 [profile.lto]
 inherits = "release"
 codegen-units = 1
 lto = "fat"
 panic = "abort"
 strip = "symbols"
+
+[workspace.lints.clippy]
+needless_bool = "allow"
 
 [workspace.dependencies]
 base = { path = "base" }

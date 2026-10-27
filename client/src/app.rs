@@ -290,11 +290,11 @@ impl State {
 impl event::Handler for State {
     type Context<'a> = &'a Sender<player::Event>;
 
-    #[rustfmt::skip]
     fn handle(&mut self, event: &Event, player_tx: Self::Context<'_>) {
         self.stopwatch.handle(event, ());
         self.window.handle(event, ());
-        self.surface.handle(event, (&*self.window.raw, &self.renderer));
+        self.surface
+            .handle(event, (&*self.window.raw, &self.renderer));
         self.game.handle(
             event,
             (player_tx, &self.stopwatch, &self.renderer, &self.surface),

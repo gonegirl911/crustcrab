@@ -10,8 +10,7 @@ use crate::{
 };
 use base::{
     color::{Rgb, Rgba},
-    math::interpolation::lerp,
-    math::quantize,
+    math::{interpolation::lerp, quantize},
 };
 use bytemuck::{Pod, Zeroable};
 use domain::game::world::block;
@@ -48,7 +47,11 @@ impl Shading {
     }
 
     #[rustfmt::skip]
-    pub(super) fn update(&mut self, renderer: &Renderer, &RenderTime { nightness, .. }: &RenderTime) {
+    pub(super) fn update(
+        &mut self,
+        renderer: &Renderer,
+        &RenderTime { nightness, .. }: &RenderTime,
+    ) {
         if self.uploaded_nightness.replace(nightness) != Some(nightness) {
             let table = LightTable::new(nightness);
             self.texture.write(renderer, bytemuck::cast_slice(table.as_slice()));
