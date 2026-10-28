@@ -62,12 +62,16 @@ impl Layer {
             renderer,
             MemoryState::Immutable(&Self::instances().collect::<Vec<_>>()),
         );
-        let (occupancy_width, occupancy_height, occupancy_data) = Self::occupancy();
+        let occupancy_image = load_rgba("client/assets/textures/clouds.png");
+        let occupancy_data = occupancy_image
+            .pixels()
+            .map(Pixel::alpha)
+            .collect::<Vec<_>>();
         let occupancy = DataTexture::builder()
             .renderer(renderer)
             .size(wgpu::Extent3d {
-                width: occupancy_width,
-                height: occupancy_height,
+                width: occupancy_image.width(),
+                height: occupancy_image.height(),
                 depth_or_array_layers: 1,
             })
             .dimension(wgpu::TextureDimension::D2)
@@ -199,14 +203,8 @@ impl Layer {
         let radius = (render_distance as u64 * Chunk::DIM as u64 / size_x) as i32;
         (-radius..=radius)
             .flat_map(move |dx| (-radius..=radius).map(move |dz| vector![dx, dz]))
-            .filter(move |&offset| magnitude_squared(offset) <= (radius as u128).pow(2))
+            .filter(move |offset| magnitude_squared(offset) <= (radius as u128).pow(2))
             .map(move |offset| Instance::new(offset.cast() * size_x as i64))
-    }
-
-    fn occupancy() -> (u32, u32, Vec<u8>) {
-        let image = load_rgba("client/assets/textures/clouds.png");
-        let data = image.pixels().map(Pixel::alpha).collect();
-        (image.width(), image.height(), data)
     }
 }
 
