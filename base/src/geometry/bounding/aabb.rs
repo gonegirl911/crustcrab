@@ -14,15 +14,15 @@ impl<const D: usize> Aabb<D> {
     }
 
     fn from_corners(a: Position<D>, b: Position<D>) -> Self {
-        let (min, max) = a.inf_sup(b);
+        let (min, max) = a.inf_sup(&b);
         Self { min, max }
     }
 
-    pub fn relative_to<P: Into<Position<D>>>(self, anchor: P) -> LocalAabb<D> {
+    pub fn relative_to<P: Into<Position<D>>>(&self, anchor: P) -> LocalAabb<D> {
         let anchor = anchor.into();
         LocalAabb {
-            min: self.min.displacement_from(anchor).into(),
-            max: self.max.displacement_from(anchor).into(),
+            min: self.min.relative_to(anchor),
+            max: self.max.relative_to(anchor),
         }
     }
 }

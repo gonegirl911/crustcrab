@@ -276,19 +276,15 @@ impl Immediates {
     ) -> Self {
         let size = CONFIG.cloud.size;
         let period = size.x as i64 * occupancy_width as i64;
-        let scroll_x = -(time_position * CONFIG.cloud.drift_per_tick)
-            .rem_euclid(period)
-            .displacement_from(0);
+        let scroll_x = -(time_position * CONFIG.cloud.drift_per_tick).wrapped_into(period);
         let camera_xz = origin.xz() - vector![scroll_x, 0.0];
-        let phase = camera_xz
-            .rem_euclid(Vector2::repeat(period))
-            .displacement_from(Point2::origin());
-        let altitude = -origin.y().displacement_from(CONFIG.cloud.altitude);
+        let phase = camera_xz.wrapped_into(&vector![period, period]);
+        let altitude = -origin.y().relative_to(CONFIG.cloud.altitude);
         Self {
             occupancy_dims: point![occupancy_width, occupancy_height].cast(),
             size: size.cast(),
             color: CONFIG.cloud.color(nightness).into(),
-            phase,
+            phase: phase.coords,
             altitude,
             padding: Default::default(),
         }

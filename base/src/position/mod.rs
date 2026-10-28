@@ -8,7 +8,7 @@ use nalgebra::{Point, SVector};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     mem,
-    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
+    ops::{Add, AddAssign, Deref, DerefMut, Sub},
 };
 
 #[derive(Clone, Copy, Serialize)]
@@ -22,18 +22,11 @@ impl<const D: usize> Position<D> {
         FractMut(self)
     }
 
-    pub fn rem_euclid(mut self, rhs: SVector<i64, D>) -> Self {
+    pub(crate) fn inf_sup(&self, other: &Self) -> (Position<D>, Position<D>) {
+        let mut inf = *self;
+        let mut sup = *other;
         for i in 0..D {
-            self.coords[i] = self.coords[i].rem_euclid(rhs[i]);
-        }
-        self
-    }
-
-    pub(crate) fn inf_sup(self, other: Self) -> (Position<D>, Position<D>) {
-        let mut inf = self;
-        let mut sup = other;
-        for i in 0..D {
-            if (&inf.coords[i], &inf.fract[i]) > (&sup.coords[i], &sup.fract[i]) {
+            if (inf.coords[i], inf.fract[i]) > (sup.coords[i], sup.fract[i]) {
                 mem::swap(&mut inf.coords[i], &mut sup.coords[i]);
                 mem::swap(&mut inf.fract[i], &mut sup.fract[i]);
             }
@@ -41,10 +34,19 @@ impl<const D: usize> Position<D> {
         (inf, sup)
     }
 
-    pub fn displacement_from<P: Into<Self>>(&self, anchor: P) -> SVector<f32, D> {
+    pub fn relative_to<P: Into<Self>>(&self, anchor: P) -> Point<f32, D> {
         let anchor = anchor.into();
         let coords = self.coords - anchor.coords;
         let fract = self.fract - anchor.fract;
+        (coords.cast() + fract).into()
+    }
+
+    pub fn wrapped_into(&self, period: &SVector<i64, D>) -> Point<f32, D> {
+        let mut coords = self.coords;
+        let fract = &self.fract;
+        for i in 0..D {
+            coords[i] = coords[i].rem_euclid(period[i]);
+        }
         coords.cast() + fract
     }
 
@@ -61,6 +63,12 @@ impl<const D: usize> Default for Position<D> {
             coords: Point::origin(),
             fract: SVector::zeros(),
         }
+    }
+}
+
+impl<const D: usize> From<&Position<D>> for Position<D> {
+    fn from(position: &Position<D>) -> Self {
+        *position
     }
 }
 
@@ -115,14 +123,8 @@ impl<const D: usize> Sub<SVector<i64, D>> for Position<D> {
     type Output = Self;
 
     fn sub(mut self, rhs: SVector<i64, D>) -> Self::Output {
-        self -= rhs;
-        self
-    }
-}
-
-impl<const D: usize> SubAssign<SVector<i64, D>> for Position<D> {
-    fn sub_assign(&mut self, rhs: SVector<i64, D>) {
         self.coords -= rhs;
+        self
     }
 }
 
@@ -130,14 +132,8 @@ impl<const D: usize> Sub<SVector<f32, D>> for Position<D> {
     type Output = Self;
 
     fn sub(mut self, rhs: SVector<f32, D>) -> Self::Output {
-        self -= rhs;
-        self
-    }
-}
-
-impl<const D: usize> SubAssign<SVector<f32, D>> for Position<D> {
-    fn sub_assign(&mut self, rhs: SVector<f32, D>) {
         *self.fract_mut() -= rhs;
+        self
     }
 }
 

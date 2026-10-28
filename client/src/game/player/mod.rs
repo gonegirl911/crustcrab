@@ -57,7 +57,7 @@ impl Player {
     pub(super) fn render_camera(&self) -> RenderCamera {
         let origin = self.view.origin;
         let anchor = self.anchor();
-        let local = origin.displacement_from(anchor).into();
+        let local = origin.relative_to(anchor);
         let frustum = self.frustum();
         RenderCamera {
             origin,
@@ -156,7 +156,7 @@ impl event::Handler for Player {
                         renderer,
                         &UniformData::new(
                             self.projection.mat() * self.view.mat(),
-                            self.view.origin.displacement_from(self.anchor()).into(),
+                            self.view.origin.relative_to(self.anchor()),
                             self.view.forward,
                             self.projection.znear,
                             self.projection.zfar,

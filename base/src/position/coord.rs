@@ -1,17 +1,17 @@
 use super::Position1;
 use nalgebra::{point, vector};
-use std::ops::{AddAssign, Mul, MulAssign};
+use std::ops::{AddAssign, Mul};
 
 #[derive(Clone, Copy, Default)]
 pub struct Coord(Position1);
 
 impl Coord {
-    pub fn rem_euclid(self, rhs: i64) -> Self {
-        Self(self.0.rem_euclid(vector![rhs]))
+    pub fn relative_to<C: Into<Self>>(self, anchor: C) -> f32 {
+        self.0.relative_to(anchor.into().0)[0]
     }
 
-    pub fn displacement_from<C: Into<Self>>(self, anchor: C) -> f32 {
-        self.0.displacement_from(anchor.into().0)[0]
+    pub fn wrapped_into(self, period: i64) -> f32 {
+        self.0.wrapped_into(&vector![period])[0]
     }
 }
 
@@ -37,13 +37,7 @@ impl Mul<f32> for Coord {
     type Output = Self;
 
     fn mul(mut self, rhs: f32) -> Self::Output {
-        self *= rhs;
-        self
-    }
-}
-
-impl MulAssign<f32> for Coord {
-    fn mul_assign(&mut self, rhs: f32) {
         *self.0.fract_mut() *= rhs;
+        self
     }
 }

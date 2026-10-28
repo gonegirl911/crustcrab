@@ -30,8 +30,8 @@ impl Clock {
     }
 
     fn synchronize(&mut self, ticks: u16) {
-        let position = self.position.rem_euclid(self.cycle.ticks_per_day as i64);
-        let difference = position.displacement_from(ticks as i64);
+        let position = self.position.wrapped_into(self.cycle.ticks_per_day as i64);
+        let difference = position - ticks as f32;
         let period = self.cycle.ticks_per_day as f32;
         let error = wrap(difference, -period * 0.5, period * 0.5);
         self.sync_error.value = Some(error);
@@ -90,9 +90,7 @@ pub(super) struct RenderTime {
 
 impl RenderTime {
     fn new(cycle: DayCycle, position: Coord) -> Self {
-        let ticks = position
-            .rem_euclid(cycle.ticks_per_day as i64)
-            .displacement_from(0);
+        let ticks = position.wrapped_into(cycle.ticks_per_day as i64);
         let nightness = Self::nightness(cycle, ticks);
         Self {
             cycle,

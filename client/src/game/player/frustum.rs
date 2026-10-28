@@ -50,7 +50,7 @@ trait Cullable {
 
 impl Cullable for bounding::Sphere {
     fn is_visible(&self, frustum: &Frustum) -> bool {
-        let v = self.center.displacement_from(frustum.origin);
+        let v = self.center.relative_to(frustum.origin).coords;
 
         let az = v.dot(&frustum.forward);
         if !(frustum.znear - self.radius..=frustum.zfar + self.radius).contains(&az) {
