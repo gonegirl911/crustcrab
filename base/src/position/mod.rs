@@ -5,11 +5,12 @@ mod swizzle;
 pub use alias::*;
 
 use nalgebra::{Point, SVector};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use std::{
     mem,
     ops::{Add, AddAssign, Deref, DerefMut, Sub},
 };
+use thiserror::Error;
 
 #[derive(Clone, Copy, Serialize)]
 pub struct Position<const D: usize> {
@@ -18,6 +19,8 @@ pub struct Position<const D: usize> {
 }
 
 impl<const D: usize> Position<D> {
+    const FRACT_COMPONENT_MAX: f32 = 1.0f32.next_down();
+
     fn fract_mut(&mut self) -> FractMut<'_, D> {
         FractMut(self)
     }
@@ -50,10 +53,24 @@ impl<const D: usize> Position<D> {
         coords.cast() + fract
     }
 
-    fn renormalize(&mut self) {
-        let whole = self.fract.map(f32::floor);
-        self.coords += whole.map(|c| c as i64);
-        self.fract = (self.fract - whole).map(|c| c.min(1.0f32.next_down()));
+    fn normalize(&mut self) {
+        for i in 0..D {
+            let whole = self.fract[i].floor();
+            self.coords[i] += whole as i64;
+            self.fract[i] = (self.fract[i] - whole).min(Self::FRACT_COMPONENT_MAX);
+        }
+    }
+
+    #[rustfmt::skip]
+    fn checked_normalize(&mut self) -> Result<(), NormalizeError> {
+        let mut normalized = *self;
+        for i in 0..D {
+            let whole = self.fract[i].floor().to_int_checked().ok_or(NormalizeError)?;
+            normalized.coords[i] = self.coords[i].checked_add(whole).ok_or(NormalizeError)?;
+            normalized.fract[i] = (self.fract[i] - whole as f32).min(Self::FRACT_COMPONENT_MAX);
+        }
+        *self = normalized;
+        Ok(())
     }
 }
 
@@ -92,15 +109,19 @@ impl<'de, const D: usize> Deserialize<'de> for Position<D> {
             fract: SVector<f32, D>,
         }
 
-        impl<const D: usize> From<Raw<D>> for Position<D> {
-            fn from(Raw { coords, fract }: Raw<D>) -> Self {
+        impl<const D: usize> TryFrom<Raw<D>> for Position<D> {
+            type Error = NormalizeError;
+
+            fn try_from(Raw { coords, fract }: Raw<D>) -> Result<Self, Self::Error> {
                 let mut value = Self { coords, fract };
-                value.renormalize();
-                value
+                value.checked_normalize()?;
+                Ok(value)
             }
         }
 
-        Raw::deserialize(deserializer).map(Into::into)
+        Raw::deserialize(deserializer)?
+            .try_into()
+            .map_err(de::Error::custom)
     }
 }
 
@@ -155,6 +176,10 @@ impl<const D: usize> DerefMut for FractMut<'_, D> {
 
 impl<const D: usize> Drop for FractMut<'_, D> {
     fn drop(&mut self) {
-        self.0.renormalize();
+        self.0.normalize();
     }
 }
+
+#[derive(Debug, Error)]
+#[error("position cannot be normalized")]
+struct NormalizeError;

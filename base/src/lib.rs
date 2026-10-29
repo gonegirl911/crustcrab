@@ -1,4 +1,4 @@
-#![feature(mut_restriction)]
+#![feature(float_conversions, mut_restriction)]
 
 pub mod collections;
 pub mod color;
