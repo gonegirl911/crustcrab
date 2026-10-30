@@ -62,9 +62,9 @@ impl<T: Pod> Buffer<[T]> {
                     contents: bytemuck::cast_slice(data),
                     usage,
                 }),
-                MemoryState::Uninit(len) => device.create_buffer(&wgpu::BufferDescriptor {
+                MemoryState::Uninit(_) => device.create_buffer(&wgpu::BufferDescriptor {
                     label: None,
-                    size: (len * size_of::<T>()) as u64,
+                    size: size as u64,
                     usage: usage | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 }),

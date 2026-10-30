@@ -172,11 +172,11 @@ impl ImageTextureArray {
     {
         let mut textures = textures.into_iter().peekable();
         let format = textures.peek().unwrap().format();
-        let mip_generator = mip::Generator::new(renderer, format);
+        let generator = mip::Generator::new(renderer, format);
 
         let mut encoder = device.create_command_encoder(&Default::default());
         for texture in textures {
-            mip_generator.generate(renderer, &mut encoder, texture);
+            generator.generate(renderer, &mut encoder, texture);
         }
         queue.submit([encoder.finish()]);
     }

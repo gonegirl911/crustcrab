@@ -13,8 +13,8 @@ pub(super) struct Output(Blit);
 impl Output {
     pub(super) fn new(
         renderer: &Renderer,
-        input_bind_group_layout: &wgpu::BindGroupLayout,
         surface: &Surface,
+        input_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let format = surface.config.format;
         let operation = if format.is_srgb() {
@@ -50,7 +50,7 @@ impl event::Handler for Output {
 
     fn handle(&mut self, _: &event::Event, (renderer, surface): Self::Context<'_>) {
         if surface.is_reformatted() {
-            *self = Self::new(renderer, &self.0.get_bind_group_layout(0), surface);
+            *self = Self::new(renderer, surface, &self.0.get_bind_group_layout(0));
         }
     }
 }

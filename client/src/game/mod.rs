@@ -45,7 +45,7 @@ pub(super) struct Game {
 impl Game {
     pub(super) fn new(renderer: &Renderer, surface: &Surface) -> Self {
         let post_processor = PostProcessor::new(renderer, surface);
-        let output = Output::new(renderer, post_processor.bind_group_layout(), surface);
+        let output = Output::new(renderer, surface, post_processor.bind_group_layout());
         let depth_texture = DepthTexture::new(renderer, surface);
         let shading = Shading::new(renderer);
         let clock = Default::default();
