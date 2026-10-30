@@ -45,7 +45,7 @@ pub fn connect(
         let event_stream = event_stream.clone();
         move || {
             let mut player_writer = BufWriter::new(&*event_stream);
-            let mut buf = Vec::new();
+            let mut buf = vec![];
             for event in player_rx {
                 match codec::send(&mut player_writer, &event, &mut buf) {
                     Ok(()) => {}
@@ -73,7 +73,7 @@ pub fn connect(
         let disconnect_tx = disconnect_tx.clone();
         move || {
             let mut control_reader = BufReader::new(&*event_stream);
-            let mut buf = Vec::new();
+            let mut buf = vec![];
             let disconnect_reason = loop {
                 let event = match codec::recv(&mut control_reader, &mut buf) {
                     Ok(event) => event,
@@ -109,7 +109,7 @@ pub fn connect(
 
     thread::spawn(move || {
         let mut chunk_reader = BufReader::new(&*chunk_stream);
-        let mut buf = Vec::new();
+        let mut buf = vec![];
         let disconnect_reason = loop {
             match codec::recv(&mut chunk_reader, &mut buf) {
                 Ok(event) => {

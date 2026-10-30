@@ -62,7 +62,7 @@ where
                     thread::spawn({
                         let arrive_tx = arrive_tx.clone();
                         move || {
-                            let mut buf = Vec::new();
+                            let mut buf = vec![];
                             match codec::recv(&mut stream, &mut buf) {
                                 Ok(Attach { token }) => {
                                     info!("[{addr}] attach {token}");
@@ -92,7 +92,7 @@ where
 
     thread::spawn(move || {
         let mut rendezvous = Rendezvous::<R, (TcpStream, SocketAddr)>::default();
-        let mut buf = Vec::new();
+        let mut buf = vec![];
         loop {
             let arrival = match rendezvous.next_deadline() {
                 Some(deadline) => arrive_rx.recv_deadline(deadline),
@@ -152,7 +152,7 @@ where
 pub fn connect<const N: usize>(addrs: [SocketAddr; N]) -> [TcpStream; N] {
     let mut streams = Vec::with_capacity(N);
     let token = Uuid::new_v4();
-    let mut buf = Vec::new();
+    let mut buf = vec![];
 
     for addr in &addrs {
         let mut stream = match TcpStream::connect(addr) {

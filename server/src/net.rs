@@ -67,7 +67,7 @@ pub fn listen(
                 let event_stream = event_stream.clone();
                 move || {
                     let mut player_reader = BufReader::new(&*event_stream);
-                    let mut buf = Vec::new();
+                    let mut buf = vec![];
                     loop {
                         match codec::recv(&mut player_reader, &mut buf) {
                             Ok(event) => {
@@ -100,7 +100,7 @@ pub fn listen(
                 let event_stream = event_stream.clone();
                 move || {
                     let mut control_writer = BufWriter::new(&*event_stream);
-                    let mut buf = Vec::new();
+                    let mut buf = vec![];
                     for event in control_rx {
                         if let Err(e) = codec::send(&mut control_writer, &event, &mut buf) {
                             if let codec::Error::Io(e) = &e
@@ -129,7 +129,7 @@ pub fn listen(
 
             thread::spawn(move || {
                 let mut chunk_writer = BufWriter::new(chunk_stream);
-                let mut buf = Vec::new();
+                let mut buf = vec![];
                 for event in chunk_rx {
                     if let Err(e) = codec::send(&mut chunk_writer, &event, &mut buf) {
                         if let codec::Error::Io(e) = &e
