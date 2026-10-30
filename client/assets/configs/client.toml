@@ -62,4 +62,4 @@ size = 3.6
 padding = 1.5
 
 [clock]
-error_decay_time_s = 0.125
+sync_error_decay_time_s = 0.125

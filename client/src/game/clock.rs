@@ -45,7 +45,7 @@ impl Clock {
 
     fn decay_sync_error(&mut self, dt_s: f32) -> f32 {
         let prev = self.sync_error.value.unwrap_or(0.0);
-        let decay_time_s = CONFIG.clock.error_decay_time_s;
+        let decay_time_s = CONFIG.clock.sync_error_decay_time_s;
         let decay_amount = dt_s / decay_time_s.max(f32::MIN_POSITIVE);
         let weight = Weight::from_exponential_decay(decay_amount);
         let cur = self.sync_error.smooth(0.0, weight);
@@ -134,5 +134,5 @@ impl RenderTime {
 
 #[derive(Deserialize)]
 pub(crate) struct Config {
-    error_decay_time_s: f32,
+    sync_error_decay_time_s: f32,
 }
