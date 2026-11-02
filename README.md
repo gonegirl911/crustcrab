@@ -3,7 +3,7 @@
 For a quick and dirty build, run:
 
 ```sh
-cargo run --release
+RUST_LOG='crustcrab=info' cargo run --release
 ```
 
 For a much faster and smaller binary at the cost of compilation speed, run:
