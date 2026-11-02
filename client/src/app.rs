@@ -123,7 +123,7 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _: WindowId, event: WindowEvent) {
         let redraw_requested = matches!(event, WindowEvent::RedrawRequested);
-        let focused_lost = matches!(event, WindowEvent::Focused(false));
+        let focus_lost = matches!(event, WindowEvent::Focused(false));
         let close_requested = matches!(event, WindowEvent::CloseRequested);
 
         if redraw_requested {
@@ -137,7 +137,7 @@ impl ApplicationHandler for App {
 
         let state = self.state.as_mut().unwrap();
 
-        if focused_lost {
+        if focus_lost {
             state.handle(&Event::InputInvalidated, &self.player_tx);
         }
 
